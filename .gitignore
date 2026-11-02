@@ -1,0 +1,17 @@
+# --- Pharo runtime -----------------------------------------------------------
+# The VM + image live here. They are large (~60 MB) and fully regenerable with
+# bootstrap-pharo.bat, so they do not belong in history.
+/pharo/
+
+# Loose Pharo image artifacts, in case any ever land outside /pharo/.
+*.image
+*.changes
+*.sources
+
+# --- Editor / tooling --------------------------------------------------------
+/.vscode/
+
+# --- OS cruft ----------------------------------------------------------------
+Thumbs.db
+Desktop.ini
+.DS_Store
