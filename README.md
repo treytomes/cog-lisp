@@ -26,7 +26,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 0 | Foundation & feasibility | ✅ **done** |
 | 1 | Reader & printer | ✅ **done** — [spec](specs/phase-1-reader-printer.md), 77/77 |
 | 2 | Core data model | ✅ **done** — [spec](specs/phase-2-core-data-model.md), 49/49 |
-| 3 | Compiler core | ⬜ |
+| 3 | Compiler core | 📋 [spec accepted](specs/phase-3-compiler-core.md) |
 | 4 | Runtime & primitives | ⬜ |
 | 5 | REPL & image integration | ⬜ |
 | 6 | Optimization & native depth | ⬜ |

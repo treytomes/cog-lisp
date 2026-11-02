@@ -4,3 +4,4 @@
 
 - [North star vision](north-star-vision.md) — cog-lisp as a living Smalltalk-like world, eventually a body for an AI agent to grow in.
 - [Phase 2 env-model decision](phase-2-env-model-decision.md) — lexical+global (locals→temps, closures→BlockClosures); why, and the escape hatch.
+- [Lean on Pharo](lean-on-pharo.md) — design tenet: reuse Pharo's machinery (VM, blocks, Opal, image) rather than reinvent it.
