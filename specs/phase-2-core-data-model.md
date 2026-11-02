@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 2 |
-| **Status** | Accepted (2026-11-02) |
+| **Status** | Implemented (2026-11-02) — `tests/phase-2-core.st` passes 49/49 |
 | **Depends on** | Phase 1 (reader & printer) |
 | **Feeds** | Phase 3 (compiler), Phase 4 (runtime & primitives) |
 | **Variable model** | Lexical + global table (locals compile to Smalltalk temps; one runtime global environment) |

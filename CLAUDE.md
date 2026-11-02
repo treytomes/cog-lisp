@@ -51,6 +51,12 @@ and prints its `printString`.
 - **Print with `Stdio stdout`, not `Transcript`.** The headless Transcript is a
   `StThreadSafeTranscript` that does **not** understand `showln:`. Use:
   `Stdio stdout nextPutAll: aString; nextPut: Character lf; flush`.
+- **A `.st` run via `st` is read as chunk format: double every literal `!` to
+  `!!`.** A lone `!` is a chunk terminator, even inside a `'string'` or a
+  `"comment"`; an un-doubled one splits the chunk mid-token (e.g. the symbol
+  `set!` or a label containing it). The chunk reader turns `!!` back into `!`.
+  Source files (`src/*.st`) that contain no `!` are unaffected; test files that
+  mention `set!` are the usual place this bites.
 - **A hung VM is killed with `taskkill /IM PharoConsole.exe /F`.** Never kill
   `Pharo.exe` — that is the user's interactive GUI image.
 - **Two processes may read the same `.image` file** as long as neither saves;
