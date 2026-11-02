@@ -65,6 +65,37 @@ and prints its `printString`.
   and must not depend on image state from a previous run (the image is never
   saved).
 
+## Verified Opal AST API (Pharo 14) — for the Phase 3 compiler
+
+Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
+
+- Parser is **`OCParser`**; AST nodes are **`OC*`** (`OCMethodNode`,
+  `OCMessageNode`, `OCLiteralValueNode`, `OCVariableNode`, `OCReturnNode`,
+  `OCSequenceNode`, `OCBlockNode`, `OCAssignmentNode`). `RB*` names are the same
+  classes.
+- **Compile:** `aMethodNode doSemanticAnalysis.` then `aMethodNode generateMethod`
+  → a `CompiledMethod`; run with `valueWithReceiver: nil arguments: #()`.
+  (`compiledMethod` alone returns nil without semantic analysis first.)
+- **Constructors that work:** `OCLiteralValueNode value:`,
+  `OCReturnNode value:`, `OCSequenceNode statements:` /
+  `temporaries:statements:`, `OCMethodNode selector:arguments:body:`,
+  `OCBlockNode arguments:body:`, `OCVariableNode named:` (resolves globals and,
+  by name, block/method args), `OCAssignmentNode variable:value:`.
+- **Message nodes: do NOT use `OCMessageNode receiver:selector:arguments:`** (nor
+  the `selector:` setter, nor `RBMessageNode`): they send `#parent:` to the
+  selector Symbol and fail. Instead **template-splice**: parse a well-formed
+  skeleton for the selector (e.g. `OCParser parseExpression: '0 + 0'`, or
+  `'0 value: 0 value: 0'`), then `m receiver: recvNode. m arguments: argNodes`.
+- Closure capture is automatic: nested `OCBlockNode`s whose bodies reference an
+  outer block's argument name compile to a real capturing `BlockClosure`.
+- **Block/method arguments are read-only** — assigning one fails semantic
+  analysis ("Assignment to read-only variable"). To make a LISP local mutable by
+  `set!`, bind it to a **temporary** initialized from the argument
+  (`[:arg | | local | local := arg. … ]`) and reference the temp. The Phase 3
+  compiler does this for every lambda parameter.
+- Reminder: `src/*.st` files are filed in as chunk format, so a literal `!`
+  (e.g. in `'set!'`) must be doubled to `!!` in the source too.
+
 ## Verified Opal / IRBuilder API (Pharo 14, build 788)
 
 Memory of this API is unreliable across versions — these were confirmed live:

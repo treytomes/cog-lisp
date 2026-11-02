@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 3 |
-| **Status** | Accepted (2026-11-02) |
+| **Status** | Implemented (2026-11-02) — `tests/phase-3-compiler.st` passes 31/31 |
 | **Depends on** | Phase 1 (reader), Phase 2 (core data model) |
 | **Feeds** | Phase 4 (runtime & primitives), Phase 5 (REPL), Phase 8 (self-hosting) |
 | **Codegen** | LISP → Smalltalk AST → Opal compiler → `CompiledMethod` |
@@ -107,6 +107,10 @@ Smalltalk variable name**. There is **no runtime environment object for locals**
 - Because nested `lambda`s compile to nested Smalltalk blocks using these
   synthetic names, **Opal performs closure capture for us** — a captured local is
   just a Smalltalk block closing over an outer temp.
+- Smalltalk block **arguments are read-only**, so a local that `set!` may mutate
+  cannot be the argument itself. Each lambda parameter is therefore bound to a
+  mutable **temporary** initialized from the argument (`[:arg | | v | v := arg.
+  … ]`); references and `set!` use the temporary.
 
 ## 7. Form-by-form translation
 
@@ -146,13 +150,13 @@ Package `CogLisp-Compiler`.
 LispCompiler new
     compile: aSexpr            "=> a zero-arg CompiledMethod (the thunk)"
     eval: aSexpr               "=> compile and run; returns the value"
-    eval: aSexpr in: anEnv     "=> evaluate against a specific global environment"
     evalString: aString        "=> read one datum and eval it"
     evalAll: aString           "=> read all top-level data, eval in order, return the last"
 ```
 
-The default global environment is `LispEnvironment default`; `eval:in:` lets a
-caller (REPL, tests) supply its own.
+Phase 3 compiles against `LispEnvironment default`. A per-call environment
+(`eval:in:`) is deferred to Phase 5 (REPL), where supplying an explicit
+environment becomes useful.
 
 ## 9. Errors
 
