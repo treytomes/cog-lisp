@@ -24,13 +24,14 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | Phase | Name | State |
 |------:|------|-------|
 | 0 | Foundation & feasibility | ✅ **done** |
-| 1 | Reader & printer | ⬜ next |
+| 1 | Reader & printer | 📋 [spec accepted](specs/phase-1-reader-printer.md) |
 | 2 | Core data model | ⬜ |
 | 3 | Compiler core | ⬜ |
 | 4 | Runtime & primitives | ⬜ |
 | 5 | REPL & image integration | ⬜ |
 | 6 | Optimization & native depth | ⬜ |
 | 7 | Language reach (stretch) | ⬜ |
+| 8 | Self-hosting (meta-circular) | ⬜ |
 
 Phase 0 is proven, not just planned: [`poc/answer.st`](poc/answer.st) builds
 three `CompiledMethod`s directly from Opal IR — a constant, a two-argument add,
@@ -59,10 +60,10 @@ Headless conventions and the verified Opal API are documented in
 ## Project plan
 
 Development is **spec-driven**: each phase is broken into specification documents
-under `specs/`, every spec carries explicit **acceptance criteria**, and each
-criterion is a headless script that prints `PASS`/`FAIL` (the `poc/answer.st`
+under [`specs/`](specs/), every spec carries explicit **acceptance criteria**, and
+each criterion is a headless script that prints `PASS`/`FAIL` (the `poc/answer.st`
 pattern). Code follows the spec; when reality disagrees, the spec is corrected
-first.
+first. See [`specs/README.md`](specs/README.md) for the workflow and index.
 
 ### Phase 0 — Foundation & feasibility ✅
 Stand up the VM and image; prove the compile-to-`CompiledMethod` pathway end to
@@ -126,3 +127,17 @@ Go deeper into the VM where it pays.
 - Macros (compile-time expansion), a richer numeric tower, a condition/restart
   error system, and two-way interop with Smalltalk objects.
 - *Acceptance:* defined per sub-feature spec when the phase is reached.
+
+### Phase 8 — Self-hosting (meta-circular)
+Reimplement cog-lisp **in cog-lisp**: rewrite the reader and the compiler — the
+latter emitting the same `CompiledMethod`s through a LISP-level interface to the
+Opal IR — in the language itself, bootstrapped by the Smalltalk-hosted
+implementation of Phases 1–4 (and macros from Phase 7).
+- The Smalltalk-hosted compiler compiles the cog-lisp-written compiler once; from
+  then on the system compiles its own source.
+- This is the real proof the language is complete: it can express its own
+  front end and code generator.
+- *Acceptance:* the self-hosted reader and compiler reproduce the Smalltalk-hosted
+  implementation's output on the Phase 1–4 corpora, **and** the compiler compiles
+  itself to a fixpoint (the compiler built by stage 2 produces byte-identical
+  output to the one built by stage 3).
