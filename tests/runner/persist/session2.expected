@@ -1,0 +1,3 @@
+49
+(define (sq n) ; square it
+  (* n n))

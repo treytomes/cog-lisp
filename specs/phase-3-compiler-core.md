@@ -14,6 +14,12 @@
 > application compiles to `LispProcedure apply: f to: {args}` rather than
 > arity-selected `value:` sends. Everything else here stands. The Phase 3 suite
 > was updated accordingly (AC-11 now asserts `LispProcedure`) and still passes.
+>
+> **Also revised by [Phase 5](phase-5-repl-runner.md) (unspecified value).** The
+> "unspecified" placeholder is now `LispUnspecified default`, not the empty list:
+> it is what `define`, `set!`, and a one-armed `if` whose test is false evaluate
+> to. AC-7 was updated to match. Phase 5 also makes every compiled `lambda` keep
+> its source text.
 
 ## 1. Goal
 

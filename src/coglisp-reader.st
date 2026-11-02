@@ -11,7 +11,7 @@
  Classes: LispCons, LispSymbol, LispEmptyList, LispReadError, LispReader,
  LispPrinter.
  ============================================================================"
-| failures cm cons sym empty err rdr prn |
+| failures cm cons sym empty unspec err rdr prn |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -22,8 +22,9 @@ cm := [:cls :cat :src |
 cons  := (Object << #LispCons) slots: { #car. #cdr }; package: 'CogLisp-Reader'; install.
 sym   := (Object << #LispSymbol) slots: { #name }; sharedVariables: { #Interned }; package: 'CogLisp-Reader'; install.
 empty := (Object << #LispEmptyList) sharedVariables: { #Default }; package: 'CogLisp-Reader'; install.
-err   := (Error  << #LispReadError) slots: { #position }; package: 'CogLisp-Reader'; install.
-rdr   := (Object << #LispReader) slots: { #stream }; sharedVariables: { #Eof }; package: 'CogLisp-Reader'; install.
+unspec := (Object << #LispUnspecified) sharedVariables: { #Default }; package: 'CogLisp-Reader'; install.
+err   := (Error  << #LispReadError) slots: { #position. #incomplete }; package: 'CogLisp-Reader'; install.
+rdr   := (Object << #LispReader) slots: { #stream. #source. #ranges }; sharedVariables: { #Eof }; package: 'CogLisp-Reader'; install.
 prn   := (Object << #LispPrinter) package: 'CogLisp-Reader'; install.
 
 "=== LispCons =============================================================="
@@ -88,17 +89,37 @@ cm value: empty class value: 'accessing' value: 'default
 	Default isNil ifTrue: [Default := self basicNew].
 	^ Default'.
 
+"=== LispUnspecified (Phase 5 section 5.1) ================================="
+cm value: unspec value: 'printing' value: 'printOn: aStream
+	aStream nextPutAll: ''#<unspecified>'''.
+cm value: unspec class value: 'accessing' value: 'default
+	Default isNil ifTrue: [Default := self basicNew].
+	^ Default'.
+
 "=== LispReadError ========================================================="
 cm value: err value: 'accessing' value: 'position
 	^ position'.
 cm value: err value: 'accessing' value: 'position: anInteger
 	position := anInteger'.
+cm value: err value: 'accessing' value: 'incomplete: aBoolean
+	incomplete := aBoolean'.
+cm value: err value: 'testing' value: 'isIncomplete
+	"True when the error happened because the input ran out, so more input could complete it."
+	^ incomplete == true'.
 
 "=== LispReader ============================================================"
-cm value: rdr value: 'private' value: 'setStream: aStream
-	stream := aStream'.
+cm value: rdr value: 'private' value: 'setStream: aStream source: aString
+	stream := aStream.
+	source := aString.
+	ranges := IdentityDictionary new'.
+cm value: rdr value: 'source' value: 'sourceFor: aCons
+	"The exact source text a list was read from, or nil (Phase 5 section 5.2)."
+	| range |
+	source isNil ifTrue: [^ nil].
+	range := ranges at: aCons ifAbsent: [^ nil].
+	^ source copyFrom: range key to: range value'.
 cm value: rdr value: 'error handling' value: 'signalError: aString
-	^ (LispReadError new) position: stream position; signal: aString'.
+	^ (LispReadError new) position: stream position; incomplete: stream atEnd; signal: aString'.
 cm value: rdr value: 'scanning' value: 'isDelimiter: aChar
 	^ aChar isSeparator or: [#($( $) $" $; $'') includes: aChar]'.
 cm value: rdr value: 'reading' value: 'next
@@ -169,6 +190,12 @@ cm value: rdr value: 'reading' value: 'readQuote
 		car: (LispSymbol named: ''quote'')
 		cdr: (LispCons car: self readNextDatum cdr: LispEmptyList default)'.
 cm value: rdr value: 'reading' value: 'readList
+	| start result |
+	start := stream position.
+	result := self readListBody.
+	(result isKindOf: LispCons) ifTrue: [ranges at: result put: (start + 1) -> stream position].
+	^ result'.
+cm value: rdr value: 'reading' value: 'readListBody
 	| elements tail |
 	stream next.
 	elements := OrderedCollection new.
@@ -312,18 +339,20 @@ cm value: rdr value: 'reading' value: 'decodeCharacter: aName
 	((aName first = $x or: [aName first = $X]) and: [aName size > 1])
 		ifTrue: [^ Character value: (Integer readFrom: aName allButFirst readStream base: 16)].
 	^ self signalError: ''unknown character name''.'.
+cm value: rdr value: 'reading' value: 'readSingle
+	| d |
+	d := self next.
+	d == self class eofObject ifTrue: [^ (LispReadError new) incomplete: true; signal: ''read: empty input''].
+	self next == self class eofObject ifFalse: [^ (LispReadError new) signal: ''read: more than one datum''].
+	^ d'.
 cm value: rdr class value: 'instance creation' value: 'on: aStringOrStream
-	^ self new setStream: (aStringOrStream isString ifTrue: [aStringOrStream readStream] ifFalse: [aStringOrStream])'.
+	aStringOrStream isString ifTrue: [^ self new setStream: aStringOrStream readStream source: aStringOrStream].
+	^ self new setStream: aStringOrStream source: nil'.
 cm value: rdr class value: 'accessing' value: 'eofObject
 	Eof isNil ifTrue: [Eof := Object new].
 	^ Eof'.
 cm value: rdr class value: 'reading' value: 'read: aString
-	| r d |
-	r := self on: aString.
-	d := r next.
-	d == self eofObject ifTrue: [^ (LispReadError new) signal: ''read: empty input''].
-	r next == self eofObject ifFalse: [^ (LispReadError new) signal: ''read: more than one datum''].
-	^ d'.
+	^ (self on: aString) readSingle'.
 cm value: rdr class value: 'reading' value: 'readAll: aString
 	| r d result |
 	r := self on: aString.
@@ -344,7 +373,8 @@ cm value: prn class value: 'writing' value: 'write: v on: s
 	(v isKindOf: Float) ifTrue: [^ self writeFloat: v on: s].
 	(v isKindOf: Character) ifTrue: [^ self writeCharacter: v on: s].
 	(v isKindOf: String) ifTrue: [^ self writeStringLiteral: v on: s].
-	^ self error: ''cannot write value''.'.
+	"Anything else (the unspecified value, procedures, host objects) writes its printString."
+	^ s nextPutAll: v printString'.
 cm value: prn class value: 'writing' value: 'writeList: aCons on: s
 	| cur |
 	s nextPut: $(.

@@ -21,7 +21,7 @@ cm := [:cls :cat :src |
     on: Error
     do: [:e | failures add: cls name , ' >> ' , (src copyUpTo: Character cr) , (src copyUpTo: Character lf) , '  --  ' , e messageText]].
 
-comp := (Object << #LispCompiler) slots: { #counter }; package: 'CogLisp-Compiler'; install.
+comp := (Object << #LispCompiler) slots: { #counter. #sourceMap }; package: 'CogLisp-Compiler'; install.
 err  := (Error  << #LispCompileError) package: 'CogLisp-Compiler'; install.
 
 "=== node-building helpers ================================================="
@@ -46,6 +46,20 @@ cm value: comp value: 'nodes' value: 'messageNode: receiverNode selector: aSelec
 	m receiver: receiverNode.
 	m arguments: argNodes.
 	^ m'.
+cm value: comp value: 'nodes' value: 'unspecifiedNode
+	^ self messageNode: (OCVariableNode named: ''LispUnspecified'') selector: #default arguments: #()'.
+cm value: comp value: 'nodes' value: 'andUnspecified: aNode
+	"Evaluate aNode for effect, then yield the unspecified value (Phase 5 section 5.1)."
+	^ self messageNode: (self blockWithArgs: #() statements: { aNode. self unspecifiedNode })
+		selector: #value
+		arguments: #()'.
+cm value: comp value: 'source' value: 'sourceOf: form
+	"Exact source text of form if the reader recorded it, else its printed form (Phase 5 section 5.2)."
+	| text |
+	sourceMap notNil ifTrue: [
+		text := sourceMap sourceFor: form.
+		text notNil ifTrue: [^ text]].
+	^ LispPrinter writeString: form'.
 cm value: comp value: 'nodes' value: 'thunk: aNode
 	^ OCBlockNode arguments: #() body: (OCSequenceNode statements: { aNode })'.
 cm value: comp value: 'nodes' value: 'blockWithArgs: argNodes temps: tempNodes statements: statementNodes
@@ -122,11 +136,11 @@ cm value: comp value: 'translating' value: 'translateIf: form inScope: scope
 	args size < 2 ifTrue: [^ self compileError: ''if needs a test and a then-branch''].
 	testN := self translate: (args at: 1) inScope: scope.
 	thenN := self translate: (args at: 2) inScope: scope.
-	elseN := args size >= 3 ifTrue: [self translate: (args at: 3) inScope: scope] ifFalse: [self emptyListNode].
+	elseN := args size >= 3 ifTrue: [self translate: (args at: 3) inScope: scope] ifFalse: [self unspecifiedNode].
 	truthyN := self messageNode: (OCVariableNode named: ''LispCore'') selector: #isTruthy: arguments: { testN }.
 	^ self messageNode: truthyN selector: #ifTrue:ifFalse: arguments: { self thunk: thenN. self thunk: elseN }'.
 cm value: comp value: 'translating' value: 'translateBegin: dataArray inScope: scope
-	dataArray isEmpty ifTrue: [^ self emptyListNode].
+	dataArray isEmpty ifTrue: [^ self unspecifiedNode].
 	dataArray size = 1 ifTrue: [^ self translate: dataArray first inScope: scope].
 	^ self messageNode: (self blockWithArgs: #() statements: (dataArray collect: [:d | self translate: d inScope: scope]))
 		selector: #value
@@ -141,6 +155,8 @@ cm value: comp value: 'translating' value: 'parseParams: spec
 		ifTrue: [^ { fixed asArray. cur }]
 		ifFalse: [^ { fixed asArray. nil }]'.
 cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
+	^ self translateLambda: form inScope: scope source: (self sourceOf: form)'.
+cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope source: sourceText
 	| parts parsed fixed restSym allParams bodyData childScope argNodes tempNodes inits bodyNodes block |
 	parts := self listToArray: form cdr.
 	parsed := self parseParams: parts first.
@@ -160,11 +176,13 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 		tempNodes add: (OCVariableNode named: tempNm).
 		inits add: (OCAssignmentNode variable: (OCVariableNode named: tempNm) value: (OCVariableNode named: argNm))].
 	bodyNodes := bodyData collect: [:d | self translate: d inScope: childScope].
-	bodyNodes isEmpty ifTrue: [bodyNodes := { self emptyListNode }].
+	bodyNodes isEmpty ifTrue: [bodyNodes := { self unspecifiedNode }].
 	block := self blockWithArgs: argNodes asArray temps: tempNodes asArray statements: (inits asArray , bodyNodes).
 	restSym isNil
-		ifTrue: [^ self messageNode: (OCVariableNode named: ''LispProcedure'') selector: #fixed:arity: arguments: { block. OCLiteralValueNode value: fixed size }]
-		ifFalse: [^ self messageNode: (OCVariableNode named: ''LispProcedure'') selector: #variadic:required: arguments: { block. OCLiteralValueNode value: fixed size }]'.
+		ifTrue: [^ self messageNode: (OCVariableNode named: ''LispProcedure'') selector: #fixed:arity:source:
+			arguments: { block. OCLiteralValueNode value: fixed size. OCLiteralValueNode value: sourceText }]
+		ifFalse: [^ self messageNode: (OCVariableNode named: ''LispProcedure'') selector: #variadic:required:source:
+			arguments: { block. OCLiteralValueNode value: fixed size. OCLiteralValueNode value: sourceText }]'.
 cm value: comp value: 'translating' value: 'translateLet: form inScope: scope
 	| parts bindings bodyData params valueData lambdaForm appForm |
 	parts := self listToArray: form cdr.
@@ -183,11 +201,14 @@ cm value: comp value: 'translating' value: 'translateDefine: form inScope: scope
 	(target isKindOf: LispCons)
 		ifTrue: [
 			nameSym := target car.
-			valueNode := self translateLambda: (self makeLambda: target cdr body: parts allButFirst) inScope: scope]
+			"the source text of the procedure is the whole define form"
+			valueNode := self translateLambda: (self makeLambda: target cdr body: parts allButFirst)
+				inScope: scope
+				source: (self sourceOf: form)]
 		ifFalse: [
 			nameSym := target.
 			valueNode := self translate: (parts at: 2) inScope: scope].
-	^ self messageNode: self globalEnvNode selector: #define:value: arguments: { self symbolNode: nameSym. valueNode }'.
+	^ self andUnspecified: (self messageNode: self globalEnvNode selector: #define:value: arguments: { self symbolNode: nameSym. valueNode })'.
 cm value: comp value: 'translating' value: 'makeLambda: paramsList body: bodyArray
 	^ LispCons car: (LispSymbol named: ''lambda'')
 		cdr: (LispCons car: paramsList cdr: (LispCons fromArray: bodyArray))'.
@@ -198,8 +219,8 @@ cm value: comp value: 'translating' value: 'translateSet: form inScope: scope
 	valueNode := self translate: (parts at: 2) inScope: scope.
 	name := scope at: sym ifAbsent: [nil].
 	name notNil
-		ifTrue: [^ OCAssignmentNode variable: (OCVariableNode named: name) value: valueNode]
-		ifFalse: [^ self messageNode: self globalEnvNode selector: #set:value: arguments: { self symbolNode: sym. valueNode }]'.
+		ifTrue: [^ self andUnspecified: (OCAssignmentNode variable: (OCVariableNode named: name) value: valueNode)]
+		ifFalse: [^ self andUnspecified: (self messageNode: self globalEnvNode selector: #set:value: arguments: { self symbolNode: sym. valueNode })]'.
 
 "=== entry points =========================================================="
 cm value: comp value: 'compiling' value: 'compile: datum
@@ -212,13 +233,25 @@ cm value: comp value: 'compiling' value: 'compile: datum
 	^ method generateMethod'.
 cm value: comp value: 'evaluating' value: 'eval: datum
 	^ (self compile: datum) valueWithReceiver: nil arguments: #()'.
+cm value: comp value: 'evaluating' value: 'eval: datum from: aReader
+	"Evaluate a datum read by aReader, so procedures can keep their exact source text."
+	sourceMap := aReader.
+	^ [self eval: datum] ensure: [sourceMap := nil]'.
 cm value: comp value: 'evaluating' value: 'evalString: aString
-	^ self eval: (LispReader read: aString)'.
+	| r |
+	r := LispReader on: aString.
+	^ self eval: r readSingle from: r'.
 cm value: comp value: 'evaluating' value: 'evalAll: aString
-	| result |
-	result := LispEmptyList default.
-	(LispReader readAll: aString) do: [:f | result := self eval: f].
+	| r d result |
+	r := LispReader on: aString.
+	result := LispUnspecified default.
+	[(d := r next) == LispReader eofObject] whileFalse: [result := self eval: d from: r].
 	^ result'.
+cm value: comp value: 'evaluating' value: 'evalFile: aPath
+	| file |
+	file := aPath asFileReference.
+	file exists ifFalse: [^ self compileError: ''file not found: '' , aPath].
+	^ self evalAll: file contents'.
 
 "=== load report ==========================================================="
 Stdio stdout

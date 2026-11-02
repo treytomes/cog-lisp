@@ -1,0 +1,1 @@
+(define (twice x) (* 2 x))

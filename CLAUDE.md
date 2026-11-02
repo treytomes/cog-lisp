@@ -65,6 +65,43 @@ and prints its `printString`.
   and must not depend on image state from a previous run (the image is never
   saved).
 
+## Verified command-line, image, and stdio mechanics (Pharo 14) — Phase 5
+
+- **Commands are Clap, not classic `CommandLineHandler`s.** The top-level
+  dispatcher ignores `CommandLineHandler` subclasses. Define a `ClapApplication`
+  subclass whose class-side method carries `<commandline>` and returns a
+  `ClapCommandSpec` (`id:`, `commandClass: self`, `addHelp`,
+  `addPositional: #args spec: [:p | p multiple: true; defaultValue: [:arg :app | #()]]`).
+  Its instance-side `execute` does the work; `self positional: #args` reads the
+  arguments. `PharoConsole.exe img lisp a b` gives `#('a' 'b')`.
+- **Quit with `Smalltalk exit: n`.** It exits immediately with that process exit
+  code. `self exitSuccess` does not end the process, and `Smalltalk snapshot:
+  false andQuit: true` (and even the stock `eval` command) can hang when stdout is
+  a pipe. Test scripts that end in `snapshot: false andQuit: true` happen to work.
+- **Never let an error go unhandled in a command.** It falls through to Pharo's
+  error reporting and the VM hangs. Catch `Error` (and resume `Warning`) and
+  `Smalltalk exit: 1`.
+- **Saving under a new name:** `PharoConsole.exe stock.image save newName`, or
+  from a script `(Smalltalk saveAs: 'newName') isImageStarting ifFalse: [...]`.
+  The stock image is left untouched.
+- **Snapshots resume in the saving process.** Code after `saveAs:` /
+  `snapshot: true andQuit: false` runs again when the saved image next starts, with
+  `isImageStarting` true. Guard it: `isImageStarting ifTrue: [Processor
+  activeProcess terminate]`, or the old process keeps running in the new session.
+- **Launch the VM with `--headless`.** By default the VM appends `--interactive`
+  to the image's arguments, even under `PharoConsole.exe`, so Pharo attaches a
+  real SDL2 OS window to the world at every startup. Its drawing failures make
+  `OSSDL2FormRenderer` print `There was an error during copy … Bad BitBlt arg`
+  **to stdout**, at timing-dependent moments, corrupting program output. With
+  `PharoConsole.exe --headless <image> …` the image chooses `NullWorldRenderer`
+  and no window exists. `build-image.bat` and `cog-lisp.bat` both pass it. (A
+  null-renderer swap before saving only appeared to work; startup replaces it.)
+- **stdin:** `Stdio stdin` is binary (no `nextLine`). Wrap it:
+  `ZnCharacterReadStream on: Stdio stdin encoding: 'utf8'` gives `nextLine` /
+  `atEnd`, handles CRLF and a final line without a newline. Piped input works.
+- **stdout/stderr:** `Stdio stdout` / `Stdio stderr` are separate. Redirecting
+  Pharo's stdout to `/dev/null` (NUL) makes writes fail; redirect to a file.
+
 ## Verified Opal AST API (Pharo 14) — for the Phase 3 compiler
 
 Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):

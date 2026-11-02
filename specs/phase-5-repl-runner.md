@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 5 |
-| **Status** | Accepted (2026-11-02) |
+| **Status** | Implemented (2026-11-02) — `tests/phase-5-shell.st` 28/28, `tests/phase-5-runner.bat` 27/27; Phases 1–4 still green |
 | **Depends on** | Phases 1–4 |
 | **Feeds** | Phase 6 (optimization), Phase 7 (language reach), Phase 8 (self-hosting) |
 | **Image strategy** | Build a dedicated `cog-lisp.image` once; the runner and REPL start from it |
@@ -236,7 +236,45 @@ Settled 2026-11-02 (owner sign-off); the spec is Accepted on these.
 6. **Source granularity.** Every `lambda` keeps its own text, nested ones
    included, not only top-level definitions.
 
-## 10. Downstream notes
+## 10. As implemented
+
+Where the implementation settled details the spec left open, or reality forced
+a change:
+
+- **The VM is launched with `--headless`.** Without it the VM appends
+  `--interactive` to the image's arguments, Pharo attaches an SDL2 OS window at
+  every startup, and its drawing failures print to stdout at unpredictable
+  moments. `build-image.bat` and `cog-lisp.bat` pass `--headless`, so no window
+  is ever created. Details and the other probe results (Clap commands,
+  `Smalltalk exit:`, the snapshot resume guard, stdin decoding) are in CLAUDE.md.
+- **Command entry** is `LispShellCommand`, a Clap command (`lisp repl`,
+  `lisp run <file>`), not a classic `CommandLineHandler`, which Pharo 14's
+  dispatcher ignores.
+- **Snapshots are guarded.** Both the build (`saveAs: 'cog-lisp'`) and
+  `(save-image)` terminate the saving process on the resume path, so it cannot
+  run on in the next session.
+- **`LispUnspecified`** lives in `CogLisp-Reader`, beside the other value types,
+  so the printer can write it.
+- **Output port.** `display`, `write`, `newline` and `disassemble` write to
+  `LispPrimitives output` (stdout by default); `LispPrimitives withOutput:do:`
+  redirects it, which is how the REPL and the in-image tests capture output.
+- **Incomplete input.** `LispReadError>>isIncomplete` is true when the input ran
+  out (unterminated list, string, comment); the REPL keeps reading on those and
+  reports the rest.
+- **REPL errors** go to stderr, like run-mode errors; results and program output
+  go to stdout.
+- **`cog-lisp.bat`** exits 2 if the image is missing, and honours
+  `COGLISP_IMAGE` to run a different image (the persistence test uses a copy).
+  The staleness warning is done inside the image, which compares `src/*.st`
+  modification times with its recorded build time.
+- **The build smoke-tests** the image before saving and refuses to save if any
+  package fails to load.
+- **Runner fixtures**: `tests/runner/NAME.lisp` (program) or `NAME.stdin` (REPL
+  input), with optional `NAME.expected` (exact stdout), `NAME.exitcode`, and
+  `NAME.stderr` (required substring). Examples keep their `.expected` beside them.
+  `.gitattributes` keeps these LF so byte-exact comparison is stable.
+
+## 11. Downstream notes
 
 - Phase 6's benchmarks can run as `cog-lisp.bat bench.lisp`, so performance work
   is measured through the real entry point.

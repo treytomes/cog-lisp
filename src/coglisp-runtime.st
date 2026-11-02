@@ -17,8 +17,8 @@ cm := [:cls :cat :src |
 
 lerr  := (Error  << #LispError) package: 'CogLisp-Runtime'; install.
 aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp-Runtime'; install.
-proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name }; package: 'CogLisp-Runtime'; install.
-prims := (Object << #LispPrimitives) package: 'CogLisp-Runtime'; install.
+proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source }; package: 'CogLisp-Runtime'; install.
+prims := (Object << #LispPrimitives) sharedVariables: { #Output }; package: 'CogLisp-Runtime'; install.
 
 "=== LispArityError ========================================================"
 cm value: aerr value: 'accessing' value: 'proc
@@ -41,8 +41,15 @@ cm value: proc value: 'accessing' value: 'name: aString
 	name := aString'.
 cm value: proc value: 'testing' value: 'isVariadic
 	^ hasRest'.
+cm value: proc value: 'accessing' value: 'source
+	"The exact LISP text this procedure was compiled from; nil for primitives (Phase 5 section 5.2)."
+	^ source'.
+cm value: proc value: 'accessing' value: 'source: aString
+	source := aString'.
+cm value: proc value: 'accessing' value: 'block
+	^ block'.
 cm value: proc value: 'printing' value: 'printOn: aStream
-	aStream nextPutAll: ''<procedure''.
+	aStream nextPutAll: ''#<procedure''.
 	name ifNotNil: [aStream nextPut: Character space; nextPutAll: name].
 	aStream nextPut: $>'.
 cm value: proc value: 'applying' value: 'signalArity: givenCount
@@ -57,6 +64,10 @@ cm value: proc class value: 'instance creation' value: 'fixed: aBlock arity: n
 	^ self new setBlock: aBlock required: n rest: false'.
 cm value: proc class value: 'instance creation' value: 'variadic: aBlock required: n
 	^ self new setBlock: aBlock required: n rest: true'.
+cm value: proc class value: 'instance creation' value: 'fixed: aBlock arity: n source: aString
+	^ (self fixed: aBlock arity: n) source: aString; yourself'.
+cm value: proc class value: 'instance creation' value: 'variadic: aBlock required: n source: aString
+	^ (self variadic: aBlock required: n) source: aString; yourself'.
 cm value: proc class value: 'applying' value: 'apply: fn to: anArray
 	(fn isKindOf: LispProcedure) ifFalse: [^ (LispError new) signal: ''object is not applicable: '' , fn printString].
 	^ fn applyTo: anArray'.
@@ -69,9 +80,24 @@ cm value: prims class value: 'installing' value: 'installInto: anEnv
 	self installPredicatesInto: anEnv.
 	self installIOInto: anEnv.
 	self installControlInto: anEnv.
+	self installSystemInto: anEnv.
 	^ anEnv'.
 cm value: prims class value: 'installing' value: 'installDefault
 	^ self installInto: LispEnvironment default'.
+cm value: prims class value: 'output' value: 'output
+	"Where display/write/newline/disassemble write. Defaults to stdout; the REPL and tests redirect it."
+	^ Output ifNil: [Stdio stdout]'.
+cm value: prims class value: 'output' value: 'withOutput: aStream do: aBlock
+	| previous |
+	previous := Output.
+	Output := aStream.
+	^ aBlock ensure: [Output := previous]'.
+cm value: prims class value: 'system' value: 'saveImage
+	"Snapshot the running image in place (Phase 5). On the resume path, when the saved
+	 image next starts, the process that saved must not keep running: terminate it."
+	(Smalltalk snapshot: true andQuit: false) isImageStarting
+		ifTrue: [Processor activeProcess terminate].
+	^ LispUnspecified default'.
 cm value: prims class value: 'installing' value: 'installListsInto: anEnv
 	anEnv define: (LispSymbol named: ''cons'') value: (LispProcedure fixed: [:a :b | LispCons car: a cdr: b] arity: 2).
 	anEnv define: (LispSymbol named: ''car'') value: (LispProcedure fixed: [:p | p car] arity: 1).
@@ -83,10 +109,10 @@ cm value: prims class value: 'installing' value: 'installListsInto: anEnv
 	anEnv define: (LispSymbol named: ''length'') value: (LispProcedure fixed: [:lst | lst lispElements size] arity: 1).
 	anEnv define: (LispSymbol named: ''reverse'') value: (LispProcedure fixed: [:lst | LispCons fromArray: lst lispElements asArray reverse] arity: 1).
 	anEnv define: (LispSymbol named: ''append'') value: (LispProcedure variadic: [:lists | | els | els := OrderedCollection new. lists lispElements do: [:l | els addAll: l lispElements]. LispCons fromArray: els asArray] required: 0).
-	anEnv define: (LispSymbol named: ''set-car!!'') value: (LispProcedure fixed: [:p :v | p car: v. v] arity: 2).
-	anEnv define: (LispSymbol named: ''set-cdr!!'') value: (LispProcedure fixed: [:p :v | p cdr: v. v] arity: 2).
+	anEnv define: (LispSymbol named: ''set-car!!'') value: (LispProcedure fixed: [:p :v | p car: v. LispUnspecified default] arity: 2).
+	anEnv define: (LispSymbol named: ''set-cdr!!'') value: (LispProcedure fixed: [:p :v | p cdr: v. LispUnspecified default] arity: 2).
 	anEnv define: (LispSymbol named: ''map'') value: (LispProcedure fixed: [:prc :lst | LispCons fromArray: (lst lispElements collect: [:e | LispProcedure apply: prc to: { e }]) asArray] arity: 2).
-	anEnv define: (LispSymbol named: ''for-each'') value: (LispProcedure fixed: [:prc :lst | lst lispElements do: [:e | LispProcedure apply: prc to: { e }]. LispEmptyList default] arity: 2)'.
+	anEnv define: (LispSymbol named: ''for-each'') value: (LispProcedure fixed: [:prc :lst | lst lispElements do: [:e | LispProcedure apply: prc to: { e }]. LispUnspecified default] arity: 2)'.
 cm value: prims class value: 'installing' value: 'installNumbersInto: anEnv
 	anEnv define: (LispSymbol named: ''+'') value: (LispProcedure variadic: [:nums | nums lispElements inject: 0 into: [:a :b | a + b]] required: 0).
 	anEnv define: (LispSymbol named: ''*'') value: (LispProcedure variadic: [:nums | nums lispElements inject: 1 into: [:a :b | a * b]] required: 0).
@@ -119,9 +145,17 @@ cm value: prims class value: 'installing' value: 'installPredicatesInto: anEnv
 	anEnv define: (LispSymbol named: ''boolean?'') value: (LispProcedure fixed: [:x | LispCore isBoolean: x] arity: 1).
 	anEnv define: (LispSymbol named: ''procedure?'') value: (LispProcedure fixed: [:x | x isKindOf: LispProcedure] arity: 1)'.
 cm value: prims class value: 'installing' value: 'installIOInto: anEnv
-	anEnv define: (LispSymbol named: ''display'') value: (LispProcedure fixed: [:x | Stdio stdout nextPutAll: ((x isKindOf: String) ifTrue: [x] ifFalse: [LispPrinter writeString: x]); flush. LispEmptyList default] arity: 1).
-	anEnv define: (LispSymbol named: ''write'') value: (LispProcedure fixed: [:x | Stdio stdout nextPutAll: (LispPrinter writeString: x); flush. LispEmptyList default] arity: 1).
-	anEnv define: (LispSymbol named: ''newline'') value: (LispProcedure fixed: [Stdio stdout nextPut: Character lf; flush. LispEmptyList default] arity: 0)'.
+	anEnv define: (LispSymbol named: ''display'') value: (LispProcedure fixed: [:x | self output nextPutAll: ((x isKindOf: String) ifTrue: [x] ifFalse: [LispPrinter writeString: x]); flush. LispUnspecified default] arity: 1).
+	anEnv define: (LispSymbol named: ''write'') value: (LispProcedure fixed: [:x | self output nextPutAll: (LispPrinter writeString: x); flush. LispUnspecified default] arity: 1).
+	anEnv define: (LispSymbol named: ''newline'') value: (LispProcedure fixed: [self output nextPut: Character lf; flush. LispUnspecified default] arity: 0)'.
+cm value: prims class value: 'installing' value: 'installSystemInto: anEnv
+	anEnv define: (LispSymbol named: ''load'') value: (LispProcedure fixed: [:path | LispCompiler new evalFile: path. LispUnspecified default] arity: 1).
+	anEnv define: (LispSymbol named: ''exit'') value: (LispProcedure variadic: [:codes | Smalltalk exit: (codes lispElements ifEmpty: [0] ifNotEmpty: [:c | c first])] required: 0).
+	anEnv define: (LispSymbol named: ''save-image'') value: (LispProcedure fixed: [self saveImage] arity: 0).
+	anEnv define: (LispSymbol named: ''procedure-source'') value: (LispProcedure fixed: [:p | p source ifNil: [false]] arity: 1).
+	anEnv define: (LispSymbol named: ''disassemble'') value: (LispProcedure fixed: [:p |
+		self output nextPutAll: p block compiledBlock symbolic; nextPut: Character lf; flush.
+		LispUnspecified default] arity: 1)'.
 cm value: prims class value: 'installing' value: 'installControlInto: anEnv
 	anEnv define: (LispSymbol named: ''apply'') value: (LispProcedure fixed: [:prc :argList | LispProcedure apply: prc to: argList lispElements asArray] arity: 2)'.
 

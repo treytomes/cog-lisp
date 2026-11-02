@@ -1,0 +1,8 @@
+# Windows batch files need CRLF for cmd.exe to handle labels and goto reliably.
+*.bat       text eol=crlf
+
+# cog-lisp sources and test fixtures stay LF: Pharo writes LF, and the runner
+# suite compares program output to .expected files byte for byte.
+*.lisp      text eol=lf
+*.expected  text eol=lf
+*.stdin     text eol=lf

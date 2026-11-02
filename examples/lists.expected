@@ -1,0 +1,6 @@
+squares: (1 4 9 16 25)
+appended: (1 2 3 4 5 6 7)
+reversed: (5 4 3 2 1)
+evens: (2 4)
+sum: 15
+a dotted pair: (a . b)

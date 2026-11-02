@@ -28,7 +28,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 2 | Core data model | ✅ **done** — [spec](specs/phase-2-core-data-model.md), 49/49 |
 | 3 | Compiler core | ✅ **done** — [spec](specs/phase-3-compiler-core.md), 31/31 |
 | 4 | Runtime & primitives | ✅ **done** — [spec](specs/phase-4-runtime-primitives.md), 44/44 |
-| 5 | REPL & image integration | 📋 [spec accepted](specs/phase-5-repl-runner.md) |
+| 5 | REPL & image integration | ✅ **done** — [spec](specs/phase-5-repl-runner.md), 28/28 + 27/27 |
 | 6 | Optimization & native depth | ⬜ |
 | 7 | Language reach (stretch) | ⬜ |
 | 8 | Self-hosting (meta-circular) | ⬜ |
@@ -42,18 +42,58 @@ project targets is validated against the live image.
 
 ## Getting started
 
+One-time setup: download the Pharo VM and stock image, then build the cog-lisp
+image from `src\` (rerun the build after changing anything in `src\`):
+
 ```bat
 bootstrap-pharo.bat
 ```
 
-downloads and unpacks the Pharo 14 VM + image into `pharo\` (not committed; see
-`.gitignore`) and prints the versions. Then run the proof-of-concept:
-
 ```bat
-pharo\PharoConsole.exe pharo\Pharo14.0-SNAPSHOT-64bit-58e29ca31d.image st poc\answer.st
+build-image.bat
 ```
 
-Headless conventions and the verified Opal API are documented in
+Run a program:
+
+```bat
+cog-lisp.bat examples\factorial.lisp
+```
+
+Or start the REPL by running `cog-lisp.bat` with no arguments:
+
+```
+> (define (sq n) (* n n))
+> (sq 12)
+144
+> (procedure-source sq)
+"(define (sq n) (* n n))"
+> (save-image)
+```
+
+`(save-image)` writes your definitions into `pharo\cog-lisp.image`, so they are
+there the next time you start it. End a session with `(exit)`.
+Every procedure keeps the source it was compiled from: `(procedure-source f)`
+returns it, and `(disassemble f)` shows its bytecode.
+
+A program's exit code is 0 on success, 1 on an uncaught error (reported on
+stderr as `error: …`), or whatever it passes to `(exit n)`. The programs in
+[`examples\`](examples/) are a good place to start.
+
+### Running the tests
+
+The in-image suites run headless against the stock image, for example:
+
+```bat
+pharo\PharoConsole.exe pharo\Pharo14.0-SNAPSHOT-64bit-58e29ca31d.image st tests\phase-4-runtime.st
+```
+
+The runner suite builds the image and drives `cog-lisp.bat` end to end:
+
+```bat
+tests\phase-5-runner.bat
+```
+
+Headless conventions and the verified Pharo mechanisms are documented in
 [`CLAUDE.md`](CLAUDE.md).
 
 ---
@@ -158,5 +198,8 @@ Make the cog-lisp image stand on its own, so the stock Pharo image is not needed
   and the compiler is written in LISP (Phase 8).
 - Build new images from an existing cog-lisp image, or from a bootstrapped kernel,
   instead of from the stock download.
+- Build cog-lisp's own VM executables in place of the stock `Pharo.exe` and
+  `PharoConsole.exe` (for example with `--headless` as the default, which the
+  launch scripts must pass explicitly today).
 - *Acceptance:* a cog-lisp image built without the stock image runs the example
   programs and the acceptance suites, and the user-visible world is LISP.

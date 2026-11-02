@@ -62,7 +62,8 @@ checkErr value: 'AC-5 unbound read signals' value: [ev value: 'nosuchvar'].
 check value: 'AC-6 (if #t 1 2)' value: (ev value: '(if #t 1 2)') value: 1.
 check value: 'AC-6 (if #f 1 2)' value: (ev value: '(if #f 1 2)') value: 2.
 check value: 'AC-6 (if 0 1 2) [0 truthy]' value: (ev value: '(if 0 1 2)') value: 1.
-check value: 'AC-7 (if #f 1) unspecified' value: (ev value: '(if #f 1)') value: LispEmptyList default.
+"Since Phase 5 the unspecified value is LispUnspecified, no longer the empty list."
+check value: 'AC-7 (if #f 1) unspecified' value: (ev value: '(if #f 1)') value: LispUnspecified default.
 
 "AC-8 begin"
 check value: 'AC-8 (begin 1 2 3)' value: (ev value: '(begin 1 2 3)') value: 3.

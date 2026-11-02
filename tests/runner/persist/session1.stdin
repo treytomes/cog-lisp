@@ -1,0 +1,3 @@
+(define (sq n) ; square it
+  (* n n))
+(save-image)
