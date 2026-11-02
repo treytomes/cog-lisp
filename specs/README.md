@@ -28,6 +28,7 @@ to successor).
 | Phase | Spec | Status |
 |------:|------|--------|
 | 1 | [Reader & Printer](phase-1-reader-printer.md) | Implemented (77/77) |
+| 2 | [Core Data Model](phase-2-core-data-model.md) | Accepted |
 
 Later phases (2–7, see the [project plan](../README.md#project-plan)) get their
 specs here as we reach them.
