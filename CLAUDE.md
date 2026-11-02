@@ -86,6 +86,9 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   selector Symbol and fail. Instead **template-splice**: parse a well-formed
   skeleton for the selector (e.g. `OCParser parseExpression: '0 + 0'`, or
   `'0 value: 0 value: 0'`), then `m receiver: recvNode. m arguments: argNodes`.
+- **Brace arrays** (`{a. b}`) are **`OCArrayNode`**: template-splice
+  `OCParser parseExpression: '{0}'`, then `n statements: elementNodes` (an empty
+  collection gives `#()`). The compiler uses this for application args arrays.
 - Closure capture is automatic: nested `OCBlockNode`s whose bodies reference an
   outer block's argument name compile to a real capturing `BlockClosure`.
 - **Block/method arguments are read-only** — assigning one fails semantic

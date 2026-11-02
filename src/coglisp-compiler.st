@@ -67,13 +67,15 @@ cm value: comp value: 'private' value: 'listToArray: aList
 	^ #()'.
 
 "=== application ==========================================================="
+cm value: comp value: 'nodes' value: 'arrayNode: elementNodes
+	| n |
+	n := OCParser parseExpression: ''{0}''.
+	n statements: elementNodes.
+	^ n'.
 cm value: comp value: 'translating' value: 'applyFn: fnNode toArgNodes: argNodes
-	| n sel |
-	n := argNodes size.
-	n = 0 ifTrue: [^ self messageNode: fnNode selector: #value arguments: #()].
-	n > 4 ifTrue: [^ self compileError: ''application with more than 4 arguments is not supported in Phase 3''].
-	sel := (String streamContents: [:s | n timesRepeat: [s nextPutAll: ''value:'']]) asSymbol.
-	^ self messageNode: fnNode selector: sel arguments: argNodes'.
+	^ self messageNode: (OCVariableNode named: ''LispProcedure'')
+		selector: #apply:to:
+		arguments: { fnNode. self arrayNode: argNodes }'.
 cm value: comp value: 'translating' value: 'translateApplication: form inScope: scope
 	| items fnNode argNodes |
 	items := self listToArray: form.
@@ -129,16 +131,28 @@ cm value: comp value: 'translating' value: 'translateBegin: dataArray inScope: s
 	^ self messageNode: (self blockWithArgs: #() statements: (dataArray collect: [:d | self translate: d inScope: scope]))
 		selector: #value
 		arguments: #()'.
+cm value: comp value: 'translating' value: 'parseParams: spec
+	| fixed cur |
+	(spec isKindOf: LispSymbol) ifTrue: [^ { #(). spec }].
+	fixed := OrderedCollection new.
+	cur := spec.
+	[cur isKindOf: LispCons] whileTrue: [fixed add: cur car. cur := cur cdr].
+	(cur isKindOf: LispSymbol)
+		ifTrue: [^ { fixed asArray. cur }]
+		ifFalse: [^ { fixed asArray. nil }]'.
 cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
-	| parts params bodyData childScope argNodes tempNodes inits bodyNodes |
+	| parts parsed fixed restSym allParams bodyData childScope argNodes tempNodes inits bodyNodes block |
 	parts := self listToArray: form cdr.
-	params := self listToArray: parts first.
+	parsed := self parseParams: parts first.
+	fixed := parsed first.
+	restSym := parsed second.
+	allParams := restSym isNil ifTrue: [fixed] ifFalse: [fixed , { restSym }].
 	bodyData := parts allButFirst.
 	childScope := scope copy.
 	argNodes := OrderedCollection new.
 	tempNodes := OrderedCollection new.
 	inits := OrderedCollection new.
-	params do: [:p | | argNm tempNm |
+	allParams do: [:p | | argNm tempNm |
 		argNm := self nextName.
 		tempNm := self nextName.
 		childScope at: p put: tempNm.
@@ -147,7 +161,10 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 		inits add: (OCAssignmentNode variable: (OCVariableNode named: tempNm) value: (OCVariableNode named: argNm))].
 	bodyNodes := bodyData collect: [:d | self translate: d inScope: childScope].
 	bodyNodes isEmpty ifTrue: [bodyNodes := { self emptyListNode }].
-	^ self blockWithArgs: argNodes asArray temps: tempNodes asArray statements: (inits asArray , bodyNodes)'.
+	block := self blockWithArgs: argNodes asArray temps: tempNodes asArray statements: (inits asArray , bodyNodes).
+	restSym isNil
+		ifTrue: [^ self messageNode: (OCVariableNode named: ''LispProcedure'') selector: #fixed:arity: arguments: { block. OCLiteralValueNode value: fixed size }]
+		ifFalse: [^ self messageNode: (OCVariableNode named: ''LispProcedure'') selector: #variadic:required: arguments: { block. OCLiteralValueNode value: fixed size }]'.
 cm value: comp value: 'translating' value: 'translateLet: form inScope: scope
 	| parts bindings bodyData params valueData lambdaForm appForm |
 	parts := self listToArray: form cdr.

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 4 |
-| **Status** | Accepted (2026-11-02) |
+| **Status** | Implemented (2026-11-02) — `tests/phase-4-runtime.st` passes 44/44; revised Phase 3 suite 31/31 |
 | **Depends on** | Phase 1 (reader), Phase 2 (core), Phase 3 (compiler) |
 | **Feeds** | Phase 5 (REPL & runner), Phase 6 (optimization) |
 | **Procedure model** | `LispProcedure` wrapper + uniform `applyTo:` an args array |

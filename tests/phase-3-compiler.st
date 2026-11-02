@@ -12,6 +12,7 @@ dir := Smalltalk imageDirectory parent / 'src'.
 (dir / 'coglisp-reader.st') fileIn.
 (dir / 'coglisp-core.st') fileIn.
 (dir / 'coglisp-compiler.st') fileIn.
+(dir / 'coglisp-runtime.st') fileIn.
 !
 
 "--- Chunk 2: the acceptance checks ----------------------------------------"
@@ -34,11 +35,8 @@ checkErr := [:label :blk |
 		on: Error
 		do: [:e | pass := pass + 1. out value: '  PASS  ' , label]].
 
-"Phase 4 will own the real primitive library; the suite binds a handful as blocks."
-LispEnvironment default define: (LispSymbol named: '+') value: [:a :b | a + b].
-LispEnvironment default define: (LispSymbol named: '-') value: [:a :b | a - b].
-LispEnvironment default define: (LispSymbol named: '*') value: [:a :b | a * b].
-LispEnvironment default define: (LispSymbol named: '=') value: [:a :b | a = b].
+"Since Phase 4, procedures are LispProcedures; install the real primitive library."
+LispPrimitives installDefault.
 
 [
 out value: '== cog-lisp Phase 3 : compiler core =='.
@@ -73,7 +71,7 @@ check value: 'AC-8 begin order' value: (evAll value: '(define c 0) (begin (set!!
 "AC-9..12 lambda / application / closures"
 check value: 'AC-9 ((lambda (x) x) 5)' value: (ev value: '((lambda (x) x) 5)') value: 5.
 check value: 'AC-10 ((lambda (x y) (+ x y)) 2 3)' value: (ev value: '((lambda (x y) (+ x y)) 2 3)') value: 5.
-check value: 'AC-11 lambda is BlockClosure' value: ((ev value: '(lambda (x) x)') isKindOf: BlockClosure) value: true.
+check value: 'AC-11 lambda is LispProcedure' value: ((ev value: '(lambda (x) x)') isKindOf: LispProcedure) value: true.
 check value: 'AC-11 compile: is CompiledMethod' value: ((LispCompiler new compile: (LispReader read: '42')) isKindOf: CompiledMethod) value: true.
 check value: 'AC-12 closure capture' value: (ev value: '(((lambda (x) (lambda (y) (+ x y))) 2) 3)') value: 5.
 

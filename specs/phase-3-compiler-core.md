@@ -8,6 +8,13 @@
 | **Feeds** | Phase 4 (runtime & primitives), Phase 5 (REPL), Phase 8 (self-hosting) |
 | **Codegen** | LISP → Smalltalk AST → Opal compiler → `CompiledMethod` |
 
+> **Partially superseded by [Phase 4](phase-4-runtime-primitives.md) (calling
+> convention only).** Since Phase 4, `lambda` compiles to a `LispProcedure`
+> (wrapping the block with arity metadata) rather than a bare `BlockClosure`, and
+> application compiles to `LispProcedure apply: f to: {args}` rather than
+> arity-selected `value:` sends. Everything else here stands. The Phase 3 suite
+> was updated accordingly (AC-11 now asserts `LispProcedure`) and still passes.
+
 ## 1. Goal
 
 Compile s-expressions into real `CompiledMethod`s that the Cog JIT runs native.
