@@ -8,6 +8,9 @@
 *.changes
 *.sources
 
+# Pharo writes this at the working directory on errors; it is transient.
+PharoDebug.log
+
 # --- Editor / tooling --------------------------------------------------------
 /.vscode/
 

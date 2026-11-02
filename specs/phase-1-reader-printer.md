@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 1 |
-| **Status** | Accepted (2026-11-02) |
+| **Status** | Implemented (2026-11-02) — `tests/phase-1-reader-printer.st` passes 77/77 |
 | **Depends on** | Phase 0 (foundation) |
 | **Feeds** | Phase 2 (core data model), Phase 3 (compiler) |
 | **Dialect** | Scheme-like (case-sensitive, `#t`/`#f`, distinct empty list) |

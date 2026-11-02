@@ -24,7 +24,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | Phase | Name | State |
 |------:|------|-------|
 | 0 | Foundation & feasibility | ✅ **done** |
-| 1 | Reader & printer | 📋 [spec accepted](specs/phase-1-reader-printer.md) |
+| 1 | Reader & printer | ✅ **done** — [spec](specs/phase-1-reader-printer.md), 77/77 |
 | 2 | Core data model | ⬜ |
 | 3 | Compiler core | ⬜ |
 | 4 | Runtime & primitives | ⬜ |
