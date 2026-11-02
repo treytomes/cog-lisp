@@ -28,10 +28,11 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 2 | Core data model | ✅ **done** — [spec](specs/phase-2-core-data-model.md), 49/49 |
 | 3 | Compiler core | ✅ **done** — [spec](specs/phase-3-compiler-core.md), 31/31 |
 | 4 | Runtime & primitives | ✅ **done** — [spec](specs/phase-4-runtime-primitives.md), 44/44 |
-| 5 | REPL & image integration | ⬜ |
+| 5 | REPL & image integration | 📋 [spec accepted](specs/phase-5-repl-runner.md) |
 | 6 | Optimization & native depth | ⬜ |
 | 7 | Language reach (stretch) | ⬜ |
 | 8 | Self-hosting (meta-circular) | ⬜ |
+| 9 | Pure Lisp image | ⬜ |
 
 Phase 0 is proven, not just planned: [`poc/answer.st`](poc/answer.st) builds
 three `CompiledMethod`s directly from Opal IR — a constant, a two-argument add,
@@ -141,3 +142,21 @@ implementation of Phases 1–4 (and macros from Phase 7).
   implementation's output on the Phase 1–4 corpora, **and** the compiler compiles
   itself to a fixpoint (the compiler built by stage 2 produces byte-identical
   output to the one built by stage 3).
+
+### Phase 9 — Pure Lisp image
+Make the cog-lisp image stand on its own, so the stock Pharo image is not needed.
+- Start from what the VM requires (its kernel objects and classes:
+  `nil`/`true`/`false`, `SmallInteger`, `Array`, `CompiledMethod`,
+  `BlockClosure`, …) plus cog-lisp.
+- **Audit every other Pharo subsystem before removing anything.** For each one —
+  networking, UI, file system, the IDE tools — decide to **keep** it, **reimplement
+  it in LISP**, or **remove** it, based on what the world needs. Networking is
+  expected to stay in some form: it is how an AI agent gets into and out of the
+  world. Reimplementing a subsystem in LISP is preferred where practical, so the
+  world can read and change it.
+- The Opal dependency goes once code generation emits bytecode directly (Phase 6)
+  and the compiler is written in LISP (Phase 8).
+- Build new images from an existing cog-lisp image, or from a bootstrapped kernel,
+  instead of from the stock download.
+- *Acceptance:* a cog-lisp image built without the stock image runs the example
+  programs and the acceptance suites, and the user-visible world is LISP.
