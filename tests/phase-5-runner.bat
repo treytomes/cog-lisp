@@ -40,6 +40,14 @@ for %%F in (tests\runner\*.lisp) do call :runcase "%%~fF" prog
 for %%F in (tests\runner\*.stdin) do call :runcase "%%~fF" repl
 for %%F in (examples\*.lisp) do call :runcase "%%~fF" prog
 
+rem --- REPL input that arrives late, as at an interactive prompt ---------------------
+rem  Pharo's stdin never blocks, so the REPL must wait for input rather than treat
+rem  "nothing yet" as end of input. ping gives a delay of about two seconds.
+(ping -n 3 127.0.0.1 >nul & type "tests\runner\delayed\late.stdin") | "%CL%" >"%TMPD%\late.out" 2>"%TMPD%\late.err"
+set OK=0
+fc /b "tests\runner\delayed\late.expected" "%TMPD%\late.out" >nul 2>&1 && set OK=1
+call :check "REPL waits for input that arrives late" !OK!
+
 rem --- AC-13 / AC-21: persistence across save-image and a new process -------------
 copy /y "pharo\cog-lisp.image" "pharo\cog-lisp-test.image" >nul
 copy /y "pharo\cog-lisp.changes" "pharo\cog-lisp-test.changes" >nul

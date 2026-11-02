@@ -13,15 +13,123 @@
  Commands must never let an error reach Pharo's own reporting (the VM hangs),
  and must end with Smalltalk exit: n. See CLAUDE.md.
  ============================================================================"
-| failures cm repl shell |
+| failures cm stdin repl shell |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
     on: Error
     do: [:e | failures add: cls name , ' >> ' , (src copyUpTo: Character cr) , (src copyUpTo: Character lf) , '  --  ' , e messageText]].
 
+stdin := (Object << #LispStdin) slots: { #kind. #handle. #pending. #eof }; package: 'CogLisp-Shell'; install.
 repl  := (Object << #LispRepl) slots: { #in. #out. #err. #compiler }; package: 'CogLisp-Shell'; install.
 shell := (ClapApplication << #LispShellCommand) sharedVariables: { #BuildTime }; package: 'CogLisp-Shell'; install.
+
+"=== LispStdin ============================================================
+ A line reader over the process stdin that WAITS for input. Pharo's stdin never
+ blocks: with nothing buffered, reads answer 0 bytes and atEnd answers true, the
+ same as at real end of input (CLAUDE.md). So when no bytes are available this
+ asks the OS what stdin is: a console never ends (the user types (exit)); a
+ redirected file has ended; a pipe has ended once PeekNamedPipe fails because
+ the writer closed it. Otherwise it sleeps briefly and polls again.
+ A console is NOT read through Pharo's stdin at all: the VM never issues a
+ console read, so typed keys are never echoed or delivered. It is read with
+ ReadConsoleW, which waits for Enter while Windows handles echo and line
+ editing. That blocks the VM until a line is entered, which is what a REPL
+ waiting at its prompt wants.
+ Bytes are decoded as UTF-8 one complete line at a time, so a partly received
+ character is never decoded early."
+cm value: stdin class value: 'win32' value: 'readConsole: h buffer: b size: n read: r control: c
+	^ self ffiCall: #(int ReadConsoleW(void* h, void* b, uint32 n, void* r, void* c)) module: ''kernel32.dll'''.
+cm value: stdin class value: 'instance creation' value: 'onConsoleHandle: aHandle
+	"A reader over a specific console input handle (used by tests)."
+	^ self basicNew initializeConsole: aHandle'.
+cm value: stdin value: 'initialization' value: 'initializeConsole: aHandle
+	pending := OrderedCollection new.
+	eof := false.
+	kind := #console.
+	handle := aHandle'.
+cm value: stdin value: 'private' value: 'readConsoleLine
+	"Block until the user enters a line; queue it as UTF-8 bytes. A failed or
+	 empty read means the console input has ended."
+	| units count ok text |
+	units := ByteArray new: 8192.
+	count := ByteArray new: 4.
+	ok := [self class readConsole: handle buffer: units size: 4096 read: count control: nil]
+		on: Error do: [:e | 0].
+	(ok = 0 or: [(count unsignedLongAt: 1) = 0]) ifTrue: [^ eof := true].
+	text := self utf16: units count: (count unsignedLongAt: 1).
+	pending addAll: text utf8Encoded'.
+cm value: stdin value: 'private' value: 'utf16: bytes count: n
+	"Decode n little-endian UTF-16 code units, joining surrogate pairs."
+	| out i unit low |
+	out := WriteStream on: (String new: n).
+	i := 1.
+	[i <= n] whileTrue: [
+		unit := bytes unsignedShortAt: i * 2 - 1.
+		((unit between: 16rD800 and: 16rDBFF) and: [i < n])
+			ifTrue: [
+				low := bytes unsignedShortAt: i * 2 + 1.
+				out nextPut: (Character value: 16r10000 + ((unit - 16rD800) bitShift: 10) + (low - 16rDC00)).
+				i := i + 2]
+			ifFalse: [
+				out nextPut: (Character value: unit).
+				i := i + 1]].
+	^ out contents'.
+cm value: stdin class value: 'win32' value: 'getStdHandle: n
+	^ self ffiCall: #(void* GetStdHandle(long n)) module: ''kernel32.dll'''.
+cm value: stdin class value: 'win32' value: 'getFileType: h
+	^ self ffiCall: #(uint32 GetFileType(void* h)) module: ''kernel32.dll'''.
+cm value: stdin class value: 'win32' value: 'peekNamedPipe: h buffer: b size: s read: r available: a left: l
+	^ self ffiCall: #(int PeekNamedPipe(void* h, void* b, uint32 s, void* r, void* a, void* l)) module: ''kernel32.dll'''.
+cm value: stdin class value: 'instance creation' value: 'new
+	^ self basicNew initialize'.
+cm value: stdin value: 'initialization' value: 'initialize
+	| type |
+	pending := OrderedCollection new.
+	eof := false.
+	kind := #unknown.
+	Smalltalk os isWindows ifFalse: [^ self].
+	[handle := self class getStdHandle: -10.
+	 type := self class getFileType: handle.
+	 kind := type = 1 ifTrue: [#file] ifFalse: [
+		type = 2 ifTrue: [#console] ifFalse: [
+		type = 3 ifTrue: [#pipe] ifFalse: [#unknown]]]]
+		on: Error do: [:e | kind := #unknown]'.
+cm value: stdin value: 'accessing' value: 'kind
+	^ kind'.
+cm value: stdin value: 'private' value: 'noInputMeansEnd
+	"Called when a read found no bytes. Answer whether input has really ended."
+	kind = #console ifTrue: [^ false].
+	kind = #pipe ifTrue: [
+		^ [(self class peekNamedPipe: handle buffer: nil size: 0 read: nil available: (ByteArray new: 4) left: nil) = 0]
+			on: Error do: [:e | true]].
+	^ true'.
+cm value: stdin value: 'private' value: 'waitForInput
+	"Block until at least one byte is pending, or input has ended."
+	| chunk |
+	kind = #console ifTrue: [
+		[pending isEmpty and: [eof not]] whileTrue: [self readConsoleLine].
+		^ self].
+	[pending isEmpty and: [eof not]] whileTrue: [
+		chunk := Stdio stdin next: 4096.
+		chunk isEmpty
+			ifTrue: [self noInputMeansEnd
+				ifTrue: [eof := true]
+				ifFalse: [(Delay forMilliseconds: 20) wait]]
+			ifFalse: [pending addAll: chunk]]'.
+cm value: stdin value: 'testing' value: 'atEnd
+	self waitForInput.
+	^ pending isEmpty'.
+cm value: stdin value: 'reading' value: 'nextLine
+	"The next line without its line ending; at end of input, whatever was left."
+	| bytes b line |
+	bytes := WriteStream on: (ByteArray new: 80).
+	[self atEnd or: [(b := pending removeFirst) = 10]] whileFalse: [bytes nextPut: b].
+	line := bytes contents.
+	(line notEmpty and: [line last = 13]) ifTrue: [line := line allButLast].
+	"Ctrl+Z typed alone on a console line means end of input, by Windows convention"
+	(line size = 1 and: [line first = 26]) ifTrue: [eof := true. pending removeAll. ^ ''''].
+	^ line utf8Decoded'.
 
 "=== LispRepl =============================================================="
 cm value: repl value: 'private' value: 'setIn: inStream out: outStream err: errStream
@@ -106,7 +214,7 @@ cm value: shell value: 'running' value: 'warnIfStale
 			nextPut: Character lf; flush]'.
 cm value: shell value: 'running' value: 'runRepl
 	(LispRepl
-		in: (ZnCharacterReadStream on: Stdio stdin encoding: ''utf8'')
+		in: LispStdin new
 		out: Stdio stdout
 		err: Stdio stderr) run.
 	Smalltalk exit: 0'.

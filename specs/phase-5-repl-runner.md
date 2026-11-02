@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 5 |
-| **Status** | Implemented (2026-11-02) — `tests/phase-5-shell.st` 28/28, `tests/phase-5-runner.bat` 27/27; Phases 1–4 still green |
+| **Status** | Implemented (2026-11-02) — `tests/phase-5-shell.st` 28/28, `tests/phase-5-runner.bat` 28/28; Phases 1–4 still green |
 | **Depends on** | Phases 1–4 |
 | **Feeds** | Phase 6 (optimization), Phase 7 (language reach), Phase 8 (self-hosting) |
 | **Image strategy** | Build a dedicated `cog-lisp.image` once; the runner and REPL start from it |
@@ -261,6 +261,15 @@ a change:
 - **Incomplete input.** `LispReadError>>isIncomplete` is true when the input ran
   out (unterminated list, string, comment); the REPL keeps reading on those and
   reports the rest.
+- **The REPL reads stdin through `LispStdin`, which waits for input.** Pharo's
+  stdin never blocks and reports "no input yet" the same way as end of input, so
+  the first version failed at an interactive console ("Incomplete input for
+  character decoding") and ended at once when piped input arrived late.
+  `LispStdin` asks Windows whether stdin is a console, pipe, or file to decide
+  when input has really ended, and polls otherwise. A console is read with
+  `ReadConsoleW` instead, because the VM never reads a console at all (typed
+  keys were not even echoed). The runner suite checks late-arriving input; the
+  console path was verified by injecting keystrokes with `WriteConsoleInputW`.
 - **REPL errors** go to stderr, like run-mode errors; results and program output
   go to stdout.
 - **`cog-lisp.bat`** exits 2 if the image is missing, and honours

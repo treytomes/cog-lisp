@@ -96,9 +96,29 @@ and prints its `printString`.
   `PharoConsole.exe --headless <image> …` the image chooses `NullWorldRenderer`
   and no window exists. `build-image.bat` and `cog-lisp.bat` both pass it. (A
   null-renderer swap before saving only appeared to work; startup replaces it.)
-- **stdin:** `Stdio stdin` is binary (no `nextLine`). Wrap it:
-  `ZnCharacterReadStream on: Stdio stdin encoding: 'utf8'` gives `nextLine` /
-  `atEnd`, handles CRLF and a final line without a newline. Piped input works.
+- **stdin never blocks, and can't tell "no input yet" from "end of input".**
+  `Stdio stdin` is binary. With nothing buffered, `next:` answers 0 bytes and
+  `atEnd` answers true, exactly as at real end of input. So wrapping it in
+  `ZnCharacterReadStream` only *seems* to work, with input already sitting in a
+  pipe: at a console it fails with "Incomplete input for character decoding", and
+  with late-arriving pipe input it ends immediately. Use `LispStdin`
+  (`src/coglisp-shell.st`): on 0 bytes it asks Windows via uFFI what stdin is
+  (`GetStdHandle(-10)`, then `GetFileType`: 1 = file, 2 = console, 3 = pipe). A
+  console never ends; a file has ended; a pipe has ended once
+  `PeekNamedPipe` answers 0 (the writer closed it; while open it answers 1 even
+  when empty). Otherwise it sleeps 20 ms and polls. It decodes UTF-8 a whole line
+  at a time. Always test stdin code with **delayed** input, e.g.
+  `(sleep 2; printf '…\n') | cog-lisp.bat`, not just a ready pipe.
+- **A console is never readable through `Stdio stdin`.** The VM never issues a
+  console read, so keys are neither echoed nor delivered (the REPL shows its
+  prompt and ignores the keyboard). `LispStdin` reads a console with
+  `ReadConsoleW` via uFFI instead: it blocks the VM until Enter, Windows does the
+  echo and line editing, and it returns UTF-16. Ctrl+Z alone on a line arrives
+  as `16r1A` and ends input.
+- **Testing console input without a person:** open `CONIN$` with `CreateFileW`
+  and inject keystrokes with `WriteConsoleInputW` (20-byte `INPUT_RECORD`s:
+  EventType 1 at offset 1, bKeyDown 1 at 5, repeat 1 at 9, the UTF-16 char at
+  15), then read with `LispStdin onConsoleHandle:`.
 - **stdout/stderr:** `Stdio stdout` / `Stdio stderr` are separate. Redirecting
   Pharo's stdout to `/dev/null` (NUL) makes writes fail; redirect to a file.
 
