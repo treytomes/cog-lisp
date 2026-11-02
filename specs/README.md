@@ -31,7 +31,7 @@ to successor).
 | 2 | [Core Data Model](phase-2-core-data-model.md) | Implemented (49/49) |
 | 3 | [Compiler Core](phase-3-compiler-core.md) | Implemented (31/31) |
 | 4 | [Runtime & Primitives](phase-4-runtime-primitives.md) | Implemented (44/44) |
-| 5 | [REPL, Runner & Image](phase-5-repl-runner.md) | Implemented (28/28 + 28/28) |
+| 5 | [REPL, Runner & Image](phase-5-repl-runner.md) | Implemented (28/28 + 30/30) |
 
 Later phases (2–7, see the [project plan](../README.md#project-plan)) get their
 specs here as we reach them.

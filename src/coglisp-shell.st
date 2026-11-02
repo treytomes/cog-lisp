@@ -88,7 +88,7 @@ cm value: stdin value: 'initialization' value: 'initialize
 	pending := OrderedCollection new.
 	eof := false.
 	kind := #unknown.
-	Smalltalk os isWindows ifFalse: [^ self].
+	OSPlatform current isWindows ifFalse: [^ self].
 	[handle := self class getStdHandle: -10.
 	 type := self class getFileType: handle.
 	 kind := type = 1 ifTrue: [#file] ifFalse: [
@@ -199,7 +199,7 @@ cm value: shell class value: 'build' value: 'markBuilt
 cm value: shell class value: 'build' value: 'buildTime
 	^ BuildTime'.
 cm value: shell value: 'running' value: 'fail: aString
-	Stdio stderr nextPutAll: ''error: '' , aString; nextPut: Character lf; flush.
+	LispTextOutput stderr nextPutAll: ''error: '' , aString; nextPut: Character lf; flush.
 	Smalltalk exit: 1'.
 cm value: shell value: 'running' value: 'warnIfStale
 	"Warn when any src/*.st file is newer than this image build (Phase 5 section 4.2)."
@@ -209,19 +209,19 @@ cm value: shell value: 'running' value: 'warnIfStale
 	srcDir := Smalltalk imageDirectory parent / ''src''.
 	srcDir exists ifFalse: [^ self].
 	(srcDir filesMatching: ''*.st'') detect: [:f | f modificationTime > built] ifFound: [:f |
-		Stdio stderr
+		LispTextOutput stderr
 			nextPutAll: ''warning: '' , f basename , '' is newer than this image; run build-image.bat to rebuild'';
 			nextPut: Character lf; flush]'.
 cm value: shell value: 'running' value: 'runRepl
 	(LispRepl
 		in: LispStdin new
-		out: Stdio stdout
-		err: Stdio stderr) run.
+		out: LispTextOutput stdout
+		err: LispTextOutput stderr) run.
 	Smalltalk exit: 0'.
 cm value: shell value: 'running' value: 'runFile: aPath
 	aPath isNil ifTrue: [^ self fail: ''no program file given''].
 	LispCompiler new evalFile: aPath.
-	Stdio stdout flush.
+	LispTextOutput stdout flush.
 	Smalltalk exit: 0'.
 cm value: shell value: 'running' value: 'execute
 	| args text |

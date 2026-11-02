@@ -6,9 +6,10 @@
  coglisp-compiler.st. Set-car and set-cdr contain a bang, written doubled so the
  chunk reader keeps it.
 
- Classes: LispError, LispArityError, LispProcedure, LispPrimitives.
+ Classes: LispError, LispArityError, LispProcedure, LispPrimitives,
+ LispTextOutput.
  ============================================================================"
-| failures cm lerr aerr proc prims |
+| failures cm lerr aerr proc prims tout |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -19,6 +20,78 @@ lerr  := (Error  << #LispError) package: 'CogLisp-Runtime'; install.
 aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp-Runtime'; install.
 proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source }; package: 'CogLisp-Runtime'; install.
 prims := (Object << #LispPrimitives) sharedVariables: { #Output }; package: 'CogLisp-Runtime'; install.
+tout  := (Object << #LispTextOutput) slots: { #kind. #handle. #stream. #buffer }; sharedVariables: { #Session. #Stdout. #Stderr }; package: 'CogLisp-Runtime'; install.
+
+"=== LispTextOutput =========================================================
+ Text output to stdout or stderr that encodes properly. Pharo's Stdio streams
+ write a string's internal representation (Latin-1 bytes, or four bytes per
+ character for wide strings), so non-ASCII text came out garbled. Text is
+ buffered until flush, then written:
+   to a console  with WriteConsoleW (UTF-16): Windows draws the characters, so
+                 the console code page does not matter and is never changed;
+   otherwise     as UTF-8 bytes on the Stdio stream (pipes, files, non-Windows)."
+cm value: tout class value: 'win32' value: 'getStdHandle: n
+	^ self ffiCall: #(void* GetStdHandle(long n)) module: ''kernel32.dll'''.
+cm value: tout class value: 'win32' value: 'getFileType: h
+	^ self ffiCall: #(uint32 GetFileType(void* h)) module: ''kernel32.dll'''.
+cm value: tout class value: 'win32' value: 'writeConsole: h buffer: b count: n written: w reserved: r
+	^ self ffiCall: #(int WriteConsoleW(void* h, void* b, uint32 n, void* w, void* r)) module: ''kernel32.dll'''.
+cm value: tout class value: 'accessing' value: 'stdout
+	"The shared stdout writer for this session (handles change when the image restarts)."
+	self ensureSession.
+	^ Stdout ifNil: [Stdout := self onStd: -11 stream: Stdio stdout]'.
+cm value: tout class value: 'accessing' value: 'stderr
+	self ensureSession.
+	^ Stderr ifNil: [Stderr := self onStd: -12 stream: Stdio stderr]'.
+cm value: tout class value: 'private' value: 'ensureSession
+	Session == Smalltalk session ifFalse: [
+		Session := Smalltalk session.
+		Stdout := nil.
+		Stderr := nil]'.
+cm value: tout class value: 'instance creation' value: 'onStd: stdHandleNumber stream: aStdioStream
+	| h |
+	OSPlatform current isWindows ifTrue: [
+		[h := self getStdHandle: stdHandleNumber.
+		 (self getFileType: h) = 2 ifTrue: [^ self onConsoleHandle: h]]
+			on: Error do: [:e | ]].
+	^ self basicNew setKind: #stream handle: nil stream: aStdioStream'.
+cm value: tout class value: 'instance creation' value: 'onConsoleHandle: aHandle
+	"A writer for a specific console output handle (used by tests)."
+	^ self basicNew setKind: #console handle: aHandle stream: nil'.
+cm value: tout value: 'private' value: 'setKind: aSymbol handle: aHandle stream: aStream
+	kind := aSymbol.
+	handle := aHandle.
+	stream := aStream.
+	buffer := WriteStream on: (String new: 256)'.
+cm value: tout value: 'accessing' value: 'kind
+	^ kind'.
+cm value: tout value: 'writing' value: 'nextPutAll: aString
+	buffer nextPutAll: aString'.
+cm value: tout value: 'writing' value: 'nextPut: aCharacter
+	buffer nextPut: aCharacter'.
+cm value: tout value: 'writing' value: 'flush
+	| text units |
+	text := buffer contents.
+	buffer := WriteStream on: (String new: 256).
+	text isEmpty ifTrue: [^ self].
+	kind = #console ifTrue: [
+		units := self utf16: text.
+		self class writeConsole: handle buffer: units count: units size // 2 written: (ByteArray new: 4) reserved: nil.
+		^ self].
+	stream nextPutAll: text utf8Encoded; flush'.
+cm value: tout value: 'private' value: 'utf16: aString
+	"Little-endian UTF-16 code units for aString, with surrogate pairs above U+FFFF."
+	| out code v |
+	out := WriteStream on: (ByteArray new: aString size * 2).
+	aString do: [:ch |
+		code := ch asInteger.
+		code < 16r10000
+			ifTrue: [out nextPut: (code bitAnd: 255); nextPut: (code bitShift: -8)]
+			ifFalse: [
+				v := code - 16r10000.
+				out nextPut: (((v bitShift: -10) + 16rD800) bitAnd: 255); nextPut: (((v bitShift: -10) + 16rD800) bitShift: -8).
+				out nextPut: (((v bitAnd: 16r3FF) + 16rDC00) bitAnd: 255); nextPut: (((v bitAnd: 16r3FF) + 16rDC00) bitShift: -8)]].
+	^ out contents'.
 
 "=== LispArityError ========================================================"
 cm value: aerr value: 'accessing' value: 'proc
@@ -86,7 +159,7 @@ cm value: prims class value: 'installing' value: 'installDefault
 	^ self installInto: LispEnvironment default'.
 cm value: prims class value: 'output' value: 'output
 	"Where display/write/newline/disassemble write. Defaults to stdout; the REPL and tests redirect it."
-	^ Output ifNil: [Stdio stdout]'.
+	^ Output ifNil: [LispTextOutput stdout]'.
 cm value: prims class value: 'output' value: 'withOutput: aStream do: aBlock
 	| previous |
 	previous := Output.

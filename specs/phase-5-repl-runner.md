@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 5 |
-| **Status** | Implemented (2026-11-02) — `tests/phase-5-shell.st` 28/28, `tests/phase-5-runner.bat` 28/28; Phases 1–4 still green |
+| **Status** | Implemented (2026-11-02) — `tests/phase-5-shell.st` 28/28, `tests/phase-5-runner.bat` 30/30; Phases 1–4 still green |
 | **Depends on** | Phases 1–4 |
 | **Feeds** | Phase 6 (optimization), Phase 7 (language reach), Phase 8 (self-hosting) |
 | **Image strategy** | Build a dedicated `cog-lisp.image` once; the runner and REPL start from it |
@@ -270,6 +270,11 @@ a change:
   `ReadConsoleW` instead, because the VM never reads a console at all (typed
   keys were not even echoed). The runner suite checks late-arriving input; the
   console path was verified by injecting keystrokes with `WriteConsoleInputW`.
+- **Output is encoded through `LispTextOutput`.** Pharo's `Stdio` streams write a
+  string's internal representation, so non-ASCII text came out garbled.
+  `LispTextOutput` writes to a console with `WriteConsoleW` (UTF-16) and to pipes
+  and files as UTF-8. The runner suite checks UTF-8 in a program's source and
+  output; console output was verified by reading back the screen buffer.
 - **REPL errors** go to stderr, like run-mode errors; results and program output
   go to stdout.
 - **`cog-lisp.bat`** exits 2 if the image is missing, and honours

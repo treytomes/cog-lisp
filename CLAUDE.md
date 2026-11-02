@@ -121,6 +121,18 @@ and prints its `printString`.
   15), then read with `LispStdin onConsoleHandle:`.
 - **stdout/stderr:** `Stdio stdout` / `Stdio stderr` are separate. Redirecting
   Pharo's stdout to `/dev/null` (NUL) makes writes fail; redirect to a file.
+- **`Stdio stdout` does not encode text.** It writes a string's internal
+  representation: `é` as the Latin-1 byte `E9`, and wide strings as four bytes per
+  character (`λ` → `BB 03 00 00`, which a console shows as `╗`). Write text through
+  `LispTextOutput stdout` / `stderr` (`src/coglisp-runtime.st`): to a console it
+  uses `WriteConsoleW` (UTF-16, so the console code page never matters and is
+  never changed); to pipes and files it writes UTF-8. To verify console output
+  without a person, read the screen back with `ReadConsoleOutputCharacterW` on
+  `CONOUT$`.
+- **Deprecated calls print to stdout.** Pharo 14's deprecation rewriter prints a
+  `DeprecationPerformedNotification` to stdout the first time a deprecated method
+  is called in a session (e.g. `Smalltalk os`; use `OSPlatform current`), which
+  corrupts program output. Byte-exact `.expected` checks catch it.
 
 ## Verified Opal AST API (Pharo 14) — for the Phase 3 compiler
 

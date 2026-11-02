@@ -28,7 +28,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 2 | Core data model | ✅ **done** — [spec](specs/phase-2-core-data-model.md), 49/49 |
 | 3 | Compiler core | ✅ **done** — [spec](specs/phase-3-compiler-core.md), 31/31 |
 | 4 | Runtime & primitives | ✅ **done** — [spec](specs/phase-4-runtime-primitives.md), 44/44 |
-| 5 | REPL & image integration | ✅ **done** — [spec](specs/phase-5-repl-runner.md), 28/28 + 28/28 |
+| 5 | REPL & image integration | ✅ **done** — [spec](specs/phase-5-repl-runner.md), 28/28 + 30/30 |
 | 6 | Optimization & native depth | ⬜ |
 | 7 | Language reach (stretch) | ⬜ |
 | 8 | Self-hosting (meta-circular) | ⬜ |
