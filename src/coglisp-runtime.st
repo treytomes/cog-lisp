@@ -6,10 +6,10 @@
  coglisp-compiler.st. Set-car and set-cdr contain a bang, written doubled so the
  chunk reader keeps it.
 
- Classes: LispError, LispArityError, LispProcedure, LispPrimitives,
+ Classes: LispError, LispArityError, LispProcedure, LispTailCall, LispPrimitives,
  LispTextOutput.
  ============================================================================"
-| failures cm lerr aerr proc prims tout |
+| failures cm lerr aerr proc tcall prims tout |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -18,7 +18,8 @@ cm := [:cls :cat :src |
 
 lerr  := (Error  << #LispError) package: 'CogLisp-Runtime'; install.
 aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp-Runtime'; install.
-proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source }; package: 'CogLisp-Runtime'; install.
+proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries }; package: 'CogLisp-Runtime'; install.
+tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runtime'; install.
 prims := (Object << #LispPrimitives) sharedVariables: { #Output }; package: 'CogLisp-Runtime'; install.
 tout  := (Object << #LispTextOutput) slots: { #kind. #handle. #stream. #buffer }; sharedVariables: { #Session. #Stdout. #Stderr }; package: 'CogLisp-Runtime'; install.
 
@@ -141,9 +142,138 @@ cm value: proc class value: 'instance creation' value: 'fixed: aBlock arity: n s
 	^ (self fixed: aBlock arity: n) source: aString; yourself'.
 cm value: proc class value: 'instance creation' value: 'variadic: aBlock required: n source: aString
 	^ (self variadic: aBlock required: n) source: aString; yourself'.
-cm value: proc class value: 'applying' value: 'apply: fn to: anArray
+cm value: proc value: 'testing' value: 'isFixedArity: n
+	^ hasRest not and: [required = n]'.
+cm value: proc value: 'testing' value: 'isPrimitive
+	"Primitives are the procedures with no LISP source (Phase 5 section 5.2). They
+	 never grow the stack without bound, so a tail call to one needs no bounce."
+	^ source isNil'.
+cm value: proc value: 'fast calls' value: 'entry: n is: aBlock
+	"Give a variadic primitive a direct entry for exactly n arguments (0-4), used by
+	 the fast-call path instead of building an argument array and a rest list. The
+	 block must be a trusted primitive: it returns a plain value, never a bounce."
+	entries isNil ifTrue: [entries := Array new: 5].
+	entries at: n + 1 put: aBlock'.
+cm value: proc value: 'fast calls' value: 'entryFor: n
+	entries isNil ifTrue: [^ nil].
+	^ entries at: n + 1'.
+
+"--- calling, with proper tail calls (Phase 6 section 4.3) -------------------
+ A call in tail position returns a LispTailCall (a bounce) instead of calling.
+ Every non-tail call site goes through apply:to: or call:with:..., which drive the
+ result: while it is a bounce, run it. So a bounce never reaches LISP code, and a
+ chain of tail calls uses one stack frame.
+ applyTo: is the raw invocation and does not drive."
+cm value: proc class value: 'applying' value: 'invoke: fn with: anArray
 	(fn isKindOf: LispProcedure) ifFalse: [^ (LispError new) signal: ''object is not applicable: '' , fn printString].
 	^ fn applyTo: anArray'.
+cm value: proc class value: 'applying' value: 'drive: aResult
+	| r |
+	r := aResult.
+	[r class == LispTailCall] whileTrue: [r := self invoke: r fn with: r args].
+	^ r'.
+cm value: proc class value: 'applying' value: 'apply: fn to: anArray
+	^ self drive: (self invoke: fn with: anArray)'.
+cm value: proc class value: 'applying' value: 'tailCall: fn to: anArray
+	^ LispTailCall fn: fn args: anArray'.
+cm value: proc class value: 'tail calls' value: 'tailCall: fn
+	"A primitive is called directly; its result, which may itself be a bounce
+	 (apply), goes back to our caller to drive. Anything else becomes a bounce."
+	| e |
+	(fn class == LispProcedure and: [fn isPrimitive]) ifTrue: [
+		(fn isFixedArity: 0) ifTrue: [^ fn block value].
+		(e := fn entryFor: 0) notNil ifTrue: [^ e value]].
+	^ LispTailCall fn: fn args: #()'.
+cm value: proc class value: 'tail calls' value: 'tailCall: fn with: a
+	"A primitive is called directly; its result, which may itself be a bounce
+	 (apply), goes back to our caller to drive. Anything else becomes a bounce."
+	| e |
+	(fn class == LispProcedure and: [fn isPrimitive]) ifTrue: [
+		(fn isFixedArity: 1) ifTrue: [^ fn block value: a].
+		(e := fn entryFor: 1) notNil ifTrue: [^ e value: a]].
+	^ LispTailCall fn: fn args: { a }'.
+cm value: proc class value: 'tail calls' value: 'tailCall: fn with: a with: b
+	"A primitive is called directly; its result, which may itself be a bounce
+	 (apply), goes back to our caller to drive. Anything else becomes a bounce."
+	| e |
+	(fn class == LispProcedure and: [fn isPrimitive]) ifTrue: [
+		(fn isFixedArity: 2) ifTrue: [^ fn block value: a value: b].
+		(e := fn entryFor: 2) notNil ifTrue: [^ e value: a value: b]].
+	^ LispTailCall fn: fn args: { a. b }'.
+cm value: proc class value: 'tail calls' value: 'tailCall: fn with: a with: b with: c
+	"A primitive is called directly; its result, which may itself be a bounce
+	 (apply), goes back to our caller to drive. Anything else becomes a bounce."
+	| e |
+	(fn class == LispProcedure and: [fn isPrimitive]) ifTrue: [
+		(fn isFixedArity: 3) ifTrue: [^ fn block value: a value: b value: c].
+		(e := fn entryFor: 3) notNil ifTrue: [^ e value: a value: b value: c]].
+	^ LispTailCall fn: fn args: { a. b. c }'.
+cm value: proc class value: 'tail calls' value: 'tailCall: fn with: a with: b with: c with: d
+	"A primitive is called directly; its result, which may itself be a bounce
+	 (apply), goes back to our caller to drive. Anything else becomes a bounce."
+	| e |
+	(fn class == LispProcedure and: [fn isPrimitive]) ifTrue: [
+		(fn isFixedArity: 4) ifTrue: [^ fn block value: a value: b value: c value: d].
+		(e := fn entryFor: 4) notNil ifTrue: [^ e value: a value: b value: c value: d]].
+	^ LispTailCall fn: fn args: { a. b. c. d }'.
+"Fast calls (Phase 6 section 5.1): a fixed-arity procedure of exactly this arity is
+ called through its block directly, with no argument array."
+cm value: proc class value: 'fast calls' value: 'call: fn
+	| r e |
+	fn class == LispProcedure ifFalse: [^ self apply: fn to: #()].
+	(fn isFixedArity: 0) ifTrue: [
+		r := fn block value.
+		r class == LispTailCall ifTrue: [^ self drive: r].
+		^ r].
+	(e := fn entryFor: 0) notNil ifTrue: [^ e value].
+	^ self apply: fn to: #()'.
+cm value: proc class value: 'fast calls' value: 'call: fn with: a
+	| r e |
+	fn class == LispProcedure ifFalse: [^ self apply: fn to: { a }].
+	(fn isFixedArity: 1) ifTrue: [
+		r := fn block value: a.
+		r class == LispTailCall ifTrue: [^ self drive: r].
+		^ r].
+	(e := fn entryFor: 1) notNil ifTrue: [^ e value: a].
+	^ self apply: fn to: { a }'.
+cm value: proc class value: 'fast calls' value: 'call: fn with: a with: b
+	| r e |
+	fn class == LispProcedure ifFalse: [^ self apply: fn to: { a. b }].
+	(fn isFixedArity: 2) ifTrue: [
+		r := fn block value: a value: b.
+		r class == LispTailCall ifTrue: [^ self drive: r].
+		^ r].
+	(e := fn entryFor: 2) notNil ifTrue: [^ e value: a value: b].
+	^ self apply: fn to: { a. b }'.
+cm value: proc class value: 'fast calls' value: 'call: fn with: a with: b with: c
+	| r e |
+	fn class == LispProcedure ifFalse: [^ self apply: fn to: { a. b. c }].
+	(fn isFixedArity: 3) ifTrue: [
+		r := fn block value: a value: b value: c.
+		r class == LispTailCall ifTrue: [^ self drive: r].
+		^ r].
+	(e := fn entryFor: 3) notNil ifTrue: [^ e value: a value: b value: c].
+	^ self apply: fn to: { a. b. c }'.
+cm value: proc class value: 'fast calls' value: 'call: fn with: a with: b with: c with: d
+	| r e |
+	fn class == LispProcedure ifFalse: [^ self apply: fn to: { a. b. c. d }].
+	(fn isFixedArity: 4) ifTrue: [
+		r := fn block value: a value: b value: c value: d.
+		r class == LispTailCall ifTrue: [^ self drive: r].
+		^ r].
+	(e := fn entryFor: 4) notNil ifTrue: [^ e value: a value: b value: c value: d].
+	^ self apply: fn to: { a. b. c. d }'.
+
+"=== LispTailCall ==========================================================="
+cm value: tcall value: 'private' value: 'setFn: aProcedure args: anArray
+	fn := aProcedure.
+	args := anArray'.
+cm value: tcall value: 'accessing' value: 'fn
+	^ fn'.
+cm value: tcall value: 'accessing' value: 'args
+	^ args'.
+cm value: tcall class value: 'instance creation' value: 'fn: aProcedure args: anArray
+	^ self basicNew setFn: aProcedure args: anArray'.
 
 "=== LispPrimitives : install the library (class-side) ====================="
 cm value: prims class value: 'installing' value: 'installInto: anEnv
@@ -198,13 +328,33 @@ cm value: prims class value: 'installing' value: 'installNumbersInto: anEnv
 	anEnv define: (LispSymbol named: ''max'') value: (LispProcedure variadic: [:first :rest | rest lispElements inject: first into: [:a :b | a max: b]] required: 1).
 	anEnv define: (LispSymbol named: ''zero?'') value: (LispProcedure fixed: [:a | a = 0] arity: 1).
 	anEnv define: (LispSymbol named: ''positive?'') value: (LispProcedure fixed: [:a | a > 0] arity: 1).
-	anEnv define: (LispSymbol named: ''negative?'') value: (LispProcedure fixed: [:a | a < 0] arity: 1)'.
+	anEnv define: (LispSymbol named: ''negative?'') value: (LispProcedure fixed: [:a | a < 0] arity: 1).
+	self installNumberEntriesInto: anEnv'.
+cm value: prims class value: 'installing' value: 'installNumberEntriesInto: anEnv
+	"Phase 6 section 5.1: direct entries for the common fixed-arity uses of the
+	 variadic arithmetic primitives, so (+ a b) costs one block call."
+	| e |
+	e := [:name | anEnv lookup: (LispSymbol named: name)].
+	(e value: ''+'') entry: 1 is: [:a | a]; entry: 2 is: [:a :b | a + b]; entry: 3 is: [:a :b :c | a + b + c].
+	(e value: ''*'') entry: 1 is: [:a | a]; entry: 2 is: [:a :b | a * b]; entry: 3 is: [:a :b :c | a * b * c].
+	(e value: ''-'') entry: 1 is: [:a | a negated]; entry: 2 is: [:a :b | a - b].
+	(e value: ''/'') entry: 1 is: [:a | 1 / a]; entry: 2 is: [:a :b | a / b].
+	(e value: ''min'') entry: 2 is: [:a :b | a min: b].
+	(e value: ''max'') entry: 2 is: [:a :b | a max: b]'.
 cm value: prims class value: 'installing' value: 'installComparisonsInto: anEnv
+	| e |
 	anEnv define: (LispSymbol named: ''='') value: (LispProcedure variadic: [:first :rest | | prev ok | prev := first. ok := true. rest lispElements do: [:x | (prev = x) ifFalse: [ok := false]. prev := x]. ok] required: 1).
 	anEnv define: (LispSymbol named: ''<'') value: (LispProcedure variadic: [:first :rest | | prev ok | prev := first. ok := true. rest lispElements do: [:x | (prev < x) ifFalse: [ok := false]. prev := x]. ok] required: 1).
 	anEnv define: (LispSymbol named: ''>'') value: (LispProcedure variadic: [:first :rest | | prev ok | prev := first. ok := true. rest lispElements do: [:x | (prev > x) ifFalse: [ok := false]. prev := x]. ok] required: 1).
 	anEnv define: (LispSymbol named: ''<='') value: (LispProcedure variadic: [:first :rest | | prev ok | prev := first. ok := true. rest lispElements do: [:x | (prev <= x) ifFalse: [ok := false]. prev := x]. ok] required: 1).
-	anEnv define: (LispSymbol named: ''>='') value: (LispProcedure variadic: [:first :rest | | prev ok | prev := first. ok := true. rest lispElements do: [:x | (prev >= x) ifFalse: [ok := false]. prev := x]. ok] required: 1)'.
+	anEnv define: (LispSymbol named: ''>='') value: (LispProcedure variadic: [:first :rest | | prev ok | prev := first. ok := true. rest lispElements do: [:x | (prev >= x) ifFalse: [ok := false]. prev := x]. ok] required: 1).
+	"direct two-argument entries (Phase 6 section 5.1)"
+	e := [:name | anEnv lookup: (LispSymbol named: name)].
+	(e value: ''='') entry: 2 is: [:a :b | a = b].
+	(e value: ''<'') entry: 2 is: [:a :b | a < b].
+	(e value: ''>'') entry: 2 is: [:a :b | a > b].
+	(e value: ''<='') entry: 2 is: [:a :b | a <= b].
+	(e value: ''>='') entry: 2 is: [:a :b | a >= b]'.
 cm value: prims class value: 'installing' value: 'installPredicatesInto: anEnv
 	anEnv define: (LispSymbol named: ''eq?'') value: (LispProcedure fixed: [:a :b | LispCore eq: a with: b] arity: 2).
 	anEnv define: (LispSymbol named: ''eqv?'') value: (LispProcedure fixed: [:a :b | LispCore eqv: a with: b] arity: 2).
@@ -226,11 +376,18 @@ cm value: prims class value: 'installing' value: 'installSystemInto: anEnv
 	anEnv define: (LispSymbol named: ''exit'') value: (LispProcedure variadic: [:codes | Smalltalk exit: (codes lispElements ifEmpty: [0] ifNotEmpty: [:c | c first])] required: 0).
 	anEnv define: (LispSymbol named: ''save-image'') value: (LispProcedure fixed: [self saveImage] arity: 0).
 	anEnv define: (LispSymbol named: ''procedure-source'') value: (LispProcedure fixed: [:p | p source ifNil: [false]] arity: 1).
+	anEnv define: (LispSymbol named: ''stack-depth'') value: (LispProcedure fixed: [| c n |
+		c := thisContext.
+		n := 0.
+		[c notNil] whileTrue: [n := n + 1. c := c sender].
+		n] arity: 0).
 	anEnv define: (LispSymbol named: ''disassemble'') value: (LispProcedure fixed: [:p |
 		self output nextPutAll: p block compiledBlock symbolic; nextPut: Character lf; flush.
 		LispUnspecified default] arity: 1)'.
 cm value: prims class value: 'installing' value: 'installControlInto: anEnv
-	anEnv define: (LispSymbol named: ''apply'') value: (LispProcedure fixed: [:prc :argList | LispProcedure apply: prc to: argList lispElements asArray] arity: 2)'.
+	"apply answers a bounce rather than calling, so that a tail call through apply
+	 runs in constant stack; every caller of a procedure drives bounces (Phase 6)."
+	anEnv define: (LispSymbol named: ''apply'') value: (LispProcedure fixed: [:prc :argList | LispProcedure tailCall: prc to: argList lispElements asArray] arity: 2)'.
 
 "=== load report ==========================================================="
 Stdio stdout

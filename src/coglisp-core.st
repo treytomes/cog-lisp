@@ -7,9 +7,10 @@
  AFTER coglisp-reader.st, since its method bodies name the Phase-1 classes
  LispCons / LispSymbol / LispEmptyList.
 
- Classes: LispCore (stateless facade), LispEnvironment, LispUnboundError.
+ Classes: LispCore (stateless facade), LispEnvironment, LispGlobal,
+ LispUnboundError.
  ============================================================================"
-| failures cm core env err |
+| failures cm core env cell err |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -18,6 +19,7 @@ cm := [:cls :cat :src |
 
 core := (Object << #LispCore) package: 'CogLisp-Core'; install.
 env  := (Object << #LispEnvironment) slots: { #bindings }; sharedVariables: { #Default }; package: 'CogLisp-Core'; install.
+cell := (Object << #LispGlobal) slots: { #symbol. #value. #bound }; package: 'CogLisp-Core'; install.
 err  := (Error  << #LispUnboundError) slots: { #symbol }; package: 'CogLisp-Core'; install.
 
 "=== LispCore : type predicates (class-side) ==============================="
@@ -63,24 +65,55 @@ cm value: core class value: 'equality' value: 'equal: a with: b
 cm value: core class value: 'truth' value: 'isTruthy: v
 	^ v ~~ false'.
 
+"=== LispGlobal (Phase 6 section 5.2) ======================================
+ One global variable: a cell owned by an environment. Compiled code holds the
+ cell itself as a literal, so a reference is one indirection at run time. A cell
+ may exist before its variable is defined (a forward reference); reading or
+ assigning it then raises LispUnboundError."
+cm value: cell value: 'private' value: 'setSymbol: aSymbol
+	symbol := aSymbol.
+	bound := false'.
+cm value: cell value: 'accessing' value: 'symbol
+	^ symbol'.
+cm value: cell value: 'testing' value: 'isBound
+	^ bound'.
+cm value: cell value: 'accessing' value: 'value
+	bound ifFalse: [^ self signalUnbound].
+	^ value'.
+cm value: cell value: 'accessing' value: 'valueIfUnbound: aBlock
+	bound ifFalse: [^ aBlock value].
+	^ value'.
+cm value: cell value: 'accessing' value: 'define: aValue
+	value := aValue.
+	bound := true.
+	^ aValue'.
+cm value: cell value: 'accessing' value: 'assign: aValue
+	bound ifFalse: [^ self signalUnbound].
+	value := aValue.
+	^ aValue'.
+cm value: cell value: 'private' value: 'signalUnbound
+	^ (LispUnboundError new) symbol: symbol; signal: ''unbound variable: '' , symbol name'.
+cm value: cell value: 'printing' value: 'printOn: aStream
+	aStream nextPutAll: ''#<global '' , symbol name , ''>'''.
+cm value: cell class value: 'instance creation' value: 'symbol: aSymbol
+	^ self new setSymbol: aSymbol'.
+
 "=== LispEnvironment ======================================================="
 cm value: env value: 'initialization' value: 'initialize
 	bindings := IdentityDictionary new'.
+cm value: env value: 'cells' value: 'cellFor: aSymbol
+	"The cell for aSymbol, created unbound if it does not exist yet."
+	^ bindings at: aSymbol ifAbsentPut: [LispGlobal symbol: aSymbol]'.
 cm value: env value: 'accessing' value: 'define: aSymbol value: aValue
-	bindings at: aSymbol put: aValue.
-	^ aValue'.
+	^ (self cellFor: aSymbol) define: aValue'.
 cm value: env value: 'accessing' value: 'lookup: aSymbol
-	^ bindings at: aSymbol ifAbsent: [
-		(LispUnboundError new) symbol: aSymbol; signal: ''unbound variable: '' , aSymbol name]'.
+	^ (self cellFor: aSymbol) value'.
 cm value: env value: 'accessing' value: 'at: aSymbol ifAbsent: aBlock
-	^ bindings at: aSymbol ifAbsent: aBlock'.
+	^ (bindings at: aSymbol ifAbsent: [^ aBlock value]) valueIfUnbound: aBlock'.
 cm value: env value: 'accessing' value: 'set: aSymbol value: aValue
-	(bindings includesKey: aSymbol) ifFalse: [
-		^ (LispUnboundError new) symbol: aSymbol; signal: ''unbound variable: '' , aSymbol name].
-	bindings at: aSymbol put: aValue.
-	^ aValue'.
+	^ (self cellFor: aSymbol) assign: aValue'.
 cm value: env value: 'testing' value: 'isBound: aSymbol
-	^ bindings includesKey: aSymbol'.
+	^ (bindings at: aSymbol ifAbsent: [^ false]) isBound'.
 cm value: env class value: 'accessing' value: 'default
 	Default isNil ifTrue: [Default := self new].
 	^ Default'.

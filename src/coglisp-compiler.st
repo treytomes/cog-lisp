@@ -1,7 +1,9 @@
 "============================================================================
- cog-lisp : Phase 3 implementation  (package CogLisp-Compiler)
- Compiler core per specs/phase-3-compiler-core.md: LISP s-expression ->
- Smalltalk AST (OC nodes) -> Opal -> CompiledMethod.
+ cog-lisp : compiler  (package CogLisp-Compiler)
+ LISP s-expression -> Smalltalk AST (OC nodes) -> Opal -> CompiledMethod.
+ Specs: phase-3-compiler-core.md (core), phase-5-repl-runner.md (source
+ retention, unspecified value), phase-6-optimization.md (proper tail calls,
+ fast calls, global cells, literal quote, direct let).
 
  LOADER script (see coglisp-reader.st). Must be filed in AFTER coglisp-reader.st
  and coglisp-core.st. Note: the set-bang symbol inside is written as a doubled
@@ -12,7 +14,13 @@
  Mechanism (all verified live, see CLAUDE.md): message nodes are built by
  template-splice (parse a skeleton for the selector, then swap receiver/args),
  because OCMessageNode's selector constructors fail. Methods compile via
- doSemanticAnalysis + generateMethod.
+ doSemanticAnalysis + generateMethod. Arbitrary objects (global cells, quoted
+ data) can be literals and stay writable.
+
+ Optimizations (Phase 6) are named options, all on by default:
+   #tailCalls #fastCalls #globalCells #literalQuote #directLet
+ LispCompiler withoutOptions: #(...) do: [...] switches some off, for
+ benchmarks and debugging.
  ============================================================================"
 | failures cm comp err |
 failures := OrderedCollection new.
@@ -21,12 +29,33 @@ cm := [:cls :cat :src |
     on: Error
     do: [:e | failures add: cls name , ' >> ' , (src copyUpTo: Character cr) , (src copyUpTo: Character lf) , '  --  ' , e messageText]].
 
-comp := (Object << #LispCompiler) slots: { #counter. #sourceMap }; package: 'CogLisp-Compiler'; install.
+comp := (Object << #LispCompiler)
+	slots: { #counter. #sourceMap. #options. #selfLoop };
+	sharedVariables: { #DefaultOptions };
+	package: 'CogLisp-Compiler';
+	install.
 err  := (Error  << #LispCompileError) package: 'CogLisp-Compiler'; install.
+
+"=== options ==============================================================="
+cm value: comp class value: 'options' value: 'allOptions
+	^ #(#tailCalls #fastCalls #globalCells #literalQuote #directLet)'.
+cm value: comp class value: 'options' value: 'defaultOptions
+	DefaultOptions isNil ifTrue: [DefaultOptions := self allOptions asSet].
+	^ DefaultOptions'.
+cm value: comp class value: 'options' value: 'withoutOptions: anArray do: aBlock
+	"Compile with some optimizations switched off while aBlock runs."
+	| saved |
+	saved := self defaultOptions copy.
+	DefaultOptions := saved copy.
+	anArray do: [:each | DefaultOptions remove: each ifAbsent: []].
+	^ aBlock ensure: [DefaultOptions := saved]'.
+cm value: comp value: 'options' value: 'uses: anOption
+	^ options includes: anOption'.
 
 "=== node-building helpers ================================================="
 cm value: comp value: 'initialization' value: 'initialize
-	counter := 0'.
+	counter := 0.
+	options := self class defaultOptions copy'.
 cm value: comp value: 'private' value: 'nextName
 	counter := counter + 1.
 	^ ''l'' , counter printString'.
@@ -34,6 +63,10 @@ cm value: comp value: 'private' value: 'compileError: aString
 	^ (LispCompileError new) signal: aString'.
 cm value: comp value: 'nodes' value: 'literalNode: aValue
 	^ OCLiteralValueNode value: aValue'.
+cm value: comp value: 'nodes' value: 'var: aName
+	^ OCVariableNode named: aName'.
+cm value: comp value: 'nodes' value: 'assign: aName value: aNode
+	^ OCAssignmentNode variable: (self var: aName) value: aNode'.
 cm value: comp value: 'nodes' value: 'templateFor: aSelector
 	aSelector isUnary ifTrue: [^ ''0 '' , aSelector].
 	aSelector isBinary ifTrue: [^ ''0 '' , aSelector , '' 0''].
@@ -46,8 +79,12 @@ cm value: comp value: 'nodes' value: 'messageNode: receiverNode selector: aSelec
 	m receiver: receiverNode.
 	m arguments: argNodes.
 	^ m'.
+cm value: comp value: 'nodes' value: 'valueSelectorFor: n
+	"value, value:, value:value:, ... for evaluating a block of n arguments"
+	n = 0 ifTrue: [^ #value].
+	^ (String streamContents: [:s | n timesRepeat: [s nextPutAll: ''value:'']]) asSymbol'.
 cm value: comp value: 'nodes' value: 'unspecifiedNode
-	^ self messageNode: (OCVariableNode named: ''LispUnspecified'') selector: #default arguments: #()'.
+	^ self messageNode: (self var: ''LispUnspecified'') selector: #default arguments: #()'.
 cm value: comp value: 'nodes' value: 'andUnspecified: aNode
 	"Evaluate aNode for effect, then yield the unspecified value (Phase 5 section 5.1)."
 	^ self messageNode: (self blockWithArgs: #() statements: { aNode. self unspecifiedNode })
@@ -66,83 +103,152 @@ cm value: comp value: 'nodes' value: 'blockWithArgs: argNodes temps: tempNodes s
 	^ OCBlockNode arguments: argNodes body: (OCSequenceNode temporaries: tempNodes statements: statementNodes)'.
 cm value: comp value: 'nodes' value: 'blockWithArgs: argNodes statements: statementNodes
 	^ self blockWithArgs: argNodes temps: #() statements: statementNodes'.
-cm value: comp value: 'nodes' value: 'globalEnvNode
-	^ self messageNode: (OCVariableNode named: ''LispEnvironment'') selector: #default arguments: #()'.
-cm value: comp value: 'nodes' value: 'emptyListNode
-	^ self messageNode: (OCVariableNode named: ''LispEmptyList'') selector: #default arguments: #()'.
-cm value: comp value: 'nodes' value: 'symbolNode: aLispSymbol
-	^ self messageNode: (OCVariableNode named: ''LispSymbol'')
-		selector: #named:
-		arguments: { OCLiteralValueNode value: aLispSymbol name }'.
-
-"=== list helpers =========================================================="
-cm value: comp value: 'private' value: 'listToArray: aList
-	(aList isKindOf: LispCons) ifTrue: [^ aList lispElements asArray].
-	^ #()'.
-
-"=== application ==========================================================="
 cm value: comp value: 'nodes' value: 'arrayNode: elementNodes
 	| n |
 	n := OCParser parseExpression: ''{0}''.
 	n statements: elementNodes.
 	^ n'.
-cm value: comp value: 'translating' value: 'applyFn: fnNode toArgNodes: argNodes
-	^ self messageNode: (OCVariableNode named: ''LispProcedure'')
-		selector: #apply:to:
-		arguments: { fnNode. self arrayNode: argNodes }'.
-cm value: comp value: 'translating' value: 'translateApplication: form inScope: scope
-	| items fnNode argNodes |
+cm value: comp value: 'nodes' value: 'emptyListNode
+	^ self messageNode: (self var: ''LispEmptyList'') selector: #default arguments: #()'.
+cm value: comp value: 'nodes' value: 'symbolNode: aLispSymbol
+	^ self messageNode: (self var: ''LispSymbol'')
+		selector: #named:
+		arguments: { OCLiteralValueNode value: aLispSymbol name }'.
+cm value: comp value: 'private' value: 'listToArray: aList
+	(aList isKindOf: LispCons) ifTrue: [^ aList lispElements asArray].
+	^ #()'.
+
+"=== globals: cells (Phase 6 section 5.2) or environment lookups ==========="
+cm value: comp value: 'globals' value: 'globalEnvNode
+	^ self messageNode: (self var: ''LispEnvironment'') selector: #default arguments: #()'.
+cm value: comp value: 'globals' value: 'cellNode: aSymbol
+	"The global cell itself, resolved now and held as a literal."
+	^ self literalNode: (LispEnvironment default cellFor: aSymbol)'.
+cm value: comp value: 'globals' value: 'globalRead: aSymbol
+	(self uses: #globalCells) ifTrue: [^ self messageNode: (self cellNode: aSymbol) selector: #value arguments: #()].
+	^ self messageNode: self globalEnvNode selector: #lookup: arguments: { self symbolNode: aSymbol }'.
+cm value: comp value: 'globals' value: 'globalDefine: aSymbol value: aNode
+	(self uses: #globalCells) ifTrue: [^ self messageNode: (self cellNode: aSymbol) selector: #define: arguments: { aNode }].
+	^ self messageNode: self globalEnvNode selector: #define:value: arguments: { self symbolNode: aSymbol. aNode }'.
+cm value: comp value: 'globals' value: 'globalAssign: aSymbol value: aNode
+	(self uses: #globalCells) ifTrue: [^ self messageNode: (self cellNode: aSymbol) selector: #assign: arguments: { aNode }].
+	^ self messageNode: self globalEnvNode selector: #set:value: arguments: { self symbolNode: aSymbol. aNode }'.
+
+"=== calls (Phase 6 sections 4 and 5.1) ===================================="
+cm value: comp value: 'calls' value: 'callNode: fnNode args: argNodes
+	"An ordinary (non-tail) call. It drives any bounce the callee returns."
+	| n sel |
+	n := argNodes size.
+	((self uses: #fastCalls) and: [n <= 4]) ifTrue: [
+		sel := (String streamContents: [:s |
+			s nextPutAll: ''call:''.
+			n timesRepeat: [s nextPutAll: ''with:'']]) asSymbol.
+		^ self messageNode: (self var: ''LispProcedure'') selector: sel arguments: { fnNode } , argNodes].
+	^ self messageNode: (self var: ''LispProcedure'') selector: #apply:to: arguments: { fnNode. self arrayNode: argNodes }'.
+cm value: comp value: 'calls' value: 'tailCallNode: fnNode args: argNodes
+	"A call in tail position: return a bounce for the caller to run, or, for a
+	 primitive, call it directly (it cannot grow the stack)."
+	| n sel |
+	n := argNodes size.
+	((self uses: #fastCalls) and: [n <= 4]) ifTrue: [
+		sel := (String streamContents: [:s |
+			s nextPutAll: ''tailCall:''.
+			n timesRepeat: [s nextPutAll: ''with:'']]) asSymbol.
+		^ self messageNode: (self var: ''LispProcedure'') selector: sel arguments: { fnNode } , argNodes].
+	^ self messageNode: (self var: ''LispProcedure'') selector: #tailCall:to: arguments: { fnNode. self arrayNode: argNodes }'.
+cm value: comp value: 'calls' value: 'isSelfTailCall: op args: argData inScope: scope
+	selfLoop isNil ifTrue: [^ false].
+	op == (selfLoop at: #name) ifFalse: [^ false].
+	(scope includesKey: op) ifTrue: [^ false].
+	^ argData size = (selfLoop at: #params) size'.
+cm value: comp value: 'calls' value: 'translateSelfTailCall: argData inScope: scope
+	"Go round the loop again (Phase 6 section 4.2) if the global still names this
+	 procedure; otherwise make an ordinary tail call to whatever it names now."
+	| newTemps thenStatements check elseNode |
+	selfLoop at: #used put: true.
+	newTemps := argData collect: [:d | | nm | nm := self nextName. (selfLoop at: #temps) add: nm. nm].
+	thenStatements := OrderedCollection new.
+	newTemps with: argData do: [:t :d | thenStatements add: (self assign: t value: (self translate: d inScope: scope))].
+	(selfLoop at: #params) with: newTemps do: [:p :t | thenStatements add: (self assign: p value: (self var: t))].
+	thenStatements add: (self assign: (selfLoop at: #again) value: (self literalNode: true)).
+	thenStatements add: (self literalNode: nil).
+	check := self messageNode: (self globalRead: (selfLoop at: #name)) selector: #== arguments: { self var: (selfLoop at: #proc) }.
+	elseNode := self tailCallNode: (self globalRead: (selfLoop at: #name))
+		args: (argData collect: [:d | self translate: d inScope: scope]).
+	^ self messageNode: check selector: #ifTrue:ifFalse: arguments: {
+		self blockWithArgs: #() statements: thenStatements asArray.
+		self thunk: elseNode }'.
+cm value: comp value: 'calls' value: 'translateApplication: form inScope: scope tail: tail
+	| items op argData fnNode argNodes |
 	items := self listToArray: form.
-	fnNode := self translate: items first inScope: scope.
-	argNodes := items allButFirst collect: [:d | self translate: d inScope: scope].
-	^ self applyFn: fnNode toArgNodes: argNodes'.
+	op := items first.
+	argData := items allButFirst.
+	(tail and: [self isSelfTailCall: op args: argData inScope: scope])
+		ifTrue: [^ self translateSelfTailCall: argData inScope: scope].
+	fnNode := self translate: op inScope: scope.
+	argNodes := argData collect: [:d | self translate: d inScope: scope].
+	(tail and: [self uses: #tailCalls]) ifTrue: [^ self tailCallNode: fnNode args: argNodes].
+	^ self callNode: fnNode args: argNodes'.
 
 "=== core dispatch ========================================================="
 cm value: comp value: 'translating' value: 'translate: datum inScope: scope
-	(datum isKindOf: LispCons) ifTrue: [^ self translateForm: datum inScope: scope].
+	^ self translate: datum inScope: scope tail: false'.
+cm value: comp value: 'translating' value: 'translate: datum inScope: scope tail: tail
+	(datum isKindOf: LispCons) ifTrue: [^ self translateForm: datum inScope: scope tail: tail].
 	(datum isKindOf: LispSymbol) ifTrue: [^ self translateVariable: datum inScope: scope].
 	(datum == LispEmptyList default) ifTrue: [^ self emptyListNode].
 	^ self literalNode: datum'.
 cm value: comp value: 'translating' value: 'translateVariable: sym inScope: scope
 	| name |
 	name := scope at: sym ifAbsent: [nil].
-	name notNil ifTrue: [^ OCVariableNode named: name].
-	^ self messageNode: self globalEnvNode selector: #lookup: arguments: { self symbolNode: sym }'.
-cm value: comp value: 'translating' value: 'translateForm: form inScope: scope
+	name notNil ifTrue: [^ self var: name].
+	^ self globalRead: sym'.
+cm value: comp value: 'translating' value: 'translateForm: form inScope: scope tail: tail
 	| op opName |
 	op := form car.
 	opName := (op isKindOf: LispSymbol) ifTrue: [op name] ifFalse: [nil].
-	opName = ''quote'' ifTrue: [^ self reconstruct: form cdr car].
-	opName = ''if'' ifTrue: [^ self translateIf: form inScope: scope].
-	opName = ''begin'' ifTrue: [^ self translateBegin: (self listToArray: form cdr) inScope: scope].
+	opName = ''quote'' ifTrue: [^ self quoteNode: form cdr car].
+	opName = ''if'' ifTrue: [^ self translateIf: form inScope: scope tail: tail].
+	opName = ''begin'' ifTrue: [^ self translateBegin: (self listToArray: form cdr) inScope: scope tail: tail].
 	opName = ''lambda'' ifTrue: [^ self translateLambda: form inScope: scope].
-	opName = ''let'' ifTrue: [^ self translateLet: form inScope: scope].
+	opName = ''let'' ifTrue: [^ self translateLet: form inScope: scope tail: tail].
 	opName = ''define'' ifTrue: [^ self translateDefine: form inScope: scope].
 	opName = ''set!!'' ifTrue: [^ self translateSet: form inScope: scope].
-	^ self translateApplication: form inScope: scope'.
+	^ self translateApplication: form inScope: scope tail: tail'.
+cm value: comp value: 'translating' value: 'translateBody: dataArray inScope: scope tail: tail
+	"Statements for a body: every form for effect, the last in tail position if the body is."
+	dataArray isEmpty ifTrue: [^ { self unspecifiedNode }].
+	^ (1 to: dataArray size) collect: [:i |
+		self translate: (dataArray at: i) inScope: scope tail: (tail and: [i = dataArray size])]'.
 
 "=== special forms ========================================================="
+cm value: comp value: 'translating' value: 'quoteNode: datum
+	"A quoted datum is a literal: the same object every time (Phase 6 section 5.3)."
+	(self uses: #literalQuote) ifTrue: [^ self literalNode: datum].
+	^ self reconstruct: datum'.
 cm value: comp value: 'translating' value: 'reconstruct: datum
 	(datum isKindOf: LispCons) ifTrue: [
-		^ self messageNode: (OCVariableNode named: ''LispCons'')
+		^ self messageNode: (self var: ''LispCons'')
 			selector: #car:cdr:
 			arguments: { self reconstruct: datum car. self reconstruct: datum cdr }].
 	(datum isKindOf: LispSymbol) ifTrue: [^ self symbolNode: datum].
 	(datum == LispEmptyList default) ifTrue: [^ self emptyListNode].
 	^ self literalNode: datum'.
-cm value: comp value: 'translating' value: 'translateIf: form inScope: scope
+cm value: comp value: 'translating' value: 'translateIf: form inScope: scope tail: tail
 	| args testN thenN elseN truthyN |
 	args := self listToArray: form cdr.
 	args size < 2 ifTrue: [^ self compileError: ''if needs a test and a then-branch''].
 	testN := self translate: (args at: 1) inScope: scope.
-	thenN := self translate: (args at: 2) inScope: scope.
-	elseN := args size >= 3 ifTrue: [self translate: (args at: 3) inScope: scope] ifFalse: [self unspecifiedNode].
-	truthyN := self messageNode: (OCVariableNode named: ''LispCore'') selector: #isTruthy: arguments: { testN }.
+	thenN := self translate: (args at: 2) inScope: scope tail: tail.
+	elseN := args size >= 3
+		ifTrue: [self translate: (args at: 3) inScope: scope tail: tail]
+		ifFalse: [self unspecifiedNode].
+	truthyN := self messageNode: (self var: ''LispCore'') selector: #isTruthy: arguments: { testN }.
 	^ self messageNode: truthyN selector: #ifTrue:ifFalse: arguments: { self thunk: thenN. self thunk: elseN }'.
-cm value: comp value: 'translating' value: 'translateBegin: dataArray inScope: scope
+cm value: comp value: 'translating' value: 'translateBegin: dataArray inScope: scope tail: tail
 	dataArray isEmpty ifTrue: [^ self unspecifiedNode].
-	dataArray size = 1 ifTrue: [^ self translate: dataArray first inScope: scope].
-	^ self messageNode: (self blockWithArgs: #() statements: (dataArray collect: [:d | self translate: d inScope: scope]))
+	dataArray size = 1 ifTrue: [^ self translate: dataArray first inScope: scope tail: tail].
+	^ self messageNode: (self blockWithArgs: #() statements: (self translateBody: dataArray inScope: scope tail: tail))
 		selector: #value
 		arguments: #()'.
 cm value: comp value: 'translating' value: 'parseParams: spec
@@ -154,48 +260,103 @@ cm value: comp value: 'translating' value: 'parseParams: spec
 	(cur isKindOf: LispSymbol)
 		ifTrue: [^ { fixed asArray. cur }]
 		ifFalse: [^ { fixed asArray. nil }]'.
+cm value: comp value: 'translating' value: 'bindParams: params into: childScope
+	"Block arguments are read-only, so each LISP variable is a temporary initialized
+	 from its argument. Answer { argNodes. tempNodes. initNodes. tempNames }."
+	| argNodes tempNodes inits names |
+	argNodes := OrderedCollection new.
+	tempNodes := OrderedCollection new.
+	inits := OrderedCollection new.
+	names := OrderedCollection new.
+	params do: [:p | | argNm tempNm |
+		argNm := self nextName.
+		tempNm := self nextName.
+		childScope at: p put: tempNm.
+		argNodes add: (self var: argNm).
+		tempNodes add: (self var: tempNm).
+		names add: tempNm.
+		inits add: (self assign: tempNm value: (self var: argNm))].
+	^ { argNodes asArray. tempNodes asArray. inits asArray. names asArray }'.
 cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
-	^ self translateLambda: form inScope: scope source: (self sourceOf: form)'.
-cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope source: sourceText
-	| parts parsed fixed restSym allParams bodyData childScope argNodes tempNodes inits bodyNodes block |
+	^ self translateLambda: form inScope: scope source: (self sourceOf: form) defining: nil'.
+cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope source: sourceText defining: nameSym
+	"nameSym is the global this lambda is being defined as, or nil. A defined,
+	 fixed-arity procedure compiles its self tail calls as a loop (section 4.2)."
+	| parts parsed fixed restSym allParams childScope bound savedLoop loop tail bodyNodes statements temps block procNode procName |
 	parts := self listToArray: form cdr.
 	parsed := self parseParams: parts first.
 	fixed := parsed first.
 	restSym := parsed second.
 	allParams := restSym isNil ifTrue: [fixed] ifFalse: [fixed , { restSym }].
-	bodyData := parts allButFirst.
 	childScope := scope copy.
-	argNodes := OrderedCollection new.
-	tempNodes := OrderedCollection new.
-	inits := OrderedCollection new.
-	allParams do: [:p | | argNm tempNm |
-		argNm := self nextName.
-		tempNm := self nextName.
-		childScope at: p put: tempNm.
-		argNodes add: (OCVariableNode named: argNm).
-		tempNodes add: (OCVariableNode named: tempNm).
-		inits add: (OCAssignmentNode variable: (OCVariableNode named: tempNm) value: (OCVariableNode named: argNm))].
-	bodyNodes := bodyData collect: [:d | self translate: d inScope: childScope].
-	bodyNodes isEmpty ifTrue: [bodyNodes := { self unspecifiedNode }].
-	block := self blockWithArgs: argNodes asArray temps: tempNodes asArray statements: (inits asArray , bodyNodes).
-	restSym isNil
-		ifTrue: [^ self messageNode: (OCVariableNode named: ''LispProcedure'') selector: #fixed:arity:source:
-			arguments: { block. OCLiteralValueNode value: fixed size. OCLiteralValueNode value: sourceText }]
-		ifFalse: [^ self messageNode: (OCVariableNode named: ''LispProcedure'') selector: #variadic:required:source:
-			arguments: { block. OCLiteralValueNode value: fixed size. OCLiteralValueNode value: sourceText }]'.
-cm value: comp value: 'translating' value: 'translateLet: form inScope: scope
-	| parts bindings bodyData params valueData lambdaForm appForm |
+	bound := self bindParams: allParams into: childScope.
+	tail := self uses: #tailCalls.
+	loop := nil.
+	(tail and: [nameSym notNil and: [restSym isNil]]) ifTrue: [
+		loop := IdentityDictionary new.
+		loop at: #name put: nameSym; at: #params put: (bound at: 4);
+			at: #proc put: self nextName; at: #again put: self nextName; at: #result put: self nextName;
+			at: #temps put: OrderedCollection new; at: #used put: false].
+	savedLoop := selfLoop.
+	selfLoop := loop.
+	bodyNodes := [self translateBody: parts allButFirst inScope: childScope tail: tail]
+		ensure: [selfLoop := savedLoop].
+	(loop notNil and: [loop at: #used])
+		ifTrue: [
+			"again := true. [again] whileTrue: [again := false. body... result := last]. result"
+			statements := (bound at: 3) asOrderedCollection.
+			statements add: (self assign: (loop at: #again) value: (self literalNode: true)).
+			statements add: (self messageNode: (self thunk: (self var: (loop at: #again)))
+				selector: #whileTrue:
+				arguments: { self blockWithArgs: #() statements:
+					({ self assign: (loop at: #again) value: (self literalNode: false) } ,
+					 bodyNodes allButLast ,
+					 { self assign: (loop at: #result) value: bodyNodes last }) }).
+			statements add: (self var: (loop at: #result)).
+			temps := (bound at: 2) , ({ loop at: #again. loop at: #result } , (loop at: #temps) asArray
+				collect: [:nm | self var: nm]).
+			block := self blockWithArgs: (bound at: 1) temps: temps statements: statements asArray]
+		ifFalse: [
+			block := self blockWithArgs: (bound at: 1) temps: (bound at: 2) statements: (bound at: 3) , bodyNodes].
+	procNode := self messageNode: (self var: ''LispProcedure'')
+		selector: (restSym isNil ifTrue: [#fixed:arity:source:] ifFalse: [#variadic:required:source:])
+		arguments: { block. self literalNode: fixed size. self literalNode: sourceText }.
+	(loop notNil and: [loop at: #used]) ifFalse: [^ procNode].
+	"The loop compares the global with this very procedure, so bind it to a variable
+	 the block can see: [| p | p := LispProcedure fixed: [...p...] .... p] value"
+	procName := loop at: #proc.
+	^ self messageNode: (self blockWithArgs: #() temps: { self var: procName }
+			statements: { self assign: procName value: procNode. self var: procName })
+		selector: #value
+		arguments: #()'.
+cm value: comp value: 'translating' value: 'translateLet: form inScope: scope tail: tail
+	| parts bindings bodyData params valueData childScope bound block |
 	parts := self listToArray: form cdr.
 	bindings := self listToArray: parts first.
 	bodyData := parts allButFirst.
 	params := bindings collect: [:b | (self listToArray: b) first].
 	valueData := bindings collect: [:b | (self listToArray: b) second].
-	lambdaForm := LispCons car: (LispSymbol named: ''lambda'')
-		cdr: (LispCons car: (LispCons fromArray: params asArray) cdr: (LispCons fromArray: bodyData)).
-	appForm := LispCons car: lambdaForm cdr: (LispCons fromArray: valueData asArray).
-	^ self translate: appForm inScope: scope'.
+	(self uses: #directLet) ifFalse: [
+		"as in Phase 3: an immediately applied lambda"
+		^ self translate: (LispCons
+				car: (self makeLambda: (LispCons fromArray: params asArray) body: bodyData)
+				cdr: (LispCons fromArray: valueData asArray))
+			inScope: scope tail: tail].
+	"Phase 6 section 5.4: a block evaluated in place; the body inherits tail position."
+	childScope := scope copy.
+	bound := self bindParams: params into: childScope.
+	block := self blockWithArgs: (bound at: 1) temps: (bound at: 2)
+		statements: (bound at: 3) , (self translateBody: bodyData inScope: childScope tail: tail).
+	params size > 4 ifTrue: [
+		^ self messageNode: block selector: #valueWithArguments:
+			arguments: { self arrayNode: (valueData collect: [:d | self translate: d inScope: scope]) }].
+	^ self messageNode: block
+		selector: (self valueSelectorFor: params size)
+		arguments: (valueData collect: [:d | self translate: d inScope: scope])'.
+cm value: comp value: 'translating' value: 'isLambdaForm: datum
+	^ (datum isKindOf: LispCons) and: [datum car == (LispSymbol named: ''lambda'')]'.
 cm value: comp value: 'translating' value: 'translateDefine: form inScope: scope
-	| parts target nameSym valueNode |
+	| parts target nameSym valueData valueNode |
 	parts := self listToArray: form cdr.
 	target := parts first.
 	(target isKindOf: LispCons)
@@ -204,11 +365,15 @@ cm value: comp value: 'translating' value: 'translateDefine: form inScope: scope
 			"the source text of the procedure is the whole define form"
 			valueNode := self translateLambda: (self makeLambda: target cdr body: parts allButFirst)
 				inScope: scope
-				source: (self sourceOf: form)]
+				source: (self sourceOf: form)
+				defining: nameSym]
 		ifFalse: [
 			nameSym := target.
-			valueNode := self translate: (parts at: 2) inScope: scope].
-	^ self andUnspecified: (self messageNode: self globalEnvNode selector: #define:value: arguments: { self symbolNode: nameSym. valueNode })'.
+			valueData := parts at: 2.
+			valueNode := (self isLambdaForm: valueData)
+				ifTrue: [self translateLambda: valueData inScope: scope source: (self sourceOf: valueData) defining: nameSym]
+				ifFalse: [self translate: valueData inScope: scope]].
+	^ self andUnspecified: (self globalDefine: nameSym value: valueNode)'.
 cm value: comp value: 'translating' value: 'makeLambda: paramsList body: bodyArray
 	^ LispCons car: (LispSymbol named: ''lambda'')
 		cdr: (LispCons car: paramsList cdr: (LispCons fromArray: bodyArray))'.
@@ -219,14 +384,16 @@ cm value: comp value: 'translating' value: 'translateSet: form inScope: scope
 	valueNode := self translate: (parts at: 2) inScope: scope.
 	name := scope at: sym ifAbsent: [nil].
 	name notNil
-		ifTrue: [^ self andUnspecified: (OCAssignmentNode variable: (OCVariableNode named: name) value: valueNode)]
-		ifFalse: [^ self andUnspecified: (self messageNode: self globalEnvNode selector: #set:value: arguments: { self symbolNode: sym. valueNode })]'.
+		ifTrue: [^ self andUnspecified: (self assign: name value: valueNode)]
+		ifFalse: [^ self andUnspecified: (self globalAssign: sym value: valueNode)]'.
 
 "=== entry points =========================================================="
 cm value: comp value: 'compiling' value: 'compile: datum
+	"A top-level form is not in tail position: its calls are ordinary calls."
 	| exprNode method |
 	counter := 0.
-	exprNode := self translate: datum inScope: IdentityDictionary new.
+	selfLoop := nil.
+	exprNode := self translate: datum inScope: IdentityDictionary new tail: false.
 	method := OCMethodNode selector: #doIt arguments: #()
 		body: (OCSequenceNode statements: { OCReturnNode value: exprNode }).
 	method doSemanticAnalysis.

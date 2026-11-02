@@ -134,6 +134,18 @@ and prints its `printString`.
   is called in a session (e.g. `Smalltalk os`; use `OSPlatform current`), which
   corrupts program output. Byte-exact `.expected` checks catch it.
 
+## Timing and benchmarking (Pharo 14) — Phase 6
+
+- **The VM clock has millisecond resolution**, even through
+  `Time microsecondClockValue` (its values end in `000`). `Time
+  microsecondsToRun:` does not exist. For short work, repeat it until a sample
+  takes at least ~100 ms and divide.
+- **Whatever runs first in a process measures slow** (up to 40%): heap growth and
+  JIT warm-up. Run a full discarded warm-up pass, and `Smalltalk garbageCollect`
+  before each series, or comparisons between configurations are meaningless.
+- `bench/results.md` is the committed performance baseline; rerun
+  `bench\run-benchmarks.bat` after compiler or runtime changes and compare.
+
 ## Verified Opal AST API (Pharo 14) — for the Phase 3 compiler
 
 Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
@@ -158,6 +170,11 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **Brace arrays** (`{a. b}`) are **`OCArrayNode`**: template-splice
   `OCParser parseExpression: '{0}'`, then `n statements: elementNodes` (an empty
   collection gives `#()`). The compiler uses this for application args arrays.
+- **Any object can be a literal**: `OCLiteralValueNode value: anObject` puts it
+  in the method's literal frame, and every run returns that same object. Such
+  objects stay **writable** (global cells, quoted lists). But **string literals
+  are compiled read-only**: mutating one raises `ModificationForbidden`. Matters
+  once cog-lisp has string-mutation primitives.
 - Closure capture is automatic: nested `OCBlockNode`s whose bodies reference an
   outer block's argument name compile to a real capturing `BlockClosure`.
 - **Block/method arguments are read-only** — assigning one fails semantic

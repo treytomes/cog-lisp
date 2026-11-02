@@ -29,7 +29,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 3 | Compiler core | ✅ **done** — [spec](specs/phase-3-compiler-core.md), 31/31 |
 | 4 | Runtime & primitives | ✅ **done** — [spec](specs/phase-4-runtime-primitives.md), 44/44 |
 | 5 | REPL & image integration | ✅ **done** — [spec](specs/phase-5-repl-runner.md), 28/28 + 30/30 |
-| 6 | Tail calls & optimization | 📋 [spec accepted](specs/phase-6-optimization.md) |
+| 6 | Tail calls & optimization | ✅ **done** — [spec](specs/phase-6-optimization.md), 105/105, [benchmarks](bench/results.md) |
 | 7 | Language reach (stretch) | ⬜ |
 | 8 | Self-hosting (meta-circular) | ⬜ |
 | 9 | Pure Lisp image | ⬜ |
@@ -91,6 +91,13 @@ The runner suite builds the image and drives `cog-lisp.bat` end to end:
 
 ```bat
 tests\phase-5-runner.bat
+```
+
+The benchmarks compare compiled cog-lisp with a tree-walking interpreter and
+hand-written Smalltalk, and write [`bench/results.md`](bench/results.md):
+
+```bat
+bench\run-benchmarks.bat
 ```
 
 Headless conventions and the verified Pharo mechanisms are documented in

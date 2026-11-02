@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 6 |
-| **Status** | Accepted (2026-11-02) |
+| **Status** | Implemented (2026-11-02) — `tests/phase-6-tail-calls.st` 105/105; `bench\run-benchmarks.bat` 10/10 |
 | **Depends on** | Phases 1–5 |
 | **Feeds** | Phase 7 (macros), Phase 8 (self-hosting), Phase 9 (pure image) |
 | **Tail calls** | Proper tail calls: self tail calls become loops; other tail calls use a trampoline |
@@ -255,3 +255,47 @@ Settled 2026-11-02 (owner sign-off); the spec is Accepted on these.
 - **Phase 9**: global cells and literal constants live in the image like any
   object, so they need nothing from Pharo's `.sources`/`.changes` files.
 - `bench/results.md` becomes the baseline for any later performance work.
+
+## 10. As implemented
+
+Where the implementation settled details the spec left open, or the benchmarks
+forced a change:
+
+- **Variadic primitives have fixed-arity entries** (revising §5.1, which had
+  variadic calls fall back to the general path). The first benchmark run showed
+  that `+`, `-`, `<`, `=` and the like dominated: they are variadic, so every
+  `(+ a 1)` built an argument array, a rest list and a collection to fold over,
+  and fast calls could not help (AC-16 failed for `fib` at 0.9×). Now a
+  procedure may carry direct entries for 0–4 arguments
+  (`LispProcedure>>entry:is:`), and the fast-call path uses them. The arithmetic,
+  comparison, `min` and `max` primitives have them. `(+ a b)` is one block call.
+- **Tail calls to primitives are made directly, not bounced** (refining §4.3). A
+  primitive cannot grow the stack, so bouncing it only cost an allocation and the
+  slow call path: `fib` ran 3.4× faster with tail calls *off* until this was
+  fixed. A primitive is a procedure with no LISP source (`isPrimitive`). The
+  exception is `apply`, which now *returns* a bounce instead of calling, so a tail
+  call through `apply` runs in constant stack (checked in AC-6).
+- **Arity-specialized tail calls** (`LispProcedure tailCall:with:…`, 0–4
+  arguments) mirror the fast calls, under the `#fastCalls` option.
+- **Self-loop shape.** A defined procedure whose body self-tail-calls compiles to
+  `[| p | p := LispProcedure fixed: [...] .... p] value`, so the loop can compare
+  the global's current value with `p` (redefinition check, §4.2). The loop and
+  the extra temporaries are only generated when a self tail call is present.
+- **`(stack-depth)`** counts the contexts on the current process's stack.
+- **Benchmark method.** The VM clock ticks in whole milliseconds, so each timed
+  sample repeats a run until it takes at least 100 ms and divides by the count.
+  Each series starts after a garbage collection, and the whole matrix is run once
+  as a discarded warm-up: without it, whichever configuration ran first measured
+  up to 40% slower.
+- **Benchmark sizes** are smaller than §6 listed (fib 22, loop 100,000, even?/odd?
+  20,000, list 20,000, globals 50,000), so the tree-walker, which recurses on the
+  host stack, finishes in reasonable time and memory.
+- **Results** (in `bench/results.md`): compiled cog-lisp is 33–193× faster than
+  the tree-walker and 2.4–67× slower than hand-written Smalltalk. With an
+  optimization switched off, its target benchmark slows by 4.6× (global cells,
+  `globals`) to 15× (tail calls, `loop`).
+- **Next performance step** (not in this phase): guarded inlining of primitives.
+  The remaining gap to Smalltalk is mostly that `(+ a b)` is still a call, where
+  Smalltalk's JIT inlines integer arithmetic. The compiler could emit `a + b`
+  directly when the global `+` still holds the original primitive, checked by
+  identity as the self-loop check is.
