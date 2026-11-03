@@ -7,3 +7,4 @@
 - [Lean on Pharo](lean-on-pharo.md) — design tenet: reuse Pharo's machinery (VM, blocks, Opal, image) rather than reinvent it.
 - [Pure Lisp image goal](pure-lisp-image-goal.md) — end state needs no stock Pharo image (Phase 9); no run-time dependency on it from Phase 5 on.
 - [Retain source](retain-source.md) — every compiled procedure keeps its exact source text, stored in the image.
+- [Expert system goal](expert-system-goal.md) — later: forward (Rete) + backward (Prolog) chaining written in cog-lisp.

@@ -217,7 +217,7 @@ node, or raise and catch an error. These come first (decided 2026-11-03):
   LISP procedure usable as a block, which must drive its own tail calls; review
   R-18). The way into the rest of the image, into the subsystems Phase 9 may keep
   or reimplement, and Phase 8's "LISP-level interface to the Opal IR".
-- **Conditions and restarts:** a LISP-level error system: `error`, condition
+- **Conditions and restarts** ([spec accepted](specs/phase-7.7-conditions-restarts.md), Phase 7.7): a LISP-level error system: `error`, condition
   objects, handlers, and restarts, with host errors mapped to conditions (review
   R-2, C-18). Before the primitives below, so they signal proper conditions.
 - **Native strings, characters, vectors and hash tables:** what a reader and a
@@ -280,3 +280,12 @@ Make the cog-lisp image stand on its own, so the stock Pharo image is not needed
   is LISP; it also resolves special-form shadowing and capture (review C-14).
 - *Acceptance:* a cog-lisp image built without the stock image runs the example
   programs and the acceptance suites, and the user-visible world is LISP.
+
+### Later: an expert system in cog-lisp (owner idea, 2026-11-03)
+A first large program written *in* cog-lisp, once the language phases are done:
+- **Forward chaining**, NRules/CLIPS style: facts in a working memory, rules that
+  fire when their conditions match, matched efficiently with a Rete network.
+- **Backward chaining**, Prolog style: goals proved from rules and facts by
+  unification and backtracking search (the approach of *ANSI Common Lisp*'s
+  chapter on inference).
+- Rules written with macros, and the knowledge base kept in the image.
