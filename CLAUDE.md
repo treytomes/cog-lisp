@@ -175,6 +175,11 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   objects stay **writable** (global cells, quoted lists). But **string literals
   are compiled read-only**: mutating one raises `ModificationForbidden`. Matters
   once cog-lisp has string-mutation primitives.
+- **Temporaries inside inlined blocks work** (`true ifTrue: [| t | t := …. …]`):
+  Opal hoists them into the enclosing method or block frame, with no closure.
+  That gives statement sequencing inside an expression. But every such temp
+  lands in that one frame, and the VM caps frame size: too many fail compilation
+  with "Cannot compile -- stack including temps is too deep". Budget them.
 - Closure capture is automatic: nested `OCBlockNode`s whose bodies reference an
   outer block's argument name compile to a real capturing `BlockClosure`.
 - **Block/method arguments are read-only** — assigning one fails semantic

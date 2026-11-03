@@ -18,7 +18,7 @@
  data) can be literals and stay writable.
 
  Optimizations (Phase 6) are named options, all on by default:
-   #tailCalls #fastCalls #globalCells #literalQuote #directLet
+   #tailCalls #fastCalls #globalCells #literalQuote #directLet #inlinePrimitives
  LispCompiler withoutOptions: #(...) do: [...] switches some off, for
  benchmarks and debugging.
  ============================================================================"
@@ -30,7 +30,7 @@ cm := [:cls :cat :src |
     do: [:e | failures add: cls name , ' >> ' , (src copyUpTo: Character cr) , (src copyUpTo: Character lf) , '  --  ' , e messageText]].
 
 comp := (Object << #LispCompiler)
-	slots: { #counter. #sourceMap. #options. #selfLoop };
+	slots: { #counter. #sourceMap. #options. #selfLoop. #inlineTemps };
 	sharedVariables: { #DefaultOptions };
 	package: 'CogLisp-Compiler';
 	install.
@@ -38,7 +38,7 @@ err  := (Error  << #LispCompileError) package: 'CogLisp-Compiler'; install.
 
 "=== options ==============================================================="
 cm value: comp class value: 'options' value: 'allOptions
-	^ #(#tailCalls #fastCalls #globalCells #literalQuote #directLet)'.
+	^ #(#tailCalls #fastCalls #globalCells #literalQuote #directLet #inlinePrimitives)'.
 cm value: comp class value: 'options' value: 'defaultOptions
 	DefaultOptions isNil ifTrue: [DefaultOptions := self allOptions asSet].
 	^ DefaultOptions'.
@@ -185,10 +185,70 @@ cm value: comp value: 'calls' value: 'translateApplication: form inScope: scope 
 	argData := items allButFirst.
 	(tail and: [self isSelfTailCall: op args: argData inScope: scope])
 		ifTrue: [^ self translateSelfTailCall: argData inScope: scope].
+	(self inlinablePrimitive: op args: argData inScope: scope) ifNotNil: [:prim |
+		^ self translateInline: prim op: op args: argData inScope: scope tail: tail].
 	fnNode := self translate: op inScope: scope.
 	argNodes := argData collect: [:d | self translate: d inScope: scope].
 	(tail and: [self uses: #tailCalls]) ifTrue: [^ self tailCallNode: fnNode args: argNodes].
 	^ self callNode: fnNode args: argNodes'.
+
+"=== guarded inlining of primitives (Phase 6 section 11) ==================="
+cm value: comp value: 'inlining' value: 'inlinablePrimitive: op args: argData inScope: scope
+	"The primitive that op names right now, if a call to it can be inlined; else nil."
+	| prim spec |
+	(self uses: #inlinePrimitives) ifFalse: [^ nil].
+	(op isKindOf: LispSymbol) ifFalse: [^ nil].
+	(scope includesKey: op) ifTrue: [^ nil].
+	prim := (LispEnvironment default cellFor: op) valueIfUnbound: [^ nil].
+	"LispProcedure is in the runtime package, which loads after this one"
+	(prim respondsTo: #inlineSpec) ifFalse: [^ nil].
+	spec := prim inlineSpec.
+	(spec notNil and: [spec first = argData size]) ifFalse: [^ nil].
+	"Each nested call among the arguments needs a temporary, and temporaries of
+	 inlined blocks all land in the enclosing procedure frame, which the VM caps.
+	 Past a budget per procedure, just make an ordinary call."
+	inlineTemps + (argData count: [:d | (self isSimpleArg: d) not]) > 12 ifTrue: [^ nil].
+	^ prim'.
+cm value: comp value: 'inlining' value: 'isSimpleArg: datum
+	"Cheap to evaluate and free of side effects other than an unbound-variable
+	 error: a literal, a quoted datum, or a variable. Used directly in the code,
+	 without a temporary; it is still evaluated once, as only one branch runs."
+	(datum isKindOf: LispCons) ifFalse: [^ true].
+	^ datum car == (LispSymbol named: ''quote'')'.
+cm value: comp value: 'inlining' value: 'translateInline: prim op: op args: argData inScope: scope tail: tail
+	"op == prim ifTrue: [<inline form>] ifFalse: [<ordinary call of op>]
+	 where each argument is used directly if simple, else evaluated first into a
+	 temporary: true ifTrue: [| x | x := a. <the conditional above>]. Opal inlines
+	 every block here, so this costs no closure. The guard keeps a redefinition of
+	 op working, in code compiled before it as well."
+	| spec temps statements argNode fast slow guard |
+	spec := prim inlineSpec.
+	temps := OrderedCollection new.
+	statements := OrderedCollection new.
+	argData do: [:d | (self isSimpleArg: d) ifFalse: [ | nm |
+		nm := self nextName.
+		temps add: nm.
+		statements add: (self assign: nm value: (self translate: d inScope: scope))]].
+	inlineTemps := inlineTemps + temps size.
+	argNode := [:i | | d |
+		d := argData at: i.
+		(self isSimpleArg: d)
+			ifTrue: [self translate: d inScope: scope]
+			ifFalse: [self var: (temps at: ((1 to: i) count: [:k | (self isSimpleArg: (argData at: k)) not]))]].
+	(spec at: 2) = #identity
+		ifTrue: [fast := self messageNode: (argNode value: 1) selector: #== arguments: { self literalNode: (spec at: 3) }]
+		ifFalse: [fast := self messageNode: (argNode value: 1) selector: (spec at: 3)
+			arguments: ((2 to: argData size) collect: [:i | argNode value: i])].
+	slow := (tail and: [self uses: #tailCalls])
+		ifTrue: [self tailCallNode: (self globalRead: op) args: ((1 to: argData size) collect: [:i | argNode value: i])]
+		ifFalse: [self callNode: (self globalRead: op) args: ((1 to: argData size) collect: [:i | argNode value: i])].
+	guard := self messageNode: (self globalRead: op) selector: #== arguments: { self literalNode: prim }.
+	guard := self messageNode: guard selector: #ifTrue:ifFalse: arguments: { self thunk: fast. self thunk: slow }.
+	temps isEmpty ifTrue: [^ guard].
+	statements add: guard.
+	^ self messageNode: (self literalNode: true)
+		selector: #ifTrue:
+		arguments: { self blockWithArgs: #() temps: (temps collect: [:nm | self var: nm]) asArray statements: statements asArray }'.
 
 "=== core dispatch ========================================================="
 cm value: comp value: 'translating' value: 'translate: datum inScope: scope
@@ -282,7 +342,7 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope source: sourceText defining: nameSym
 	"nameSym is the global this lambda is being defined as, or nil. A defined,
 	 fixed-arity procedure compiles its self tail calls as a loop (section 4.2)."
-	| parts parsed fixed restSym allParams childScope bound savedLoop loop tail bodyNodes statements temps block procNode procName |
+	| parts parsed fixed restSym allParams childScope bound savedLoop savedInlineTemps loop tail bodyNodes statements temps block procNode procName |
 	parts := self listToArray: form cdr.
 	parsed := self parseParams: parts first.
 	fixed := parsed first.
@@ -298,9 +358,11 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 			at: #proc put: self nextName; at: #again put: self nextName; at: #result put: self nextName;
 			at: #temps put: OrderedCollection new; at: #used put: false].
 	savedLoop := selfLoop.
+	savedInlineTemps := inlineTemps.
 	selfLoop := loop.
+	inlineTemps := 0.
 	bodyNodes := [self translateBody: parts allButFirst inScope: childScope tail: tail]
-		ensure: [selfLoop := savedLoop].
+		ensure: [selfLoop := savedLoop. inlineTemps := savedInlineTemps].
 	(loop notNil and: [loop at: #used])
 		ifTrue: [
 			"again := true. [again] whileTrue: [again := false. body... result := last]. result"
@@ -393,6 +455,7 @@ cm value: comp value: 'compiling' value: 'compile: datum
 	| exprNode method |
 	counter := 0.
 	selfLoop := nil.
+	inlineTemps := 0.
 	exprNode := self translate: datum inScope: IdentityDictionary new tail: false.
 	method := OCMethodNode selector: #doIt arguments: #()
 		body: (OCSequenceNode statements: { OCReturnNode value: exprNode }).

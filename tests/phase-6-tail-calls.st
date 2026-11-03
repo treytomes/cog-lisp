@@ -135,6 +135,32 @@ check value: 'AC-11 a fresh binding per evaluation'
 	value: (ev value: '(define (mk n acc) (if (= n 0) acc (mk (- n 1) (cons (let ((k n)) (lambda () k)) acc)))) (map (lambda (f) (f)) (mk 3 (list)))')
 	value: (lst value: '(1 2 3)').
 
+"AC-19..23 guarded inlining of primitives (section 11)"
+check value: 'AC-19 every inline form gives the call result'
+	value: (ev value: '(list (+ 2 3) (- 2 3) (* 2 3) (= 2 2) (< 2 3) (> 2 3) (<= 3 3) (>= 2 3) (eq? (quote a) (quote a)) (car (cons 1 2)) (cdr (cons 1 2)) (not #f) (not 0) (null? (list)) (null? (list 1)))')
+	value: (lst value: '(5 -1 6 #t #t #f #t #f #t 1 2 #t #f #t #f)').
+check value: 'AC-19 inline form in tail position' value: (ev value: '(define (in-tail a b) (* a b)) (in-tail 6 7)') value: 42.
+check value: 'AC-19 nested inline forms' value: (ev value: '(define (poly x) (+ (* x (+ (* x 2) 3)) 4)) (poly 5)') value: 69.
+checkErr value: 'AC-19 an inlined form still type-checks' value: Error value: [ev value: '(define (bad-car x) (car x)) (bad-car 5)'].
+check value: 'AC-20 compiled with the primitive, then + is redefined'
+	value: (ev value: '(define (add2 a b) (+ a b)) (define orig-plus +) (define (+ a b) (quote plus)) (add2 1 2)')
+	value: (LispSymbol named: 'plus').
+check value: 'AC-21 compiled while + is redefined'
+	value: (ev value: '(define (add3 a b) (+ a b)) (add3 1 2)')
+	value: (LispSymbol named: 'plus').
+check value: 'AC-20 restoring + restores the result'
+	value: (ev value: '(define + orig-plus) (list (add2 1 2) (add3 1 2))')
+	value: (lst value: '(3 3)').
+check value: 'AC-19 a wide expression stays within the frame limit'
+	value: (ev value: '(define (wide p) (list (car p) (+ (car p) (cdr p)) (* (car p) (car p)) (- (cdr p) (car p)) (+ (car p) (car p)) (+ (cdr p) (cdr p)) (* (cdr p) (car p)) (+ (car p) (* 2 (cdr p))) (- (car p) (+ 1 (cdr p))) (+ (+ (car p) 1) (+ (cdr p) 1)) (* (+ (car p) 1) (- (cdr p) 1)) (+ (car p) (+ (car p) (+ (car p) (cdr p)))) (- (* (car p) 3) (* (cdr p) 2)) (+ (* (car p) (car p)) (* (cdr p) (cdr p))))) (wide (cons 2 3))')
+	value: (lst value: '(2 5 4 1 4 6 6 8 -2 7 6 9 0 13)').
+check value: 'AC-22 a local named + is not inlined' value: (ev value: '(let ((+ -)) (+ 5 3))') value: 2.
+check value: 'AC-22 a parameter named car is not inlined' value: (ev value: '((lambda (car x) (car x)) (lambda (v) (* v 10)) 4)') value: 40.
+ev value: '(define (inl a b) (+ a b))'.
+check value: 'AC-23 the compiled code contains the + send'
+	value: (((LispEnvironment default lookup: (LispSymbol named: 'inl')) block compiledBlock symbolic) includesSubstring: 'send: +')
+	value: true.
+
 "AC-12 every correctness check, with all optimizations on and with each one off"
 core value: 'AC-12 all on:'.
 LispCompiler allOptions do: [:opt |

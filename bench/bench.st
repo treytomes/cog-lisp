@@ -47,9 +47,9 @@ LispPrimitives installDefault.
 
 benches := {
 	{ 'fib 22'. '(define (fib n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))'. '(fib 22)'. 17711.
-		[CogLispBenchSmalltalk fib: 22]. #(#fastCalls) }.
+		[CogLispBenchSmalltalk fib: 22]. #(#fastCalls #inlinePrimitives) }.
 	{ 'tak 18 12 6'. '(define (tak x y z) (if (not (< y x)) z (tak (tak (- x 1) y z) (tak (- y 1) z x) (tak (- z 1) x y))))'. '(tak 18 12 6)'. 7.
-		[CogLispBenchSmalltalk tak: 18 y: 12 z: 6]. #(#fastCalls) }.
+		[CogLispBenchSmalltalk tak: 18 y: 12 z: 6]. #(#fastCalls #inlinePrimitives) }.
 	{ 'loop 100000'. '(define (count-loop n acc) (if (= n 0) acc (count-loop (- n 1) (+ acc 1))))'. '(count-loop 100000 0)'. 100000.
 		[CogLispBenchSmalltalk countLoop: 100000]. #(#tailCalls) }.
 	{ 'even?/odd? 20000'. '(define (my-even? n) (if (= n 0) #t (my-odd? (- n 1)))) (define (my-odd? n) (if (= n 0) #f (my-even? (- n 1))))'. '(my-even? 20000)'. true.
@@ -120,7 +120,7 @@ rows do: [:r | check value: 'AC-15 compiled faster than the tree-walker: ' , ((r
 "AC-16: each optimization beats its own switched-off version on its target benchmark"
 rows do: [:r | ((r at: 1) at: 6) do: [:opt | | offTime |
 	offTime := (r at: 2) at: (configs findFirst: [:c | (c at: 2) = { opt }]).
-	check value: 'AC-16 ' , opt , ' makes ' , ((r at: 1) at: 1) , ' faster (' , (ratio value: offTime value: (r at: 2) first) , ')'
+	check value: 'AC-16/24 ' , opt , ' makes ' , ((r at: 1) at: 1) , ' faster (' , (ratio value: offTime value: (r at: 2) first) , ')'
 		value: (r at: 2) first < offTime]].
 
 report := String streamContents: [:s |

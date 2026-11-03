@@ -18,7 +18,7 @@ cm := [:cls :cat :src |
 
 lerr  := (Error  << #LispError) package: 'CogLisp-Runtime'; install.
 aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp-Runtime'; install.
-proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries }; package: 'CogLisp-Runtime'; install.
+proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries. #inline }; package: 'CogLisp-Runtime'; install.
 tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runtime'; install.
 prims := (Object << #LispPrimitives) sharedVariables: { #Output }; package: 'CogLisp-Runtime'; install.
 tout  := (Object << #LispTextOutput) slots: { #kind. #handle. #stream. #buffer }; sharedVariables: { #Session. #Stdout. #Stderr }; package: 'CogLisp-Runtime'; install.
@@ -157,6 +157,14 @@ cm value: proc value: 'fast calls' value: 'entry: n is: aBlock
 cm value: proc value: 'fast calls' value: 'entryFor: n
 	entries isNil ifTrue: [^ nil].
 	^ entries at: n + 1'.
+cm value: proc value: 'inlining' value: 'inline: aSpec
+	"Declare how the compiler may inline a call to this primitive (Phase 6 section 11):
+	 { argCount. #send. selector }    -> x sel  or  x sel y
+	 { argCount. #identity. object }  -> x == object
+	 It must do exactly what the primitive does for that many arguments."
+	inline := aSpec'.
+cm value: proc value: 'inlining' value: 'inlineSpec
+	^ inline'.
 
 "--- calling, with proper tail calls (Phase 6 section 4.3) -------------------
  A call in tail position returns a LispTailCall (a bounce) instead of calling.
@@ -284,7 +292,20 @@ cm value: prims class value: 'installing' value: 'installInto: anEnv
 	self installIOInto: anEnv.
 	self installControlInto: anEnv.
 	self installSystemInto: anEnv.
+	self installInlineFormsInto: anEnv.
 	^ anEnv'.
+cm value: prims class value: 'installing' value: 'installInlineFormsInto: anEnv
+	"Inline forms for guarded inlining (Phase 6 section 11.2). Each matches what
+	 the primitive does for that many arguments."
+	| e |
+	e := [:name | anEnv lookup: (LispSymbol named: name)].
+	#(''+'' ''-'' ''*'' ''='' ''<'' ''>'' ''<='' ''>='') do: [:op |
+		(e value: op) inline: { 2. #send. op asSymbol }].
+	(e value: ''eq?'') inline: #(2 #send #==).
+	(e value: ''car'') inline: #(1 #send #car).
+	(e value: ''cdr'') inline: #(1 #send #cdr).
+	(e value: ''not'') inline: { 1. #identity. false }.
+	(e value: ''null?'') inline: { 1. #identity. LispEmptyList default }'.
 cm value: prims class value: 'installing' value: 'installDefault
 	^ self installInto: LispEnvironment default'.
 cm value: prims class value: 'output' value: 'output

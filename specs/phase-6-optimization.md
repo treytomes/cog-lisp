@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 6 |
-| **Status** | Implemented (2026-11-02) — `tests/phase-6-tail-calls.st` 105/105; `bench\run-benchmarks.bat` 10/10 |
+| **Status** | Implemented (2026-11-02) — `tests/phase-6-tail-calls.st` 127/127; `bench\run-benchmarks.bat` 12/12 (including §11, guarded inlining, added 2026-11-03) |
 | **Depends on** | Phases 1–5 |
 | **Feeds** | Phase 7 (macros), Phase 8 (self-hosting), Phase 9 (pure image) |
 | **Tail calls** | Proper tail calls: self tail calls become loops; other tail calls use a trampoline |
@@ -294,8 +294,95 @@ forced a change:
   the tree-walker and 2.4–67× slower than hand-written Smalltalk. With an
   optimization switched off, its target benchmark slows by 4.6× (global cells,
   `globals`) to 15× (tail calls, `loop`).
-- **Next performance step** (not in this phase): guarded inlining of primitives.
+- **Next performance step** (done afterwards; see §11): guarded inlining of primitives.
   The remaining gap to Smalltalk is mostly that `(+ a b)` is still a call, where
   Smalltalk's JIT inlines integer arithmetic. The compiler could emit `a + b`
   directly when the global `+` still holds the original primitive, checked by
   identity as the self-loop check is.
+
+## 11. Addendum: guarded inlining of primitives
+
+Added 2026-11-03, after the main phase, to close part of the gap to Smalltalk
+that §10 attributed to arithmetic being a call. **Redefining a primitive must
+keep working** (owner requirement): `(define (+ a b) …)` changes what every
+`(+ a b)` does, including in code compiled earlier.
+
+### 11.1 Design
+
+A call `(op a b …)` is inlined when `op` is a global, not shadowed by a local,
+and at compile time its cell holds a primitive that declares an **inline form**
+for that many arguments. The compiler emits, with fresh temporaries:
+
+```smalltalk
+true ifTrue: [| f x y |
+	f := <read op's cell>.  x := <a>.  y := <b>.
+	f == <that primitive, as a literal>
+		ifTrue: [x + y]                              "the inline form"
+		ifFalse: [LispProcedure call: f with: x with: y]]   "or tailCall: in tail position"
+```
+
+- Opal inlines the `true ifTrue:` block, so its temporaries are ordinary method
+  temporaries and no closure is created. Each argument is evaluated once, after
+  the operator, in the same order as an ordinary call.
+- The guard is one identity comparison, which the JIT compiles inline. If `op`
+  is rebound (before or after compiling), the guard fails and the call goes to
+  whatever `op` now holds. Restoring the original makes the guard pass again.
+- The inline form is exactly what the primitive's fixed-arity entry does
+  (`[:a :b | a + b]` → `x + y`), so results and errors are unchanged.
+- It is a `LispCompiler` option, `#inlinePrimitives`, on by default.
+
+### 11.2 Inline forms
+
+| Primitive | Arguments | Inline form |
+|---|---|---|
+| `+ - * = < > <= >=` | 2 | the Smalltalk binary send of the same name |
+| `eq?` | 2 | `x == y` |
+| `car`, `cdr` | 1 | `x car`, `x cdr` |
+| `not` | 1 | `x == false` |
+| `null?` | 1 | `x == ()` (the empty-list object as a literal) |
+
+A primitive declares its inline form with `LispProcedure>>inline:`.
+
+### 11.3 Acceptance criteria
+
+In `tests/phase-6-tail-calls.st`:
+- AC-19 Inlined calls return the same results as calls, for every form in §11.2,
+  including in tail position and at top level.
+- AC-20 A procedure compiled while `+` is the primitive follows a later
+  redefinition of `+`, and returns to the fast path when `+` is restored.
+- AC-21 A procedure compiled while `+` is redefined calls the redefinition.
+- AC-22 A local variable named `+` is never inlined: `(let ((+ -)) (+ 5 3))` → 2.
+- AC-23 Inlining really happens: the compiled code contains the `+` send.
+- AC-12's sweep includes the new option, so every correctness check also runs
+  with inlining off.
+
+In `bench\run-benchmarks.bat`:
+- AC-24 `#inlinePrimitives` makes `fib` and `tak` faster than with it off.
+
+### 11.4 As implemented
+
+Status: implemented 2026-11-03. `tests/phase-6-tail-calls.st` 127/127 (AC-19–23,
+and the AC-12 sweep with inlining off); `bench\run-benchmarks.bat` 12/12 (AC-24).
+
+- **Simple arguments get no temporary** (revising §11.1). The first version gave
+  every call a temporary for the operator and one per argument. Temporaries of
+  inlined blocks all land in the enclosing procedure's frame, and a wide
+  expression hit the VM's limit ("stack including temps is too deep"). Now a
+  literal, quoted datum, or variable is used directly (only one branch runs, so
+  it is still evaluated once), and the guard reads the operator's global
+  directly. `(+ n 1)` compiles to `(+cell value == prim) ifTrue: [n + 1] ifFalse:
+  [...]` with no temporaries at all.
+- **Nested calls in argument position still take a temporary**, assigned before
+  the guard inside `true ifTrue: [| t | ...]`. So when an argument is itself a
+  call, it is evaluated *before* the operator, unlike an ordinary call. Scheme
+  leaves this order unspecified; it only shows if an argument rebinds the
+  operator.
+- **A budget of 12 such temporaries per procedure**: past it, a call is not
+  inlined. Checked by a wide-expression test.
+- **Results:** `fib` 5.84 → 2.34 ms and `tak` 6.25 → 2.14 ms. The gap to
+  hand-written Smalltalk narrowed from 28× to 12× (`fib`) and from 26× to 10×
+  (`tak`). With inlining off, `tak` is 2.7× slower and `loop` 3.6× slower.
+- **Noise:** one benchmark run showed `globals` at 45.8 ms with everything on
+  (vs ~25 ms in every other column); an immediate rerun gave 24.8 ms. Single
+  runs can still be disturbed by other load on the machine; rerun before
+  trusting an outlier.
