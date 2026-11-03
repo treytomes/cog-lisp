@@ -30,7 +30,9 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 4 | Runtime & primitives | ✅ **done** — [spec](specs/phase-4-runtime-primitives.md), 44/44 |
 | 5 | REPL & image integration | ✅ **done** — [spec](specs/phase-5-repl-runner.md), 28/28 + 30/30 |
 | 6 | Tail calls & optimization | ✅ **done** — [spec](specs/phase-6-optimization.md), 127/127, [benchmarks](bench/results.md) |
-| 7 | Language reach (stretch) | ⬜ |
+| 7 | Macros & derived forms | 📋 [spec accepted](specs/phase-7-macros.md) |
+| — | Smalltalk interop | ⬜ planned (see below) |
+| — | Numeric tower · conditions & restarts · hygienic macros | ⬜ planned (see below) |
 | 8 | Self-hosting (meta-circular) | ⬜ |
 | 9 | Pure Lisp image | ⬜ |
 
@@ -171,10 +173,23 @@ Go deeper into the VM where it pays.
 - *Acceptance:* measured speedup over an interpreter baseline; tail-recursive
   loops run in constant stack.
 
-### Phase 7 — Language reach (stretch)
-- Macros (compile-time expansion), a richer numeric tower, a condition/restart
-  error system, and two-way interop with Smalltalk objects.
-- *Acceptance:* defined per sub-feature spec when the phase is reached.
+### Phase 7 — Macros & derived forms
+- `define-macro` (non-hygienic, with `gensym`), quasiquote, internal `define`,
+  and the standard derived forms (`cond`, `and`/`or`, `let*`, named `let`, `do`,
+  …) written in cog-lisp itself. An optional `lib/cl.lisp` adds Common Lisp
+  names for working through *ANSI Common Lisp*.
+- *Acceptance:* see the [Phase 7 spec](specs/phase-7-macros.md).
+
+### Planned later phases (numbered when specified)
+Split out of the original Phase 7, to come before self-hosting:
+- **Smalltalk interop** (owner priority): call Smalltalk from LISP (send messages
+  to Smalltalk objects, reach classes and globals) and LISP from Smalltalk (a
+  LISP procedure usable as a block). The way into the rest of the image, and
+  into the subsystems Phase 9 may keep or reimplement.
+- **Numeric tower:** exact rationals, exactness, and the Scheme numeric
+  procedures.
+- **Conditions and restarts:** a LISP-level error system with handlers.
+- **Hygienic macros:** `syntax-rules`.
 
 ### Phase 8 — Self-hosting (meta-circular)
 Reimplement cog-lisp **in cog-lisp**: rewrite the reader and the compiler — the
