@@ -12,6 +12,11 @@ regression checks in `tests/phase-7.5-review.st` (114 checks) or a runner
 fixture. What is left is *planned* for a named phase or *kept*; T-3 goes into the
 Phase 7.5 VS Code extension.
 
+*Plan targets, as re-ordered 2026-11-03 (README):* **self-hosting** items are
+the *self-hosting groundwork* step before Phase 8; **Smalltalk interop** and
+**conditions & restarts** also come before Phase 8; **numeric tower** and
+**hygienic macros** are part of Phase 9; **language server** is unchanged.
+
 Finding ids: **H** repo hygiene, **T** tests & build, **D** docs, **O**
 optimization; **C** compiler & macros and **R** reader, data model, runtime &
 REPL come from the independent reviews.

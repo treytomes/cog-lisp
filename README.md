@@ -32,10 +32,10 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 6 | Tail calls & optimization | ✅ **done** — [spec](specs/phase-6-optimization.md), 127/127, [benchmarks](bench/results.md) |
 | 7 | Macros & derived forms | ✅ **done** — [spec](specs/phase-7-macros.md), 115/115 |
 | 7.5 | Review & tooling | ✅ **done** — [spec](specs/phase-7.5-review-and-tooling.md), [review](specs/review-phases-1-7.md), [VS Code](vscode/README.md); all suites 627/627 |
-| — | Smalltalk interop | ⬜ planned (see below) |
-| — | Numeric tower · conditions & restarts · hygienic macros | ⬜ planned (see below) |
+| — | Before Phase 8: Smalltalk interop · conditions & restarts · native strings, characters, vectors & hash tables · self-hosting groundwork | ⬜ planned, in that order (see below) |
 | 8 | Self-hosting (meta-circular) | ⬜ |
-| 9 | Pure Lisp image | ⬜ |
+| — | CI/CD: tests on every push; image and VS Code extension built for tagged releases | ⬜ planned (see below) |
+| 9 | Pure Lisp image (with the numeric tower and hygienic macros) | ⬜ |
 
 Phase 0 is proven, not just planned: [`poc/answer.st`](poc/answer.st) builds
 three `CompiledMethod`s directly from Opal IR — a constant, a two-argument add,
@@ -207,16 +207,30 @@ A consolidation phase before self-hosting, with no new language features.
   globals, diagnostics, macro expansion.
 - *Acceptance:* see the [Phase 7.5 spec](specs/phase-7.5-review-and-tooling.md).
 
-### Planned later phases (numbered when specified)
-Split out of the original Phase 7, to come before self-hosting:
-- **Smalltalk interop** (owner priority): call Smalltalk from LISP (send messages
+### Before Phase 8 (in this order; each numbered when specified)
+Phase 8 rewrites the reader and compiler in cog-lisp, and today that code could
+not be written: LISP cannot look inside a string, keep a table, build an Opal
+node, or raise and catch an error. These come first (decided 2026-11-03):
+- **Smalltalk interop** (owner priority; [spec accepted](specs/phase-7.6-smalltalk-interop.md), Phase 7.6): call Smalltalk from LISP (send messages
   to Smalltalk objects, reach classes and globals) and LISP from Smalltalk (a
-  LISP procedure usable as a block). The way into the rest of the image, and
-  into the subsystems Phase 9 may keep or reimplement.
-- **Numeric tower:** exact rationals, exactness, and the Scheme numeric
-  procedures.
-- **Conditions and restarts:** a LISP-level error system with handlers.
-- **Hygienic macros:** `syntax-rules`.
+  LISP procedure usable as a block, which must drive its own tail calls; review
+  R-18). The way into the rest of the image, into the subsystems Phase 9 may keep
+  or reimplement, and Phase 8's "LISP-level interface to the Opal IR".
+- **Conditions and restarts:** a LISP-level error system: `error`, condition
+  objects, handlers, and restarts, with host errors mapped to conditions (review
+  R-2, C-18). Before the primitives below, so they signal proper conditions.
+- **Native strings, characters, vectors and hash tables:** what a reader and a
+  compiler written in LISP need (`string-ref`, `substring`, `string->symbol`,
+  `string->number`, `char->integer`, character predicates, string building,
+  vectors, hash tables), as **native primitives** in cog-lisp's runtime rather
+  than LISP names over Smalltalk objects: the world stays readable in LISP
+  (Phase 9), and the fixpoint check is simpler without host objects in the loop.
+- **Self-hosting groundwork:** the review findings marked *plan → self-hosting*
+  (`specs/review-phases-1-7.md`): calls nested ~20 deep (C-5), lambdas with
+  more than 15 parameters (C-4), cycle-safe `equal?` and printing (R-4), string
+  escapes for control characters (R-20), `load` relative to the loading file and
+  program arguments (R-22), and the compiler's special-form dispatch and
+  template parsing (C-18).
 
 ### Phase 8 — Self-hosting (meta-circular)
 Reimplement cog-lisp **in cog-lisp**: rewrite the reader and the compiler — the
@@ -231,6 +245,14 @@ implementation of Phases 1–4 (and macros from Phase 7).
   implementation's output on the Phase 1–4 corpora, **and** the compiler compiles
   itself to a fixpoint (the compiler built by stage 2 produces byte-identical
   output to the one built by stage 3).
+
+### After Phase 8: CI/CD (numbered when specified)
+A GitHub Actions pipeline on a Windows runner:
+- **On every push and pull request:** bootstrap Pharo (cached), then
+  `tests\run-all.bat` and the VS Code extension's `npm test`.
+- **On a tagged release:** build `cog-lisp.image` (with its `.changes`) and the
+  extension's `cog-lisp.vsix`, and attach them to the GitHub release, so cog-lisp
+  can be tried without building anything.
 
 ### Phase 9 — Pure Lisp image
 Make the cog-lisp image stand on its own, so the stock Pharo image is not needed.
@@ -250,5 +272,10 @@ Make the cog-lisp image stand on its own, so the stock Pharo image is not needed
 - Build cog-lisp's own VM executables in place of the stock `Pharo.exe` and
   `PharoConsole.exe` (for example with `--headless` as the default, which the
   launch scripts must pass explicitly today).
+- **Numeric tower** (moved here from before Phase 8, which does not need it):
+  exact rationals with read syntax, exactness, `+inf.0`/`+nan.0`, and the Scheme
+  numeric procedures (review R-11, R-21).
+- **Hygienic macros** (likewise): `syntax-rules`, best written once the compiler
+  is LISP; it also resolves special-form shadowing and capture (review C-14).
 - *Acceptance:* a cog-lisp image built without the stock image runs the example
   programs and the acceptance suites, and the user-visible world is LISP.
