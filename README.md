@@ -31,7 +31,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 5 | REPL & image integration | ✅ **done** — [spec](specs/phase-5-repl-runner.md), 28/28 + 36/36 |
 | 6 | Tail calls & optimization | ✅ **done** — [spec](specs/phase-6-optimization.md), 127/127, [benchmarks](bench/results.md) |
 | 7 | Macros & derived forms | ✅ **done** — [spec](specs/phase-7-macros.md), 115/115 |
-| 7.5 | Review & tooling | ✅ **done** — [spec](specs/phase-7.5-review-and-tooling.md), [review](specs/review-phases-1-7.md), [VS Code](vscode/README.md); all suites 624/624 |
+| 7.5 | Review & tooling | ✅ **done** — [spec](specs/phase-7.5-review-and-tooling.md), [review](specs/review-phases-1-7.md), [VS Code](vscode/README.md); all suites 627/627 |
 | — | Smalltalk interop | ⬜ planned (see below) |
 | — | Numeric tower · conditions & restarts · hygienic macros | ⬜ planned (see below) |
 | 8 | Self-hosting (meta-circular) | ⬜ |

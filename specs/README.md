@@ -34,7 +34,7 @@ to successor).
 | 5 | [REPL, Runner & Image](phase-5-repl-runner.md) | Implemented (28/28 + 30/30) |
 | 6 | [Tail Calls & Optimization](phase-6-optimization.md) | Implemented (127/127 + bench 12/12) |
 | 7 | [Macros & Derived Forms](phase-7-macros.md) | Implemented (115/115) |
-| 7.5 | [Review & Tooling](phase-7.5-review-and-tooling.md) | Implemented (114/114 review checks; all suites 624/624; editor checks by hand) |
+| 7.5 | [Review & Tooling](phase-7.5-review-and-tooling.md) | Implemented (114/114 review checks; all suites 627/627; extension checked in VS Code) |
 
 Later phases (2–7, see the [project plan](../README.md#project-plan)) get their
 specs here as we reach them.

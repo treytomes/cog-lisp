@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 7.5 |
-| **Status** | Implemented (2026-11-03) — review fixed (624/624 checks); extension built and installed; AC-8 to AC-10 to be checked by hand in VS Code |
+| **Status** | Implemented (2026-11-03) — review fixed (all suites 627/627); extension built, installed, and checked in VS Code by the owner (AC-8 to AC-10) |
 | **Depends on** | Phases 1–7 |
 | **Feeds** | Phase 8 (self-hosting), Smalltalk interop, every later phase |
 | **Kind** | Consolidation: no new language features |
@@ -207,7 +207,11 @@ step). `npm test` runs 15 form-scanner checks and the grammar assertions of
   Windows with a libuv assertion (exit 127, pass or fail), so
   `test/grammar.test.js` runs it and judges by its output; a planted wrong
   assertion is reported as a failure.
-- **Not checked from here:** AC-8 to AC-10 need the editor itself. Their command
-  lines were run from Node exactly as the extension spawns them (the run, the
-  REPL, and the matcher on a located error, including a path with spaces), and
-  the steps to check them in VS Code are in `vscode/README.md`.
+- **Checked in the editor (AC-8 to AC-10)** by the owner, with the steps in
+  `vscode/README.md`. That check found one bug: when a program's output did not
+  end its line, the error report continued it in the terminal and the matcher
+  took the output as part of the path. The runner now starts the report on a new
+  line, and the matcher anchors on the path's drive letter
+  (`vscode/test/matcher.test.js`, `tests/runner/midline.*`).
+- **AC-11:** the language-server plan (§5.4) is accepted, to be numbered and
+  specified as a later phase.
