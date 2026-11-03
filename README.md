@@ -31,6 +31,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 5 | REPL & image integration | ✅ **done** — [spec](specs/phase-5-repl-runner.md), 28/28 + 36/36 |
 | 6 | Tail calls & optimization | ✅ **done** — [spec](specs/phase-6-optimization.md), 127/127, [benchmarks](bench/results.md) |
 | 7 | Macros & derived forms | ✅ **done** — [spec](specs/phase-7-macros.md), 115/115 |
+| 7.5 | Review & tooling | 📋 [spec accepted](specs/phase-7.5-review-and-tooling.md) |
 | — | Smalltalk interop | ⬜ planned (see below) |
 | — | Numeric tower · conditions & restarts · hygienic macros | ⬜ planned (see below) |
 | 8 | Self-hosting (meta-circular) | ⬜ |
@@ -185,13 +186,18 @@ Go deeper into the VM where it pays.
   `format`, keywords, multiple values, `&optional` or `&key`.
 - *Acceptance:* see the [Phase 7 spec](specs/phase-7-macros.md).
 
-### Next after Phase 7, before Phase 8
+### Phase 7.5 — Review & tooling
+A consolidation phase before self-hosting, with no new language features.
 - **Review of Phases 1–7:** a full review of the first seven phases (specs, code,
-  tests, and the Pharo findings in CLAUDE.md) to see what we would do better with
-  what we know now, and to fix or plan those changes before self-hosting.
-- **VS Code integration layer:** plan how cog-lisp works inside VS Code (for
-  example: syntax support for `.lisp` files, running a program or a selection,
-  a REPL in the integrated terminal, and access to procedure source).
+  tests, build, and the Pharo findings in CLAUDE.md) to see what we would do
+  better with what we know now. Each finding is fixed now, planned for a named
+  phase, or kept with a reason, in `specs/review-phases-1-7.md`.
+- **VS Code integration:** a local extension (`vscode/`, installed from a
+  `.vsix`) with syntax highlighting, bracket handling, run file, a REPL in the
+  integrated terminal, and send-form-to-REPL. Plus a plan for a language server
+  served by the image itself: hover with procedure source, completion from the
+  globals, diagnostics, macro expansion.
+- *Acceptance:* see the [Phase 7.5 spec](specs/phase-7.5-review-and-tooling.md).
 
 ### Planned later phases (numbered when specified)
 Split out of the original Phase 7, to come before self-hosting:
