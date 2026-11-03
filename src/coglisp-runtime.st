@@ -9,7 +9,7 @@
  Classes: LispError, LispArityError, LispProcedure, LispTailCall, LispPrimitives,
  LispTextOutput.
  ============================================================================"
-| failures cm lerr aerr proc tcall prims tout |
+| failures cm lerr aerr proc tcall prims tout facade |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -21,6 +21,8 @@ aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp
 proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries. #inline }; package: 'CogLisp-Runtime'; install.
 tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runtime'; install.
 prims := (Object << #LispPrimitives) sharedVariables: { #Output. #GensymCounter }; package: 'CogLisp-Runtime'; install.
+"CogLisp: the Smalltalk-side facade for evaluating and calling LISP (Phase 7.6 section 5.2)."
+facade := (Object << #CogLisp) package: 'CogLisp-Runtime'; install.
 tout  := (Object << #LispTextOutput) slots: { #kind. #handle. #stream. #buffer. #midLine }; sharedVariables: { #Session. #Stdout. #Stderr }; package: 'CogLisp-Runtime'; install.
 
 "=== LispTextOutput =========================================================
@@ -133,6 +135,44 @@ cm value: proc value: 'accessing' value: 'source: aString
 	source := aString'.
 cm value: proc value: 'accessing' value: 'block
 	^ block'.
+cm value: proc value: 'block protocol' value: 'value
+	"A LISP procedure answers the messages Smalltalk sends to a block, and each
+	 drives its tail calls, so Smalltalk never sees a LispTailCall (Phase 7.6
+	 section 5.1; review R-18)."
+	^ LispProcedure apply: self to: #()'.
+cm value: proc value: 'block protocol' value: 'value: a
+	^ LispProcedure apply: self to: { a }'.
+cm value: proc value: 'block protocol' value: 'value: a value: b
+	^ LispProcedure apply: self to: { a. b }'.
+cm value: proc value: 'block protocol' value: 'value: a value: b value: c
+	^ LispProcedure apply: self to: { a. b. c }'.
+cm value: proc value: 'block protocol' value: 'value: a value: b value: c value: d
+	^ LispProcedure apply: self to: { a. b. c. d }'.
+cm value: proc value: 'block protocol' value: 'valueWithArguments: anArray
+	^ LispProcedure apply: self to: anArray asArray'.
+cm value: proc value: 'block protocol' value: 'numArgs
+	^ required'.
+cm value: proc value: 'block protocol' value: 'cull: a
+	^ (required = 0 and: [hasRest not]) ifTrue: [self value] ifFalse: [self value: a]'.
+cm value: proc value: 'block protocol' value: 'cull: a cull: b
+	required >= 2 ifTrue: [^ self value: a value: b].
+	^ self cull: a'.
+cm value: proc value: 'block protocol' value: 'on: exceptionClass do: handler
+	"The procedure as the protected block of an exception handler."
+	^ [self value] on: exceptionClass do: handler'.
+cm value: proc value: 'block protocol' value: 'ensure: aBlock
+	^ [self value] ensure: aBlock'.
+cm value: proc value: 'block protocol' value: 'ifCurtailed: aBlock
+	^ [self value] ifCurtailed: aBlock'.
+cm value: proc value: 'block protocol' value: 'asBlock
+	"A real BlockClosure that calls this procedure, for code that needs one (fork)."
+	(hasRest not and: [required <= 4]) ifFalse: [
+		^ (LispError new) signal: ''procedure->block: needs a procedure of at most 4 fixed arguments''].
+	required = 0 ifTrue: [^ [self value]].
+	required = 1 ifTrue: [^ [:a | self value: a]].
+	required = 2 ifTrue: [^ [:a :b | self value: a value: b]].
+	required = 3 ifTrue: [^ [:a :b :c | self value: a value: b value: c]].
+	^ [:a :b :c :d | self value: a value: b value: c value: d]'.
 cm value: proc value: 'printing' value: 'printOn: aStream
 	aStream nextPutAll: ''#<procedure''.
 	name ifNotNil: [aStream nextPut: Character space; nextPutAll: name].
@@ -310,6 +350,7 @@ cm value: prims class value: 'installing' value: 'installInto: anEnv
 	self installSystemInto: anEnv.
 	self installMacroSupportInto: anEnv.
 	self installListSearchInto: anEnv.
+	self installInteropInto: anEnv.
 	"every primitive knows its name, for printing and error messages (review R-7)"
 	anEnv cellsDo: [:c | | v |
 		v := c valueIfUnbound: [nil].
@@ -328,6 +369,47 @@ cm value: prims class value: 'installing' value: 'installMacroSupportInto: anEnv
 	anEnv define: (LispSymbol named: ''macroexpand-1'') value: (LispProcedure fixed: [:form | LispCompiler new macroexpand1: form] arity: 1).
 	anEnv define: (LispSymbol named: ''macroexpand'') value: (LispProcedure fixed: [:form | LispCompiler new macroexpand: form] arity: 1).
 	anEnv define: (LispSymbol named: ''eval'') value: (LispProcedure fixed: [:form | LispCompiler new eval: form] arity: 1)'.
+cm value: prims class value: 'installing' value: 'installInteropInto: anEnv
+	"Phase 7.6 sections 4.3 to 4.5: dynamic sends and lookups, and the values that
+	 differ between the languages. Names arrive as LISP symbols or strings."
+	| def nameOf |
+	def := [:name :proc | anEnv define: (LispSymbol named: name) value: proc].
+	nameOf := [:x | (x isKindOf: LispSymbol) ifTrue: [x name] ifFalse: [x asString]].
+	def value: ''smalltalk-global'' value: (LispProcedure fixed: [:name |
+		Smalltalk globals at: (nameOf value: name) asSymbol ifAbsent: [false]] arity: 1).
+	def value: ''smalltalk-selector'' value: (LispProcedure fixed: [:name | (nameOf value: name) asSymbol] arity: 1).
+	def value: ''smalltalk-send'' value: (LispProcedure variadic: [:recv :sel :rest |
+		recv perform: (nameOf value: sel) asSymbol withArguments: rest lispElements asArray] required: 2).
+	def value: ''smalltalk-nil'' value: (LispProcedure fixed: [nil] arity: 0).
+	def value: ''smalltalk-nil?'' value: (LispProcedure fixed: [:x | x isNil] arity: 1).
+	def value: ''smalltalk-symbol'' value: (LispProcedure fixed: [:x | (nameOf value: x) asSymbol] arity: 1).
+	def value: ''lisp-symbol'' value: (LispProcedure fixed: [:x | LispSymbol named: x asString] arity: 1).
+	def value: ''list->array'' value: (LispProcedure fixed: [:l | (LispCons elementsOf: l for: ''list->array'') asArray] arity: 1).
+	def value: ''array->list'' value: (LispProcedure fixed: [:a | LispCons fromArray: a asArray] arity: 1).
+	def value: ''procedure->block'' value: (LispProcedure fixed: [:p | p asBlock] arity: 1).
+	def value: ''smalltalk-object?'' value: (LispProcedure fixed: [:x |
+		(x class package name beginsWith: ''CogLisp'') not
+			and: [(x isKindOf: Boolean) not and: [x isNumber not
+			and: [(x isKindOf: Character) not and: [(LispCore isString: x) not]]]]] arity: 1)'.
+cm value: facade class value: 'evaluating' value: 'eval: aString
+	"Evaluate LISP source in the global environment; answer the last value."
+	^ LispCompiler new evalAll: aString'.
+cm value: facade class value: 'evaluating' value: 'read: aString
+	"The datum aString holds, unevaluated."
+	^ LispReader read: aString'.
+cm value: facade class value: 'globals' value: 'at: aName
+	"The value of the LISP global aName (a string or Smalltalk symbol)."
+	^ LispEnvironment default lookup: (LispSymbol named: aName asString)'.
+cm value: facade class value: 'globals' value: 'define: aName as: aValue
+	^ LispEnvironment default define: (LispSymbol named: aName asString) value: aValue'.
+cm value: facade class value: 'calling' value: 'call: aName
+	^ LispProcedure apply: (self at: aName) to: #()'.
+cm value: facade class value: 'calling' value: 'call: aName with: a
+	^ LispProcedure apply: (self at: aName) to: { a }'.
+cm value: facade class value: 'calling' value: 'call: aName with: a with: b
+	^ LispProcedure apply: (self at: aName) to: { a. b }'.
+cm value: facade class value: 'calling' value: 'call: aName withArguments: anArray
+	^ LispProcedure apply: (self at: aName) to: anArray asArray'.
 cm value: prims class value: 'installing' value: 'installListSearchInto: anEnv
 	"memq memv member: the first tail of lst whose car matches, else #f.
 	 assq assv assoc: the first pair in alist whose car matches, else #f."

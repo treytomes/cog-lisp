@@ -4,7 +4,7 @@
 // strings, comments, block comments and character literals.
 'use strict';
 
-const DELIMITERS = new Set([' ', '\t', '\r', '\n', '\f', '(', ')', '"', ';', "'", '`', ',']);
+const DELIMITERS = new Set([' ', '\t', '\r', '\n', '\f', '(', ')', '[', ']', '"', ';', "'", '`', ',']);
 
 /**
  * The top-level datums of text, as [start, end) offsets. A quote prefix
@@ -43,8 +43,9 @@ function topLevelForms(text) {
     if (depth === 0 && start < 0) start = i;
     if (c === "'" || c === '`') { i++; continue; }
     if (c === ',') { i += text[i + 1] === '@' ? 2 : 1; continue; }
-    if (c === '(') { depth++; i++; continue; }
-    if (c === ')') {
+    // [ ] (Smalltalk sends, Phase 7.6) nest like ( )
+    if (c === '(' || c === '[') { depth++; i++; continue; }
+    if (c === ')' || c === ']') {
       i++;
       if (depth > 0) depth--;
       close(i);

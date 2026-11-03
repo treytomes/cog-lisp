@@ -129,6 +129,30 @@ cm value: empty value: 'enumerating' value: 'lispElements
 	^ OrderedCollection new'.
 cm value: empty value: 'enumerating' value: 'lispTail
 	^ self'.
+cm value: cons value: 'smalltalk protocol' value: 'do: aBlock
+	"Smalltalk code can iterate a LISP list (Phase 7.6 section 4.5)."
+	| cur |
+	cur := self.
+	[cur isKindOf: LispCons] whileTrue: [aBlock value: cur car. cur := cur cdr]'.
+cm value: cons value: 'smalltalk protocol' value: 'collect: aBlock
+	"A new LISP list of the results."
+	^ LispCons fromArray: (self lispElements collect: [:e | aBlock value: e]) asArray'.
+cm value: cons value: 'smalltalk protocol' value: 'size
+	^ self lispElements size'.
+cm value: cons value: 'smalltalk protocol' value: 'asArray
+	^ self lispElements asArray'.
+cm value: cons value: 'smalltalk protocol' value: 'asOrderedCollection
+	^ self lispElements asOrderedCollection'.
+cm value: empty value: 'smalltalk protocol' value: 'do: aBlock
+	^ self'.
+cm value: empty value: 'smalltalk protocol' value: 'collect: aBlock
+	^ self'.
+cm value: empty value: 'smalltalk protocol' value: 'size
+	^ 0'.
+cm value: empty value: 'smalltalk protocol' value: 'asArray
+	^ #()'.
+cm value: empty value: 'smalltalk protocol' value: 'asOrderedCollection
+	^ OrderedCollection new'.
 cm value: empty class value: 'accessing' value: 'default
 	Default isNil ifTrue: [Default := self basicNew].
 	^ Default'.
@@ -168,9 +192,9 @@ cm value: lerr class value: 'describing' value: 'describe: anError
 		sel = #car: ifTrue: [^ ''set-car!!: not a pair: '' , (self show: rcv)].
 		sel = #cdr: ifTrue: [^ ''set-cdr!!: not a pair: '' , (self show: rcv)].
 		(#(#adaptToNumber:andSend: #adaptToInteger:andSend: #adaptToFloat:andSend: #adaptToFraction:andSend:) includes: sel)
-			ifTrue: [^ anError message arguments last , '': not a number''].
-		"any other message a value does not understand: a primitive was given the wrong type"
-		^ ''wrong type of argument: '' , (self show: rcv)].
+			ifTrue: [^ anError message arguments last asString , '': not a number''].
+		"any other message: say so plainly, as Smalltalk would (Phase 7.6 section 7)"
+		^ (self show: rcv) , '' does not understand #'' , sel].
 	(anError isKindOf: ZeroDivide) ifTrue: [^ ''division by zero''].
 	text := anError messageText.
 	(text isNil or: [text isEmpty]) ifTrue: [text := anError class name].
@@ -224,7 +248,7 @@ cm value: rdr value: 'error handling' value: 'signalError: aString at: anOffset 
 	"anOffset is the 0-based offset of the character the error is about."
 	^ (LispReadError new) position: anOffset; incomplete: aBoolean; signal: aString'.
 cm value: rdr value: 'scanning' value: 'isDelimiter: aChar
-	^ aChar isSeparator or: [#($( $) $" $; $'' $` $,) includes: aChar]'.
+	^ aChar isSeparator or: [#($( $) $[ $] $" $; $'' $` $,) includes: aChar]'.
 cm value: rdr value: 'reading' value: 'next
 	self skipIntertoken.
 	stream atEnd ifTrue: [^ self class eofObject].
@@ -290,6 +314,8 @@ cm value: rdr value: 'reading' value: 'readDatum
 	c := stream peek.
 	c = $( ifTrue: [^ self readList].
 	c = $) ifTrue: [^ self signalError: ''unexpected )''].
+	c = $[ ifTrue: [^ self readBracket].
+	c = $] ifTrue: [^ self signalError: ''unexpected ]''].
 	c = $'' ifTrue: [stream next. ^ self readQuote].
 	c = $` ifTrue: [stream next. ^ self readAbbreviation: ''quasiquote''].
 	c = $, ifTrue: [
@@ -310,6 +336,46 @@ cm value: rdr value: 'reading' value: 'readAbbreviation: aName
 	^ LispCons
 		car: (LispSymbol named: aName)
 		cdr: (LispCons car: self readNextDatum cdr: LispEmptyList default)'.
+cm value: rdr value: 'reading' value: 'readBracket
+	"[receiver message ...] reads as (send receiver selector arg ...): Phase 7.6
+	 section 4.2. The list keeps the bracket''s source range, like any list."
+	| start parts result |
+	start := stream position.
+	stream next.
+	parts := OrderedCollection new.
+	[self skipIntertoken.
+	 stream atEnd ifTrue: [^ self signalIncomplete: ''unterminated ['' at: start].
+	 stream peek = $]] whileFalse: [parts add: self readDatum].
+	stream next.
+	result := self sendFormFrom: parts at: start.
+	ranges at: result put: (start + 1) -> stream position.
+	^ result'.
+cm value: rdr value: 'reading' value: 'sendFormFrom: parts at: start
+	"Unary [r sel], binary [r + a], or keyword [r k1: a1 k2: a2]. A capitalized
+	 receiver symbol names a Smalltalk global (section 10, decision 2)."
+	| recv rest selector args identifier |
+	identifier := ''[a-zA-Z_][a-zA-Z0-9_]*''.
+	parts size < 2 ifTrue: [^ self badSendAt: start].
+	recv := parts first.
+	((recv isKindOf: LispSymbol) and: [recv name first isUppercase]) ifTrue: [
+		recv := LispCons fromArray: { LispSymbol named: ''smalltalk''. recv }].
+	rest := parts allButFirst.
+	(rest size = 1 and: [(rest first isKindOf: LispSymbol) and: [rest first name matchesRegex: identifier]])
+		ifTrue: [selector := rest first. args := #()].
+	(selector isNil and: [rest size = 2 and: [(rest first isKindOf: LispSymbol)
+		and: [rest first name allSatisfy: [:c | ''+-*/\<>=~@%|&?'' includes: c]]]])
+		ifTrue: [selector := rest first. args := { rest second }].
+	(selector isNil and: [rest size even and: [(1 to: rest size by: 2) allSatisfy: [:i |
+		((rest at: i) isKindOf: LispSymbol) and: [(rest at: i) name matchesRegex: identifier , ''\:'']]]])
+		ifTrue: [
+			selector := LispSymbol named: (String streamContents: [:s |
+				1 to: rest size by: 2 do: [:i | s nextPutAll: (rest at: i) name]]).
+			args := (2 to: rest size by: 2) collect: [:i | rest at: i]].
+	selector isNil ifTrue: [^ self badSendAt: start].
+	^ LispCons fromArray: { LispSymbol named: ''send''. recv. selector } , args asArray'.
+cm value: rdr value: 'error handling' value: 'badSendAt: start
+	^ self signalError: ''bad message send: brackets are Smalltalk sends; use ( ) for grouping''
+		at: start incomplete: false'.
 cm value: rdr value: 'reading' value: 'readList
 	| start result |
 	start := stream position.
@@ -520,7 +586,7 @@ cm value: prn class value: 'writing' value: 'write: v on: s
 	^ self print: v on: s display: false'.
 cm value: prn class value: 'writing' value: 'print: v on: s display: displaying
 	displaying ifTrue: [
-		(v isKindOf: String) ifTrue: [^ s nextPutAll: v].
+		((v isKindOf: String) and: [v isSymbol not]) ifTrue: [^ s nextPutAll: v].
 		(v isKindOf: Character) ifTrue: [^ s nextPut: v]].
 	(v isKindOf: LispCons) ifTrue: [^ self printList: v on: s display: displaying].
 	"3/2, which reads back as a symbol for now; Smalltalk prints (3/2) (review R-11)"
@@ -533,9 +599,14 @@ cm value: prn class value: 'writing' value: 'print: v on: s display: displaying
 	(v isKindOf: Integer) ifTrue: [^ s nextPutAll: v printString].
 	(v isKindOf: Float) ifTrue: [^ self writeFloat: v on: s].
 	(v isKindOf: Character) ifTrue: [^ self writeCharacter: v on: s].
+	(v isKindOf: Symbol) ifTrue: [^ s nextPutAll: ''#<''; nextPutAll: v printString; nextPut: $>].
 	(v isKindOf: String) ifTrue: [^ self writeStringLiteral: v on: s].
-	"Anything else (the unspecified value, procedures, host objects) writes its printString."
-	^ s nextPutAll: v printString'.
+	"cog-lisp''s own objects (the unspecified value, procedures, macros) print as they
+	 say; any other Smalltalk object as #<its printString>, so it cannot be mistaken
+	 for LISP data: nil used to print as nil, which reads back as a symbol (Phase 7.6
+	 section 4.6; review R-18)."
+	(v class package name beginsWith: ''CogLisp'') ifTrue: [^ s nextPutAll: v printString].
+	^ s nextPutAll: ''#<''; nextPutAll: v printString; nextPut: $>'.
 cm value: prn class value: 'writing' value: 'writeList: aCons on: s
 	^ self printList: aCons on: s display: false'.
 cm value: prn class value: 'writing' value: 'printList: aCons on: s display: displaying

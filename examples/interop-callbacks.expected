@@ -1,0 +1,9 @@
+(odd even odd even)
+(100000 100001 100002)
+caught a division by zero
+#<#frobnicate>
+(body cleanup)
+(#<FullBlockClosure> 2 42)
+144
+(1 4 9)
+81

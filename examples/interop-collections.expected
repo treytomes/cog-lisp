@@ -1,0 +1,12 @@
+5
+#<an OrderedCollection('Smalltalk' 'Self' 'Scheme' 'Simula')>
+#<an OrderedCollection(9 4 4 6 6)>
+Smalltalk
+29
+#<a SortedCollection('Lisp' 'Self' 'Scheme' 'Simula' 'Smalltalk')>
+#<a SortedCollection('lisp' 'scheme' 'self' 'simula' 'smalltalk')>
+1958
+unknown
+(Lisp Smalltalk Scheme)
+3
+(1 4 7 10)

@@ -33,7 +33,8 @@ cm value: core class value: 'predicates' value: 'isSymbol: v
 cm value: core class value: 'predicates' value: 'isBoolean: v
 	^ (v == true) or: [v == false]'.
 cm value: core class value: 'predicates' value: 'isString: v
-	^ v isKindOf: String'.
+	"A Smalltalk symbol is a String in Smalltalk, but not a string in LISP (Phase 7.6 section 4.5)."
+	^ (v isKindOf: String) and: [v isSymbol not]'.
 cm value: core class value: 'predicates' value: 'isChar: v
 	^ v isKindOf: Character'.
 cm value: core class value: 'predicates' value: 'isNumber: v

@@ -35,6 +35,9 @@ check('cursor just after a form', at('(a)\n(b)|\n'), '(b)');
 check('cursor on a blank line after a form', at('(a)\n\n|'), '(a)');
 check('cursor before every form', at('|  (a) (b)'), '(a)');
 check('no forms', topLevelFormAt('; just a comment\n', 3), null);
+check('a bracket send is a form', texts('[coll size] (a [b c: 1])'), ['[coll size]', '(a [b c: 1])']);
+check('cursor inside a bracket inside a form', at('(define c [OrderedCollection |new])'), '(define c [OrderedCollection new])');
+check('#\\[ is a character, not a bracket', texts('(list #\\[ #\\]) (z)'), ['(list #\\[ #\\])', '(z)']);
 
 console.log('');
 console.log('== RESULT: ' + pass + '/' + total + ' checks passed ==');

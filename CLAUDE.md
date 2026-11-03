@@ -212,6 +212,15 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   method is compiled from `cm value: cls value: 'cat' value: '<source>'`, so an
   apostrophe in a comment (`Floyd's`) ends the literal early and the whole file
   fails to load with "End of statement expected". Write `''` (and `!!` for `!`).
+- **Opal inlines control selectors even when the argument is not a block.** A
+  message node for `ifTrue:`, `and:`, `whileTrue:`, `to:do:`, `ifNil:` … built with
+  a non-block argument compiles inline, the argument taken as a plain value; the
+  method is never sent. To send one for real (e.g. with a LISP procedure as the
+  block), use `perform:withArguments:` (`LispCompiler inlinedSelectors`).
+- **`aSymbol , aString` answers a Symbol** (`#+ , ': x'` is `#'+: x'`); send
+  `asString` first when building text from a selector.
+- **`anObject value` answers the object itself** (`Object>>value`), so any object
+  silently "works" as a zero-argument block; a LISP procedure overrides it.
 - **`aCharacter value` is the character itself**, not its code (it is
   `Object>>value`); use `asInteger`. `Character value: n` (class side) does make a
   character from a code.

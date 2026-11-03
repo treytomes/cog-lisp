@@ -342,6 +342,8 @@ cm value: comp value: 'translating' value: 'translateForm: form inScope: scope t
 		^ self translateSet: form inScope: scope].
 	opName = ''quasiquote'' ifTrue: [self check: form operands: 1 to: 1. ^ self qqNode: form cdr car level: 0 inScope: scope].
 	opName = ''define-macro'' ifTrue: [self check: form operands: 2 to: nil. ^ self translateDefineMacro: form inScope: scope].
+	opName = ''send'' ifTrue: [^ self translateSend: form inScope: scope].
+	opName = ''smalltalk'' ifTrue: [^ self translateSmalltalkGlobal: form].
 	(self macroFor: op inScope: scope) ifNotNil: [:m |
 		^ self translateMacroCall: form macro: m inScope: scope tail: tail].
 	^ self translateApplication: form inScope: scope tail: tail'.
@@ -760,6 +762,52 @@ cm value: comp value: 'translating' value: 'translateNamedLet: parts inScope: sc
 			car: (LispCons fromArray: { LispSymbol named: ''let''. LispEmptyList default. defineForm. name })
 			cdr: (LispCons fromArray: inits asArray))
 		inScope: scope tail: tail'.
+cm value: comp value: 'interop' value: 'selectorArity: aString
+	"The number of arguments of a Smalltalk selector spelled aString, or nil if it
+	 is not one: unary (foo), binary (+, ->, ==) or keyword (at:put:)."
+	(aString notEmpty and: [aString allSatisfy: [:c | ''+-*/\<>=~@%|&?,'' includes: c]]) ifTrue: [^ 1].
+	(aString matchesRegex: ''[a-zA-Z_][a-zA-Z0-9_]*'') ifTrue: [^ 0].
+	(aString matchesRegex: ''([a-zA-Z_][a-zA-Z0-9_]*\:)+'') ifTrue: [^ aString occurrencesOf: $:].
+	^ nil'.
+cm value: comp value: 'interop' value: 'translateSend: form inScope: scope
+	"(send receiver selector arg ...): a real Smalltalk message send, the selector
+	 unevaluated (specs/phase-7.6-smalltalk-interop.md section 4.1)."
+	| parts selector arity args |
+	self check: form operands: 2 to: nil.
+	parts := self listToArray: form cdr.
+	(parts second isKindOf: LispSymbol) ifFalse: [^ self compileError: ''send: bad selector: '' , (self show: parts second)].
+	arity := self selectorArity: parts second name.
+	arity isNil ifTrue: [^ self compileError: ''send: not a Smalltalk selector: '' , parts second name].
+	args := parts allButFirst: 2.
+	args size = arity ifFalse: [
+		^ self compileError: ''send: '' , parts second name , '' takes '' , arity printString ,
+			(arity = 1 ifTrue: ['' argument''] ifFalse: ['' arguments'']) , '', got '' , args size printString].
+	selector := parts second name asSymbol.
+	"Opal compiles these selectors inline, taking a non-block argument as a plain value:
+	 (send #t ifTrue: f) would answer f instead of calling it. Perform them, so the
+	 real method runs and sends value to the procedure."
+	(self class inlinedSelectors includes: selector) ifTrue: [
+		^ self messageNode: (self translate: parts first inScope: scope)
+			selector: #perform:withArguments:
+			arguments: { self literalNode: selector. self arrayNode: (args collect: [:d | self translate: d inScope: scope]) }].
+	^ self messageNode: (self translate: parts first inScope: scope)
+		selector: selector
+		arguments: (args collect: [:d | self translate: d inScope: scope])'.
+cm value: comp class value: 'interop' value: 'inlinedSelectors
+	"The messages Opal compiles inline instead of sending (OCASTTranslator)."
+	^ #(#ifTrue: #ifFalse: #ifTrue:ifFalse: #ifFalse:ifTrue: #and: #or: #and:and: #or:or:
+		#whileTrue: #whileFalse: #whileTrue #whileFalse #to:do: #to:by:do: #timesRepeat: #repeat
+		#ifNil: #ifNotNil: #ifNil:ifNotNil: #ifNotNil:ifNil:
+		#ifEmpty: #ifNotEmpty: #ifEmpty:ifNotEmpty: #ifNotEmpty:ifEmpty:) asSet'.
+cm value: comp value: 'interop' value: 'translateSmalltalkGlobal: form
+	"(smalltalk Name): the Smalltalk global, resolved when compiled (section 4.3)."
+	| name |
+	self check: form operands: 1 to: 1.
+	name := form cdr car.
+	(name isKindOf: LispSymbol) ifFalse: [^ self compileError: ''smalltalk: bad name: '' , (self show: name)].
+	(Smalltalk globals includesKey: name name asSymbol)
+		ifFalse: [^ self compileError: ''smalltalk: no Smalltalk global named '' , name name].
+	^ self var: name name'.
 cm value: comp value: 'translating' value: 'isLambdaForm: datum
 	^ (datum isKindOf: LispCons) and: [datum car == (LispSymbol named: ''lambda'')]'.
 cm value: comp value: 'translating' value: 'translateDefine: form inScope: scope

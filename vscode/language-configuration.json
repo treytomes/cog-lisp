@@ -1,23 +1,63 @@
 {
   "comments": {
     "lineComment": ";",
-    "blockComment": ["#|", "|#"]
+    "blockComment": [
+      "#|",
+      "|#"
+    ]
   },
   "brackets": [
-    ["(", ")"]
+    [
+      "(",
+      ")"
+    ],
+    [
+      "[",
+      "]"
+    ]
   ],
   "autoClosingPairs": [
-    { "open": "(", "close": ")" },
-    { "open": "\"", "close": "\"", "notIn": ["string", "comment"] },
-    { "open": "#|", "close": "|#", "notIn": ["string"] }
+    {
+      "open": "(",
+      "close": ")"
+    },
+    {
+      "open": "[",
+      "close": "]"
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "notIn": [
+        "string",
+        "comment"
+      ]
+    },
+    {
+      "open": "#|",
+      "close": "|#",
+      "notIn": [
+        "string"
+      ]
+    }
   ],
   "surroundingPairs": [
-    ["(", ")"],
-    ["\"", "\""]
+    [
+      "(",
+      ")"
+    ],
+    [
+      "[",
+      "]"
+    ],
+    [
+      "\"",
+      "\""
+    ]
   ],
-  "wordPattern": "[^\\s()\"';`,]+",
+  "wordPattern": "[^\\s()\\[\\]\"';`,]+",
   "indentationRules": {
-    "increaseIndentPattern": "^.*\\([^)]*$",
-    "decreaseIndentPattern": "^\\s*\\)"
+    "increaseIndentPattern": "^.*[(\\[][^)\\]]*$",
+    "decreaseIndentPattern": "^\\s*[)\\]]"
   }
 }

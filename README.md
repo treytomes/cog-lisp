@@ -31,8 +31,9 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 5 | REPL & image integration | ✅ **done** — [spec](specs/phase-5-repl-runner.md), 28/28 + 36/36 |
 | 6 | Tail calls & optimization | ✅ **done** — [spec](specs/phase-6-optimization.md), 127/127, [benchmarks](bench/results.md) |
 | 7 | Macros & derived forms | ✅ **done** — [spec](specs/phase-7-macros.md), 115/115 |
-| 7.5 | Review & tooling | ✅ **done** — [spec](specs/phase-7.5-review-and-tooling.md), [review](specs/review-phases-1-7.md), [VS Code](vscode/README.md); all suites 627/627 |
-| — | Before Phase 8: Smalltalk interop · conditions & restarts · native strings, characters, vectors & hash tables · self-hosting groundwork | ⬜ planned, in that order (see below) |
+| 7.5 | Review & tooling | ✅ **done** — [spec](specs/phase-7.5-review-and-tooling.md), [review](specs/review-phases-1-7.md), [VS Code](vscode/README.md) |
+| 7.6 | Smalltalk interop | ✅ **done** — [spec](specs/phase-7.6-smalltalk-interop.md), 82/82, [examples](examples/interop-send.lisp); all suites 719/719 |
+| — | Before Phase 8: conditions & restarts (7.7) · native strings, characters, vectors & hash tables (7.8) · self-hosting groundwork (7.9) | ⬜ planned, in that order (see below) |
 | 8 | Self-hosting (meta-circular) | ⬜ |
 | — | CI/CD: tests on every push; image and VS Code extension built for tagged releases | ⬜ planned (see below) |
 | 9 | Pure Lisp image (with the numeric tower and hygienic macros) | ⬜ |
@@ -211,7 +212,7 @@ A consolidation phase before self-hosting, with no new language features.
 Phase 8 rewrites the reader and compiler in cog-lisp, and today that code could
 not be written: LISP cannot look inside a string, keep a table, build an Opal
 node, or raise and catch an error. These come first (decided 2026-11-03):
-- **Smalltalk interop** (owner priority; [spec accepted](specs/phase-7.6-smalltalk-interop.md), Phase 7.6): call Smalltalk from LISP (send messages
+- **Smalltalk interop** — ✅ done as Phase 7.6 ([spec](specs/phase-7.6-smalltalk-interop.md)): `[coll add: x]`, `(send d at:put: k v)`, `(smalltalk Dictionary)`. Call Smalltalk from LISP (send messages
   to Smalltalk objects, reach classes and globals) and LISP from Smalltalk (a
   LISP procedure usable as a block, which must drive its own tail calls; review
   R-18). The way into the rest of the image, into the subsystems Phase 9 may keep

@@ -3,23 +3,58 @@
   "name": "cog-lisp",
   "scopeName": "source.cog-lisp",
   "patterns": [
-    { "include": "#expression" }
+    {
+      "include": "#expression"
+    }
   ],
   "repository": {
     "expression": {
       "patterns": [
-        { "include": "#comment" },
-        { "include": "#block-comment" },
-        { "include": "#string" },
-        { "include": "#character" },
-        { "include": "#boolean" },
-        { "include": "#definition" },
-        { "include": "#special-form" },
-        { "include": "#macro" },
-        { "include": "#quote" },
-        { "include": "#paren" },
-        { "include": "#number" },
-        { "include": "#symbol" }
+        {
+          "include": "#comment"
+        },
+        {
+          "include": "#block-comment"
+        },
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#character"
+        },
+        {
+          "include": "#boolean"
+        },
+        {
+          "include": "#definition"
+        },
+        {
+          "include": "#special-form"
+        },
+        {
+          "include": "#macro"
+        },
+        {
+          "include": "#quote"
+        },
+        {
+          "include": "#bracket"
+        },
+        {
+          "include": "#paren"
+        },
+        {
+          "include": "#selector-keyword"
+        },
+        {
+          "include": "#number"
+        },
+        {
+          "include": "#class-name"
+        },
+        {
+          "include": "#symbol"
+        }
       ]
     },
     "comment": {
@@ -31,7 +66,9 @@
       "begin": "#\\|",
       "end": "\\|#",
       "patterns": [
-        { "include": "#block-comment" }
+        {
+          "include": "#block-comment"
+        }
       ]
     },
     "string": {
@@ -51,36 +88,52 @@
     },
     "character": {
       "name": "constant.character.cog-lisp",
-      "match": "#\\\\(?:space|newline|tab|return|null|[xX][0-9a-fA-F]+|.)(?=[\\s()\";]|$)"
+      "match": "#\\\\(?:space|newline|tab|return|null|[xX][0-9a-fA-F]+|.)(?=[\\s()\\[\\]\";]|$)"
     },
     "boolean": {
       "name": "constant.language.boolean.cog-lisp",
-      "match": "#(?:true|false|t|f)(?=[\\s()\";]|$)"
+      "match": "#(?:true|false|t|f)(?=[\\s()\\[\\]\";]|$)"
     },
     "definition": {
       "comment": "The name a definition introduces: (define (f ...)), (define x ...), and the macro and CL definers.",
-      "match": "(\\()\\s*(define|define-macro|defun|defmacro|defvar|defparameter)\\s+(\\()?\\s*([^\\s()\";']+)",
+      "match": "(\\()\\s*(define|define-macro|defun|defmacro|defvar|defparameter)\\s+(\\()?\\s*([^\\s()\\[\\]\";']+)",
       "captures": {
-        "1": { "name": "punctuation.section.parens.begin.cog-lisp" },
-        "2": { "name": "keyword.control.definition.cog-lisp" },
-        "3": { "name": "punctuation.section.parens.begin.cog-lisp" },
-        "4": { "name": "entity.name.function.cog-lisp" }
+        "1": {
+          "name": "punctuation.section.parens.begin.cog-lisp"
+        },
+        "2": {
+          "name": "keyword.control.definition.cog-lisp"
+        },
+        "3": {
+          "name": "punctuation.section.parens.begin.cog-lisp"
+        },
+        "4": {
+          "name": "entity.name.function.cog-lisp"
+        }
       }
     },
     "special-form": {
       "comment": "The compiler's special forms (src/coglisp-compiler.st translateForm:).",
-      "match": "(\\()\\s*(quote|quasiquote|unquote|unquote-splicing|if|begin|lambda|let|set!)(?=[\\s()]|$)",
+      "match": "(\\()\\s*(quote|quasiquote|unquote|unquote-splicing|if|begin|lambda|let|set!|send|smalltalk)(?=[\\s()\\[\\]]|$)",
       "captures": {
-        "1": { "name": "punctuation.section.parens.begin.cog-lisp" },
-        "2": { "name": "keyword.control.special-form.cog-lisp" }
+        "1": {
+          "name": "punctuation.section.parens.begin.cog-lisp"
+        },
+        "2": {
+          "name": "keyword.control.special-form.cog-lisp"
+        }
       }
     },
     "macro": {
       "comment": "Derived forms from lib/core.lisp and lib/cl.lisp.",
-      "match": "(\\()\\s*(cond|case|and|or|when|unless|let\\*|letrec\\*?|do|else|setq|progn|prog1|labels|flet|dolist|dotimes|push|pop)(?=[\\s()]|$)",
+      "match": "(\\()\\s*(cond|case|and|or|when|unless|let\\*|letrec\\*?|do|else|setq|progn|prog1|labels|flet|dolist|dotimes|push|pop)(?=[\\s()\\[\\]]|$)",
       "captures": {
-        "1": { "name": "punctuation.section.parens.begin.cog-lisp" },
-        "2": { "name": "keyword.control.macro.cog-lisp" }
+        "1": {
+          "name": "punctuation.section.parens.begin.cog-lisp"
+        },
+        "2": {
+          "name": "keyword.control.macro.cog-lisp"
+        }
       }
     },
     "quote": {
@@ -89,18 +142,47 @@
     },
     "paren": {
       "patterns": [
-        { "name": "punctuation.section.parens.begin.cog-lisp", "match": "\\(" },
-        { "name": "punctuation.section.parens.end.cog-lisp", "match": "\\)" }
+        {
+          "name": "punctuation.section.parens.begin.cog-lisp",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.section.parens.end.cog-lisp",
+          "match": "\\)"
+        }
       ]
     },
     "number": {
       "name": "constant.numeric.cog-lisp",
-      "match": "(?<![^\\s()'`,@])[+-]?(?:\\d+\\.?\\d*(?:[eE][+-]?\\d+)?|\\.\\d+(?:[eE][+-]?\\d+)?)(?=[\\s()\";]|$)"
+      "match": "(?<![^\\s()\\[\\]'`,@])[+-]?(?:\\d+\\.?\\d*(?:[eE][+-]?\\d+)?|\\.\\d+(?:[eE][+-]?\\d+)?)(?=[\\s()\\[\\]\";]|$)"
     },
     "symbol": {
       "comment": "Any other token: consumed whole, so a digit inside a name is not a number.",
       "name": "variable.other.cog-lisp",
-      "match": "[^\\s()\";'`,]+"
+      "match": "[^\\s()\\[\\]\";'`,]+"
+    },
+    "bracket": {
+      "comment": "A Smalltalk send: [receiver message ...] (Phase 7.6).",
+      "patterns": [
+        {
+          "name": "punctuation.section.brackets.begin.cog-lisp",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.section.brackets.end.cog-lisp",
+          "match": "\\]"
+        }
+      ]
+    },
+    "selector-keyword": {
+      "comment": "A keyword part of a Smalltalk selector: at: in [d at: k put: v], or at:put: in (send d at:put: k v).",
+      "name": "entity.name.function.selector.cog-lisp",
+      "match": "(?<![^\\s(\\[])(?:[A-Za-z_][A-Za-z0-9_]*:)+(?=[\\s()\\[\\]\";]|$)"
+    },
+    "class-name": {
+      "comment": "A capitalized name: a Smalltalk global in brackets and in (smalltalk Name).",
+      "name": "entity.name.type.class.cog-lisp",
+      "match": "(?<![^\\s(\\[])[A-Z][A-Za-z0-9_]*(?=[\\s()\\[\\]\";]|$)"
     }
   }
 }

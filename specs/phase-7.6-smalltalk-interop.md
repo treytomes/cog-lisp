@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 7.6 (the first of the steps before Phase 8; README "Before Phase 8") |
-| **Status** | Accepted (2026-11-03) |
+| **Status** | Implemented (2026-11-03) — `tests/phase-7.6-interop.st` 82/82; five examples; all suites 719/719 |
 | **Depends on** | Phases 1–7.5 |
 | **Feeds** | 7.7 conditions & restarts, 7.8 native data, Phase 8 (the LISP-level interface to Opal), Phase 9 (the subsystem audit) |
 | **Direction** | Both ways: LISP calls Smalltalk, and Smalltalk calls LISP |
@@ -309,3 +309,31 @@ Settled 2026-11-03 (owner sign-off); the spec is Accepted on these.
      not read; the read error says *brackets are Smalltalk sends; use ( ) for
      grouping* when a bracket form is not a valid send.
    - Vectors (Phase 7.8) use the R7RS `#(…)` syntax, never brackets.
+
+## 11. As implemented
+
+- **Tests:** `tests/phase-7.6-interop.st` 82/82 (AC-1 to AC-19); the five
+  examples of §9 in the runner suite (now 52/52); AC-20 in
+  `bench\run-benchmarks.bat`: a loop of 10⁶ `(send acc + 1)` runs at **0.9×** the
+  same loop with `(+ acc 1)` (a literal send is a plain message send; `+` pays its
+  redefinition guard). All suites: 719/719.
+- **Inlined selectors are performed** (a detail the spec did not foresee). Opal
+  compiles `ifTrue:`, `and:`, `whileTrue:`, `to:do:`, `ifNil:` and the like
+  inline even when an argument is not a block literal, taking the argument as a
+  plain value: `(send #t ifTrue: f)` answered `f` itself. `send` therefore
+  compiles those selectors (the set Opal inlines) as `perform:withArguments:`, so
+  the real method runs and sends `value` to the procedure. All other selectors are
+  direct sends (AC-3).
+- **"Not understood" replaces "wrong type of argument"** for any message without a
+  more specific translation (§7): `#<an OrderedCollection()> does not
+  understand #frobnicate`. One review check (R-2, a comparison of a string)
+  now expects that wording.
+- **Printing:** objects whose class is in a `CogLisp-*` package print as they
+  say (`#<procedure sq>`, `#<unspecified>`); every other non-LISP value prints as
+  `#<printString>`. `display` treats a Smalltalk symbol like `write` does, not
+  as text.
+- **`procedure->block`** accepts procedures of 0 to 4 fixed arguments; others are
+  an error (a variadic procedure has no single block arity).
+- **The VS Code extension** knows the new syntax: `[ ]` match, auto-close and
+  nest for send-form-to-REPL; keyword selectors, capitalized names, `send` and
+  `smalltalk` are highlighted (`vscode/test/syntax.test.lisp`).

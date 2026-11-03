@@ -42,3 +42,19 @@
 (let* ((v 1)) v) ; a comment (not code)
 ;^^^^ keyword.control.macro.cog-lisp
 ;                ^^^^^^^^^^^^^^^^^^^^^^ comment.line.semicolon.cog-lisp
+
+(define c [OrderedCollection new])
+;         ^ punctuation.section.brackets.begin.cog-lisp
+;          ^^^^^^^^^^^^^^^^^ entity.name.type.class.cog-lisp
+;                               ^ punctuation.section.brackets.end.cog-lisp
+
+[d at: 1 put: "x"]
+;  ^^^ entity.name.function.selector.cog-lisp
+;      ^ constant.numeric.cog-lisp
+;        ^^^^ entity.name.function.selector.cog-lisp
+
+(send d at:put: k v) (smalltalk Set)
+;^^^^ keyword.control.special-form.cog-lisp
+;       ^^^^^^^ entity.name.function.selector.cog-lisp
+;                     ^^^^^^^^^ keyword.control.special-form.cog-lisp
+;                               ^^^ entity.name.type.class.cog-lisp

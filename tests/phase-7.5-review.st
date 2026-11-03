@@ -71,7 +71,7 @@ h check: 'R-2 map over a non-list' actual: (msg value: '(map car 5)') expected: 
 h check: 'R-2 assq over a non-list' actual: (msg value: '(assq 1 5)') expected: 'assq: not a proper list: 5'.
 h check: 'R-2 arithmetic on a string' actual: (msg value: '(+ 1 "a")') expected: '+: not a number'.
 h check: 'R-2 division by zero' actual: (msg value: '(/ 1 0)') expected: 'division by zero'.
-h check: 'R-2 comparison of a string' actual: ((msg value: '(< "1" 2)') beginsWith: 'wrong type of argument') expected: true.
+h check: 'R-2 comparison of a string' actual: ((msg value: '(< "1" 2)') includesSubstring: 'does not understand') expected: true.
 h check: 'R-9 length of a dotted list is an error' actual: (msg value: '(length (quote (1 . 2)))') expected: 'length: not a proper list: (1 . 2)'.
 h check: 'R-9 apply of a dotted list is an error' actual: (msg value: '(apply + (quote (1 . 2)))') expected: 'apply: not a proper list: (1 . 2)'.
 h check: 'R-9 append keeps an improper last argument' actual: (ev value: '(append (quote (1)) (quote (2 . 3)))') expected: (lst value: '(1 2 . 3)').
