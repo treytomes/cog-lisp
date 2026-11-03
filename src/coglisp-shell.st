@@ -201,7 +201,11 @@ cm value: shell class value: 'build' value: 'buildTime
 cm value: shell value: 'running' value: 'fail: aString
 	self failReport: ''error: '' , aString'.
 cm value: shell value: 'running' value: 'failReport: aLine
+	"The report starts its own line even when the program''s output did not end with
+	 one: in a terminal stdout and stderr share lines, and an editor''s problem
+	 matcher reads path:line:col: error: from the start of a line."
 	LispTextOutput stdout flush.
+	LispTextOutput stdout isMidLine ifTrue: [LispTextOutput stderr nextPut: Character lf].
 	LispTextOutput stderr nextPutAll: aLine; nextPut: Character lf; flush.
 	Smalltalk exit: 1'.
 cm value: shell value: 'running' value: 'warnIfStale

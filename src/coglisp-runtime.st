@@ -21,7 +21,7 @@ aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp
 proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries. #inline }; package: 'CogLisp-Runtime'; install.
 tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runtime'; install.
 prims := (Object << #LispPrimitives) sharedVariables: { #Output. #GensymCounter }; package: 'CogLisp-Runtime'; install.
-tout  := (Object << #LispTextOutput) slots: { #kind. #handle. #stream. #buffer }; sharedVariables: { #Session. #Stdout. #Stderr }; package: 'CogLisp-Runtime'; install.
+tout  := (Object << #LispTextOutput) slots: { #kind. #handle. #stream. #buffer. #midLine }; sharedVariables: { #Session. #Stdout. #Stderr }; package: 'CogLisp-Runtime'; install.
 
 "=== LispTextOutput =========================================================
  Text output to stdout or stderr that encodes properly. Pharo's Stdio streams
@@ -67,9 +67,15 @@ cm value: tout value: 'private' value: 'setKind: aSymbol handle: aHandle stream:
 cm value: tout value: 'accessing' value: 'kind
 	^ kind'.
 cm value: tout value: 'writing' value: 'nextPutAll: aString
+	aString isEmpty ifFalse: [midLine := aString last ~= Character lf].
 	buffer nextPutAll: aString'.
 cm value: tout value: 'writing' value: 'nextPut: aCharacter
+	midLine := aCharacter ~= Character lf.
 	buffer nextPut: aCharacter'.
+cm value: tout value: 'accessing' value: 'isMidLine
+	"True when the last character written was not a line feed: the next text
+	 would continue that line."
+	^ midLine == true'.
 cm value: tout value: 'writing' value: 'flush
 	| text units |
 	text := buffer contents.
