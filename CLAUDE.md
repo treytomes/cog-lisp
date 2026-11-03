@@ -33,6 +33,13 @@ bootstrap-pharo.bat
 It downloads the stable 64-bit Windows VM + image into `pharo\`, extracts them,
 and prints the VM and image versions. It is idempotent (cached zips are reused).
 
+The root scripts each have a bash equivalent for Git Bash (`bootstrap-pharo.sh`,
+`build-image.sh`, `cog-lisp.sh`); keep each pair in step when changing either.
+In mintty, stdin is a pipe, not a Windows console, so an interactive REPL needs
+a console terminal (Windows Terminal, VS Code) or `winpty`; piped input works.
+Re-running the bootstrap re-extracts over `pharo\` (including the stock image),
+which fails if the GUI `Pharo.exe` has those files open.
+
 ## Running Pharo headless
 
 Use **`PharoConsole.exe`** (writes to stdout), not `Pharo.exe` (GUI, detaches):

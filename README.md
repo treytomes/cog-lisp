@@ -46,7 +46,9 @@ project targets is validated against the live image.
 ## Getting started
 
 One-time setup: download the Pharo VM and stock image, then build the cog-lisp
-image from `src\` (rerun the build after changing anything in `src\`):
+image from `src\` (rerun the build after changing anything in `src\` or
+`lib\core.lisp`). Each script has a bash equivalent for Git Bash
+(`bootstrap-pharo.sh`, `build-image.sh`, `cog-lisp.sh`):
 
 ```bat
 bootstrap-pharo.bat
@@ -79,10 +81,16 @@ Every procedure keeps the source it was compiled from: `(procedure-source f)`
 returns it, and `(disassemble f)` shows its bytecode.
 
 A program's exit code is 0 on success, 1 on an uncaught error (reported on
-stderr as `error: …`), or whatever it passes to `(exit n)`. The programs in
+stderr as `path:line:col: error: …`), or whatever it passes to `(exit n)`. The programs in
 [`examples\`](examples/) are a good place to start.
 
 ### Running the tests
+
+Run every suite (about 30 seconds) with:
+
+```bat
+tests\run-all.bat
+```
 
 The in-image suites run headless against the stock image, for example:
 
