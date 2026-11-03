@@ -86,7 +86,9 @@ cog-lisp.bat program.lisp    run a program, then exit
   print a one-line warning but run anyway.
 
 ### 4.3 New package `CogLisp-Shell`
-- `LispCommandLineHandler` — the `lisp` command (`lisp run <file>`, `lisp repl`).
+- `LispShellCommand` — the `lisp` command (`lisp run <file>`, `lisp repl`). (First
+  planned as a `LispCommandLineHandler`; Pharo 14 dispatches Clap commands, see
+  §10.)
 - `LispRepl` — the read-eval-print loop over a read stream and a write stream, so
   it is testable without a console.
 

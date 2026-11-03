@@ -14,35 +14,21 @@
 dir := Smalltalk imageDirectory parent / 'src'.
 #('coglisp-reader.st' 'coglisp-core.st' 'coglisp-compiler.st' 'coglisp-runtime.st' 'coglisp-shell.st')
 	do: [:name | (dir / name) fileIn].
+(Smalltalk imageDirectory parent / 'tests' / 'harness.st') fileIn.
 !
 
 "--- Chunk 2: the acceptance checks ----------------------------------------"
-| out pass total check checkErr checkMsg ev lst sym lib g1 g2 |
-out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
-pass := 0.
-total := 0.
+| h out check checkErr checkMsg ev lst sym lib g1 g2 |
+h := LispTestHarness new.
+out := [:s | h say: s].
 ev := [:s | LispCompiler new evalAll: s].
 lst := [:s | LispReader read: s].
 sym := [:s | LispSymbol named: s].
 lib := Smalltalk imageDirectory parent / 'lib'.
-check := [:label :actual :expected |
-	total := total + 1.
-	(LispCore equal: actual with: expected)
-		ifTrue: [pass := pass + 1. out value: '  PASS  ' , label]
-		ifFalse: [out value: '  FAIL  ' , label , '  got=' , ([LispPrinter writeString: actual] on: Error do: [:e | actual printString]) , '  want=' , (LispPrinter writeString: expected)]].
-checkErr := [:label :errClass :blk |
-	total := total + 1.
-	[blk value. out value: '  FAIL  ' , label , ' (no error raised)']
-		on: errClass
-		do: [:e | pass := pass + 1. out value: '  PASS  ' , label]].
+check := h checkBlock.
+checkErr := h checkErrBlock.
 "an error of errClass whose message contains needle"
-checkMsg := [:label :errClass :needle :blk |
-	total := total + 1.
-	[blk value. out value: '  FAIL  ' , label , ' (no error raised)']
-		on: errClass
-		do: [:e | (e messageText includesSubstring: needle)
-			ifTrue: [pass := pass + 1. out value: '  PASS  ' , label]
-			ifFalse: [out value: '  FAIL  ' , label , '  message=' , e messageText printString]]].
+checkMsg := h checkMsgBlock.
 
 [
 out value: '== cog-lisp Phase 7 : macros & derived forms =='.
@@ -269,10 +255,6 @@ check value: 'regression: closures in a self-loop capture each iteration'
 check value: 'regression: ... with a set!! inside the loop'
 	value: (ev value: '(define (mk2 n acc) (if (= n 0) acc (begin (set!! n n) (mk2 (- n 1) (cons (lambda () n) acc))))) (map (lambda (g) (g)) (mk2 3 (list)))')
 	value: (lst value: '(1 2 3)').
-] on: Error do: [:e |
-	out value: '  FAIL  unexpected error: ' , e class name , ' ' , e messageText printString].
-
-out value: ''.
-out value: '== RESULT: ' , pass printString , '/' , total printString , ' checks passed =='.
-Smalltalk exit: (pass = total ifTrue: [0] ifFalse: [1]).
+h finish
+] on: Error do: [:e | h harnessError: e].
 !

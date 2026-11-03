@@ -12,25 +12,17 @@
 dir := Smalltalk imageDirectory parent / 'src'.
 #('coglisp-reader.st' 'coglisp-core.st' 'coglisp-compiler.st' 'coglisp-runtime.st' 'coglisp-shell.st')
 	do: [:name | (dir / name) fileIn].
+(Smalltalk imageDirectory parent / 'tests' / 'harness.st') fileIn.
 !
 
 "--- Chunk 2: the acceptance checks ----------------------------------------"
-| out pass total check checkErr ev lst core |
-out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
-pass := 0.
-total := 0.
+| h out check checkErr ev lst core |
+h := LispTestHarness new.
+out := [:s | h say: s].
 ev := [:s | LispCompiler new evalAll: s].
 lst := [:s | LispReader read: s].
-check := [:label :actual :expected |
-	total := total + 1.
-	(LispCore equal: actual with: expected)
-		ifTrue: [pass := pass + 1. out value: '  PASS  ' , label]
-		ifFalse: [out value: '  FAIL  ' , label , '  got=' , ([LispPrinter writeString: actual] on: Error do: [:e | actual printString]) , '  want=' , (LispPrinter writeString: expected)]].
-checkErr := [:label :errClass :blk |
-	total := total + 1.
-	[blk value. out value: '  FAIL  ' , label , ' (no error raised)']
-		on: errClass
-		do: [:e | pass := pass + 1. out value: '  PASS  ' , label]].
+check := h checkBlock.
+checkErr := h checkErrBlock.
 
 LispPrimitives installDefault.
 
@@ -167,11 +159,10 @@ LispCompiler allOptions do: [:opt |
 	LispCompiler withoutOptions: { opt } do: [core value: 'AC-12 without ' , opt , ':']].
 check value: 'AC-12 options restored afterwards' value: LispCompiler defaultOptions size value: LispCompiler allOptions size.
 
-out value: ''.
-out value: '== RESULT: ' , pass printString , '/' , total printString , ' checks passed =='
+h finish
 ]
 	on: Error
-	do: [:e | out value: 'HARNESS ERROR: ' , e class name , ': ' , e messageText printString].
+	do: [:e | h harnessError: e].
 
 Smalltalk snapshot: false andQuit: true.
 !

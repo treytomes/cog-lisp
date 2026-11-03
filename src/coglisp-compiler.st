@@ -27,7 +27,7 @@ failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
     on: Error
-    do: [:e | failures add: cls name , ' >> ' , (src copyUpTo: Character cr) , (src copyUpTo: Character lf) , '  --  ' , e messageText]].
+    do: [:e | failures add: cls name , ' >> ' , src lines first , '  --  ' , e messageText]].
 
 comp := (Object << #LispCompiler)
 	slots: { #counter. #sourceMap. #options. #selfLoop. #inlineTemps. #topForm. #sourceContext. #inBody };
@@ -709,3 +709,5 @@ Stdio stdout
 	nextPut: Character lf.
 failures do: [:f | Stdio stdout nextPutAll: '  ' , f; nextPut: Character lf].
 Stdio stdout flush.
+"a failed method must stop the build and the test suites, not just be reported"
+failures isEmpty ifFalse: [Error signal: 'LOAD FAILURES in CogLisp-Compiler: ' , failures size printString].

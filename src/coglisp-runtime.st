@@ -14,7 +14,7 @@ failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
     on: Error
-    do: [:e | failures add: cls name , ' >> ' , (src copyUpTo: Character cr) , (src copyUpTo: Character lf) , '  --  ' , e messageText]].
+    do: [:e | failures add: cls name , ' >> ' , src lines first , '  --  ' , e messageText]].
 
 lerr  := (Error  << #LispError) package: 'CogLisp-Runtime'; install.
 aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp-Runtime'; install.
@@ -445,3 +445,5 @@ Stdio stdout
 	nextPut: Character lf.
 failures do: [:f | Stdio stdout nextPutAll: '  ' , f; nextPut: Character lf].
 Stdio stdout flush.
+"a failed method must stop the build and the test suites, not just be reported"
+failures isEmpty ifFalse: [Error signal: 'LOAD FAILURES in CogLisp-Runtime: ' , failures size printString].

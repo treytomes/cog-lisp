@@ -11,42 +11,16 @@ srcFile := Smalltalk imageDirectory parent / 'src' / 'coglisp-reader.st'.
 srcFile exists
 	ifTrue: [srcFile fileIn]
 	ifFalse: [Stdio stdout nextPutAll: 'SOURCE NOT FOUND: ' , srcFile pathString; nextPut: Character lf; flush].
+(Smalltalk imageDirectory parent / 'tests' / 'harness.st') fileIn.
 !
 
 "--- Chunk 2: the acceptance checks ----------------------------------------"
-| out pass total eq check checkErr rd sp |
-out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
-pass := 0.
-total := 0.
-sp := [:v | [LispPrinter writeString: v] on: Error do: [:e | v printString]].
+| h out check checkErr rd |
+h := LispTestHarness new.
+out := [:s | h say: s].
+check := h checkBlock.
 
-"recursive structural equality (equal?-style), Phase-1 test helper"
-eq := nil.
-eq := [:a :b |
-	a == b
-		ifTrue: [true]
-		ifFalse: [
-			((a isKindOf: LispCons) and: [b isKindOf: LispCons])
-				ifTrue: [(eq value: a car value: b car) and: [eq value: a cdr value: b cdr]]
-				ifFalse: [
-					((a isKindOf: String) and: [b isKindOf: String])
-						ifTrue: [a = b]
-						ifFalse: [
-							(a isNumber and: [b isNumber])
-								ifTrue: [(a class = b class) and: [a = b]]
-								ifFalse: [a = b]]]]].
-
-check := [:label :actual :expected |
-	total := total + 1.
-	(eq value: actual value: expected)
-		ifTrue: [pass := pass + 1. out value: '  PASS  ' , label]
-		ifFalse: [out value: '  FAIL  ' , label , '  got=' , (sp value: actual) , '  want=' , (sp value: expected)]].
-
-checkErr := [:label :blk |
-	total := total + 1.
-	[blk value. out value: '  FAIL  ' , label , ' (no error raised)']
-		on: LispReadError
-		do: [:e | pass := pass + 1. out value: '  PASS  ' , label]].
+checkErr := [:label :blk | h check: label raises: LispReadError do: blk].
 
 rd := [:s | LispReader read: s].
 
@@ -171,11 +145,10 @@ checkErr value: 'AC-21 unknown hash' value: [LispReader read: '#q'].
 		value: (LispReader read: (LispPrinter writeString: f))
 		value: f].
 
-out value: ''.
-out value: '== RESULT: ' , pass printString , '/' , total printString , ' checks passed =='
+h finish
 ]
 	on: Error
-	do: [:e | out value: 'HARNESS ERROR: ' , e class name , ': ' , e messageText printString].
+	do: [:e | h harnessError: e].
 
 Smalltalk snapshot: false andQuit: true.
 !

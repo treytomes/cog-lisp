@@ -54,7 +54,9 @@ processing, higher-order functions over `map` — run end to end.
   left fold; `= < > <= >=` are **chained** (`(< 1 2 3)` is true iff strictly
   increasing).
 - **I/O** (`display`, `write`, `newline`) writes to `Stdio stdout` so it works
-  headless; Phase 5 may redirect it. `write` uses the Phase 1 printer.
+  headless; Phase 5 may redirect it. `write` uses the Phase 1 printer. (Since
+  Phase 5, output goes through `LispPrimitives output`, a `LispTextOutput` that
+  encodes text for a console, pipe or file.)
 
 ## 4. New types
 

@@ -13,26 +13,18 @@ dir := Smalltalk imageDirectory parent / 'src'.
 (dir / 'coglisp-core.st') fileIn.
 (dir / 'coglisp-compiler.st') fileIn.
 (dir / 'coglisp-runtime.st') fileIn.
+(Smalltalk imageDirectory parent / 'tests' / 'harness.st') fileIn.
 !
 
 "--- Chunk 2: the acceptance checks ----------------------------------------"
-| out pass total check checkErrClass ev evAll lst |
-out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
-pass := 0.
-total := 0.
+| h out check checkErrClass ev evAll lst |
+h := LispTestHarness new.
+out := [:s | h say: s].
 ev := [:s | LispCompiler new evalString: s].
 evAll := [:s | LispCompiler new evalAll: s].
 lst := [:s | LispReader read: s].
-check := [:label :actual :expected |
-	total := total + 1.
-	(LispCore equal: actual with: expected)
-		ifTrue: [pass := pass + 1. out value: '  PASS  ' , label]
-		ifFalse: [out value: '  FAIL  ' , label , '  got=' , ([LispPrinter writeString: actual] on: Error do: [:e | actual printString]) , '  want=' , ([LispPrinter writeString: expected] on: Error do: [:e | expected printString])]].
-checkErrClass := [:label :errClass :blk |
-	total := total + 1.
-	[blk value. out value: '  FAIL  ' , label , ' (no error raised)']
-		on: errClass
-		do: [:e | pass := pass + 1. out value: '  PASS  ' , label]].
+check := h checkBlock.
+checkErrClass := h checkErrBlock.
 
 LispPrimitives installDefault.
 
@@ -127,11 +119,10 @@ check value: 'AC-19 compose = 25'
 check value: 'AC-20 fact 5' value: (evAll value: '(define (fact n) (if (= n 0) 1 (* n (fact (- n 1))))) (fact 5)') value: 120.
 check value: 'AC-20 closure capture' value: (ev value: '(((lambda (x) (lambda (y) (+ x y))) 2) 3)') value: 5.
 
-out value: ''.
-out value: '== RESULT: ' , pass printString , '/' , total printString , ' checks passed =='
+h finish
 ]
 	on: Error
-	do: [:e | out value: 'HARNESS ERROR: ' , e class name , ': ' , e messageText printString].
+	do: [:e | h harnessError: e].
 
 Smalltalk snapshot: false andQuit: true.
 !

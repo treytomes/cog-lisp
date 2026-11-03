@@ -10,23 +10,15 @@
 dir := Smalltalk imageDirectory parent / 'src'.
 (dir / 'coglisp-reader.st') fileIn.
 (dir / 'coglisp-core.st') fileIn.
+(Smalltalk imageDirectory parent / 'tests' / 'harness.st') fileIn.
 !
 
 "--- Chunk 2: the acceptance checks ----------------------------------------"
-| out pass total check checkErr rd sym env env2 |
-out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
-pass := 0.
-total := 0.
-check := [:label :actual :expected |
-	total := total + 1.
-	actual = expected
-		ifTrue: [pass := pass + 1. out value: '  PASS  ' , label]
-		ifFalse: [out value: '  FAIL  ' , label , '  got=' , actual printString , '  want=' , expected printString]].
-checkErr := [:label :blk |
-	total := total + 1.
-	[blk value. out value: '  FAIL  ' , label , ' (no error raised)']
-		on: LispUnboundError
-		do: [:e | pass := pass + 1. out value: '  PASS  ' , label]].
+| h out check checkErr rd sym env env2 |
+h := LispTestHarness new.
+out := [:s | h say: s].
+check := h checkBlock.
+checkErr := [:label :blk | h check: label raises: LispUnboundError do: blk].
 rd := [:s | LispReader read: s].
 sym := [:s | LispSymbol named: s].
 
@@ -115,11 +107,10 @@ env2 := LispEnvironment new.
 env2 define: (rd value: 'x') value: 7.
 check value: 'AC-13 interning bridge' value: (env2 lookup: (rd value: 'x')) value: 7.
 
-out value: ''.
-out value: '== RESULT: ' , pass printString , '/' , total printString , ' checks passed =='
+h finish
 ]
 	on: Error
-	do: [:e | out value: 'HARNESS ERROR: ' , e class name , ': ' , e messageText printString].
+	do: [:e | h harnessError: e].
 
 Smalltalk snapshot: false andQuit: true.
 !

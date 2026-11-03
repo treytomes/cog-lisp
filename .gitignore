@@ -10,6 +10,8 @@
 
 # Pharo writes this at the working directory on errors; it is transient.
 PharoDebug.log
+# The VM writes a minidump here when it aborts (e.g. at --maxOldSpaceSize).
+crash.dmp
 
 # --- Editor / tooling --------------------------------------------------------
 /.vscode/

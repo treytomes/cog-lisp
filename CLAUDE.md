@@ -198,6 +198,13 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   compiler does this for every lambda parameter.
 - Reminder: `src/*.st` files are filed in as chunk format, so a literal `!`
   (e.g. in `'set!'`) must be doubled to `!!` in the source too.
+- **A method may name only classes from its own or an earlier package.** The
+  packages load in order (reader, core, compiler, runtime, shell), and a method
+  that names a class defined later fails to compile ("undeclared"). So the
+  compiler reaches runtime classes as `Smalltalk at: #LispProcedure`, or tests
+  `respondsTo:`, and generated code (compiled after everything is loaded) may
+  name any of them. Since Phase 7.5 a package that fails to compile a method
+  signals an error at the end of its file-in, so the build and the suites stop.
 
 ## Verified Opal / IRBuilder API (Pharo 14, build 788)
 
@@ -233,3 +240,22 @@ This project follows spec-driven development: **write the spec before the code.*
   `PASS`/`FAIL` per check, and a final `RESULT: n/n` line.
 - Code changes reference the spec section they satisfy. If reality forces a
   deviation, update the spec first, then the code.
+- **Run everything with `tests\run-all.bat`** (~30 s): each `tests\phase-*.st`
+  in a fresh stock image, then `tests\phase-5-runner.bat` (which rebuilds
+  `pharo\cog-lisp.image`), with a total; exit 0 only if all pass. Benchmarks are
+  separate (`bench\run-benchmarks.bat`) and noisy when the machine is busy.
+- **Suites use `tests/harness.st`** (`LispTestHarness`): file it in after the
+  packages, then `h check:actual:expected:`, `h check:raises:do:`,
+  `h check:raises:containing:do:` (or the `h checkBlock`-style blocks), and end
+  with `h finish` inside `[...] on: Error do: [:e | h harnessError: e]`. `finish`
+  exits 0 or 1, so a new suite is picked up by `run-all.bat` with no other change.
+- **An unhandled error in a `st` chunk prints its stack and exits 1**; it does
+  not hang (unlike an unhandled error inside a Clap command).
+- **Parallel headless runs on one image file can collide**: filing in writes to
+  the image's `.changes`, and a second VM may fail with "Cannot open non source
+  file". For concurrent runs (e.g. several reviewers), use a copy of the stock
+  image per run. Kill a stray VM by PID, not by `taskkill /IM`, when other runs
+  may be live.
+- **`--maxOldSpaceSize=<bytes>` caps the VM heap**, but at the cap the VM logs
+  "MaxOldSpaceSize reached", aborts, writes `crash.dmp` (~75 MB) in the working
+  directory, and then hangs instead of exiting. A cap is only a backstop.

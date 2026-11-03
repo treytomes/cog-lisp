@@ -13,27 +13,19 @@
 dir := Smalltalk imageDirectory parent / 'src'.
 #('coglisp-reader.st' 'coglisp-core.st' 'coglisp-compiler.st' 'coglisp-runtime.st' 'coglisp-shell.st')
 	do: [:name | (dir / name) fileIn].
+(Smalltalk imageDirectory parent / 'tests' / 'harness.st') fileIn.
 !
 
 "--- Chunk 2: the acceptance checks ----------------------------------------"
-| out pass total check checkErr ev evAll nl repl r captured tmp unspec |
-out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
-pass := 0.
-total := 0.
+| h out check checkErr ev evAll nl repl r captured tmp unspec |
+h := LispTestHarness new.
+out := [:s | h say: s].
 nl := String with: Character lf.
 ev := [:s | LispCompiler new evalString: s].
 evAll := [:s | LispCompiler new evalAll: s].
 unspec := LispUnspecified default.
-check := [:label :actual :expected |
-	total := total + 1.
-	(LispCore equal: actual with: expected)
-		ifTrue: [pass := pass + 1. out value: '  PASS  ' , label]
-		ifFalse: [out value: '  FAIL  ' , label , '  got=' , actual printString , '  want=' , expected printString]].
-checkErr := [:label :errClass :blk |
-	total := total + 1.
-	[blk value. out value: '  FAIL  ' , label , ' (no error raised)']
-		on: errClass
-		do: [:e | pass := pass + 1. out value: '  PASS  ' , label]].
+check := h checkBlock.
+checkErr := h checkErrBlock.
 "run the REPL over a string; answer {stdout. stderr}"
 repl := [:input | | o e |
 	o := WriteStream on: String new.
@@ -117,11 +109,10 @@ check value: 'AC-19 value-form define keeps the lambda text'
 check value: 'AC-20 primitives have no source' value: (ev value: '(procedure-source car)') value: false.
 check value: 'AC-20 source text is a string' value: (ev value: '(string? (procedure-source (lambda () 1)))') value: true.
 
-out value: ''.
-out value: '== RESULT: ' , pass printString , '/' , total printString , ' checks passed =='
+h finish
 ]
 	on: Error
-	do: [:e | out value: 'HARNESS ERROR: ' , e class name , ': ' , e messageText printString].
+	do: [:e | h harnessError: e].
 
 Smalltalk snapshot: false andQuit: true.
 !

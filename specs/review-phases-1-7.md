@@ -12,26 +12,29 @@ REPL come from the independent reviews.
 
 ## Repo hygiene
 
-### H-1 Sources check out as CRLF in a fresh clone — fix now
+### H-1 Sources check out as CRLF in a fresh clone — fixed (batch 1)
 - **Evidence.** Git for Windows sets `core.autocrlf=true` system-wide, and
   `.gitattributes` covers only `*.bat`, `*.lisp`, `*.expected`, `*.stdin`. A fresh
   clone (`git clone` then `git ls-files --eol`) has 41 files as CRLF, including
   every `src/*.st` and `*.md`; every commit warns "LF will be replaced by CRLF".
   The suites still pass from the CRLF clone (Phase 3, 5, 7 suites checked:
   Pharo normalizes line endings on file-in), so this is hygiene, not breakage.
-- **Fix.** `* text=auto eol=lf` in `.gitattributes`, keeping `*.bat eol=crlf`,
-  and `*.image`/`*.changes`/`*.sources` binary.
+- **Done.** `.gitattributes` makes every text file LF (`* text=auto eol=lf`),
+  `*.bat` CRLF, Pharo files binary; `git add --renormalize .` changed nothing in
+  the index (it was already LF).
 
 ## Tests & build
 
-### T-1 No single command runs everything — fix now (AC-5)
+### T-1 No single command runs everything — fixed (batch 1; AC-5)
 - **Evidence.** Seven in-image suites, the runner suite and the benchmarks are
   run separately, each with its own command line.
 - **Fix.** `tests\run-all.bat`: every `tests\phase-*.st` against the stock image,
   then `tests\phase-5-runner.bat`; per-suite RESULT lines and a total; exit 1 on
   any failure. Benchmarks stay separate (slow, and noisy on a busy machine).
+- **Done.** All 8 suites, 507/507, in ~30 s. A planted failing suite is reported
+  with its failing check and makes the run fail.
 
-### T-2 The check harness is copied into every suite — fix now
+### T-2 The check harness is copied into every suite — fixed (batch 1)
 - **Evidence.** All seven `tests/phase-*.st` define their own `out`, `check`,
   `checkErr` blocks and repeat the package-loading chunk (code reference). The
   copies have drifted: only Phase 7 has `checkMsg`, and suites differ in how they
@@ -40,6 +43,10 @@ REPL come from the independent reviews.
   `LispTestHarness` class with `check:actual:expected:`, `check:raises:do:`,
   `check:raises:containing:do:`, and `finish` (prints RESULT, exits 0/1). The
   suites keep their checks unchanged except for the call syntax.
+- **Done.** As above, with `h checkBlock`/`checkErrBlock`/`checkMsgBlock` so the
+  checks themselves are unchanged; every suite now exits 0 or 1 by its result
+  (Phases 1–6 used to exit 0 regardless), and an unexpected error prints the
+  partial RESULT and exits 1.
 
 ### T-3 Nothing warns that `pharo\cog-lisp.image` is older than the sources — plan → Phase 7.5 tooling
 - **Evidence.** `cog-lisp.bat` runs whatever image was last built; after editing
@@ -50,12 +57,13 @@ REPL come from the independent reviews.
 
 ## Docs
 
-### D-1 CLAUDE.md does not record the compiler/runtime load-order rule — fix now
+### D-1 CLAUDE.md does not record the compiler/runtime load-order rule — fixed (batch 1)
 - **Evidence.** `src/coglisp-compiler.st` loads before `coglisp-runtime.st`, so a
   compiler method that names `LispProcedure` fails to compile ("undeclared");
   the compiler uses `Smalltalk at: #LispProcedure` and `respondsTo:` instead.
   Learned in Phase 6, not written down (`grep` of CLAUDE.md).
-- **Fix.** Add it to CLAUDE.md's Opal section.
+- **Done.** Recorded in CLAUDE.md's Opal section, with the batch-1 harness and
+  VM findings (parallel runs on one image, the heap cap).
 
 ### D-2 "Deferred" lists in earlier specs — keep
 - **Evidence.** Phases 1, 3 and 4 list items deferred to Phase 7 (quasiquote,
@@ -224,22 +232,29 @@ were re-run and reproduced.
   cost. Arithmetic: rewrite the host error at report time for now. General
   host-error mapping: **plan → conditions & restarts**.
 
-### R-3 Runaway recursion eats all memory and never errors — plan → conditions & restarts
+### R-3 Runaway recursion eats all memory and never errors — fix now (batch 2)
 - **Evidence.** `(define (f) (+ 1 (f))) (f)`: no output in 90 s; PharoConsole
   reached ~17 GB. Deep finite recursion (`10⁶`) is fine.
-- **Verdict.** Plan, but check now whether the VM accepts a heap cap that
-  `cog-lisp.bat` can pass; if so, fix now. A real hazard on this laptop.
+- **Verdict.** Fix now (owner, 2026-11-03), in batch 2. The VM accepts
+  `--maxOldSpaceSize`, but at the cap it aborts, writes a 75 MB `crash.dmp` and
+  hangs (checked: killed by `timeout` after 120 s). So: a memory watchdog in
+  the image that signals a LISP error in the running program well below the
+  cap, with the cap as the backstop.
 
 ### R-4 Cyclic lists hang `list?`, `length`, `equal?` and printing — fix now (`list?`, `length`), plan (rest)
 - **Evidence.** After `(set-cdr! (cdr l) l)`, each of those timed out.
 - **Fix.** Cycle check (two pointers) in `list?` (R7RS: `#f`) and `length`
   (error). Cycle-safe `equal?` and printing: **plan → self-hosting**.
 
-### R-5 The build saves an image even when a package fails to load — fix now
+### R-5 The build saves an image even when a package fails to load — fixed (batch 1)
 - **Evidence.** A reader with one broken method printed `LOAD FAILURES: 1` and
   the file-in returned normally; the build would continue and save. Phase 5 §10
   says it refuses. The failure label also prints the method's first line twice.
 - **Fix.** Each loader signals an error when it has failures; fix the label.
+- **Done.** Checked with a broken method in a copy of `coglisp-core.st`: the
+  build prints the failure once, `BUILD FAILED while loading: 'LOAD FAILURES in
+  CogLisp-Core: 1'`, exits 1 and saves nothing. An unhandled error in a test
+  suite's load chunk prints its stack and exits 1.
 
 ### R-6 The REPL drops forms before a read error on the same line — fix now
 - **Evidence.** `(display 1) (display 2) )` prints nothing, then `error:
@@ -324,9 +339,10 @@ were re-run and reproduced.
 - **Evidence.** `abc#|c|#def` reads as one symbol (Phase 1 §5 lists `#|` as a
   delimiter).
 
-### R-24 Spec text that predates later phases — fix now (docs)
+### R-24 Spec text that predates later phases — fixed (batch 1)
 - **Evidence.** Phase 5 §4 names `LispCommandLineHandler` (corrected later in the
   same spec); Phase 4 says I/O goes to `Stdio stdout` (now `LispTextOutput`).
+- **Done.** Both specs now say what changed and where.
 
 ### R-25 Equal string literals in one form are shared — keep
 - **Evidence.** `(let ((a "abc") (b "abc")) (eq? a b))` → `#t`.
@@ -343,10 +359,10 @@ recovery after an error.
 
 | Verdict | Findings |
 |---|---|
-| **Fix now** | H-1 · T-1 · T-2 · D-1 · O-1 · C-1/C-12 · C-2 · C-3 · C-4 (`let`) · C-6 · C-7 · C-8 · C-9 · C-10 · C-11 · C-13 · C-17/R-7 · R-1/R-15 · R-2 (lists) · R-4 (`list?`, `length`) · R-5 · R-6 · R-8 · R-9 · R-10 · R-11 (printer) · R-12 · R-13 · R-14 · R-16 · R-19 (prefix) · R-20 (chars) · R-23 · R-24 |
+| **Fix now** | H-1 · T-1 · T-2 · D-1 · O-1 · C-1/C-12 · C-2 · C-3 · C-4 (`let`) · C-6 · C-7 · C-8 · C-9 · C-10 · C-11 · C-13 · C-17/R-7 · R-1/R-15 · R-2 (lists) · R-4 (`list?`, `length`) · R-5 · R-6 · R-8 · R-9 · R-10 · R-11 (printer) · R-12 · R-13 · R-14 · R-16 · R-19 (prefix) · R-20 (chars) · R-23 · R-24 · R-3 (watchdog) |
 | **Plan → self-hosting** | C-4 (`lambda`) · C-5 · C-18 (dispatch, templates) · R-4 (`equal?`, printer) · R-20 (strings) · R-22 |
 | **Plan → Smalltalk interop** | C-16 · R-18 |
-| **Plan → conditions & restarts** | C-18 (`qqAppend`) · R-2 (host errors) · R-3 |
+| **Plan → conditions & restarts** | C-18 (`qqAppend`) · R-2 (host errors) |
 | **Plan → numeric tower** | R-11 (reading) · R-21 |
 | **Plan → hygienic macros** | C-14 |
 | **Plan → language server** | C-18 (positions) · R-17 |

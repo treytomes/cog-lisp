@@ -16,7 +16,7 @@ failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
     on: Error
-    do: [:e | failures add: cls name , ' >> ' , (src copyUpTo: Character cr) , (src copyUpTo: Character lf) , '  --  ' , e messageText]].
+    do: [:e | failures add: cls name , ' >> ' , src lines first , '  --  ' , e messageText]].
 
 "--- install all classes first, so method bodies may name their siblings ------"
 cons  := (Object << #LispCons) slots: { #car. #cdr }; package: 'CogLisp-Reader'; install.
@@ -430,3 +430,5 @@ Stdio stdout
 	nextPut: Character lf.
 failures do: [:f | Stdio stdout nextPutAll: '  ' , f; nextPut: Character lf].
 Stdio stdout flush.
+"a failed method must stop the build and the test suites, not just be reported"
+failures isEmpty ifFalse: [Error signal: 'LOAD FAILURES in CogLisp-Reader: ' , failures size printString].

@@ -13,27 +13,19 @@ dir := Smalltalk imageDirectory parent / 'src'.
 (dir / 'coglisp-core.st') fileIn.
 (dir / 'coglisp-compiler.st') fileIn.
 (dir / 'coglisp-runtime.st') fileIn.
+(Smalltalk imageDirectory parent / 'tests' / 'harness.st') fileIn.
 !
 
 "--- Chunk 2: the acceptance checks ----------------------------------------"
-| out pass total check checkErr ev evAll eq |
-out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
-pass := 0.
-total := 0.
+| h out check checkErr ev evAll eq |
+h := LispTestHarness new.
+out := [:s | h say: s].
 ev := [:s | LispCompiler new evalString: s].
 evAll := [:s | LispCompiler new evalAll: s].
 "structural equality for list results (reuse LispCore)"
 eq := [:a :b | LispCore equal: a with: b].
-check := [:label :actual :expected |
-	total := total + 1.
-	(eq value: actual value: expected)
-		ifTrue: [pass := pass + 1. out value: '  PASS  ' , label]
-		ifFalse: [out value: '  FAIL  ' , label , '  got=' , (LispPrinter writeString: actual) , '  want=' , (LispPrinter writeString: expected)]].
-checkErr := [:label :blk |
-	total := total + 1.
-	[blk value. out value: '  FAIL  ' , label , ' (no error raised)']
-		on: Error
-		do: [:e | pass := pass + 1. out value: '  PASS  ' , label]].
+check := h checkBlock.
+checkErr := [:label :blk | h check: label raises: Error do: blk].
 
 "Since Phase 4, procedures are LispProcedures; install the real primitive library."
 LispPrimitives installDefault.
@@ -97,11 +89,10 @@ check value: 'AC-19 (fact 5)=120'
 "AC-20 evalAll returns last"
 check value: 'AC-20 evalAll last' value: (evAll value: '(define a 7) (+ a 1)') value: 8.
 
-out value: ''.
-out value: '== RESULT: ' , pass printString , '/' , total printString , ' checks passed =='
+h finish
 ]
 	on: Error
-	do: [:e | out value: 'HARNESS ERROR: ' , e class name , ': ' , e messageText printString].
+	do: [:e | h harnessError: e].
 
 Smalltalk snapshot: false andQuit: true.
 !
