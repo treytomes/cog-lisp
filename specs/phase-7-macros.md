@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 7 |
-| **Status** | Implemented (2026-11-03) — `tests/phase-7-macros.st` passes 105/105 |
+| **Status** | Implemented (2026-11-03) — `tests/phase-7-macros.st` passes 115/115 |
 | **Depends on** | Phases 1–6 |
 | **Feeds** | Phase 8 (self-hosting), the later language phases (§10) |
 | **Macro system** | Non-hygienic, procedural (`defmacro` style) with `gensym` |
@@ -123,6 +123,15 @@ variables, with `letrec*` semantics: all names are in scope throughout the body
 (so local procedures can be mutually recursive), and their values are assigned
 in order. Compiled as locals initialized to the unspecified value, then assigned.
 A body-level `define` after an expression is a compile error, as in R7RS.
+
+As in R7RS §5.3.2, the start of a body is found **after macro expansion**: macro
+calls there are expanded while looking for defines, so a macro may expand to a
+`define` (e.g. `defun` in a body makes a local procedure), and a `begin` there is
+spliced into the body, so a macro may expand to several. A name defined so far
+shadows a macro of the same name in the forms after it. A `define` anywhere else
+inside a body (after an expression, or inside an `if`, `when`, …), whether
+written or produced by a macro, is a compile error. At top level, `define` in a
+`begin` or other expression still makes a global.
 
 ## 7. Derived forms (`lib/core.lisp`)
 
@@ -258,13 +267,17 @@ Where the implementation settled details the spec left open:
   `(lambda () n)` gave `(0 0 0)`. The loop body now copies the parameters into
   temporaries declared inside the loop block, which the VM allocates fresh on
   each iteration. Two regression checks are in `tests/phase-7-macros.st`.
-- **Known limitation:** a macro that expands to `define` inside a body produces
-  a *global* definition, not an internal one: internal defines are recognized
-  before expansion. Revisit in the review of Phases 1–7.
+- **Defines from macros (fixed after the first Phase 7 commit).** Internal
+  defines were first recognized *before* expansion, so a macro expanding to
+  `define` in a body (e.g. `defun`) made a *global*, and so did a written
+  `define` inside an expression in a body. Now the body's start is scanned with
+  expansion and `begin` splicing (§6), and the compiler tracks whether it is
+  inside a body (`inBody`), so any other `define` there is a compile error. Ten
+  checks under AC-13 cover it.
 - **`lib/cl.lisp`** also provides `eq`, `equal`, `numberp`, `symbolp`, `zerop`,
   `plusp`, `minusp`, `evenp`, `oddp`, `1+` and `1-`. `defun`/`defmacro` accept
   `&rest`. `defvar` without a value binds `()`.
-- **Tests:** `tests/phase-7-macros.st` 105/105; the runner suite (now including
+- **Tests:** `tests/phase-7-macros.st` 115/115; the runner suite (now including
   `examples/macros.lisp`, `examples/cl-style.lisp`, and the AC-20 fixture
   `tests/runner/derived-forms.lisp`) 36/36; all earlier suites and the
   benchmarks (12/12) unchanged.

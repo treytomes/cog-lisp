@@ -30,7 +30,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 4 | Runtime & primitives | ✅ **done** — [spec](specs/phase-4-runtime-primitives.md), 44/44 |
 | 5 | REPL & image integration | ✅ **done** — [spec](specs/phase-5-repl-runner.md), 28/28 + 36/36 |
 | 6 | Tail calls & optimization | ✅ **done** — [spec](specs/phase-6-optimization.md), 127/127, [benchmarks](bench/results.md) |
-| 7 | Macros & derived forms | ✅ **done** — [spec](specs/phase-7-macros.md), 105/105 |
+| 7 | Macros & derived forms | ✅ **done** — [spec](specs/phase-7-macros.md), 115/115 |
 | — | Smalltalk interop | ⬜ planned (see below) |
 | — | Numeric tower · conditions & restarts · hygienic macros | ⬜ planned (see below) |
 | 8 | Self-hosting (meta-circular) | ⬜ |

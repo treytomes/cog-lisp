@@ -159,6 +159,22 @@ check value: 'AC-13 internal defines in a let body' value: (ev value: '(let ((a 
 check value: 'AC-13 internal define with set!!' value: (ev value: '(define (f4) (define c 0) (set!! c (+ c 5)) c) (f4)') value: 5.
 check value: 'AC-13 local procedure as a closure' value: (ev value: '(define (adder n) (define (add k) (+ n k)) add) ((adder 3) 4)') value: 7.
 checkErr value: 'AC-13 a define after an expression is an error' value: LispCompileError value: [ev value: '(define (f5) 1 (define x 2) x)'].
+"... including defines that come from macros (spec section 6)"
+ev value: '(define-macro (defn2 name params . body) `(define (,name ,@params) ,@body))'.
+check value: 'AC-13 a macro expanding to define makes a local' value: (ev value: '(define (f6) (defn2 helper6 (x) (* x 3)) (helper6 4)) (f6)') value: 12.
+checkErr value: 'AC-13 ... not a global' value: LispUnboundError value: [ev value: 'helper6'].
+check value: 'AC-13 ... and keeps the macro call text'
+	value: (ev value: '(define (f7) (defn2 sq7 (x) (* x x)) sq7) (procedure-source (f7))')
+	value: '(defn2 sq7 (x) (* x x))'.
+check value: 'AC-13 a macro expanding to several defines (begin is spliced)'
+	value: (ev value: '(define-macro (two-defs a b) `(begin (define ,a 1) (define ,b 2))) (define (f8) (two-defs p8 q8) (+ p8 q8)) (f8)')
+	value: 3.
+checkErr value: 'AC-13 ... not globals' value: LispUnboundError value: [ev value: 'p8'].
+check value: 'AC-13 a begin of defines at the start of a body' value: (ev value: '(define (f9) (begin (define a 1) (define b 2)) (+ a b)) (f9)') value: 3.
+check value: 'AC-13 a local define shadows a macro in later forms' value: (ev value: '(define (f10) (define (when x) (* x 10)) (when 4)) (f10)') value: 40.
+checkErr value: 'AC-13 a define inside an expression is an error' value: LispCompileError value: [ev value: '(define (f11) (if #t (define zz 1)) 2)'].
+checkErr value: 'AC-13 a macro define after an expression is an error' value: LispCompileError value: [ev value: '(define (f12) 1 (defn2 late (x) x) 2)'].
+check value: 'AC-13 top level: a begin of defines is still global' value: (ev value: '(begin (define tb1 1) (define tb2 2)) (+ tb1 tb2)') value: 3.
 
 "AC-14 the derived forms"
 check value: 'AC-14 cond' value: (ev value: '(cond ((= 1 2) 1) ((= 1 1) 2) (else 3))') value: 2.

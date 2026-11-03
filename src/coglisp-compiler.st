@@ -30,7 +30,7 @@ cm := [:cls :cat :src |
     do: [:e | failures add: cls name , ' >> ' , (src copyUpTo: Character cr) , (src copyUpTo: Character lf) , '  --  ' , e messageText]].
 
 comp := (Object << #LispCompiler)
-	slots: { #counter. #sourceMap. #options. #selfLoop. #inlineTemps. #topForm. #sourceContext };
+	slots: { #counter. #sourceMap. #options. #selfLoop. #inlineTemps. #topForm. #sourceContext. #inBody };
 	sharedVariables: { #DefaultOptions };
 	package: 'CogLisp-Compiler';
 	install.
@@ -396,34 +396,64 @@ cm value: comp value: 'translating' value: 'isDefineForm: datum
 cm value: comp value: 'translating' value: 'translateScopedBody: dataArray inScope: childScope tail: tail
 	"A procedure or let body. Leading defines are locals of the body, with letrec*
 	 semantics: all are in scope throughout, assigned in order. Adds them to
-	 childScope and answers { tempNames. statements }."
-	| defs rest temps statements |
+	 childScope and answers { tempNames. statements }.
+	 As in R7RS 5.3.2, macro calls at the start of the body are expanded while
+	 looking for defines, so a macro may expand to a define, and a begin there is
+	 spliced into the body, so a macro may expand to several. Each form carries the
+	 source text its lambdas take (section 5.3): the macro call it came from."
+	| pending defs rest temps statements item datum m savedContext savedInBody beginSym |
+	beginSym := LispSymbol named: ''begin''.
+	pending := OrderedCollection new.
+	dataArray do: [:d | pending add: { d. sourceContext }].
 	defs := OrderedCollection new.
-	rest := dataArray readStream.
-	[rest atEnd not and: [self isDefineForm: rest peek]] whileTrue: [defs add: rest next].
-	rest := rest upToEnd.
-	(rest anySatisfy: [:d | self isDefineForm: d])
+	rest := nil.
+	[rest isNil and: [pending notEmpty]] whileTrue: [
+		item := pending removeFirst.
+		datum := item first.
+		m := (datum isKindOf: LispCons) ifTrue: [self macroFor: datum car inScope: childScope] ifFalse: [nil].
+		m notNil
+			ifTrue: [pending addFirst: { self expand: datum with: m. (self recordedSourceOf: datum) ifNil: [item second] }]
+			ifFalse: [
+				(self isDefineForm: datum)
+					ifTrue: [ | target nm |
+						"in scope at once, so it shadows a macro of the same name in later forms"
+						target := (self listToArray: datum cdr) first.
+						nm := self nextName.
+						childScope at: ((target isKindOf: LispCons) ifTrue: [target car] ifFalse: [target]) put: nm.
+						defs add: { datum. item second. nm }]
+					ifFalse: [
+						((datum isKindOf: LispCons) and: [datum car == beginSym and: [(childScope includesKey: beginSym) not]])
+							ifTrue: [(self listToArray: datum cdr) reverseDo: [:d | pending addFirst: { d. item second }]]
+							ifFalse: [rest := OrderedCollection with: item]]]].
+	rest isNil ifTrue: [rest := OrderedCollection new].
+	rest addAll: pending.
+	(rest anySatisfy: [:it | self isDefineForm: it first])
 		ifTrue: [^ self compileError: ''define after an expression in a body''].
 	temps := OrderedCollection new.
 	statements := OrderedCollection new.
-	defs do: [:d | | target nm |
-		target := (self listToArray: d cdr) first.
-		nm := self nextName.
-		childScope at: ((target isKindOf: LispCons) ifTrue: [target car] ifFalse: [target]) put: nm.
-		temps add: nm.
-		statements add: (self assign: nm value: self unspecifiedNode)].
-	defs with: temps do: [:d :nm | | parts target valueData |
-		parts := self listToArray: d cdr.
+	defs do: [:d |
+		temps add: d third.
+		statements add: (self assign: d third value: self unspecifiedNode)].
+	savedContext := sourceContext.
+	savedInBody := inBody.
+	inBody := true.
+	[defs do: [:d | | parts target valueData |
+		sourceContext := d second.
+		parts := self listToArray: d first cdr.
 		target := parts first.
-		statements add: (self assign: nm value: ((target isKindOf: LispCons)
+		statements add: (self assign: d third value: ((target isKindOf: LispCons)
 			ifTrue: [self translateLambda: (self makeLambda: target cdr body: parts allButFirst)
-				inScope: childScope source: (self sourceOf: d) defining: nil]
+				inScope: childScope source: (self sourceOf: d first) defining: nil]
 			ifFalse: [
 				valueData := parts at: 2.
 				(self isLambdaForm: valueData)
 					ifTrue: [self translateLambda: valueData inScope: childScope source: (self sourceOf: valueData) defining: nil]
 					ifFalse: [self translate: valueData inScope: childScope]]))].
-	statements addAll: (self translateBody: rest asArray inScope: childScope tail: tail).
+	 rest isEmpty ifTrue: [statements add: self unspecifiedNode].
+	 rest withIndexDo: [:it :i |
+		sourceContext := it second.
+		statements add: (self translate: it first inScope: childScope tail: (tail and: [i = rest size]))]]
+		ensure: [sourceContext := savedContext. inBody := savedInBody].
 	^ { temps. statements asArray }'.
 cm value: comp value: 'translating' value: 'translateBody: dataArray inScope: scope tail: tail
 	"Statements for a body: every form for effect, the last in tail position if the body is."
@@ -601,7 +631,11 @@ cm value: comp value: 'translating' value: 'translateNamedLet: parts inScope: sc
 cm value: comp value: 'translating' value: 'isLambdaForm: datum
 	^ (datum isKindOf: LispCons) and: [datum car == (LispSymbol named: ''lambda'')]'.
 cm value: comp value: 'translating' value: 'translateDefine: form inScope: scope
+	"A global definition. Inside a procedure or let body, a define is a local and is
+	 handled by translateScopedBody:, but only at the start of the body; reaching one
+	 here from a body means it is in an expression, an error as in R7RS."
 	| parts target nameSym valueData valueNode |
+	inBody == true ifTrue: [^ self compileError: ''define is allowed only at top level or at the start of a body''].
 	parts := self listToArray: form cdr.
 	target := parts first.
 	(target isKindOf: LispCons)
@@ -640,6 +674,7 @@ cm value: comp value: 'compiling' value: 'compile: datum
 	selfLoop := nil.
 	topForm := datum.
 	sourceContext := nil.
+	inBody := false.
 	inlineTemps := 0.
 	exprNode := self translate: datum inScope: IdentityDictionary new tail: false.
 	method := OCMethodNode selector: #doIt arguments: #()
