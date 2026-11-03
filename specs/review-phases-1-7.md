@@ -54,7 +54,7 @@ REPL come from the independent reviews.
   (Phases 1–6 used to exit 0 regardless), and an unexpected error prints the
   partial RESULT and exits 1.
 
-### T-3 Nothing warns that `pharo\cog-lisp.image` is older than the sources — plan → Phase 7.5 tooling
+### T-3 Nothing warns that `pharo\cog-lisp.image` is older than the sources — fixed (VS Code extension)
 - **Evidence.** `cog-lisp.bat` runs whatever image was last built; after editing
   `src/` or `lib/core.lisp`, programs silently run the old code until
   `build-image.bat` is run (code reference; observed during Phase 7).

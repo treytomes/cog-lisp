@@ -122,6 +122,9 @@ and prints its `printString`.
   `ReadConsoleW` via uFFI instead: it blocks the VM until Enter, Windows does the
   echo and line editing, and it returns UTF-16. Ctrl+Z alone on a line arrives
   as `16r1A` and ends input.
+- **`cmd /c name.bat` does not find a batch file in the current directory here**
+  ("not recognized"): name it `.
+ame.bat`. The VS Code extension does this.
 - **Testing console input without a person:** open `CONIN$` with `CreateFileW`
   and inject keystrokes with `WriteConsoleInputW` (20-byte `INPUT_RECORD`s:
   EventType 1 at offset 1, bKeyDown 1 at 5, repeat 1 at 9, the UTF-16 char at

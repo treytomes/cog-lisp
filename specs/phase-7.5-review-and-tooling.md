@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 7.5 |
-| **Status** | Accepted (2026-11-03) |
+| **Status** | Implemented (2026-11-03) — review fixed (624/624 checks); extension built and installed; AC-8 to AC-10 to be checked by hand in VS Code |
 | **Depends on** | Phases 1–7 |
 | **Feeds** | Phase 8 (self-hosting), Smalltalk interop, every later phase |
 | **Kind** | Consolidation: no new language features |
@@ -173,3 +173,41 @@ Settled 2026-11-03 (owner sign-off); the spec is Accepted on these.
    runtime, given the code and specs but not our candidate list.
 5. **Language server:** planned only (§5.4), built in a later phase. The
    extension stays thin in 7.5.
+
+## 8. As implemented
+
+**Review (AC-1 to AC-5).** `specs/review-phases-1-7.md` has 61 findings across
+every area of §4.1 (7 from our own pass, 54 from the two independent
+reviewers, each re-run before being recorded). Every *fix now* finding was fixed
+in four commits; each has regression checks in `tests/phase-7.5-review.st` (114
+checks) or a runner fixture (`tests/runner/located.*`). The rest are planned for
+named phases or kept, with reasons. `tests\run-all.bat` runs every suite: 624/624.
+Specs changed by a fix say so (Phases 1, 4, 5, 6, 7). The root scripts also have
+bash equivalents (`bootstrap-pharo.sh`, `build-image.sh`, `cog-lisp.sh`).
+
+**VS Code (AC-6 to AC-10).** `vscode/` is a plain-JavaScript extension (no build
+step). `npm test` runs 15 form-scanner checks and the grammar assertions of
+`test/syntax.test.lisp`; `npm run package` builds `cog-lisp.vsix`, which
+`code --install-extension` installed (AC-6, AC-7). Details settled in building it:
+
+- **The editor runs the repo's own scripts.** Run File is a task, and the REPL a
+  terminal, both `cmd.exe /d /c .\cog-lisp.bat …` from the repo root; Rebuild
+  Image runs `.\build-image.bat`. The script is named `.\x.bat`: on this machine
+  `cmd` does not run a batch file in the current directory by its bare name, and
+  a relative path keeps quotes (which `cmd /c` mangles) off the command line.
+- **The problem matcher** reads `path:line:col: error: message` (review R-1),
+  with absolute paths.
+- **Send to REPL** sends the selection, or the top-level form at the cursor,
+  found by a small scanner (`src/forms.js`) that knows the reader's rules for
+  strings, comments, block comments and character literals.
+- **Stale image (review T-3):** on activation, and on saving `src\*.st` or
+  `lib\core.lisp`, the extension warns when the image is older than a source and
+  offers to rebuild.
+- **Grammar test:** `vscode-tmgrammar-test` ends every run on Node 24 for
+  Windows with a libuv assertion (exit 127, pass or fail), so
+  `test/grammar.test.js` runs it and judges by its output; a planted wrong
+  assertion is reported as a failure.
+- **Not checked from here:** AC-8 to AC-10 need the editor itself. Their command
+  lines were run from Node exactly as the extension spawns them (the run, the
+  REPL, and the matcher on a located error, including a path with spaces), and
+  the steps to check them in VS Code are in `vscode/README.md`.

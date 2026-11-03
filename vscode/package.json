@@ -1,0 +1,156 @@
+{
+  "name": "cog-lisp",
+  "displayName": "cog-lisp",
+  "description": "Syntax, run, and REPL support for cog-lisp, the image-based LISP on Pharo (specs/phase-7.5-review-and-tooling.md section 5).",
+  "version": "0.1.0",
+  "publisher": "cog-lisp",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "workspaceContains:cog-lisp.bat"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "cog-lisp",
+        "aliases": [
+          "cog-lisp"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cog-lisp",
+        "scopeName": "source.cog-lisp",
+        "path": "./syntaxes/cog-lisp.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "cog-lisp.runFile",
+        "title": "Run File",
+        "category": "cog-lisp",
+        "icon": "$(play)"
+      },
+      {
+        "command": "cog-lisp.startRepl",
+        "title": "Start REPL",
+        "category": "cog-lisp"
+      },
+      {
+        "command": "cog-lisp.sendToRepl",
+        "title": "Send Selection or Form to REPL",
+        "category": "cog-lisp"
+      },
+      {
+        "command": "cog-lisp.rebuildImage",
+        "title": "Rebuild Image",
+        "category": "cog-lisp"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "cog-lisp.runFile",
+          "when": "editorLangId == cog-lisp"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "cog-lisp.runFile",
+          "when": "editorLangId == cog-lisp"
+        },
+        {
+          "command": "cog-lisp.sendToRepl",
+          "when": "editorLangId == cog-lisp"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "cog-lisp.sendToRepl",
+        "key": "ctrl+enter",
+        "when": "editorTextFocus && editorLangId == cog-lisp"
+      }
+    ],
+    "configuration": {
+      "title": "cog-lisp",
+      "properties": {
+        "cogLisp.root": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Folder holding `cog-lisp.bat` and `pharo\\`. Empty: the workspace folder that contains `cog-lisp.bat`."
+        },
+        "cogLisp.warnStaleImage": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Warn when `src\\*.st` or `lib\\core.lisp` is newer than `pharo\\cog-lisp.image`, so programs would run old code."
+        }
+      }
+    },
+    "taskDefinitions": [
+      {
+        "type": "cog-lisp",
+        "required": [
+          "task"
+        ],
+        "properties": {
+          "task": {
+            "type": "string",
+            "enum": [
+              "run",
+              "build"
+            ],
+            "description": "run: run a file; build: rebuild pharo\\cog-lisp.image."
+          },
+          "file": {
+            "type": "string",
+            "description": "The program to run."
+          }
+        }
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "cog-lisp",
+        "owner": "cog-lisp",
+        "source": "cog-lisp",
+        "fileLocation": [
+          "absolute"
+        ],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+): error: (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        },
+        "severity": "error"
+      }
+    ],
+    "terminal": {
+      "profiles": [
+        {
+          "id": "cog-lisp.repl",
+          "title": "cog-lisp REPL"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node test/forms.test.js && node test/grammar.test.js",
+    "package": "vsce package --skip-license --allow-missing-repository --out cog-lisp.vsix"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "4.0.0",
+    "vscode-tmgrammar-test": "0.1.3"
+  }
+}

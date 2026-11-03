@@ -14,7 +14,14 @@ PharoDebug.log
 crash.dmp
 
 # --- Editor / tooling --------------------------------------------------------
-/.vscode/
+# Workspace settings are shared (the .lisp association and the spelling
+# dictionary); anything else VS Code writes there stays local.
+/.vscode/*
+!/.vscode/settings.json
+
+# The VS Code extension's dev tools and its packaged .vsix are regenerable.
+/vscode/node_modules/
+/vscode/*.vsix
 
 # --- OS cruft ----------------------------------------------------------------
 Thumbs.db
