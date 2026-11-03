@@ -321,6 +321,6 @@ Settled 2026-11-02 (owner sign-off); the spec is Accepted on these.
 
 - `LispSymbol` interning established here is the basis for `eq?` in Phase 2.
 - The reader's output is the compiler's input in Phase 3; keeping it plain data
-  (no behaviour baked in) keeps the compiler free to interpret forms.
+  (no behavior baked in) keeps the compiler free to interpret forms.
 - When quasiquote lands (Phase 7), it extends §6 `abbreviation` only; nothing
   here needs to change.

@@ -7,10 +7,10 @@
  AFTER coglisp-reader.st, since its method bodies name the Phase-1 classes
  LispCons / LispSymbol / LispEmptyList.
 
- Classes: LispCore (stateless facade), LispEnvironment, LispGlobal,
+ Classes: LispCore (stateless facade), LispEnvironment, LispGlobal, LispMacro,
  LispUnboundError.
  ============================================================================"
-| failures cm core env cell err |
+| failures cm core env cell macro err |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -20,6 +20,7 @@ cm := [:cls :cat :src |
 core := (Object << #LispCore) package: 'CogLisp-Core'; install.
 env  := (Object << #LispEnvironment) slots: { #bindings }; sharedVariables: { #Default }; package: 'CogLisp-Core'; install.
 cell := (Object << #LispGlobal) slots: { #symbol. #value. #bound }; package: 'CogLisp-Core'; install.
+macro := (Object << #LispMacro) slots: { #expander }; package: 'CogLisp-Core'; install.
 err  := (Error  << #LispUnboundError) slots: { #symbol }; package: 'CogLisp-Core'; install.
 
 "=== LispCore : type predicates (class-side) ==============================="
@@ -64,6 +65,19 @@ cm value: core class value: 'equality' value: 'equal: a with: b
 "=== LispCore : truthiness (class-side) ===================================="
 cm value: core class value: 'truth' value: 'isTruthy: v
 	^ v ~~ false'.
+
+"=== LispMacro (Phase 7 section 5) =========================================
+ What define-macro binds a global to: a holder for the expander procedure. The
+ compiler recognizes it at compile time and expands calls instead of compiling
+ them as calls. Defined here because the compiler loads before the runtime."
+cm value: macro value: 'private' value: 'setExpander: aProcedure
+	expander := aProcedure'.
+cm value: macro value: 'accessing' value: 'expander
+	^ expander'.
+cm value: macro value: 'printing' value: 'printOn: aStream
+	aStream nextPutAll: ''#<macro>'''.
+cm value: macro class value: 'instance creation' value: 'expander: aProcedure
+	^ self new setExpander: aProcedure'.
 
 "=== LispGlobal (Phase 6 section 5.2) ======================================
  One global variable: a cell owned by an environment. Compiled code holds the

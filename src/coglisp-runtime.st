@@ -20,7 +20,7 @@ lerr  := (Error  << #LispError) package: 'CogLisp-Runtime'; install.
 aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp-Runtime'; install.
 proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries. #inline }; package: 'CogLisp-Runtime'; install.
 tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runtime'; install.
-prims := (Object << #LispPrimitives) sharedVariables: { #Output }; package: 'CogLisp-Runtime'; install.
+prims := (Object << #LispPrimitives) sharedVariables: { #Output. #GensymCounter }; package: 'CogLisp-Runtime'; install.
 tout  := (Object << #LispTextOutput) slots: { #kind. #handle. #stream. #buffer }; sharedVariables: { #Session. #Stdout. #Stderr }; package: 'CogLisp-Runtime'; install.
 
 "=== LispTextOutput =========================================================
@@ -292,8 +292,37 @@ cm value: prims class value: 'installing' value: 'installInto: anEnv
 	self installIOInto: anEnv.
 	self installControlInto: anEnv.
 	self installSystemInto: anEnv.
+	self installMacroSupportInto: anEnv.
+	self installListSearchInto: anEnv.
 	self installInlineFormsInto: anEnv.
 	^ anEnv'.
+cm value: prims class value: 'installing' value: 'installMacroSupportInto: anEnv
+	"Phase 7 section 5.2. gensym makes uninterned symbols: not in the intern table,
+	 so no symbol the reader produces is ever identical to one."
+	anEnv define: (LispSymbol named: ''gensym'') value: (LispProcedure variadic: [:prefix |
+		GensymCounter := (GensymCounter ifNil: [0]) + 1.
+		LispSymbol new setName: (prefix lispElements ifEmpty: [''g''] ifNotEmpty: [:p | p first]) , GensymCounter printString]
+		required: 0).
+	anEnv define: (LispSymbol named: ''macroexpand-1'') value: (LispProcedure fixed: [:form | LispCompiler new macroexpand1: form] arity: 1).
+	anEnv define: (LispSymbol named: ''macroexpand'') value: (LispProcedure fixed: [:form | LispCompiler new macroexpand: form] arity: 1).
+	anEnv define: (LispSymbol named: ''eval'') value: (LispProcedure fixed: [:form | LispCompiler new eval: form] arity: 1)'.
+cm value: prims class value: 'installing' value: 'installListSearchInto: anEnv
+	"memq memv member: the first tail of lst whose car matches, else #f.
+	 assq assv assoc: the first pair in alist whose car matches, else #f."
+	| mem ass |
+	mem := [:test | [:x :lst | | cur |
+		cur := lst.
+		[(cur isKindOf: LispCons) and: [(test value: x value: cur car) not]] whileTrue: [cur := cur cdr].
+		(cur isKindOf: LispCons) ifTrue: [cur] ifFalse: [false]]].
+	ass := [:test | [:x :alist | | found |
+		found := alist lispElements detect: [:pair | (pair isKindOf: LispCons) and: [test value: x value: pair car]] ifNone: [false].
+		found]].
+	anEnv define: (LispSymbol named: ''memq'') value: (LispProcedure fixed: (mem value: [:a :b | LispCore eq: a with: b]) arity: 2).
+	anEnv define: (LispSymbol named: ''memv'') value: (LispProcedure fixed: (mem value: [:a :b | LispCore eqv: a with: b]) arity: 2).
+	anEnv define: (LispSymbol named: ''member'') value: (LispProcedure fixed: (mem value: [:a :b | LispCore equal: a with: b]) arity: 2).
+	anEnv define: (LispSymbol named: ''assq'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore eq: a with: b]) arity: 2).
+	anEnv define: (LispSymbol named: ''assv'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore eqv: a with: b]) arity: 2).
+	anEnv define: (LispSymbol named: ''assoc'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore equal: a with: b]) arity: 2)'.
 cm value: prims class value: 'installing' value: 'installInlineFormsInto: anEnv
 	"Inline forms for guarded inlining (Phase 6 section 11.2). Each matches what
 	 the primitive does for that many arguments."

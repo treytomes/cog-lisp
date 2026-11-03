@@ -30,7 +30,7 @@ cm := [:cls :cat :src |
     do: [:e | failures add: cls name , ' >> ' , (src copyUpTo: Character cr) , (src copyUpTo: Character lf) , '  --  ' , e messageText]].
 
 comp := (Object << #LispCompiler)
-	slots: { #counter. #sourceMap. #options. #selfLoop. #inlineTemps };
+	slots: { #counter. #sourceMap. #options. #selfLoop. #inlineTemps. #topForm. #sourceContext };
 	sharedVariables: { #DefaultOptions };
 	package: 'CogLisp-Compiler';
 	install.
@@ -91,12 +91,19 @@ cm value: comp value: 'nodes' value: 'andUnspecified: aNode
 		selector: #value
 		arguments: #()'.
 cm value: comp value: 'source' value: 'sourceOf: form
-	"Exact source text of form if the reader recorded it, else its printed form (Phase 5 section 5.2)."
+	"Exact source text of form if the reader recorded it (Phase 5 section 5.2). A
+	 form built by a macro has no text of its own, so it gets the text of the macro
+	 call it came from (Phase 7 section 5.3). Otherwise, its printed form."
 	| text |
 	sourceMap notNil ifTrue: [
 		text := sourceMap sourceFor: form.
 		text notNil ifTrue: [^ text]].
+	sourceContext notNil ifTrue: [^ sourceContext].
 	^ LispPrinter writeString: form'.
+cm value: comp value: 'source' value: 'recordedSourceOf: form
+	"Only text the reader recorded for form itself, or nil."
+	sourceMap isNil ifTrue: [^ nil].
+	^ sourceMap sourceFor: form'.
 cm value: comp value: 'nodes' value: 'thunk: aNode
 	^ OCBlockNode arguments: #() body: (OCSequenceNode statements: { aNode })'.
 cm value: comp value: 'nodes' value: 'blockWithArgs: argNodes temps: tempNodes statements: statementNodes
@@ -262,6 +269,8 @@ cm value: comp value: 'translating' value: 'translateVariable: sym inScope: scop
 	| name |
 	name := scope at: sym ifAbsent: [nil].
 	name notNil ifTrue: [^ self var: name].
+	(self macroFor: sym inScope: scope) notNil ifTrue: [
+		^ self compileError: ''macro used as a value: '' , sym name].
 	^ self globalRead: sym'.
 cm value: comp value: 'translating' value: 'translateForm: form inScope: scope tail: tail
 	| op opName |
@@ -274,7 +283,148 @@ cm value: comp value: 'translating' value: 'translateForm: form inScope: scope t
 	opName = ''let'' ifTrue: [^ self translateLet: form inScope: scope tail: tail].
 	opName = ''define'' ifTrue: [^ self translateDefine: form inScope: scope].
 	opName = ''set!!'' ifTrue: [^ self translateSet: form inScope: scope].
+	opName = ''quasiquote'' ifTrue: [^ self qqNode: form cdr car level: 0 inScope: scope].
+	opName = ''define-macro'' ifTrue: [^ self translateDefineMacro: form inScope: scope].
+	(self macroFor: op inScope: scope) ifNotNil: [:m |
+		^ self translateMacroCall: form macro: m inScope: scope tail: tail].
 	^ self translateApplication: form inScope: scope tail: tail'.
+
+"=== macros (Phase 7 section 5) ============================================"
+cm value: comp value: 'macros' value: 'macroFor: op inScope: scope
+	"The macro op names at compile time, if op is a symbol that is not a local."
+	| value |
+	(op isKindOf: LispSymbol) ifFalse: [^ nil].
+	(scope includesKey: op) ifTrue: [^ nil].
+	value := (LispEnvironment default cellFor: op) valueIfUnbound: [^ nil].
+	(value isKindOf: LispMacro) ifFalse: [^ nil].
+	^ value'.
+cm value: comp value: 'macros' value: 'expand: form with: aMacro
+	"Run the expander on the operands of form, unevaluated."
+	| name |
+	name := (form car isKindOf: LispSymbol) ifTrue: [form car name] ifFalse: [''?''].
+	^ [(Smalltalk at: #LispProcedure) apply: aMacro expander to: (self listToArray: form cdr)]
+		on: Error
+		do: [:e | self compileError: ''error expanding '' , name , '': '' ,
+			((e messageText isNil or: [e messageText isEmpty]) ifTrue: [e class name] ifFalse: [e messageText])]'.
+cm value: comp value: 'macros' value: 'translateMacroCall: form macro: aMacro inScope: scope tail: tail
+	"Compile the expansion in place of form, keeping its tail position. Lambdas the
+	 expansion builds take the source text of this call (section 5.3), and a macro
+	 call at top level keeps its expansion at top level."
+	| expansion text savedContext savedTop |
+	expansion := self expand: form with: aMacro.
+	text := self recordedSourceOf: form.
+	savedContext := sourceContext.
+	savedTop := topForm.
+	text notNil ifTrue: [sourceContext := text].
+	form == topForm ifTrue: [topForm := expansion].
+	^ [self translate: expansion inScope: scope tail: tail]
+		ensure: [sourceContext := savedContext. topForm := savedTop]'.
+cm value: comp value: 'macros' value: 'translateDefineMacro: form inScope: scope
+	"(define-macro (name . params) body...) or (define-macro name expander-expr)"
+	| parts target nameSym valueNode |
+	form == topForm ifFalse: [^ self compileError: ''define-macro is allowed only at top level''].
+	parts := self listToArray: form cdr.
+	parts isEmpty ifTrue: [^ self compileError: ''define-macro needs a name''].
+	target := parts first.
+	(target isKindOf: LispCons)
+		ifTrue: [
+			nameSym := target car.
+			valueNode := self translateLambda: (self makeLambda: target cdr body: parts allButFirst)
+				inScope: scope source: (self sourceOf: form) defining: nil]
+		ifFalse: [
+			nameSym := target.
+			valueNode := self translate: (parts at: 2) inScope: scope].
+	^ self andUnspecified: (self globalDefine: nameSym
+		value: (self messageNode: (self var: ''LispMacro'') selector: #expander: arguments: { valueNode }))'.
+cm value: comp value: 'macros' value: 'macroexpand1: form
+	"Expand form once if it is a call of a global macro; else answer it unchanged."
+	| m |
+	(form isKindOf: LispCons) ifFalse: [^ form].
+	m := self macroFor: form car inScope: IdentityDictionary new.
+	m isNil ifTrue: [^ form].
+	^ self expand: form with: m'.
+cm value: comp value: 'macros' value: 'macroexpand: form
+	| current next |
+	current := form.
+	[next := self macroexpand1: current. next == current] whileFalse: [current := next].
+	^ current'.
+
+"=== quasiquote (Phase 7 section 4) ========================================"
+cm value: comp value: 'quasiquote' value: 'isTagged: datum as: aName
+	"datum is the two-element list (aName x)"
+	^ (datum isKindOf: LispCons)
+		and: [datum car == (LispSymbol named: aName)
+		and: [(datum cdr isKindOf: LispCons) and: [datum cdr cdr == LispEmptyList default]]]'.
+cm value: comp value: 'quasiquote' value: 'qqIsConstant: t level: n
+	"True if nothing in t is evaluated at quasiquote level n."
+	(t isKindOf: LispCons) ifFalse: [^ true].
+	((self isTagged: t as: ''unquote'') or: [self isTagged: t as: ''unquote-splicing'']) ifTrue: [
+		n = 0 ifTrue: [^ false].
+		^ self qqIsConstant: t cdr car level: n - 1].
+	(self isTagged: t as: ''quasiquote'') ifTrue: [^ self qqIsConstant: t cdr car level: n + 1].
+	^ (self qqIsConstant: t car level: n) and: [self qqIsConstant: t cdr level: n]'.
+cm value: comp value: 'quasiquote' value: 'qqTagged: aName with: aNode
+	"code building the list (aName <aNode value>)"
+	^ self messageNode: (self var: ''LispCons'') selector: #car:cdr: arguments: {
+		self literalNode: (LispSymbol named: aName).
+		self messageNode: (self var: ''LispCons'') selector: #car:cdr: arguments: { aNode. self emptyListNode } }'.
+cm value: comp value: 'quasiquote' value: 'qqNode: t level: n inScope: scope
+	"Code that builds the structure the template t describes. Constant parts are
+	 literals; construction uses LispCons directly, never the global cons/append."
+	| head |
+	(self qqIsConstant: t level: n) ifTrue: [^ self quoteNode: t].
+	(self isTagged: t as: ''unquote'') ifTrue: [
+		n = 0 ifTrue: [^ self translate: t cdr car inScope: scope].
+		^ self qqTagged: ''unquote'' with: (self qqNode: t cdr car level: n - 1 inScope: scope)].
+	(self isTagged: t as: ''unquote-splicing'') ifTrue: [
+		n = 0 ifTrue: [^ self compileError: ''unquote-splicing outside a list''].
+		^ self qqTagged: ''unquote-splicing'' with: (self qqNode: t cdr car level: n - 1 inScope: scope)].
+	(self isTagged: t as: ''quasiquote'') ifTrue: [
+		^ self qqTagged: ''quasiquote'' with: (self qqNode: t cdr car level: n + 1 inScope: scope)].
+	head := t car.
+	((self isTagged: head as: ''unquote-splicing'') and: [n = 0]) ifTrue: [
+		^ self messageNode: (self var: ''LispCons'') selector: #qqAppend:to: arguments: {
+			self translate: head cdr car inScope: scope.
+			self qqNode: t cdr level: n inScope: scope }].
+	^ self messageNode: (self var: ''LispCons'') selector: #car:cdr: arguments: {
+		self qqNode: head level: n inScope: scope.
+		self qqNode: t cdr level: n inScope: scope }'.
+
+"=== bodies with internal define (Phase 7 section 6) ======================="
+cm value: comp value: 'translating' value: 'isDefineForm: datum
+	^ (datum isKindOf: LispCons) and: [datum car == (LispSymbol named: ''define'')]'.
+cm value: comp value: 'translating' value: 'translateScopedBody: dataArray inScope: childScope tail: tail
+	"A procedure or let body. Leading defines are locals of the body, with letrec*
+	 semantics: all are in scope throughout, assigned in order. Adds them to
+	 childScope and answers { tempNames. statements }."
+	| defs rest temps statements |
+	defs := OrderedCollection new.
+	rest := dataArray readStream.
+	[rest atEnd not and: [self isDefineForm: rest peek]] whileTrue: [defs add: rest next].
+	rest := rest upToEnd.
+	(rest anySatisfy: [:d | self isDefineForm: d])
+		ifTrue: [^ self compileError: ''define after an expression in a body''].
+	temps := OrderedCollection new.
+	statements := OrderedCollection new.
+	defs do: [:d | | target nm |
+		target := (self listToArray: d cdr) first.
+		nm := self nextName.
+		childScope at: ((target isKindOf: LispCons) ifTrue: [target car] ifFalse: [target]) put: nm.
+		temps add: nm.
+		statements add: (self assign: nm value: self unspecifiedNode)].
+	defs with: temps do: [:d :nm | | parts target valueData |
+		parts := self listToArray: d cdr.
+		target := parts first.
+		statements add: (self assign: nm value: ((target isKindOf: LispCons)
+			ifTrue: [self translateLambda: (self makeLambda: target cdr body: parts allButFirst)
+				inScope: childScope source: (self sourceOf: d) defining: nil]
+			ifFalse: [
+				valueData := parts at: 2.
+				(self isLambdaForm: valueData)
+					ifTrue: [self translateLambda: valueData inScope: childScope source: (self sourceOf: valueData) defining: nil]
+					ifFalse: [self translate: valueData inScope: childScope]]))].
+	statements addAll: (self translateBody: rest asArray inScope: childScope tail: tail).
+	^ { temps. statements asArray }'.
 cm value: comp value: 'translating' value: 'translateBody: dataArray inScope: scope tail: tail
 	"Statements for a body: every form for effect, the last in tail position if the body is."
 	dataArray isEmpty ifTrue: [^ { self unspecifiedNode }].
@@ -308,9 +458,11 @@ cm value: comp value: 'translating' value: 'translateIf: form inScope: scope tai
 cm value: comp value: 'translating' value: 'translateBegin: dataArray inScope: scope tail: tail
 	dataArray isEmpty ifTrue: [^ self unspecifiedNode].
 	dataArray size = 1 ifTrue: [^ self translate: dataArray first inScope: scope tail: tail].
-	^ self messageNode: (self blockWithArgs: #() statements: (self translateBody: dataArray inScope: scope tail: tail))
-		selector: #value
-		arguments: #()'.
+	"true ifTrue: [...] rather than [...] value: Opal inlines it, so a sequence
+	 costs no closure and no frame (derived forms expand to begin often)"
+	^ self messageNode: (self literalNode: true)
+		selector: #ifTrue:
+		arguments: { self blockWithArgs: #() statements: (self translateBody: dataArray inScope: scope tail: tail) }'.
 cm value: comp value: 'translating' value: 'parseParams: spec
 	| fixed cur |
 	(spec isKindOf: LispSymbol) ifTrue: [^ { #(). spec }].
@@ -342,7 +494,7 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope source: sourceText defining: nameSym
 	"nameSym is the global this lambda is being defined as, or nil. A defined,
 	 fixed-arity procedure compiles its self tail calls as a loop (section 4.2)."
-	| parts parsed fixed restSym allParams childScope bound savedLoop savedInlineTemps loop tail bodyNodes statements temps block procNode procName |
+	| parts parsed fixed restSym allParams childScope bound savedLoop savedInlineTemps loop tail body bodyNodes iterNames iterInits localNodes statements temps block procNode procName |
 	parts := self listToArray: form cdr.
 	parsed := self parseParams: parts first.
 	fixed := parsed first.
@@ -352,26 +504,37 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 	bound := self bindParams: allParams into: childScope.
 	tail := self uses: #tailCalls.
 	loop := nil.
+	iterNames := #().
+	iterInits := #().
 	(tail and: [nameSym notNil and: [restSym isNil]]) ifTrue: [
 		loop := IdentityDictionary new.
 		loop at: #name put: nameSym; at: #params put: (bound at: 4);
 			at: #proc put: self nextName; at: #again put: self nextName; at: #result put: self nextName;
-			at: #temps put: OrderedCollection new; at: #used put: false].
+			at: #temps put: OrderedCollection new; at: #used put: false.
+		"The body works on per-iteration copies of the parameters, declared inside the
+		 loop block, so a closure made in one iteration keeps that iteration''s
+		 values: Opal gives such temps fresh storage each time round (Phase 7)."
+		iterNames := allParams collect: [:p | | q | q := self nextName. childScope at: p put: q. q].
+		iterInits := (1 to: iterNames size) collect: [:i |
+			self assign: (iterNames at: i) value: (self var: ((bound at: 4) at: i))]].
 	savedLoop := selfLoop.
 	savedInlineTemps := inlineTemps.
 	selfLoop := loop.
 	inlineTemps := 0.
-	bodyNodes := [self translateBody: parts allButFirst inScope: childScope tail: tail]
+	body := [self translateScopedBody: parts allButFirst inScope: childScope tail: tail]
 		ensure: [selfLoop := savedLoop. inlineTemps := savedInlineTemps].
+	bodyNodes := body at: 2.
+	localNodes := (iterNames , (body at: 1) asArray) collect: [:nm | self var: nm].
 	(loop notNil and: [loop at: #used])
 		ifTrue: [
-			"again := true. [again] whileTrue: [again := false. body... result := last]. result"
+			"again := true. [again] whileTrue: [| q... | again := false. q := p... body... result := last]. result"
 			statements := (bound at: 3) asOrderedCollection.
 			statements add: (self assign: (loop at: #again) value: (self literalNode: true)).
 			statements add: (self messageNode: (self thunk: (self var: (loop at: #again)))
 				selector: #whileTrue:
-				arguments: { self blockWithArgs: #() statements:
+				arguments: { self blockWithArgs: #() temps: localNodes statements:
 					({ self assign: (loop at: #again) value: (self literalNode: false) } ,
+					 iterInits ,
 					 bodyNodes allButLast ,
 					 { self assign: (loop at: #result) value: bodyNodes last }) }).
 			statements add: (self var: (loop at: #result)).
@@ -379,7 +542,8 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 				collect: [:nm | self var: nm]).
 			block := self blockWithArgs: (bound at: 1) temps: temps statements: statements asArray]
 		ifFalse: [
-			block := self blockWithArgs: (bound at: 1) temps: (bound at: 2) statements: (bound at: 3) , bodyNodes].
+			block := self blockWithArgs: (bound at: 1) temps: (bound at: 2) , localNodes
+				statements: (bound at: 3) , iterInits , bodyNodes].
 	procNode := self messageNode: (self var: ''LispProcedure'')
 		selector: (restSym isNil ifTrue: [#fixed:arity:source:] ifFalse: [#variadic:required:source:])
 		arguments: { block. self literalNode: fixed size. self literalNode: sourceText }.
@@ -392,8 +556,10 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 		selector: #value
 		arguments: #()'.
 cm value: comp value: 'translating' value: 'translateLet: form inScope: scope tail: tail
-	| parts bindings bodyData params valueData childScope bound block |
+	| parts bindings bodyData params valueData childScope bound body block |
 	parts := self listToArray: form cdr.
+	(parts notEmpty and: [parts first isKindOf: LispSymbol]) ifTrue: [
+		^ self translateNamedLet: parts inScope: scope tail: tail].
 	bindings := self listToArray: parts first.
 	bodyData := parts allButFirst.
 	params := bindings collect: [:b | (self listToArray: b) first].
@@ -407,14 +573,31 @@ cm value: comp value: 'translating' value: 'translateLet: form inScope: scope ta
 	"Phase 6 section 5.4: a block evaluated in place; the body inherits tail position."
 	childScope := scope copy.
 	bound := self bindParams: params into: childScope.
-	block := self blockWithArgs: (bound at: 1) temps: (bound at: 2)
-		statements: (bound at: 3) , (self translateBody: bodyData inScope: childScope tail: tail).
+	body := self translateScopedBody: bodyData inScope: childScope tail: tail.
+	block := self blockWithArgs: (bound at: 1)
+		temps: (bound at: 2) , ((body at: 1) asArray collect: [:nm | self var: nm])
+		statements: (bound at: 3) , (body at: 2).
 	params size > 4 ifTrue: [
 		^ self messageNode: block selector: #valueWithArguments:
 			arguments: { self arrayNode: (valueData collect: [:d | self translate: d inScope: scope]) }].
 	^ self messageNode: block
 		selector: (self valueSelectorFor: params size)
 		arguments: (valueData collect: [:d | self translate: d inScope: scope])'.
+cm value: comp value: 'translating' value: 'translateNamedLet: parts inScope: scope tail: tail
+	"(let name ((v e)...) body...) is ((let () (define (name v...) body...) name) e...):
+	 name is visible in the body only, and the initial values are evaluated outside it."
+	| name bindings vars inits defineForm |
+	name := parts first.
+	bindings := self listToArray: (parts at: 2).
+	vars := bindings collect: [:b | (self listToArray: b) first].
+	inits := bindings collect: [:b | (self listToArray: b) second].
+	defineForm := LispCons car: (LispSymbol named: ''define'')
+		cdr: (LispCons car: (LispCons car: name cdr: (LispCons fromArray: vars asArray))
+			cdr: (LispCons fromArray: (parts allButFirst: 2))).
+	^ self translate: (LispCons
+			car: (LispCons fromArray: { LispSymbol named: ''let''. LispEmptyList default. defineForm. name })
+			cdr: (LispCons fromArray: inits asArray))
+		inScope: scope tail: tail'.
 cm value: comp value: 'translating' value: 'isLambdaForm: datum
 	^ (datum isKindOf: LispCons) and: [datum car == (LispSymbol named: ''lambda'')]'.
 cm value: comp value: 'translating' value: 'translateDefine: form inScope: scope
@@ -455,6 +638,8 @@ cm value: comp value: 'compiling' value: 'compile: datum
 	| exprNode method |
 	counter := 0.
 	selfLoop := nil.
+	topForm := datum.
+	sourceContext := nil.
 	inlineTemps := 0.
 	exprNode := self translate: datum inScope: IdentityDictionary new tail: false.
 	method := OCMethodNode selector: #doIt arguments: #()

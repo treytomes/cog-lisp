@@ -1,0 +1,12 @@
+4
+(c d)
+(2 4) (3 9) (4 16) (5 25) 
+(d c b a)
+6
+42
+(10 20 30)
+ran
+(defun our-length (lst)
+  (if (null lst)
+      0
+      (+ (our-length (cdr lst)) 1)))

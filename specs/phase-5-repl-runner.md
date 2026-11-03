@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 5 |
-| **Status** | Implemented (2026-11-02) — `tests/phase-5-shell.st` 28/28, `tests/phase-5-runner.bat` 30/30; Phases 1–4 still green |
+| **Status** | Implemented (2026-11-02) — `tests/phase-5-shell.st` 28/28, `tests/phase-5-runner.bat` 30/30 (36/36 with the Phase 7 examples); Phases 1–4 still green |
 | **Depends on** | Phases 1–4 |
 | **Feeds** | Phase 6 (optimization), Phase 7 (language reach), Phase 8 (self-hosting) |
 | **Image strategy** | Build a dedicated `cog-lisp.image` once; the runner and REPL start from it |
@@ -92,7 +92,7 @@ cog-lisp.bat program.lisp    run a program, then exit
 
 ## 5. Language additions
 
-| Name | Behaviour |
+| Name | Behavior |
 |---|---|
 | unspecified value | A singleton `LispUnspecified default`, printed as `#<unspecified>`. Returned by `define`, `set!`, a one-armed `if` whose test is false, `display`/`write`/`newline`, `for-each`, `set-car!`/`set-cdr!`, and `load`. It replaces the Phase 3 placeholder (the empty list), so `(if #f 1)` no longer looks like `()`. |
 | `(load "path")` | Read and evaluate every form in a file, relative to the current directory. |

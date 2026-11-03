@@ -1,0 +1,6 @@
+sum of 0..4 is 10
+3 2 1 
+(if (> x 0) (begin (display x) x))
+(lambda (x) (+ x 10))
+15
+(negative zero odd even)

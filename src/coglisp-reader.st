@@ -64,6 +64,15 @@ cm value: cons class value: 'instance creation' value: 'fromArray: anArray
 	result := LispEmptyList default.
 	anArray reverseDo: [:e | result := self car: e cdr: result].
 	^ result'.
+cm value: cons class value: 'quasiquote' value: 'qqAppend: aList to: tail
+	"Fresh copy of the proper list aList, ending in tail: the runtime part of
+	 unquote-splicing (Phase 7 section 4). Never uses the global append."
+	| result |
+	(aList == LispEmptyList default or: [(aList isKindOf: LispCons) and: [aList isProperList]])
+		ifFalse: [^ (Error new) signal: ''unquote-splicing: not a list''].
+	result := tail.
+	aList lispElements reverseDo: [:e | result := self car: e cdr: result].
+	^ result'.
 
 "=== LispSymbol ============================================================"
 cm value: sym value: 'accessing' value: 'name
@@ -121,7 +130,7 @@ cm value: rdr value: 'source' value: 'sourceFor: aCons
 cm value: rdr value: 'error handling' value: 'signalError: aString
 	^ (LispReadError new) position: stream position; incomplete: stream atEnd; signal: aString'.
 cm value: rdr value: 'scanning' value: 'isDelimiter: aChar
-	^ aChar isSeparator or: [#($( $) $" $; $'') includes: aChar]'.
+	^ aChar isSeparator or: [#($( $) $" $; $'' $` $,) includes: aChar]'.
 cm value: rdr value: 'reading' value: 'next
 	self skipIntertoken.
 	stream atEnd ifTrue: [^ self class eofObject].
@@ -178,6 +187,11 @@ cm value: rdr value: 'reading' value: 'readDatum
 	c = $( ifTrue: [^ self readList].
 	c = $) ifTrue: [^ self signalError: ''unexpected )''].
 	c = $'' ifTrue: [stream next. ^ self readQuote].
+	c = $` ifTrue: [stream next. ^ self readAbbreviation: ''quasiquote''].
+	c = $, ifTrue: [
+		stream next.
+		(stream atEnd not and: [stream peek = $@]) ifTrue: [stream next. ^ self readAbbreviation: ''unquote-splicing''].
+		^ self readAbbreviation: ''unquote''].
 	c = $" ifTrue: [^ self readString].
 	c = $# ifTrue: [^ self readHash].
 	^ self readToken'.
@@ -186,8 +200,11 @@ cm value: rdr value: 'reading' value: 'readNextDatum
 	stream atEnd ifTrue: [^ self signalError: ''unexpected end of input''].
 	^ self readDatum'.
 cm value: rdr value: 'reading' value: 'readQuote
+	^ self readAbbreviation: ''quote'''.
+cm value: rdr value: 'reading' value: 'readAbbreviation: aName
+	"''x `x ,x ,@x read as (quote x) (quasiquote x) (unquote x) (unquote-splicing x)."
 	^ LispCons
-		car: (LispSymbol named: ''quote'')
+		car: (LispSymbol named: aName)
 		cdr: (LispCons car: self readNextDatum cdr: LispEmptyList default)'.
 cm value: rdr value: 'reading' value: 'readList
 	| start result |

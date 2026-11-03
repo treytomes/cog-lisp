@@ -33,7 +33,7 @@ to successor).
 | 4 | [Runtime & Primitives](phase-4-runtime-primitives.md) | Implemented (44/44) |
 | 5 | [REPL, Runner & Image](phase-5-repl-runner.md) | Implemented (28/28 + 30/30) |
 | 6 | [Tail Calls & Optimization](phase-6-optimization.md) | Implemented (127/127 + bench 12/12) |
-| 7 | [Macros & Derived Forms](phase-7-macros.md) | Accepted |
+| 7 | [Macros & Derived Forms](phase-7-macros.md) | Implemented (105/105) |
 
 Later phases (2–7, see the [project plan](../README.md#project-plan)) get their
 specs here as we reach them.

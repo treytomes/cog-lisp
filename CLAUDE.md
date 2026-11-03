@@ -180,6 +180,15 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   That gives statement sequencing inside an expression. But every such temp
   lands in that one frame, and the VM caps frame size: too many fail compilation
   with "Cannot compile -- stack including temps is too deep". Budget them.
+- **`[...] value` is a real block call** (a closure and a stack frame) even when
+  the block is a literal; only the control selectors (`ifTrue:`, `whileTrue:`,
+  `and:`, …) are inlined. To sequence statements without a frame, use
+  `true ifTrue: [...]`. (`begin` compiled to `[...] value` until Phase 7, which
+  made each `begin` one frame deeper.)
+- **Temps declared inside a `whileTrue:` loop block get fresh storage on each
+  iteration** when a closure captures them; temps declared outside are shared
+  by every iteration. A loop that creates closures must copy its variables into
+  loop-block temps, or every closure sees the last iteration's values.
 - Closure capture is automatic: nested `OCBlockNode`s whose bodies reference an
   outer block's argument name compile to a real capturing `BlockClosure`.
 - **Block/method arguments are read-only** — assigning one fails semantic

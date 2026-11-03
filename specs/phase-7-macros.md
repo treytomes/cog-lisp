@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 7 |
-| **Status** | Accepted (2026-11-03) |
+| **Status** | Implemented (2026-11-03) — `tests/phase-7-macros.st` passes 105/105 |
 | **Depends on** | Phases 1–6 |
 | **Feeds** | Phase 8 (self-hosting), the later language phases (§10) |
 | **Macro system** | Non-hygienic, procedural (`defmacro` style) with `gensym` |
@@ -231,3 +231,40 @@ Settled 2026-11-03 (owner sign-off); the spec is Accepted on these.
    the old Phase 7 is tracked as planned later phases, numbered when each is
    specified: **Smalltalk interop** (owner priority), numeric tower, conditions
    and restarts, hygienic macros. Self-hosting and the pure image keep 8 and 9.
+
+## 11. As implemented
+
+Where the implementation settled details the spec left open:
+
+- **`LispMacro`** (in `CogLisp-Core`) wraps the expander and prints `#<macro>`.
+  Expansion calls the expander through `LispProcedure apply:to:`, so an expander
+  is an ordinary compiled procedure.
+- **Splicing** uses an internal `LispCons class>>qqAppend:to:`, which copies the
+  spliced list and signals "unquote-splicing: not a list" for anything else
+  (AC-2). Constant parts of a template are shared literals, as with `quote`.
+- **`gensym`** takes an optional prefix string: `(gensym "loop")` gives
+  `loop<n>`. The counter is shared, so every name is unique in the session.
+- **Source of expanded code.** While a macro call's expansion is compiled, a
+  lambda with no source range of its own takes the text of the macro call. An
+  internal `define` gives its procedure the text of that `define` form.
+- **`begin` no longer creates a closure.** It compiled to `[...] value`, which
+  the VM runs as a real block call, so each `begin` cost a stack frame. Derived
+  forms expand to `begin` often, and a `do` loop's result clause measured one
+  frame deeper than its body (AC-16). It now compiles to `true ifTrue: [...]`,
+  which Opal inlines.
+- **Phase 6 fix: per-iteration variables in self-loops.** A self tail call
+  compiled to a loop reused the parameter temporaries, so a closure made in one
+  iteration saw the values of later ones: `(mk 3 '())` collecting
+  `(lambda () n)` gave `(0 0 0)`. The loop body now copies the parameters into
+  temporaries declared inside the loop block, which the VM allocates fresh on
+  each iteration. Two regression checks are in `tests/phase-7-macros.st`.
+- **Known limitation:** a macro that expands to `define` inside a body produces
+  a *global* definition, not an internal one: internal defines are recognized
+  before expansion. Revisit in the review of Phases 1–7.
+- **`lib/cl.lisp`** also provides `eq`, `equal`, `numberp`, `symbolp`, `zerop`,
+  `plusp`, `minusp`, `evenp`, `oddp`, `1+` and `1-`. `defun`/`defmacro` accept
+  `&rest`. `defvar` without a value binds `()`.
+- **Tests:** `tests/phase-7-macros.st` 105/105; the runner suite (now including
+  `examples/macros.lisp`, `examples/cl-style.lisp`, and the AC-20 fixture
+  `tests/runner/derived-forms.lisp`) 36/36; all earlier suites and the
+  benchmarks (12/12) unchanged.

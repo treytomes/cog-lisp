@@ -10,7 +10,7 @@
 
 ## 1. Goal
 
-Give the values the reader produces their **behaviour**: the equality predicates
+Give the values the reader produces their **behavior**: the equality predicates
 (`eq?`, `eqv?`, `equal?`), the type predicates (`pair?`, `null?`, `symbol?`, …),
 the single notion of truth the language runs on, and the **global environment**
 that holds top-level definitions. These are the semantic primitives the Phase 3
@@ -36,7 +36,7 @@ evaluating or compiling anything.
   variables never live in a runtime environment object; only globals do.
 - Procedures / closures and `procedure?` (Phase 3/4 — procedures do not exist
   yet).
-- Numeric tower beyond integer + float (rationals, complex, bignum behaviour
+- Numeric tower beyond integer + float (rationals, complex, bignum behavior
   beyond what Smalltalk gives for free), vectors, hash tables, ports.
 
 ## 3. Decisions
@@ -140,7 +140,7 @@ Phase 3's `if` compiles its test through this rule (not through Smalltalk's own
 A mutable map from **interned symbols** (compared by `eq?`/identity — an
 `IdentityDictionary` keyed by `LispSymbol`) to values.
 
-| Selector | Behaviour |
+| Selector | Behavior |
 |---|---|
 | `define: aSymbol value: aValue` | bind/rebind `aSymbol`; returns the value |
 | `lookup: aSymbol` | the bound value, or signal `LispUnboundError` |

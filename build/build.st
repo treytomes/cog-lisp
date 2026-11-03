@@ -23,13 +23,16 @@ dir := Smalltalk imageDirectory parent / 'src'.
 | out ok |
 out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
 ok := [LispPrimitives installDefault.
-	  "defines nothing, so the image ships with only the primitives bound"
-	  (LispCompiler new evalString: '((lambda (n) (* n n)) 7)') = 49]
+	  "the derived forms (cond, and, or, let*, do, ...) -- specs/phase-7-macros.md section 7"
+	  LispCompiler new evalFile: (Smalltalk imageDirectory parent / 'lib' / 'core.lisp') fullName.
+	  "defines nothing, so the image ships with only the primitives and core.lisp bound"
+	  ((LispCompiler new evalString: '((lambda (n) (* n n)) 7)') = 49)
+		and: [(LispCompiler new evalString: '(let* ((a 1) (b (+ a 1))) (cond ((= b 1) 10) ((= b 2) 20) (else 30)))') = 20]]
 		on: Error
 		do: [:e | out value: 'BUILD ERROR: ' , e messageText printString. false].
 ok ifFalse: [out value: 'BUILD FAILED: smoke test did not pass; image not saved'. Smalltalk exit: 1].
 LispShellCommand markBuilt.
-out value: 'BUILD OK: packages loaded, primitives installed, smoke test passed'.
+out value: 'BUILD OK: packages loaded, primitives and lib/core.lisp installed, smoke test passed'.
 !
 
 "--- Chunk 3: save as cog-lisp. When the saved image later starts, this process

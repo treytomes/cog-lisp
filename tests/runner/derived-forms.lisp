@@ -1,0 +1,11 @@
+; AC-20 (Phase 7): the built image already has lib/core.lisp's derived forms
+(define (grade n)
+  (let* ((pct (* n 10))
+         (band (cond ((>= pct 90) 'a)
+                     ((>= pct 80) 'b)
+                     (else 'c))))
+    (list pct band)))
+(display (map grade '(9 8 3)))
+(newline)
+(display (and (when #t 1) (unless #f 2) (do ((i 0 (+ i 1))) ((= i 3) i))))
+(newline)

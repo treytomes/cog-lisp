@@ -112,7 +112,7 @@ it. The stack therefore holds at most one frame for any chain of tail calls.
 ### 4.4 `(stack-depth)`
 
 A primitive answering the number of contexts on the current process's stack. It
-makes constant-stack behaviour testable. It may also serve later reflection
+makes constant-stack behavior testable. It may also serve later reflection
 needs.
 
 ## 5. Optimizations
@@ -124,7 +124,7 @@ A non-tail call `(f a b)` compiles to an arity-specialized entry,
 `LispProcedure` of exactly that arity, the entry calls its block directly
 (`block value: a value: b`), with no argument array, then drives the result.
 Anything else (variadic, wrong count, more than 4 arguments, not a procedure)
-falls back to the general `apply:to:`, which keeps today's behaviour and errors.
+falls back to the general `apply:to:`, which keeps today's behavior and errors.
 
 ### 5.2 Global variable cells
 
@@ -386,3 +386,10 @@ and the AC-12 sweep with inlining off); `bench\run-benchmarks.bat` 12/12 (AC-24)
   (vs ~25 ms in every other column); an immediate rerun gave 24.8 ms. Single
   runs can still be disturbed by other load on the machine; rerun before
   trusting an outlier.
+
+## 12. Correction (found in Phase 7)
+
+The self-loop of §10 reused its parameter temporaries across iterations, so
+closures created inside the loop shared them and saw later values. Fixed in
+Phase 7 by copying the parameters into per-iteration temporaries declared in the
+loop block; see `specs/phase-7-macros.md` §11.
