@@ -30,11 +30,11 @@ cm := [:cls :cat :src |
     do: [:e | failures add: cls name , ' >> ' , src lines first , '  --  ' , e messageText]].
 
 comp := (Object << #LispCompiler)
-	slots: { #counter. #sourceMap. #options. #selfLoop. #inlineTemps. #topForm. #sourceContext. #inBody };
+	slots: { #counter. #sourceMap. #options. #selfLoop. #inlineTemps. #topForm. #sourceContext. #inBody. #expansionDepth };
 	sharedVariables: { #DefaultOptions };
 	package: 'CogLisp-Compiler';
 	install.
-err  := (Error  << #LispCompileError) package: 'CogLisp-Compiler'; install.
+err  := (LispError << #LispCompileError) package: 'CogLisp-Compiler'; install.
 
 "=== options ==============================================================="
 cm value: comp class value: 'options' value: 'allOptions
@@ -122,8 +122,43 @@ cm value: comp value: 'nodes' value: 'symbolNode: aLispSymbol
 		selector: #named:
 		arguments: { OCLiteralValueNode value: aLispSymbol name }'.
 cm value: comp value: 'private' value: 'listToArray: aList
-	(aList isKindOf: LispCons) ifTrue: [^ aList lispElements asArray].
-	^ #()'.
+	"The elements of a proper list in code. Anything else is bad syntax (review C-6)."
+	aList == LispEmptyList default ifTrue: [^ #()].
+	(aList isKindOf: LispCons) ifFalse: [^ self compileError: ''bad syntax: expected a list: '' , (self show: aList)].
+	aList isProperList ifFalse: [^ self compileError: ''bad syntax: improper list: '' , (self show: aList)].
+	^ aList lispElements asArray'.
+cm value: comp value: 'syntax checks' value: 'show: aDatum
+	^ LispPrinter writeString: aDatum limitedTo: 60'.
+cm value: comp value: 'syntax checks' value: 'syntaxError: aName form: aForm
+	^ self compileError: aName , '': bad syntax: '' , (self show: aForm)'.
+cm value: comp value: 'syntax checks' value: 'check: aForm operands: min to: max
+	"aForm has between min and max operands (max nil: no limit)."
+	| n |
+	n := (self listToArray: aForm cdr) size.
+	(n < min or: [max notNil and: [n > max]]) ifTrue: [^ self syntaxError: aForm car name form: aForm]'.
+cm value: comp value: 'syntax checks' value: 'checkDefine: aForm
+	"(define name expr) or (define (name . params) body...)"
+	| parts target |
+	parts := self listToArray: aForm cdr.
+	parts isEmpty ifTrue: [^ self syntaxError: ''define'' form: aForm].
+	target := parts first.
+	(target isKindOf: LispCons) ifTrue: [
+		(target car isKindOf: LispSymbol) ifFalse: [^ self compileError: ''define: bad name: '' , (self show: target car)].
+		^ self].
+	(target isKindOf: LispSymbol) ifFalse: [^ self compileError: ''define: bad name: '' , (self show: target)].
+	parts size = 2 ifFalse: [^ self syntaxError: ''define'' form: aForm]'.
+cm value: comp value: 'syntax checks' value: 'checkBindings: data in: aForm
+	"((name expr) ...), each name a symbol, none twice. Answer the bindings as arrays."
+	| bindings seen |
+	seen := IdentitySet new.
+	bindings := (self listToArray: data) collect: [:b | | pair |
+		pair := (b isKindOf: LispCons) ifTrue: [self listToArray: b] ifFalse: [#()].
+		(pair size = 2 and: [pair first isKindOf: LispSymbol]) ifFalse: [
+			^ self compileError: ''let: bad binding: '' , (self show: b)].
+		(seen includes: pair first) ifTrue: [^ self compileError: ''let: duplicate name: '' , pair first name].
+		seen add: pair first.
+		pair].
+	^ bindings'.
 
 "=== globals: cells (Phase 6 section 5.2) or environment lookups ==========="
 cm value: comp value: 'globals' value: 'globalEnvNode
@@ -276,15 +311,18 @@ cm value: comp value: 'translating' value: 'translateForm: form inScope: scope t
 	| op opName |
 	op := form car.
 	opName := (op isKindOf: LispSymbol) ifTrue: [op name] ifFalse: [nil].
-	opName = ''quote'' ifTrue: [^ self quoteNode: form cdr car].
-	opName = ''if'' ifTrue: [^ self translateIf: form inScope: scope tail: tail].
+	opName = ''quote'' ifTrue: [self check: form operands: 1 to: 1. ^ self quoteNode: form cdr car].
+	opName = ''if'' ifTrue: [self check: form operands: 2 to: 3. ^ self translateIf: form inScope: scope tail: tail].
 	opName = ''begin'' ifTrue: [^ self translateBegin: (self listToArray: form cdr) inScope: scope tail: tail].
-	opName = ''lambda'' ifTrue: [^ self translateLambda: form inScope: scope].
-	opName = ''let'' ifTrue: [^ self translateLet: form inScope: scope tail: tail].
-	opName = ''define'' ifTrue: [^ self translateDefine: form inScope: scope].
-	opName = ''set!!'' ifTrue: [^ self translateSet: form inScope: scope].
-	opName = ''quasiquote'' ifTrue: [^ self qqNode: form cdr car level: 0 inScope: scope].
-	opName = ''define-macro'' ifTrue: [^ self translateDefineMacro: form inScope: scope].
+	opName = ''lambda'' ifTrue: [self check: form operands: 1 to: nil. ^ self translateLambda: form inScope: scope].
+	opName = ''let'' ifTrue: [self check: form operands: 1 to: nil. ^ self translateLet: form inScope: scope tail: tail].
+	opName = ''define'' ifTrue: [self checkDefine: form. ^ self translateDefine: form inScope: scope].
+	opName = ''set!!'' ifTrue: [
+		self check: form operands: 2 to: 2.
+		(form cdr car isKindOf: LispSymbol) ifFalse: [^ self compileError: ''set!!: bad name: '' , (self show: form cdr car)].
+		^ self translateSet: form inScope: scope].
+	opName = ''quasiquote'' ifTrue: [self check: form operands: 1 to: 1. ^ self qqNode: form cdr car level: 0 inScope: scope].
+	opName = ''define-macro'' ifTrue: [self check: form operands: 2 to: nil. ^ self translateDefineMacro: form inScope: scope].
 	(self macroFor: op inScope: scope) ifNotNil: [:m |
 		^ self translateMacroCall: form macro: m inScope: scope tail: tail].
 	^ self translateApplication: form inScope: scope tail: tail'.
@@ -311,14 +349,22 @@ cm value: comp value: 'macros' value: 'translateMacroCall: form macro: aMacro in
 	 expansion builds take the source text of this call (section 5.3), and a macro
 	 call at top level keeps its expansion at top level."
 	| expansion text savedContext savedTop |
-	expansion := self expand: form with: aMacro.
+	expansionDepth := (expansionDepth ifNil: [0]) + 1.
+	expansionDepth > self class maxExpansions ifTrue: [expansionDepth := 0. ^ self expansionTooDeep: form].
+	expansion := [self expand: form with: aMacro] ifCurtailed: [expansionDepth := expansionDepth - 1].
 	text := self recordedSourceOf: form.
 	savedContext := sourceContext.
 	savedTop := topForm.
 	text notNil ifTrue: [sourceContext := text].
 	form == topForm ifTrue: [topForm := expansion].
 	^ [self translate: expansion inScope: scope tail: tail]
-		ensure: [sourceContext := savedContext. topForm := savedTop]'.
+		ensure: [sourceContext := savedContext. topForm := savedTop. expansionDepth := expansionDepth - 1]'.
+cm value: comp value: 'macros' value: 'expansionTooDeep: form
+	"A macro that expands into itself forever would otherwise hang (review C-7)."
+	^ self compileError: ''macro expansion too deep (more than '' , self class maxExpansions printString ,
+		'' steps): '' , ((form car isKindOf: LispSymbol) ifTrue: [form car name] ifFalse: [self show: form])'.
+cm value: comp class value: 'limits' value: 'maxExpansions
+	^ 10000'.
 cm value: comp value: 'macros' value: 'translateDefineMacro: form inScope: scope
 	"(define-macro (name . params) body...) or (define-macro name expander-expr)"
 	| parts target nameSym valueNode |
@@ -344,9 +390,12 @@ cm value: comp value: 'macros' value: 'macroexpand1: form
 	m isNil ifTrue: [^ form].
 	^ self expand: form with: m'.
 cm value: comp value: 'macros' value: 'macroexpand: form
-	| current next |
+	| current next steps |
 	current := form.
-	[next := self macroexpand1: current. next == current] whileFalse: [current := next].
+	steps := 0.
+	[next := self macroexpand1: current. next == current] whileFalse: [
+		(steps := steps + 1) > self class maxExpansions ifTrue: [^ self expansionTooDeep: form].
+		current := next].
 	^ current'.
 
 "=== quasiquote (Phase 7 section 4) ========================================"
@@ -401,8 +450,9 @@ cm value: comp value: 'translating' value: 'translateScopedBody: dataArray inSco
 	 looking for defines, so a macro may expand to a define, and a begin there is
 	 spliced into the body, so a macro may expand to several. Each form carries the
 	 source text its lambdas take (section 5.3): the macro call it came from."
-	| pending defs rest temps statements item datum m savedContext savedInBody beginSym |
+	| pending defs rest temps statements item datum m savedContext savedInBody beginSym steps |
 	beginSym := LispSymbol named: ''begin''.
+	steps := 0.
 	pending := OrderedCollection new.
 	dataArray do: [:d | pending add: { d. sourceContext }].
 	defs := OrderedCollection new.
@@ -412,11 +462,14 @@ cm value: comp value: 'translating' value: 'translateScopedBody: dataArray inSco
 		datum := item first.
 		m := (datum isKindOf: LispCons) ifTrue: [self macroFor: datum car inScope: childScope] ifFalse: [nil].
 		m notNil
-			ifTrue: [pending addFirst: { self expand: datum with: m. (self recordedSourceOf: datum) ifNil: [item second] }]
+			ifTrue: [
+				(steps := steps + 1) > self class maxExpansions ifTrue: [^ self expansionTooDeep: datum].
+				pending addFirst: { self expand: datum with: m. (self recordedSourceOf: datum) ifNil: [item second] }]
 			ifFalse: [
 				(self isDefineForm: datum)
 					ifTrue: [ | target nm |
 						"in scope at once, so it shadows a macro of the same name in later forms"
+						self checkDefine: datum.
 						target := (self listToArray: datum cdr) first.
 						nm := self nextName.
 						childScope at: ((target isKindOf: LispCons) ifTrue: [target car] ifFalse: [target]) put: nm.
@@ -442,12 +495,12 @@ cm value: comp value: 'translating' value: 'translateScopedBody: dataArray inSco
 		parts := self listToArray: d first cdr.
 		target := parts first.
 		statements add: (self assign: d third value: ((target isKindOf: LispCons)
-			ifTrue: [self translateLambda: (self makeLambda: target cdr body: parts allButFirst)
-				inScope: childScope source: (self sourceOf: d first) defining: nil]
+			ifTrue: [self named: (self translateLambda: (self makeLambda: target cdr body: parts allButFirst)
+				inScope: childScope source: (self sourceOf: d first) defining: nil) as: target car]
 			ifFalse: [
 				valueData := parts at: 2.
 				(self isLambdaForm: valueData)
-					ifTrue: [self translateLambda: valueData inScope: childScope source: (self sourceOf: valueData) defining: nil]
+					ifTrue: [self named: (self translateLambda: valueData inScope: childScope source: (self sourceOf: valueData) defining: nil) as: target]
 					ifFalse: [self translate: valueData inScope: childScope]]))].
 	 rest isEmpty ifTrue: [statements add: self unspecifiedNode].
 	 rest withIndexDo: [:it :i |
@@ -494,11 +547,20 @@ cm value: comp value: 'translating' value: 'translateBegin: dataArray inScope: s
 		selector: #ifTrue:
 		arguments: { self blockWithArgs: #() statements: (self translateBody: dataArray inScope: scope tail: tail) }'.
 cm value: comp value: 'translating' value: 'parseParams: spec
-	| fixed cur |
+	"(a b . rest), (a b) or rest: symbols only, none twice (review C-6)."
+	| fixed cur all bad |
+	bad := [^ self compileError: ''lambda: bad parameter list: '' , (self show: spec)].
 	(spec isKindOf: LispSymbol) ifTrue: [^ { #(). spec }].
 	fixed := OrderedCollection new.
 	cur := spec.
-	[cur isKindOf: LispCons] whileTrue: [fixed add: cur car. cur := cur cdr].
+	[cur isKindOf: LispCons] whileTrue: [
+		(cur car isKindOf: LispSymbol) ifFalse: [bad value].
+		fixed add: cur car.
+		cur := cur cdr].
+	((cur isKindOf: LispSymbol) or: [cur == LispEmptyList default]) ifFalse: [bad value].
+	all := (cur isKindOf: LispSymbol) ifTrue: [fixed , { cur }] ifFalse: [fixed].
+	all asSet size = all size ifFalse: [
+		^ self compileError: ''lambda: duplicate parameter in '' , (self show: spec)].
 	(cur isKindOf: LispSymbol)
 		ifTrue: [^ { fixed asArray. cur }]
 		ifFalse: [^ { fixed asArray. nil }]'.
@@ -590,10 +652,10 @@ cm value: comp value: 'translating' value: 'translateLet: form inScope: scope ta
 	parts := self listToArray: form cdr.
 	(parts notEmpty and: [parts first isKindOf: LispSymbol]) ifTrue: [
 		^ self translateNamedLet: parts inScope: scope tail: tail].
-	bindings := self listToArray: parts first.
+	bindings := self checkBindings: parts first in: form.
 	bodyData := parts allButFirst.
-	params := bindings collect: [:b | (self listToArray: b) first].
-	valueData := bindings collect: [:b | (self listToArray: b) second].
+	params := bindings collect: [:b | b first].
+	valueData := bindings collect: [:b | b second].
 	(self uses: #directLet) ifFalse: [
 		"as in Phase 3: an immediately applied lambda"
 		^ self translate: (LispCons
@@ -618,9 +680,10 @@ cm value: comp value: 'translating' value: 'translateNamedLet: parts inScope: sc
 	 name is visible in the body only, and the initial values are evaluated outside it."
 	| name bindings vars inits defineForm |
 	name := parts first.
-	bindings := self listToArray: (parts at: 2).
-	vars := bindings collect: [:b | (self listToArray: b) first].
-	inits := bindings collect: [:b | (self listToArray: b) second].
+	parts size < 2 ifTrue: [^ self compileError: ''let: bad syntax: named let '' , name name , '' has no bindings''].
+	bindings := self checkBindings: (parts at: 2) in: nil.
+	vars := bindings collect: [:b | b first].
+	inits := bindings collect: [:b | b second].
 	defineForm := LispCons car: (LispSymbol named: ''define'')
 		cdr: (LispCons car: (LispCons car: name cdr: (LispCons fromArray: vars asArray))
 			cdr: (LispCons fromArray: (parts allButFirst: 2))).
@@ -642,17 +705,20 @@ cm value: comp value: 'translating' value: 'translateDefine: form inScope: scope
 		ifTrue: [
 			nameSym := target car.
 			"the source text of the procedure is the whole define form"
-			valueNode := self translateLambda: (self makeLambda: target cdr body: parts allButFirst)
+			valueNode := self named: (self translateLambda: (self makeLambda: target cdr body: parts allButFirst)
 				inScope: scope
 				source: (self sourceOf: form)
-				defining: nameSym]
+				defining: nameSym) as: nameSym]
 		ifFalse: [
 			nameSym := target.
 			valueData := parts at: 2.
 			valueNode := (self isLambdaForm: valueData)
-				ifTrue: [self translateLambda: valueData inScope: scope source: (self sourceOf: valueData) defining: nameSym]
+				ifTrue: [self named: (self translateLambda: valueData inScope: scope source: (self sourceOf: valueData) defining: nameSym) as: nameSym]
 				ifFalse: [self translate: valueData inScope: scope]].
 	^ self andUnspecified: (self globalDefine: nameSym value: valueNode)'.
+cm value: comp value: 'translating' value: 'named: procNode as: aSymbol
+	"procNode, a procedure-building node, sent named: so the procedure knows its name (review C-17)."
+	^ self messageNode: procNode selector: #named: arguments: { self literalNode: aSymbol name }'.
 cm value: comp value: 'translating' value: 'makeLambda: paramsList body: bodyArray
 	^ LispCons car: (LispSymbol named: ''lambda'')
 		cdr: (LispCons car: paramsList cdr: (LispCons fromArray: bodyArray))'.
@@ -676,11 +742,27 @@ cm value: comp value: 'compiling' value: 'compile: datum
 	sourceContext := nil.
 	inBody := false.
 	inlineTemps := 0.
-	exprNode := self translate: datum inScope: IdentityDictionary new tail: false.
+	expansionDepth := 0.
+	"A host error while translating is malformed input the checks did not catch (review C-6)"
+	exprNode := [self translate: datum inScope: IdentityDictionary new tail: false]
+		on: Error
+		do: [:e | (e isKindOf: LispError) ifTrue: [e pass].
+			self compileError: ''bad syntax: '' , (self show: datum)].
 	method := OCMethodNode selector: #doIt arguments: #()
 		body: (OCSequenceNode statements: { OCReturnNode value: exprNode }).
-	method doSemanticAnalysis.
-	^ method generateMethod'.
+	"Pharo''s limits (frame size, 15 block arguments) as LISP errors (review C-2)"
+	^ [method doSemanticAnalysis.
+	   method generateMethod]
+		on: Error
+		do: [:e | self compileError: (self describeBackEndError: e) , '': '' , (self show: datum)]'.
+cm value: comp value: 'compiling' value: 'describeBackEndError: anError
+	| text |
+	text := anError messageText ifNil: [''''].
+	((text includesSubstring: ''too deep'') or: [text includesSubstring: ''out of range''])
+		ifTrue: [^ ''too large or too deeply nested to compile''].
+	(text includesSubstring: ''Too many arguments'')
+		ifTrue: [^ ''too many parameters or let bindings (at most 15)''].
+	^ ''cannot compile ('' , anError class name , '' '' , text , '')'''.
 cm value: comp value: 'evaluating' value: 'eval: datum
 	^ (self compile: datum) valueWithReceiver: nil arguments: #()'.
 cm value: comp value: 'evaluating' value: 'eval: datum from: aReader
@@ -697,11 +779,28 @@ cm value: comp value: 'evaluating' value: 'evalAll: aString
 	result := LispUnspecified default.
 	[(d := r next) == LispReader eofObject] whileFalse: [result := self eval: d from: r].
 	^ result'.
+cm value: comp value: 'evaluating' value: 'evalAll: aString named: aName
+	"Like evalAll:, but an error from any form is signalled again as a
+	 LispLocatedError saying where it happened: the start of the top-level form, or
+	 the offending character for a read error (review R-1). An error that is already
+	 located, from a nested load, keeps its own (innermost) location."
+	| r d result |
+	r := LispReader on: aString.
+	result := LispUnspecified default.
+	[[(d := r next) == LispReader eofObject] whileFalse: [result := self eval: d from: r]]
+		on: Error
+		do: [:e | | offset |
+			(e isKindOf: LispLocatedError) ifTrue: [e pass].
+			offset := (e isKindOf: LispReadError)
+				ifTrue: [e position ifNil: [r datumStart]]
+				ifFalse: [r datumStart].
+			^ (LispLocatedError cause: e file: aName source: aString offset: (offset ifNil: [0])) signal].
+	^ result'.
 cm value: comp value: 'evaluating' value: 'evalFile: aPath
 	| file |
 	file := aPath asFileReference.
 	file exists ifFalse: [^ self compileError: ''file not found: '' , aPath].
-	^ self evalAll: file contents'.
+	^ self evalAll: file contents named: file fullName'.
 
 "=== load report ==========================================================="
 Stdio stdout

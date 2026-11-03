@@ -138,10 +138,7 @@ cm value: repl value: 'private' value: 'setIn: inStream out: outStream err: errS
 	err := errStream.
 	compiler := LispCompiler new'.
 cm value: repl value: 'reporting' value: 'errorText: anError
-	| text |
-	text := anError messageText.
-	(text isNil or: [text isEmpty]) ifTrue: [text := anError class name].
-	^ text'.
+	^ LispError describe: anError'.
 cm value: repl value: 'reporting' value: 'report: anError
 	err nextPutAll: ''error: '' , (self errorText: anError); nextPut: Character lf; flush'.
 cm value: repl value: 'running' value: 'prompt
@@ -199,7 +196,10 @@ cm value: shell class value: 'build' value: 'markBuilt
 cm value: shell class value: 'build' value: 'buildTime
 	^ BuildTime'.
 cm value: shell value: 'running' value: 'fail: aString
-	LispTextOutput stderr nextPutAll: ''error: '' , aString; nextPut: Character lf; flush.
+	self failReport: ''error: '' , aString'.
+cm value: shell value: 'running' value: 'failReport: aLine
+	LispTextOutput stdout flush.
+	LispTextOutput stderr nextPutAll: aLine; nextPut: Character lf; flush.
 	Smalltalk exit: 1'.
 cm value: shell value: 'running' value: 'warnIfStale
 	"Warn when any src/*.st file is newer than this image build (Phase 5 section 4.2)."
@@ -212,15 +212,45 @@ cm value: shell value: 'running' value: 'warnIfStale
 		LispTextOutput stderr
 			nextPutAll: ''warning: '' , f basename , '' is newer than this image; run build-image.bat to rebuild'';
 			nextPut: Character lf; flush]'.
+cm value: shell class value: 'memory' value: 'memoryLimit
+	"Bytes of heap a program may grow to before it is stopped with an error (review
+	 R-3). 2 GB, or COGLISP_MAX_MEMORY_MB. cog-lisp.bat also caps the VM at 8 GB as
+	 a backstop, so a larger setting has no effect past that."
+	| mb |
+	mb := [(OSEnvironment current at: ''COGLISP_MAX_MEMORY_MB'' ifAbsent: [nil]) ifNotNil: [:s | s asInteger]]
+		on: Error do: [:e | nil].
+	^ (mb ifNil: [2048]) * 1048576'.
+cm value: shell value: 'memory' value: 'withMemoryLimitDo: aBlock
+	^ self withMemoryLimit: self class memoryLimit do: aBlock'.
+cm value: shell value: 'memory' value: 'withMemoryLimit: limit do: aBlock
+	"Run aBlock while a watchdog checks the heap every 100 ms. Past the limit it
+	 signals a LispError in the running program, which reports it like any error
+	 (and the REPL carries on). Runaway recursion otherwise grows the heap until the
+	 machine runs out of memory: Pharo has no stack limit (review R-3)."
+	| main fired watchdog |
+	main := Processor activeProcess.
+	fired := false.
+	watchdog := [[(Delay forMilliseconds: 100) wait.
+		Smalltalk vm memorySize > limit
+			ifTrue: [fired ifFalse: [
+				fired := true.
+				main signalException: ((LispError new) messageText:
+					''out of memory: the program grew past '' , (limit // 1048576) printString ,
+					'' MB (runaway recursion?)''; yourself)]]
+			ifFalse: [fired := false]] repeat]
+		forkAt: Processor userInterruptPriority.
+	watchdog name: ''cog-lisp memory watchdog''.
+	^ aBlock ensure: [watchdog terminate]'.
 cm value: shell value: 'running' value: 'runRepl
-	(LispRepl
-		in: LispStdin new
-		out: LispTextOutput stdout
-		err: LispTextOutput stderr) run.
+	self withMemoryLimitDo: [
+		(LispRepl
+			in: LispStdin new
+			out: LispTextOutput stdout
+			err: LispTextOutput stderr) run].
 	Smalltalk exit: 0'.
 cm value: shell value: 'running' value: 'runFile: aPath
 	aPath isNil ifTrue: [^ self fail: ''no program file given''].
-	LispCompiler new evalFile: aPath.
+	self withMemoryLimitDo: [LispCompiler new evalFile: aPath].
 	LispTextOutput stdout flush.
 	Smalltalk exit: 0'.
 cm value: shell value: 'running' value: 'execute
@@ -232,9 +262,9 @@ cm value: shell value: 'running' value: 'execute
 	  self fail: ''unknown lisp command: '' , args first]
 		on: Warning do: [:w | w resume]]
 		on: Error do: [:e |
-			text := e messageText.
-			(text isNil or: [text isEmpty]) ifTrue: [text := e class name].
-			self fail: text]'.
+			"path:line:col: error: message, for an error while running a file (review R-1)"
+			(e isKindOf: LispLocatedError) ifTrue: [^ self failReport: e reportText].
+			self fail: (LispError describe: e)]'.
 
 "=== load report ==========================================================="
 Stdio stdout

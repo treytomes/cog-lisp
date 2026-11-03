@@ -31,6 +31,9 @@ cm value: #equality: value: 'equality: aBlock
 	equality := aBlock'.
 cm value: #is:equalTo: value: 'is: a equalTo: b
 	equality notNil ifTrue: [^ equality value: a value: b].
+	"Smalltalk Arrays (used to check several results at once) compare element by element"
+	((a isKindOf: Array) and: [b isKindOf: Array]) ifTrue: [
+		^ a size = b size and: [(1 to: a size) allSatisfy: [:i | self is: (a at: i) equalTo: (b at: i)]]].
 	(Smalltalk includesKey: #LispCore) ifTrue: [^ (Smalltalk at: #LispCore) equal: a with: b].
 	^ self structurallyEqual: a to: b'.
 cm value: #structurallyEqual:to: value: 'structurallyEqual: a to: b

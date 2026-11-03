@@ -197,6 +197,11 @@ LispReader class >> eofObject                      "=> the unique end-of-input m
   `#f` are both valid data, so neither can signal EOF).
 - Reader errors signal **`LispReadError`** (subclass of `Error`) with position
   information (offset into the source).
+  *(Since Phase 7.5: `LispReadError` is a `LispError`, review R-16. `position`
+  is the 0-based offset of the character the error is about, which for an
+  unterminated list, string or block comment is its opening delimiter, review
+  R-1. `isIncomplete` is true only when the input ran out inside a datum, so
+  more input could complete it, review R-15.)*
 
 ## 8. Printer spec
 

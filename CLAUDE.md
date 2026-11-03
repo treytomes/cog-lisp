@@ -198,6 +198,13 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   compiler does this for every lambda parameter.
 - Reminder: `src/*.st` files are filed in as chunk format, so a literal `!`
   (e.g. in `'set!'`) must be doubled to `!!` in the source too.
+- **Method source in `src/*.st` is a string literal: double every `'`.** Each
+  method is compiled from `cm value: cls value: 'cat' value: '<source>'`, so an
+  apostrophe in a comment (`Floyd's`) ends the literal early and the whole file
+  fails to load with "End of statement expected". Write `''` (and `!!` for `!`).
+- **Never `^` inside a primitive's block.** A block stored in a `LispProcedure`
+  runs after the installing method has returned, so a `^` in it raises
+  `BlockCannotReturn`. Use `ifTrue:ifFalse:` instead.
 - **A method may name only classes from its own or an earlier package.** The
   packages load in order (reader, core, compiler, runtime, shell), and a method
   that names a class defined later fails to compile ("undeclared"). So the

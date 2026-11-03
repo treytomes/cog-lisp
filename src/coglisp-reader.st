@@ -11,7 +11,7 @@
  Classes: LispCons, LispSymbol, LispEmptyList, LispReadError, LispReader,
  LispPrinter.
  ============================================================================"
-| failures cm cons sym empty unspec err rdr prn |
+| failures cm cons sym empty unspec lerr err loc rdr prn |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -23,8 +23,15 @@ cons  := (Object << #LispCons) slots: { #car. #cdr }; package: 'CogLisp-Reader';
 sym   := (Object << #LispSymbol) slots: { #name }; sharedVariables: { #Interned }; package: 'CogLisp-Reader'; install.
 empty := (Object << #LispEmptyList) sharedVariables: { #Default }; package: 'CogLisp-Reader'; install.
 unspec := (Object << #LispUnspecified) sharedVariables: { #Default }; package: 'CogLisp-Reader'; install.
-err   := (Error  << #LispReadError) slots: { #position. #incomplete }; package: 'CogLisp-Reader'; install.
-rdr   := (Object << #LispReader) slots: { #stream. #source. #ranges }; sharedVariables: { #Eof }; package: 'CogLisp-Reader'; install.
+"LispError is the root of every cog-lisp error, so a handler can tell a LISP error
+ from a host bug (specs/review-phases-1-7.md R-16). It lives here, in the first
+ package, so every later package can subclass it."
+lerr  := (Error  << #LispError) package: 'CogLisp-Reader'; install.
+err   := (lerr   << #LispReadError) slots: { #position. #incomplete }; package: 'CogLisp-Reader'; install.
+"An error raised while running a file, with where it happened (review R-1). The
+ runner prints it as path:line:col: error: message, which editors can parse."
+loc   := (lerr   << #LispLocatedError) slots: { #cause. #file. #line. #column }; package: 'CogLisp-Reader'; install.
+rdr   := (Object << #LispReader) slots: { #stream. #source. #ranges. #datumStart }; sharedVariables: { #Eof }; package: 'CogLisp-Reader'; install.
 prn   := (Object << #LispPrinter) package: 'CogLisp-Reader'; install.
 
 "=== LispCons =============================================================="
@@ -64,6 +71,25 @@ cm value: cons class value: 'instance creation' value: 'fromArray: anArray
 	result := LispEmptyList default.
 	anArray reverseDo: [:e | result := self car: e cdr: result].
 	^ result'.
+cm value: cons class value: 'checked access' value: 'elementsOf: aList for: aName
+	"The elements of the proper list aList, or a LispError naming the procedure
+	 aName: for a non-list, a dotted list, or a circular one (review R-2, R-4, R-9).
+	 The cycle check is Floyd''s: a second pointer moving at half speed."
+	| els cur slow step |
+	els := OrderedCollection new.
+	cur := aList.
+	slow := aList.
+	step := 0.
+	[cur isKindOf: LispCons] whileTrue: [
+		els add: cur car.
+		cur := cur cdr.
+		step := step + 1.
+		step even ifTrue: [
+			slow := slow cdr.
+			slow == cur ifTrue: [^ (LispError new) signal: aName , '': circular list'']]].
+	cur == LispEmptyList default ifFalse: [
+		^ (LispError new) signal: aName , '': not a proper list: '' , (LispPrinter writeString: aList limitedTo: 60)].
+	^ els'.
 cm value: cons class value: 'quasiquote' value: 'qqAppend: aList to: tail
 	"Fresh copy of the proper list aList, ending in tail: the runtime part of
 	 unquote-splicing (Phase 7 section 4). Never uses the global append."
@@ -116,6 +142,58 @@ cm value: err value: 'testing' value: 'isIncomplete
 	"True when the error happened because the input ran out, so more input could complete it."
 	^ incomplete == true'.
 
+"=== LispError: what a user is told about an error (review R-2) ============="
+cm value: lerr class value: 'describing' value: 'show: aValue
+	^ LispPrinter writeString: aValue limitedTo: 60'.
+cm value: lerr class value: 'describing' value: 'describe: anError
+	"The message for anError in LISP terms. Host errors that LISP code commonly
+	 causes are translated: car of a non-pair, arithmetic on a non-number, division
+	 by zero. Anything else keeps its own message (or its class name)."
+	| text |
+	(anError isKindOf: LispLocatedError) ifTrue: [^ anError messageText].
+	(anError isKindOf: MessageNotUnderstood) ifTrue: [ | sel rcv |
+		sel := anError message selector.
+		rcv := anError receiver.
+		sel = #car ifTrue: [^ ''car: not a pair: '' , (self show: rcv)].
+		sel = #cdr ifTrue: [^ ''cdr: not a pair: '' , (self show: rcv)].
+		sel = #car: ifTrue: [^ ''set-car!!: not a pair: '' , (self show: rcv)].
+		sel = #cdr: ifTrue: [^ ''set-cdr!!: not a pair: '' , (self show: rcv)].
+		(#(#adaptToNumber:andSend: #adaptToInteger:andSend: #adaptToFloat:andSend: #adaptToFraction:andSend:) includes: sel)
+			ifTrue: [^ anError message arguments last , '': not a number''].
+		"any other message a value does not understand: a primitive was given the wrong type"
+		^ ''wrong type of argument: '' , (self show: rcv)].
+	(anError isKindOf: ZeroDivide) ifTrue: [^ ''division by zero''].
+	text := anError messageText.
+	(text isNil or: [text isEmpty]) ifTrue: [text := anError class name].
+	^ text'.
+
+"=== LispLocatedError (review R-1) =========================================="
+cm value: loc value: 'private' value: 'setCause: anError file: aName line: l column: c
+	cause := anError.
+	file := aName.
+	line := l.
+	column := c'.
+cm value: loc value: 'accessing' value: 'cause
+	^ cause'.
+cm value: loc value: 'accessing' value: 'file
+	^ file'.
+cm value: loc value: 'accessing' value: 'line
+	^ line'.
+cm value: loc value: 'accessing' value: 'column
+	^ column'.
+cm value: loc value: 'accessing' value: 'messageText
+	"The message of the error itself, in LISP terms."
+	^ LispError describe: cause'.
+cm value: loc value: 'accessing' value: 'locationText
+	^ file , '':'' , line printString , '':'' , column printString'.
+cm value: loc value: 'accessing' value: 'reportText
+	"path:line:col: error: message (the format a VS Code problem matcher reads)"
+	^ self locationText , '': error: '' , self messageText'.
+cm value: loc class value: 'instance creation' value: 'cause: anError file: aName source: aString offset: anOffset
+	| lc |
+	lc := LispReader lineAndColumnOf: anOffset in: aString.
+	^ self new setCause: anError file: aName line: lc first column: lc last'.
+
 "=== LispReader ============================================================"
 cm value: rdr value: 'private' value: 'setStream: aStream source: aString
 	stream := aStream.
@@ -128,13 +206,26 @@ cm value: rdr value: 'source' value: 'sourceFor: aCons
 	range := ranges at: aCons ifAbsent: [^ nil].
 	^ source copyFrom: range key to: range value'.
 cm value: rdr value: 'error handling' value: 'signalError: aString
-	^ (LispReadError new) position: stream position; incomplete: stream atEnd; signal: aString'.
+	"An error at the current character. More input would not fix it."
+	^ self signalError: aString at: stream position incomplete: false'.
+cm value: rdr value: 'error handling' value: 'signalIncomplete: aString at: anOffset
+	"The input ran out inside a datum that starts at anOffset: more input could complete it."
+	^ self signalError: aString at: anOffset incomplete: true'.
+cm value: rdr value: 'error handling' value: 'signalError: aString at: anOffset incomplete: aBoolean
+	"anOffset is the 0-based offset of the character the error is about."
+	^ (LispReadError new) position: anOffset; incomplete: aBoolean; signal: aString'.
 cm value: rdr value: 'scanning' value: 'isDelimiter: aChar
 	^ aChar isSeparator or: [#($( $) $" $; $'' $` $,) includes: aChar]'.
 cm value: rdr value: 'reading' value: 'next
 	self skipIntertoken.
 	stream atEnd ifTrue: [^ self class eofObject].
+	datumStart := stream position.
 	^ self readDatum'.
+cm value: rdr value: 'source' value: 'datumStart
+	"The 0-based offset where the datum last answered by next starts."
+	^ datumStart'.
+cm value: rdr value: 'source' value: 'source
+	^ source'.
 cm value: rdr value: 'reading' value: 'atEnd
 	self skipIntertoken.
 	^ stream atEnd'.
@@ -162,11 +253,12 @@ cm value: rdr value: 'scanning' value: 'skipLineComment
 	[stream atEnd or: [stream peek = Character lf]] whileFalse: [stream next].
 	stream atEnd ifFalse: [stream next]'.
 cm value: rdr value: 'scanning' value: 'skipBlockComment
-	| depth |
+	| depth start |
+	start := stream position.
 	stream next. stream next.
 	depth := 1.
 	[depth > 0] whileTrue: [
-		stream atEnd ifTrue: [^ self signalError: ''unterminated block comment''].
+		stream atEnd ifTrue: [^ self signalIncomplete: ''unterminated block comment'' at: start].
 		(self tryConsume: $# next: $|)
 			ifTrue: [depth := depth + 1]
 			ifFalse: [
@@ -197,7 +289,7 @@ cm value: rdr value: 'reading' value: 'readDatum
 	^ self readToken'.
 cm value: rdr value: 'reading' value: 'readNextDatum
 	self skipIntertoken.
-	stream atEnd ifTrue: [^ self signalError: ''unexpected end of input''].
+	stream atEnd ifTrue: [^ self signalIncomplete: ''unexpected end of input'' at: stream position].
 	^ self readDatum'.
 cm value: rdr value: 'reading' value: 'readQuote
 	^ self readAbbreviation: ''quote'''.
@@ -209,16 +301,17 @@ cm value: rdr value: 'reading' value: 'readAbbreviation: aName
 cm value: rdr value: 'reading' value: 'readList
 	| start result |
 	start := stream position.
-	result := self readListBody.
+	result := self readListBodyFrom: start.
 	(result isKindOf: LispCons) ifTrue: [ranges at: result put: (start + 1) -> stream position].
 	^ result'.
-cm value: rdr value: 'reading' value: 'readListBody
+cm value: rdr value: 'reading' value: 'readListBodyFrom: start
+	"start is the offset of the opening parenthesis; errors about the whole list point there."
 	| elements tail |
 	stream next.
 	elements := OrderedCollection new.
 	tail := LispEmptyList default.
 	[self skipIntertoken.
-	 stream atEnd ifTrue: [^ self signalError: ''unterminated list''].
+	 stream atEnd ifTrue: [^ self signalIncomplete: ''unterminated list'' at: start].
 	 stream peek = $)] whileFalse: [
 		self atDotMarker
 			ifTrue: [
@@ -226,7 +319,8 @@ cm value: rdr value: 'reading' value: 'readListBody
 				stream next.
 				tail := self readNextDatum.
 				self skipIntertoken.
-				(stream atEnd not and: [stream peek = $)]) ifFalse: [^ self signalError: ''bad dotted pair''].
+				stream atEnd ifTrue: [^ self signalIncomplete: ''unterminated list'' at: start].
+				stream peek = $) ifFalse: [^ self signalError: ''bad dotted pair''].
 				stream next.
 				^ self buildList: elements tail: tail]
 			ifFalse: [elements add: self readDatum]].
@@ -246,16 +340,17 @@ cm value: rdr value: 'private' value: 'buildList: anOrderedCollection tail: tail
 	anOrderedCollection reverseDo: [:e | result := LispCons car: e cdr: result].
 	^ result'.
 cm value: rdr value: 'reading' value: 'readString
-	| s c |
+	| s c start |
+	start := stream position.
 	stream next.
 	s := WriteStream on: String new.
-	[stream atEnd ifTrue: [^ self signalError: ''unterminated string''].
+	[stream atEnd ifTrue: [^ self signalIncomplete: ''unterminated string'' at: start].
 	 (c := stream next) = $"] whileFalse: [
-		c = $\ ifTrue: [s nextPut: self readEscape] ifFalse: [s nextPut: c]].
+		c = $\ ifTrue: [s nextPut: (self readEscapeFrom: start)] ifFalse: [s nextPut: c]].
 	^ s contents'.
-cm value: rdr value: 'reading' value: 'readEscape
+cm value: rdr value: 'reading' value: 'readEscapeFrom: start
 	| c |
-	stream atEnd ifTrue: [^ self signalError: ''unterminated string escape''].
+	stream atEnd ifTrue: [^ self signalIncomplete: ''unterminated string'' at: start].
 	c := stream next.
 	c = $" ifTrue: [^ $"].
 	c = $\ ifTrue: [^ $\].
@@ -267,9 +362,13 @@ cm value: rdr value: 'reading' value: 'readEscape
 cm value: rdr value: 'reading' value: 'readToken
 	| s str |
 	s := WriteStream on: String new.
-	[stream atEnd or: [self isDelimiter: stream peek]] whileFalse: [s nextPut: stream next].
+	"R-23: #| starts a block comment, so it ends a token too"
+	[stream atEnd or: [(self isDelimiter: stream peek) or: [stream peek = $# and: [self peekAheadIsBlockComment]]]]
+		whileFalse: [s nextPut: stream next].
 	str := s contents.
 	str isEmpty ifTrue: [^ self signalError: ''unexpected character''].
+	"R-14: a lone dot means something only inside a list, where atDotMarker sees it"
+	str = ''.'' ifTrue: [^ self signalError: ''unexpected dot'' at: stream position - 1 incomplete: false].
 	^ self classifyToken: str'.
 cm value: rdr value: 'reading' value: 'classifyToken: str
 	(self looksLikeInteger: str) ifTrue: [^ str asInteger].
@@ -327,7 +426,7 @@ cm value: rdr value: 'number parsing' value: 'parseFloat: str
 cm value: rdr value: 'reading' value: 'readHash
 	| c word |
 	stream next.
-	stream atEnd ifTrue: [^ self signalError: ''unexpected # at end of input''].
+	stream atEnd ifTrue: [^ self signalIncomplete: ''unexpected # at end of input'' at: stream position - 1].
 	c := stream peek.
 	c = $\ ifTrue: [stream next. ^ self readCharacter].
 	word := self readHashWord.
@@ -341,7 +440,7 @@ cm value: rdr value: 'reading' value: 'readHashWord
 	^ s contents'.
 cm value: rdr value: 'reading' value: 'readCharacter
 	| s |
-	stream atEnd ifTrue: [^ self signalError: ''unterminated character literal''].
+	stream atEnd ifTrue: [^ self signalIncomplete: ''unterminated character literal'' at: stream position - 2].
 	s := WriteStream on: String new.
 	s nextPut: stream next.
 	[stream atEnd or: [self isDelimiter: stream peek]] whileFalse: [s nextPut: stream next].
@@ -353,8 +452,13 @@ cm value: rdr value: 'reading' value: 'decodeCharacter: aName
 	aName = ''tab'' ifTrue: [^ Character tab].
 	aName = ''return'' ifTrue: [^ Character cr].
 	aName = ''null'' ifTrue: [^ Character value: 0].
-	((aName first = $x or: [aName first = $X]) and: [aName size > 1])
-		ifTrue: [^ Character value: (Integer readFrom: aName allButFirst readStream base: 16)].
+	((aName first = $x or: [aName first = $X]) and: [aName size > 1]) ifTrue: [ | code |
+		"R-13: a bad code is a read error, not a host number-parsing error"
+		(aName allButFirst allSatisfy: [:ch | ''0123456789abcdefABCDEF'' includes: ch])
+			ifFalse: [^ self signalError: ''bad character code: #\'' , aName].
+		code := Integer readFrom: aName allButFirst readStream base: 16.
+		code > 16r10FFFF ifTrue: [^ self signalError: ''bad character code: #\'' , aName].
+		^ Character value: code].
 	^ self signalError: ''unknown character name''.'.
 cm value: rdr value: 'reading' value: 'readSingle
 	| d |
@@ -365,6 +469,14 @@ cm value: rdr value: 'reading' value: 'readSingle
 cm value: rdr class value: 'instance creation' value: 'on: aStringOrStream
 	aStringOrStream isString ifTrue: [^ self new setStream: aStringOrStream readStream source: aStringOrStream].
 	^ self new setStream: aStringOrStream source: nil'.
+cm value: rdr class value: 'source' value: 'lineAndColumnOf: anOffset in: aString
+	"1-based line and column of the character at the 0-based anOffset."
+	| line lineStart limit |
+	line := 1.
+	lineStart := 1.
+	limit := (anOffset max: 0) min: aString size.
+	1 to: limit do: [:i | (aString at: i) = Character lf ifTrue: [line := line + 1. lineStart := i + 1]].
+	^ { line. limit + 1 - lineStart + 1 }'.
 cm value: rdr class value: 'accessing' value: 'eofObject
 	Eof isNil ifTrue: [Eof := Object new].
 	^ Eof'.
@@ -380,6 +492,12 @@ cm value: rdr class value: 'reading' value: 'readAll: aString
 "=== LispPrinter (stateless, class-side) ==================================="
 cm value: prn class value: 'writing' value: 'writeString: aValue
 	^ String streamContents: [:s | self write: aValue on: s]'.
+cm value: prn class value: 'writing' value: 'writeString: aValue limitedTo: n
+	"At most n characters, ending in ... when cut short: safe on circular lists."
+	| text |
+	text := [String streamContents: [:s | self write: aValue on: s] limitedTo: n]
+		on: Error do: [:e | aValue printString].
+	^ text size >= n ifTrue: [(text first: n) , ''...''] ifFalse: [text]'.
 cm value: prn class value: 'writing' value: 'write: v on: s
 	v == true ifTrue: [^ s nextPutAll: ''#t''].
 	v == false ifTrue: [^ s nextPutAll: ''#f''].

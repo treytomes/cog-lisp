@@ -77,6 +77,13 @@ cog-lisp.bat program.lisp    run a program, then exit
   semantics). Output from `display`/`write`/`newline` goes to stdout. Exit code
   **0** on success; **1** on an uncaught LISP error, after printing
   `error: <message>` to stderr. The image is not saved.
+  *(Since Phase 7.5, review R-1: an error while running a file prints
+  `<path>:<line>:<column>: error: <message>`, the line and column of the
+  top-level form that failed, or of the offending character for a read error;
+  `<path>` is the file's full path, the innermost file for a nested `load`.
+  Editors parse this format, so it is pinned by `tests/runner/located.*`. A
+  program whose heap grows past 2 GB (`COGLISP_MAX_MEMORY_MB`) is stopped with
+  `error: out of memory …`, review R-3.)*
 - **REPL mode:** prompt `> `; reads one complete datum (it may span lines), evals
   it, prints the value with `write`, and loops. The unspecified value is not
   printed. An error prints `error: <message>` and the loop continues. EOF or

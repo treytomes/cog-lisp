@@ -21,7 +21,7 @@ core := (Object << #LispCore) package: 'CogLisp-Core'; install.
 env  := (Object << #LispEnvironment) slots: { #bindings }; sharedVariables: { #Default }; package: 'CogLisp-Core'; install.
 cell := (Object << #LispGlobal) slots: { #symbol. #value. #bound }; package: 'CogLisp-Core'; install.
 macro := (Object << #LispMacro) slots: { #expander }; package: 'CogLisp-Core'; install.
-err  := (Error  << #LispUnboundError) slots: { #symbol }; package: 'CogLisp-Core'; install.
+err  := (LispError << #LispUnboundError) slots: { #symbol }; package: 'CogLisp-Core'; install.
 
 "=== LispCore : type predicates (class-side) ==============================="
 cm value: core class value: 'predicates' value: 'isPair: v
@@ -126,6 +126,9 @@ cm value: env value: 'accessing' value: 'at: aSymbol ifAbsent: aBlock
 	^ (bindings at: aSymbol ifAbsent: [^ aBlock value]) valueIfUnbound: aBlock'.
 cm value: env value: 'accessing' value: 'set: aSymbol value: aValue
 	^ (self cellFor: aSymbol) assign: aValue'.
+cm value: env value: 'enumerating' value: 'cellsDo: aBlock
+	"Every global cell, bound or not."
+	bindings do: aBlock'.
 cm value: env value: 'testing' value: 'isBound: aSymbol
 	^ (bindings at: aSymbol ifAbsent: [^ false]) isBound'.
 cm value: env class value: 'accessing' value: 'default

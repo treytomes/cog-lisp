@@ -12,14 +12,19 @@ set "ROOT=%~dp0"
 set "VM=%ROOT%pharo\PharoConsole.exe"
 if defined COGLISP_IMAGE (set "IMG=%COGLISP_IMAGE%") else (set "IMG=%ROOT%pharo\cog-lisp.image")
 
+rem  The image stops a program whose heap passes 2 GB (COGLISP_MAX_MEMORY_MB);
+rem  the VM cap is a backstop in case that watchdog cannot run. At the cap the VM
+rem  aborts and hangs, so keep it well above the watchdog limit.
+set "CAP=--maxOldSpaceSize=8589934592"
+
 if not exist "%IMG%" goto :noimage
 
 if "%~1"=="" goto :repl
-"%VM%" --headless "%IMG%" lisp run "%~f1"
+"%VM%" --headless %CAP% "%IMG%" lisp run "%~f1"
 exit /b %ERRORLEVEL%
 
 :repl
-"%VM%" --headless "%IMG%" lisp repl
+"%VM%" --headless %CAP% "%IMG%" lisp repl
 exit /b %ERRORLEVEL%
 
 :noimage

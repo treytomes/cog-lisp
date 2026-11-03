@@ -16,7 +16,7 @@ cm := [:cls :cat :src |
     on: Error
     do: [:e | failures add: cls name , ' >> ' , src lines first , '  --  ' , e messageText]].
 
-lerr  := (Error  << #LispError) package: 'CogLisp-Runtime'; install.
+lerr  := LispError.  "defined by the reader package"
 aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp-Runtime'; install.
 proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries. #inline }; package: 'CogLisp-Runtime'; install.
 tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runtime'; install.
@@ -113,6 +113,11 @@ cm value: proc value: 'accessing' value: 'name
 	^ name'.
 cm value: proc value: 'accessing' value: 'name: aString
 	name := aString'.
+cm value: proc value: 'accessing' value: 'named: aString
+	"Name this procedure (once: an alias does not rename it) and answer it. The
+	 compiler sends this to the value of (define (f ...) ...) (review C-17)."
+	name isNil ifTrue: [name := aString].
+	^ self'.
 cm value: proc value: 'testing' value: 'isVariadic
 	^ hasRest'.
 cm value: proc value: 'accessing' value: 'source
@@ -127,7 +132,12 @@ cm value: proc value: 'printing' value: 'printOn: aStream
 	name ifNotNil: [aStream nextPut: Character space; nextPutAll: name].
 	aStream nextPut: $>'.
 cm value: proc value: 'applying' value: 'signalArity: givenCount
-	^ (LispArityError new) proc: self; given: givenCount; signal: ''wrong number of arguments''.'.
+	"sq: expected 1 argument, got 0 (review R-7)"
+	| wanted |
+	wanted := (hasRest ifTrue: [''at least ''] ifFalse: ['''']) , required printString ,
+		(required = 1 ifTrue: ['' argument''] ifFalse: ['' arguments'']).
+	^ (LispArityError new) proc: self; given: givenCount;
+		signal: (name ifNil: [''procedure'']) , '': expected '' , wanted , '', got '' , givenCount printString'.
 cm value: proc value: 'applying' value: 'applyTo: anArray
 	hasRest ifFalse: [
 		anArray size = required ifFalse: [^ self signalArity: anArray size].
@@ -294,6 +304,10 @@ cm value: prims class value: 'installing' value: 'installInto: anEnv
 	self installSystemInto: anEnv.
 	self installMacroSupportInto: anEnv.
 	self installListSearchInto: anEnv.
+	"every primitive knows its name, for printing and error messages (review R-7)"
+	anEnv cellsDo: [:c | | v |
+		v := c valueIfUnbound: [nil].
+		(v isKindOf: LispProcedure) ifTrue: [v named: c symbol name]].
 	self installInlineFormsInto: anEnv.
 	^ anEnv'.
 cm value: prims class value: 'installing' value: 'installMacroSupportInto: anEnv
@@ -314,15 +328,15 @@ cm value: prims class value: 'installing' value: 'installListSearchInto: anEnv
 		cur := lst.
 		[(cur isKindOf: LispCons) and: [(test value: x value: cur car) not]] whileTrue: [cur := cur cdr].
 		(cur isKindOf: LispCons) ifTrue: [cur] ifFalse: [false]]].
-	ass := [:test | [:x :alist | | found |
-		found := alist lispElements detect: [:pair | (pair isKindOf: LispCons) and: [test value: x value: pair car]] ifNone: [false].
+	ass := [:test :nm | [:x :alist | | found |
+		found := (LispCons elementsOf: alist for: nm) detect: [:pair | (pair isKindOf: LispCons) and: [test value: x value: pair car]] ifNone: [false].
 		found]].
 	anEnv define: (LispSymbol named: ''memq'') value: (LispProcedure fixed: (mem value: [:a :b | LispCore eq: a with: b]) arity: 2).
 	anEnv define: (LispSymbol named: ''memv'') value: (LispProcedure fixed: (mem value: [:a :b | LispCore eqv: a with: b]) arity: 2).
 	anEnv define: (LispSymbol named: ''member'') value: (LispProcedure fixed: (mem value: [:a :b | LispCore equal: a with: b]) arity: 2).
-	anEnv define: (LispSymbol named: ''assq'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore eq: a with: b]) arity: 2).
-	anEnv define: (LispSymbol named: ''assv'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore eqv: a with: b]) arity: 2).
-	anEnv define: (LispSymbol named: ''assoc'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore equal: a with: b]) arity: 2)'.
+	anEnv define: (LispSymbol named: ''assq'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore eq: a with: b] value: ''assq'') arity: 2).
+	anEnv define: (LispSymbol named: ''assv'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore eqv: a with: b] value: ''assv'') arity: 2).
+	anEnv define: (LispSymbol named: ''assoc'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore equal: a with: b] value: ''assoc'') arity: 2)'.
 cm value: prims class value: 'installing' value: 'installInlineFormsInto: anEnv
 	"Inline forms for guarded inlining (Phase 6 section 11.2). Each matches what
 	 the primitive does for that many arguments."
@@ -359,13 +373,21 @@ cm value: prims class value: 'installing' value: 'installListsInto: anEnv
 	anEnv define: (LispSymbol named: ''null?'') value: (LispProcedure fixed: [:x | LispCore isNull: x] arity: 1).
 	anEnv define: (LispSymbol named: ''list?'') value: (LispProcedure fixed: [:x | LispCore isList: x] arity: 1).
 	anEnv define: (LispSymbol named: ''list'') value: (LispProcedure variadic: [:args | args] required: 0).
-	anEnv define: (LispSymbol named: ''length'') value: (LispProcedure fixed: [:lst | lst lispElements size] arity: 1).
-	anEnv define: (LispSymbol named: ''reverse'') value: (LispProcedure fixed: [:lst | LispCons fromArray: lst lispElements asArray reverse] arity: 1).
-	anEnv define: (LispSymbol named: ''append'') value: (LispProcedure variadic: [:lists | | els | els := OrderedCollection new. lists lispElements do: [:l | els addAll: l lispElements]. LispCons fromArray: els asArray] required: 0).
+	anEnv define: (LispSymbol named: ''length'') value: (LispProcedure fixed: [:lst | (LispCons elementsOf: lst for: ''length'') size] arity: 1).
+	anEnv define: (LispSymbol named: ''reverse'') value: (LispProcedure fixed: [:lst | LispCons fromArray: (LispCons elementsOf: lst for: ''reverse'') asArray reverse] arity: 1).
+	"R7RS append: copies all but the last argument; the last becomes the tail as it is, so it may be improper or not a list at all (review R-9)"
+	anEnv define: (LispSymbol named: ''append'') value: (LispProcedure variadic: [:lists | | args result |
+		args := lists lispElements.
+		args isEmpty
+			ifTrue: [LispEmptyList default]
+			ifFalse: [
+				result := args last.
+				(args allButLast) reverseDo: [:l | (LispCons elementsOf: l for: ''append'') reverseDo: [:e | result := LispCons car: e cdr: result]].
+				result]] required: 0).
 	anEnv define: (LispSymbol named: ''set-car!!'') value: (LispProcedure fixed: [:p :v | p car: v. LispUnspecified default] arity: 2).
 	anEnv define: (LispSymbol named: ''set-cdr!!'') value: (LispProcedure fixed: [:p :v | p cdr: v. LispUnspecified default] arity: 2).
-	anEnv define: (LispSymbol named: ''map'') value: (LispProcedure fixed: [:prc :lst | LispCons fromArray: (lst lispElements collect: [:e | LispProcedure apply: prc to: { e }]) asArray] arity: 2).
-	anEnv define: (LispSymbol named: ''for-each'') value: (LispProcedure fixed: [:prc :lst | lst lispElements do: [:e | LispProcedure apply: prc to: { e }]. LispUnspecified default] arity: 2)'.
+	anEnv define: (LispSymbol named: ''map'') value: (LispProcedure fixed: [:prc :lst | LispCons fromArray: ((LispCons elementsOf: lst for: ''map'') collect: [:e | LispProcedure apply: prc to: { e }]) asArray] arity: 2).
+	anEnv define: (LispSymbol named: ''for-each'') value: (LispProcedure fixed: [:prc :lst | (LispCons elementsOf: lst for: ''for-each'') do: [:e | LispProcedure apply: prc to: { e }]. LispUnspecified default] arity: 2)'.
 cm value: prims class value: 'installing' value: 'installNumbersInto: anEnv
 	anEnv define: (LispSymbol named: ''+'') value: (LispProcedure variadic: [:nums | nums lispElements inject: 0 into: [:a :b | a + b]] required: 0).
 	anEnv define: (LispSymbol named: ''*'') value: (LispProcedure variadic: [:nums | nums lispElements inject: 1 into: [:a :b | a * b]] required: 0).
@@ -423,7 +445,14 @@ cm value: prims class value: 'installing' value: 'installIOInto: anEnv
 	anEnv define: (LispSymbol named: ''newline'') value: (LispProcedure fixed: [self output nextPut: Character lf; flush. LispUnspecified default] arity: 0)'.
 cm value: prims class value: 'installing' value: 'installSystemInto: anEnv
 	anEnv define: (LispSymbol named: ''load'') value: (LispProcedure fixed: [:path | LispCompiler new evalFile: path. LispUnspecified default] arity: 1).
-	anEnv define: (LispSymbol named: ''exit'') value: (LispProcedure variadic: [:codes | Smalltalk exit: (codes lispElements ifEmpty: [0] ifNotEmpty: [:c | c first])] required: 0).
+	"(exit) and (exit #t) succeed, (exit #f) fails, (exit n) for n in 0..255 (R7RS; review R-10)"
+	anEnv define: (LispSymbol named: ''exit'') value: (LispProcedure variadic: [:codes | | c |
+		c := codes lispElements ifEmpty: [0] ifNotEmpty: [:cs | cs first].
+		c == true ifTrue: [c := 0].
+		c == false ifTrue: [c := 1].
+		((c isKindOf: Integer) and: [c between: 0 and: 255])
+			ifTrue: [Smalltalk exit: c]
+			ifFalse: [(LispError new) signal: ''exit: expected #t, #f or an integer from 0 to 255: '' , (LispPrinter writeString: c limitedTo: 60)]] required: 0).
 	anEnv define: (LispSymbol named: ''save-image'') value: (LispProcedure fixed: [self saveImage] arity: 0).
 	anEnv define: (LispSymbol named: ''procedure-source'') value: (LispProcedure fixed: [:p | p source ifNil: [false]] arity: 1).
 	anEnv define: (LispSymbol named: ''stack-depth'') value: (LispProcedure fixed: [| c n |
@@ -437,7 +466,7 @@ cm value: prims class value: 'installing' value: 'installSystemInto: anEnv
 cm value: prims class value: 'installing' value: 'installControlInto: anEnv
 	"apply answers a bounce rather than calling, so that a tail call through apply
 	 runs in constant stack; every caller of a procedure drives bounces (Phase 6)."
-	anEnv define: (LispSymbol named: ''apply'') value: (LispProcedure fixed: [:prc :argList | LispProcedure tailCall: prc to: argList lispElements asArray] arity: 2)'.
+	anEnv define: (LispSymbol named: ''apply'') value: (LispProcedure fixed: [:prc :argList | LispProcedure tailCall: prc to: (LispCons elementsOf: argList for: ''apply'') asArray] arity: 2)'.
 
 "=== load report ==========================================================="
 Stdio stdout

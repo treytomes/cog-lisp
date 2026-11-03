@@ -108,7 +108,7 @@ re-run and reproduced before being recorded.
 - **Fix.** Evaluate the arguments into the C-1 temps first, then branch on the
   identity check; both branches use the temps.
 
-### C-2 Back-end limits escape as raw Smalltalk errors — fix now
+### C-2 Back-end limits escape as raw Smalltalk errors — fixed (batch 2)
 - **Evidence.** Frame overflow, `Too many arguments` and `genStorePopTemp`
   surface as `Error`/`OCCompilationError`, not `LispCompileError`.
 - **Fix.** `compile:` catches errors from semantic analysis and code generation
@@ -134,7 +134,7 @@ re-run and reproduced before being recorded.
 - **Verdict.** Plan: hoist arguments into temps past a depth budget. C-2 makes it
   a clean error now.
 
-### C-6 Malformed special forms crash or are silently accepted — fix now
+### C-6 Malformed special forms crash or are silently accepted — fixed (batch 2)
 - **Evidence.** `(lambda)`, `(let x)`, `(let ((x)) x)`, `(define)`, `(define x)`,
   `(set! x)`, `(define-macro foo)`, `(let loop)` → `SubscriptOutOfBounds`;
   `(quote)` → `MessageNotUnderstood`. Accepted silently: `(+ 1 . 2)` → 1,
@@ -144,7 +144,7 @@ re-run and reproduced before being recorded.
 - **Fix.** Shape checks per special form (arity, symbols for names, no duplicate
   parameters); `listToArray:` rejects improper lists.
 
-### C-7 A macro that expands forever hangs the VM — fix now
+### C-7 A macro that expands forever hangs the VM — fixed (batch 2)
 - **Evidence.** `(define-macro (forever) '(forever)) (forever)`: no output; killed
   after 91 s.
 - **Fix.** An expansion-depth limit: "macro expansion too deep: forever".
@@ -191,7 +191,7 @@ re-run and reproduced before being recorded.
 - **Evidence.** `eval` of a form holding a fresh string freezes that string.
 - **Verdict.** Plan with string mutation: `eval` copies strings it embeds.
 
-### C-17 / R-7 Procedures are never named; arity errors say nothing — fix now
+### C-17 / R-7 Procedures are never named; arity errors say nothing — fixed (batch 2)
 - **Evidence.** `(define (sq x) x) (sq)` → "error: wrong number of arguments"
   (re-run); `sq` and `car` both print `#<procedure>`. Nothing calls `name:`.
 - **Fix.** `define` (global and internal) and the primitive installer name the
@@ -213,7 +213,7 @@ splices; macro errors and introspection; source retention through macros and
 From the reviewer's scripts and `cog-lisp.bat` runs. R-1, R-6, R-7, R-8 and R-11
 were re-run and reproduced.
 
-### R-1 Errors carry no file, line or position — fix now
+### R-1 Errors carry no file, line or position — fixed (batch 2)
 - **Evidence.** A program failing on line 6 prints only `error: Message not
   understood: SmallInteger >> #car`; a read error prints `error: unterminated
   list` with no position (and the reader's position is the end of input, not the
@@ -223,7 +223,7 @@ were re-run and reproduced.
   errors point at the opening delimiter. Pin the format in the Phase 5 spec; the
   VS Code problem matcher parses it.
 
-### R-2 Primitives leak raw Smalltalk errors — fix now (lists), plan (rest)
+### R-2 Primitives leak raw Smalltalk errors — fixed (batch 2; lists; host-error mapping still planned → conditions & restarts)
 - **Evidence.** `(car 5)`, `(car '())` → MNU `#car`; `(length 5)`, `(append '(1)
   5)`, `(map car 5)`, `(apply + 5)` → MNU `#lispElements`; `(+ 1 "a")` →
   `#adaptToNumber:andSend:`; `(/ 1 0)` → `ZeroDivide`; `(procedure-source 5)`.
@@ -232,7 +232,7 @@ were re-run and reproduced.
   cost. Arithmetic: rewrite the host error at report time for now. General
   host-error mapping: **plan → conditions & restarts**.
 
-### R-3 Runaway recursion eats all memory and never errors — fix now (batch 2)
+### R-3 Runaway recursion eats all memory and never errors — fixed (batch 2)
 - **Evidence.** `(define (f) (+ 1 (f))) (f)`: no output in 90 s; PharoConsole
   reached ~17 GB. Deep finite recursion (`10⁶`) is fine.
 - **Verdict.** Fix now (owner, 2026-11-03), in batch 2. The VM accepts
@@ -241,7 +241,7 @@ were re-run and reproduced.
   the image that signals a LISP error in the running program well below the
   cap, with the cap as the backstop.
 
-### R-4 Cyclic lists hang `list?`, `length`, `equal?` and printing — fix now (`list?`, `length`), plan (rest)
+### R-4 Cyclic lists hang `list?`, `length`, `equal?` and printing — fixed (batch 2; length; list? in batch 4)
 - **Evidence.** After `(set-cdr! (cdr l) l)`, each of those timed out.
 - **Fix.** Cycle check (two pointers) in `list?` (R7RS: `#f`) and `length`
   (error). Cycle-safe `equal?` and printing: **plan → self-hosting**.
@@ -267,13 +267,13 @@ were re-run and reproduced.
   (re-run). R7RS: `a`, `(a b c)`.
 - **Fix.** A display mode in `LispPrinter`.
 
-### R-9 List primitives mishandle improper lists — fix now
+### R-9 List primitives mishandle improper lists — fixed (batch 2)
 - **Evidence.** `(append '(1) '(2 . 3))` → `(1 2)`; `(append '() 5)` → MNU;
   `(length '(1 . 2))` → 1; `(apply + '(1 . 2))` → 1.
 - **Fix.** `append` shares its last argument as the tail; the others use the
   checked proper-list walk of R-2.
 
-### R-10 `(exit x)` does not check its argument — fix now
+### R-10 `(exit x)` does not check its argument — fixed (batch 2)
 - **Evidence.** `(exit "x")` → 18, `(exit -1)` → 127, `(exit 300)` → 44,
   `(exit 2.5)` → 0.
 - **Fix.** Integers 0–255; `#t` → 0, `#f` → 1 (R7RS); otherwise an error.
@@ -287,20 +287,20 @@ were re-run and reproduced.
 - **Evidence.** `-0.0` reads with sign bit 0; `(eqv? 0.0 -0.0)` → `#t` (R7RS: `#f`).
 - **Fix.** `Float negativeZero` in `parseFloat:`; `eqv:` compares float sign bits.
 
-### R-13 A bad `#\x` escape raises a plain `Error` — fix now
+### R-13 A bad `#\x` escape raises a plain `Error` — fixed (batch 2)
 - **Evidence.** `#\xZZ` → `Error: Reading a number failed …`.
 - **Fix.** Validate the digits; `LispReadError` "bad character code".
 
-### R-14 A lone `.` reads as a symbol — fix now
+### R-14 A lone `.` reads as a symbol — fixed (batch 2)
 - **Evidence.** `.` reads as the symbol `.` (Phase 1 §5, §9: an error).
 - **Fix.** "unexpected dot" in `classifyToken:`.
 
-### R-15 `isIncomplete` is set for any error at end of input — fix now (with R-1)
+### R-15 `isIncomplete` is set for any error at end of input — fixed (batch 2)
 - **Evidence.** `#tru` and `#\spacex` report incomplete. Harmless in today's REPL
   (it adds a newline); not for `read` or a language server.
 - **Fix.** Only unterminated list, string, comment, character and quote set it.
 
-### R-16 Reader and compiler errors are not `LispError`s — fix now
+### R-16 Reader and compiler errors are not `LispError`s — fixed (batch 2)
 - **Evidence.** `LispReadError`, `LispCompileError`, `LispUnboundError` subclass
   `Error` directly; `LispError` is defined in the runtime, which loads last. Error
   reporting (R-1, R-2) cannot tell a LISP error from a host bug.
@@ -335,7 +335,7 @@ were re-run and reproduced.
 - **Evidence.** `(load "b.lisp")` in `sub\a.lisp` loads `.\b.lisp`;
   `cog-lisp.bat e1.lisp extra` ignores `extra`.
 
-### R-23 `#|` does not end a token — fix now
+### R-23 `#|` does not end a token — fixed (batch 2)
 - **Evidence.** `abc#|c|#def` reads as one symbol (Phase 1 §5 lists `#|` as a
   delimiter).
 
