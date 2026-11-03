@@ -73,7 +73,7 @@ REPL come from the independent reviews.
 
 ## Optimization
 
-### O-1 Four-argument `+` takes the slow variadic path (and the `globals` benchmark measures it) — fix now
+### O-1 Four-argument `+` takes the slow variadic path (and the `globals` benchmark measures it) — fixed (batch 3)
 - **Evidence.** 50,000 iterations of a self-loop (`ms` per run, stock image):
   `(+ acc 1)` 0.75 · `(+ acc g1)` 1.05 · `(+ (+ (+ acc g1) g2) g3)` 1.50 ·
   `(+ acc 1 2)` 2.25 · **`(+ acc 1 2 3)` 32.3** · `(+ acc g1 g2 g3)` 34.3.
@@ -91,7 +91,7 @@ REPL come from the independent reviews.
 From the reviewer's headless scripts. C-1, C-6, C-10, C-11, C-14 and C-17 were
 re-run and reproduced before being recorded.
 
-### C-1 Self tail calls exhaust the frame at ~8 call sites — fix now
+### C-1 Self tail calls exhaust the frame at ~8 call sites — fixed (batch 3)
 - **Evidence.** A `cond` whose k branches each self-tail-call `(st (- n 1) b c a)`:
   k=4 works; k=8 "Cannot compile -- stack including temps is too deep"; k=12
   `genStorePopTemp: index 64 is out of range`. Each self tail call allocates new
@@ -101,7 +101,7 @@ re-run and reproduced before being recorded.
   call (safe: an argument is never in tail position). Prototyped by the reviewer:
   30 branches compile and run. Folds in C-12.
 
-### C-12 Self-tail-call arguments are compiled twice — fix now (with C-1)
+### C-12 Self-tail-call arguments are compiled twice — fixed (batch 3)
 - **Evidence.** Translated for the loop branch and again for the fallback tail
   call: a counting macro in such an argument expands twice; code and the inline
   temp budget are doubled.
@@ -115,13 +115,13 @@ re-run and reproduced before being recorded.
   and re-signals `LispCompileError` with a plain message ("expression too deeply
   nested", "too many parameters (at most 15)").
 
-### C-3 Quasiquote templates with more than ~25 unquoted elements fail — fix now
+### C-3 Quasiquote templates with more than ~25 unquoted elements fail — fixed (batch 3)
 - **Evidence.** 20 `,x` elements compile; 30 or 60 overflow the frame (nested
   `LispCons car:cdr:`, two stack slots per element). `(list …)` with 300
   arguments is fine (brace arrays). Code-generating macros will hit this.
 - **Fix.** Build each run of elements between splices from one brace array.
 
-### C-4 More than 15 parameters or `let` bindings fail — fix now (`let`), plan (`lambda`)
+### C-4 More than 15 parameters or `let` bindings fail — fixed (batch 3; let; lambda still planned)
 - **Evidence.** 16: `OCCompilationError … Too many arguments` (Pharo's block
   argument limit).
 - **Verdict.** `let`: compile as a zero-argument block with temporaries. `lambda`:
@@ -149,31 +149,31 @@ re-run and reproduced before being recorded.
   after 91 s.
 - **Fix.** An expansion-depth limit: "macro expansion too deep: forever".
 
-### C-8 Named `let`, `do`, `dolist`, `dotimes` are not compiled as loops — fix now
+### C-8 Named `let`, `do`, `dolist`, `dotimes` are not compiled as loops — fixed (batch 3)
 - **Evidence.** Only global defines get the self-loop; local procedures bounce
   every iteration. 10⁷ iterations: global self-loop 102 ms, named `let` 899 ms,
   `do` 875 ms. (Constant stack, as required.)
 - **Fix.** The self-loop takes a local name too; its guard compares the local's
   temporary with the procedure instead of a global cell.
 
-### C-9 Every `set!` and `define` allocates a closure — fix now
+### C-9 Every `set!` and `define` allocates a closure — fixed (batch 3)
 - **Evidence.** `andUnspecified:` builds `[node. LispUnspecified default] value`;
   a `set!` variable becomes heap-allocated. A `set!` loop: 392 → 179 ms per 10⁷
   iterations with `true ifTrue: [...]` (the Phase 7 `begin` fix).
 - **Fix.** Same pattern as `begin`.
 
-### C-10 Named `let` retains made-up source text — fix now
+### C-10 Named `let` retains made-up source text — fixed (batch 3)
 - **Evidence.** `(procedure-source (let lp ((i 0)) lp))` → `"(define (lp i) lp)"`
   (re-run). Also `let` with `#directLet` off.
 - **Fix.** Set `sourceContext` to the form's recorded text, as for macro calls.
 
-### C-11 `define-macro` is rejected inside a top-level `begin` — fix now
+### C-11 `define-macro` is rejected inside a top-level `begin` — fixed (batch 3)
 - **Evidence.** `(begin (define-macro (m1) 1) 2)` → "allowed only at top level"
   (re-run). In R7RS a top-level `begin` is top level; macro-defining macros need it.
 - **Fix.** `eval:` expands the top of a form and runs a top-level `begin`'s forms
   one at a time, so a macro defined early in it is usable later in it.
 
-### C-13 With `#literalQuote` off, quoted gensyms become interned — fix now
+### C-13 With `#literalQuote` off, quoted gensyms become interned — fixed (batch 3)
 - **Evidence.** A quoted gensym `eq?` itself: `#t` normally, `#f` with the option off.
 - **Fix.** Emit an uninterned symbol as a literal.
 

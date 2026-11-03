@@ -87,9 +87,11 @@ cm value: comp value: 'nodes' value: 'unspecifiedNode
 	^ self messageNode: (self var: ''LispUnspecified'') selector: #default arguments: #()'.
 cm value: comp value: 'nodes' value: 'andUnspecified: aNode
 	"Evaluate aNode for effect, then yield the unspecified value (Phase 5 section 5.1)."
-	^ self messageNode: (self blockWithArgs: #() statements: { aNode. self unspecifiedNode })
-		selector: #value
-		arguments: #()'.
+	"true ifTrue: [...] is inlined by Opal: no closure, and no variable it assigns is
+	 forced into the heap (review C-9)."
+	^ self messageNode: (self literalNode: true)
+		selector: #ifTrue:
+		arguments: { self blockWithArgs: #() statements: { aNode. self unspecifiedNode } }'.
 cm value: comp value: 'source' value: 'sourceOf: form
 	"Exact source text of form if the reader recorded it (Phase 5 section 5.2). A
 	 form built by a macro has no text of its own, so it gets the text of the macro
@@ -201,25 +203,42 @@ cm value: comp value: 'calls' value: 'tailCallNode: fnNode args: argNodes
 cm value: comp value: 'calls' value: 'isSelfTailCall: op args: argData inScope: scope
 	selfLoop isNil ifTrue: [^ false].
 	op == (selfLoop at: #name) ifFalse: [^ false].
-	(scope includesKey: op) ifTrue: [^ false].
+	"a global procedure: op must not be shadowed; a local one (review C-8): op must
+	 still name the same local, not one bound inside the body"
+	(selfLoop at: #local)
+		ifNil: [(scope includesKey: op) ifTrue: [^ false]]
+		ifNotNil: [:t | (scope at: op ifAbsent: [nil]) = t ifFalse: [^ false]].
 	^ argData size = (selfLoop at: #params) size'.
+cm value: comp value: 'calls' value: 'selfLoopRead
+	"What the loop compares with itself: the global cell, or the local variable."
+	^ (selfLoop at: #local)
+		ifNil: [self globalRead: (selfLoop at: #name)]
+		ifNotNil: [:t | self var: t]'.
 cm value: comp value: 'calls' value: 'translateSelfTailCall: argData inScope: scope
 	"Go round the loop again (Phase 6 section 4.2) if the global still names this
 	 procedure; otherwise make an ordinary tail call to whatever it names now."
-	| newTemps thenStatements check elseNode |
+	"The arguments are evaluated once, into scratch temps shared by every self tail
+	 call of this loop (review C-1, C-12): safe, since no self tail call can run
+	 while another one''s arguments are being evaluated (they are not in tail
+	 position). Then: true ifTrue: [s1 := a1. ... (p == f) ifTrue: [again] ifFalse: [tail call]]."
+	| scratch statements thenStatements check elseNode |
 	selfLoop at: #used put: true.
-	newTemps := argData collect: [:d | | nm | nm := self nextName. (selfLoop at: #temps) add: nm. nm].
+	scratch := selfLoop at: #scratch ifAbsentPut: [
+		argData collect: [:d | | nm | nm := self nextName. (selfLoop at: #temps) add: nm. nm]].
+	statements := OrderedCollection new.
+	scratch with: argData do: [:t :d | statements add: (self assign: t value: (self translate: d inScope: scope))].
 	thenStatements := OrderedCollection new.
-	newTemps with: argData do: [:t :d | thenStatements add: (self assign: t value: (self translate: d inScope: scope))].
-	(selfLoop at: #params) with: newTemps do: [:p :t | thenStatements add: (self assign: p value: (self var: t))].
+	(selfLoop at: #params) with: scratch do: [:p :t | thenStatements add: (self assign: p value: (self var: t))].
 	thenStatements add: (self assign: (selfLoop at: #again) value: (self literalNode: true)).
 	thenStatements add: (self literalNode: nil).
-	check := self messageNode: (self globalRead: (selfLoop at: #name)) selector: #== arguments: { self var: (selfLoop at: #proc) }.
-	elseNode := self tailCallNode: (self globalRead: (selfLoop at: #name))
-		args: (argData collect: [:d | self translate: d inScope: scope]).
-	^ self messageNode: check selector: #ifTrue:ifFalse: arguments: {
+	check := self messageNode: self selfLoopRead selector: #== arguments: { self var: (selfLoop at: #proc) }.
+	elseNode := self tailCallNode: self selfLoopRead args: (scratch collect: [:t | self var: t]).
+	statements add: (self messageNode: check selector: #ifTrue:ifFalse: arguments: {
 		self blockWithArgs: #() statements: thenStatements asArray.
-		self thunk: elseNode }'.
+		self thunk: elseNode }).
+	^ self messageNode: (self literalNode: true)
+		selector: #ifTrue:
+		arguments: { self blockWithArgs: #() statements: statements asArray }'.
 cm value: comp value: 'calls' value: 'translateApplication: form inScope: scope tail: tail
 	| items op argData fnNode argNodes |
 	items := self listToArray: form.
@@ -430,14 +449,33 @@ cm value: comp value: 'quasiquote' value: 'qqNode: t level: n inScope: scope
 		^ self qqTagged: ''unquote-splicing'' with: (self qqNode: t cdr car level: n - 1 inScope: scope)].
 	(self isTagged: t as: ''quasiquote'') ifTrue: [
 		^ self qqTagged: ''quasiquote'' with: (self qqNode: t cdr car level: n + 1 inScope: scope)].
-	head := t car.
-	((self isTagged: head as: ''unquote-splicing'') and: [n = 0]) ifTrue: [
-		^ self messageNode: (self var: ''LispCons'') selector: #qqAppend:to: arguments: {
-			self translate: head cdr car inScope: scope.
-			self qqNode: t cdr level: n inScope: scope }].
-	^ self messageNode: (self var: ''LispCons'') selector: #car:cdr: arguments: {
-		self qqNode: head level: n inScope: scope.
-		self qqNode: t cdr level: n inScope: scope }'.
+	^ self qqListNode: t level: n inScope: scope'.
+cm value: comp value: 'quasiquote' value: 'isLevelZeroSplice: datum level: n
+	^ n = 0 and: [self isTagged: datum as: ''unquote-splicing'']'.
+cm value: comp value: 'quasiquote' value: 'qqListNode: t level: n inScope: scope
+	"The run of elements before a level-0 splice or the tail goes into one brace
+	 array: LispCons fromArray: {e1. e2. ...} tail: rest. Nested car:cdr: took two
+	 stack slots an element and overflowed the frame at ~25 (review C-3)."
+	| elements cur tailNode |
+	elements := OrderedCollection new.
+	cur := t.
+	[(cur isKindOf: LispCons)
+		and: [(self isTagged: cur as: ''unquote'') not
+		and: [(self isTagged: cur as: ''unquote-splicing'') not
+		and: [(self isTagged: cur as: ''quasiquote'') not
+		and: [(self isLevelZeroSplice: cur car level: n) not]]]]]
+		whileTrue: [
+			elements add: (self qqNode: cur car level: n inScope: scope).
+			cur := cur cdr].
+	tailNode := ((cur isKindOf: LispCons) and: [self isLevelZeroSplice: cur car level: n])
+		ifTrue: [self messageNode: (self var: ''LispCons'') selector: #qqAppend:to: arguments: {
+			self translate: cur car cdr car inScope: scope.
+			self qqNode: cur cdr level: n inScope: scope }]
+		ifFalse: [self qqNode: cur level: n inScope: scope].
+	elements isEmpty ifTrue: [^ tailNode].
+	^ self messageNode: (self var: ''LispCons'') selector: #fromArray:tail: arguments: {
+		self arrayNode: elements asArray.
+		tailNode }'.
 
 "=== bodies with internal define (Phase 7 section 6) ======================="
 cm value: comp value: 'translating' value: 'isDefineForm: datum
@@ -496,11 +534,11 @@ cm value: comp value: 'translating' value: 'translateScopedBody: dataArray inSco
 		target := parts first.
 		statements add: (self assign: d third value: ((target isKindOf: LispCons)
 			ifTrue: [self named: (self translateLambda: (self makeLambda: target cdr body: parts allButFirst)
-				inScope: childScope source: (self sourceOf: d first) defining: nil) as: target car]
+				inScope: childScope source: (self sourceOf: d first) defining: target car local: d third) as: target car]
 			ifFalse: [
 				valueData := parts at: 2.
 				(self isLambdaForm: valueData)
-					ifTrue: [self named: (self translateLambda: valueData inScope: childScope source: (self sourceOf: valueData) defining: nil) as: target]
+					ifTrue: [self named: (self translateLambda: valueData inScope: childScope source: (self sourceOf: valueData) defining: target local: d third) as: target]
 					ifFalse: [self translate: valueData inScope: childScope]]))].
 	 rest isEmpty ifTrue: [statements add: self unspecifiedNode].
 	 rest withIndexDo: [:it :i |
@@ -524,7 +562,10 @@ cm value: comp value: 'translating' value: 'reconstruct: datum
 		^ self messageNode: (self var: ''LispCons'')
 			selector: #car:cdr:
 			arguments: { self reconstruct: datum car. self reconstruct: datum cdr }].
-	(datum isKindOf: LispSymbol) ifTrue: [^ self symbolNode: datum].
+	(datum isKindOf: LispSymbol) ifTrue: [
+		"a gensym cannot be looked up by name; embed the symbol itself (review C-13)"
+		(LispSymbol isInterned: datum) ifFalse: [^ self literalNode: datum].
+		^ self symbolNode: datum].
 	(datum == LispEmptyList default) ifTrue: [^ self emptyListNode].
 	^ self literalNode: datum'.
 cm value: comp value: 'translating' value: 'translateIf: form inScope: scope tail: tail
@@ -584,7 +625,10 @@ cm value: comp value: 'translating' value: 'bindParams: params into: childScope
 cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 	^ self translateLambda: form inScope: scope source: (self sourceOf: form) defining: nil'.
 cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope source: sourceText defining: nameSym
-	"nameSym is the global this lambda is being defined as, or nil. A defined,
+	^ self translateLambda: form inScope: scope source: sourceText defining: nameSym local: nil'.
+cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope source: sourceText defining: nameSym local: localTemp
+	"nameSym is the name this lambda is being defined as, or nil: a global, or a local
+	 held in the temp localTemp (internal define, named let; review C-8). A defined,
 	 fixed-arity procedure compiles its self tail calls as a loop (section 4.2)."
 	| parts parsed fixed restSym allParams childScope bound savedLoop savedInlineTemps loop tail body bodyNodes iterNames iterInits localNodes statements temps block procNode procName |
 	parts := self listToArray: form cdr.
@@ -600,7 +644,7 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 	iterInits := #().
 	(tail and: [nameSym notNil and: [restSym isNil]]) ifTrue: [
 		loop := IdentityDictionary new.
-		loop at: #name put: nameSym; at: #params put: (bound at: 4);
+		loop at: #name put: nameSym; at: #local put: localTemp; at: #params put: (bound at: 4);
 			at: #proc put: self nextName; at: #again put: self nextName; at: #result put: self nextName;
 			at: #temps put: OrderedCollection new; at: #used put: false.
 		"The body works on per-iteration copies of the parameters, declared inside the
@@ -651,17 +695,18 @@ cm value: comp value: 'translating' value: 'translateLet: form inScope: scope ta
 	| parts bindings bodyData params valueData childScope bound body block |
 	parts := self listToArray: form cdr.
 	(parts notEmpty and: [parts first isKindOf: LispSymbol]) ifTrue: [
-		^ self translateNamedLet: parts inScope: scope tail: tail].
+		^ self withSourceOf: form do: [self translateNamedLet: parts inScope: scope tail: tail]].
 	bindings := self checkBindings: parts first in: form.
 	bodyData := parts allButFirst.
 	params := bindings collect: [:b | b first].
 	valueData := bindings collect: [:b | b second].
 	(self uses: #directLet) ifFalse: [
 		"as in Phase 3: an immediately applied lambda"
-		^ self translate: (LispCons
+		^ self withSourceOf: form do: [self translate: (LispCons
 				car: (self makeLambda: (LispCons fromArray: params asArray) body: bodyData)
 				cdr: (LispCons fromArray: valueData asArray))
-			inScope: scope tail: tail].
+			inScope: scope tail: tail]].
+	params size > 15 ifTrue: [^ self translateLargeLet: params values: valueData body: bodyData inScope: scope tail: tail].
 	"Phase 6 section 5.4: a block evaluated in place; the body inherits tail position."
 	childScope := scope copy.
 	bound := self bindParams: params into: childScope.
@@ -675,6 +720,29 @@ cm value: comp value: 'translating' value: 'translateLet: form inScope: scope ta
 	^ self messageNode: block
 		selector: (self valueSelectorFor: params size)
 		arguments: (valueData collect: [:d | self translate: d inScope: scope])'.
+cm value: comp value: 'translating' value: 'withSourceOf: form do: aBlock
+	"Translate code made up from form (named let, let as a lambda) so that its
+	 lambdas keep form''s source text, as for a macro call (review C-10)."
+	| text saved |
+	text := self recordedSourceOf: form.
+	text isNil ifTrue: [^ aBlock value].
+	saved := sourceContext.
+	sourceContext := text.
+	^ aBlock ensure: [sourceContext := saved]'.
+cm value: comp value: 'translating' value: 'translateLargeLet: params values: valueData body: bodyData inScope: scope tail: tail
+	"A let with more bindings than a block may have arguments (15; review C-4):
+	 [| v1 ... vn | v1 := e1. ... body] value, each e evaluated in the outer scope."
+	| childScope names assigns body |
+	names := params collect: [:p | self nextName].
+	assigns := names with: valueData collect: [:t :d | self assign: t value: (self translate: d inScope: scope)].
+	childScope := scope copy.
+	params with: names do: [:p :t | childScope at: p put: t].
+	body := self translateScopedBody: bodyData inScope: childScope tail: tail.
+	^ self messageNode: (self blockWithArgs: #()
+			temps: (names , (body at: 1) asArray collect: [:nm | self var: nm])
+			statements: assigns , (body at: 2))
+		selector: #value
+		arguments: #()'.
 cm value: comp value: 'translating' value: 'translateNamedLet: parts inScope: scope tail: tail
 	"(let name ((v e)...) body...) is ((let () (define (name v...) body...) name) e...):
 	 name is visible in the body only, and the initial values are evaluated outside it."
@@ -734,12 +802,14 @@ cm value: comp value: 'translating' value: 'translateSet: form inScope: scope
 
 "=== entry points =========================================================="
 cm value: comp value: 'compiling' value: 'compile: datum
+	^ self compile: datum context: nil'.
+cm value: comp value: 'compiling' value: 'compile: datum context: text
 	"A top-level form is not in tail position: its calls are ordinary calls."
 	| exprNode method |
 	counter := 0.
 	selfLoop := nil.
 	topForm := datum.
-	sourceContext := nil.
+	sourceContext := text.
 	inBody := false.
 	inlineTemps := 0.
 	expansionDepth := 0.
@@ -764,7 +834,24 @@ cm value: comp value: 'compiling' value: 'describeBackEndError: anError
 		ifTrue: [^ ''too many parameters or let bindings (at most 15)''].
 	^ ''cannot compile ('' , anError class name , '' '' , text , '')'''.
 cm value: comp value: 'evaluating' value: 'eval: datum
-	^ (self compile: datum) valueWithReceiver: nil arguments: #()'.
+	^ self eval: datum context: nil steps: 0'.
+cm value: comp value: 'evaluating' value: 'eval: datum context: text steps: n
+	"At top level, the forms of a begin and the expansion of a macro call are
+	 themselves top-level forms, compiled and run one after another (R7RS; review
+	 C-11). So a define-macro there is at top level, and a macro it defines can be
+	 used by the forms after it. text is the source a made-up lambda takes."
+	| m result |
+	n > self class maxExpansions ifTrue: [^ self expansionTooDeep: datum].
+	((datum isKindOf: LispCons) and: [datum car == (LispSymbol named: ''begin'')]) ifTrue: [
+		result := LispUnspecified default.
+		(self listToArray: datum cdr) do: [:f | result := self eval: f context: text steps: n].
+		^ result].
+	m := (datum isKindOf: LispCons) ifTrue: [self macroFor: datum car inScope: IdentityDictionary new] ifFalse: [nil].
+	m notNil ifTrue: [
+		^ self eval: (self expand: datum with: m)
+			context: ((self recordedSourceOf: datum) ifNil: [text])
+			steps: n + 1].
+	^ (self compile: datum context: text) valueWithReceiver: nil arguments: #()'.
 cm value: comp value: 'evaluating' value: 'eval: datum from: aReader
 	"Evaluate a datum read by aReader, so procedures can keep their exact source text."
 	sourceMap := aReader.

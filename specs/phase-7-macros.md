@@ -133,6 +133,12 @@ inside a body (after an expression, or inside an `if`, `when`, …), whether
 written or produced by a macro, is a compile error. At top level, `define` in a
 `begin` or other expression still makes a global.
 
+*Since Phase 7.5 (review C-11):* at top level, the forms of a `begin` and the
+expansion of a macro call are themselves top-level forms, compiled and run one
+after another. So `define-macro` is allowed in a top-level `begin`, a macro may
+expand to several `define-macro`s, and a macro defined early in a `begin` can be
+used later in it.
+
 ## 7. Derived forms (`lib/core.lisp`)
 
 Written as `define-macro`s; loaded into `cog-lisp.image` by the build and by the

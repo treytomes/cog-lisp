@@ -66,6 +66,12 @@ cm value: cons value: 'enumerating' value: 'lispTail
 	^ cur'.
 cm value: cons class value: 'instance creation' value: 'car: a cdr: b
 	^ self new setCar: a cdr: b'.
+cm value: cons class value: 'instance creation' value: 'fromArray: anArray tail: tail
+	"A fresh list of anArray''s elements ending in tail (quasiquote, review C-3)."
+	| result |
+	result := tail.
+	anArray reverseDo: [:e | result := self car: e cdr: result].
+	^ result'.
 cm value: cons class value: 'instance creation' value: 'fromArray: anArray
 	| result |
 	result := LispEmptyList default.
@@ -107,6 +113,9 @@ cm value: sym value: 'private' value: 'setName: aString
 	name := aString'.
 cm value: sym value: 'testing' value: 'isLispSymbol
 	^ true'.
+cm value: sym class value: 'testing' value: 'isInterned: aSymbol
+	"False for a gensym: no symbol read from text is identical to it."
+	^ Interned notNil and: [(Interned at: aSymbol name ifAbsent: [nil]) == aSymbol]'.
 cm value: sym class value: 'instance creation' value: 'named: aString
 	Interned isNil ifTrue: [Interned := Dictionary new].
 	^ Interned at: aString ifAbsent: [Interned at: aString put: (self new setName: aString)]'.

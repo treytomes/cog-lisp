@@ -393,3 +393,25 @@ The self-loop of §10 reused its parameter temporaries across iterations, so
 closures created inside the loop shared them and saw later values. Fixed in
 Phase 7 by copying the parameters into per-iteration temporaries declared in the
 loop block; see `specs/phase-7-macros.md` §11.
+
+## 13. Changes from the Phase 7.5 review
+
+See `specs/review-phases-1-7.md` for the evidence behind each.
+
+- **Fixed-arity entries are now 0–4 as §10 says** (O-1). `+` and `*` had 1–3 and
+  the comparisons only 2, so `(+ acc g1 g2 g3)` took the variadic path, about 14×
+  slower. The `globals` benchmark is that expression: 24.8 → 2.2 ms, and its gap
+  to Smalltalk went from ~80× to ~7×. `-` has 1–4; `= < > <= >=` have 2–4.
+- **Self-loops for local procedures** (C-8). Internal defines, and so named `let`,
+  `do`, `dolist` and `dotimes`, compile their self tail calls as loops too. The
+  guard compares the local variable, not a global cell, with the procedure, so
+  `set!` of the local mid-loop is still followed. They had bounced on every
+  iteration, ~9× slower than a global self-loop; now the same speed.
+- **One set of argument temps per loop** (C-1, C-12). Each self tail call
+  allocated new temps for its arguments in the procedure's one frame, so about 8
+  self tail calls overflowed it; and each call's arguments were compiled twice.
+  Now the arguments are evaluated once, into temps every self tail call of the
+  loop shares, and then the guard is checked.
+- **`set!` and `define` no longer make a closure** (C-9): they sequence with
+  `true ifTrue: [...]`, as `begin` does since Phase 7, so a `set!` variable is
+  no longer forced into the heap.

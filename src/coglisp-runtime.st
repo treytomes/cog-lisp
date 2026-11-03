@@ -407,9 +407,11 @@ cm value: prims class value: 'installing' value: 'installNumberEntriesInto: anEn
 	 variadic arithmetic primitives, so (+ a b) costs one block call."
 	| e |
 	e := [:name | anEnv lookup: (LispSymbol named: name)].
-	(e value: ''+'') entry: 1 is: [:a | a]; entry: 2 is: [:a :b | a + b]; entry: 3 is: [:a :b :c | a + b + c].
-	(e value: ''*'') entry: 1 is: [:a | a]; entry: 2 is: [:a :b | a * b]; entry: 3 is: [:a :b :c | a * b * c].
-	(e value: ''-'') entry: 1 is: [:a | a negated]; entry: 2 is: [:a :b | a - b].
+	"0 to 4 arguments, as Phase 6 section 10 says: with four, (+ acc g1 g2 g3) used to take
+	 the variadic path, 14 times slower (review O-1)"
+	(e value: ''+'') entry: 0 is: [0]; entry: 1 is: [:a | a]; entry: 2 is: [:a :b | a + b]; entry: 3 is: [:a :b :c | a + b + c]; entry: 4 is: [:a :b :c :d | a + b + c + d].
+	(e value: ''*'') entry: 0 is: [1]; entry: 1 is: [:a | a]; entry: 2 is: [:a :b | a * b]; entry: 3 is: [:a :b :c | a * b * c]; entry: 4 is: [:a :b :c :d | a * b * c * d].
+	(e value: ''-'') entry: 1 is: [:a | a negated]; entry: 2 is: [:a :b | a - b]; entry: 3 is: [:a :b :c | a - b - c]; entry: 4 is: [:a :b :c :d | a - b - c - d].
 	(e value: ''/'') entry: 1 is: [:a | 1 / a]; entry: 2 is: [:a :b | a / b].
 	(e value: ''min'') entry: 2 is: [:a :b | a min: b].
 	(e value: ''max'') entry: 2 is: [:a :b | a max: b]'.
@@ -423,6 +425,11 @@ cm value: prims class value: 'installing' value: 'installComparisonsInto: anEnv
 	"direct two-argument entries (Phase 6 section 5.1)"
 	e := [:name | anEnv lookup: (LispSymbol named: name)].
 	(e value: ''='') entry: 2 is: [:a :b | a = b].
+	"chained three- and four-argument comparisons (review O-1)"
+	#(#= #< #> #<= #>=) do: [:op |
+		(e value: op asString)
+			entry: 3 is: [:a :b :c | (a perform: op with: b) and: [b perform: op with: c]];
+			entry: 4 is: [:a :b :c :d | ((a perform: op with: b) and: [b perform: op with: c]) and: [c perform: op with: d]]].
 	(e value: ''<'') entry: 2 is: [:a :b | a < b].
 	(e value: ''>'') entry: 2 is: [:a :b | a > b].
 	(e value: ''<='') entry: 2 is: [:a :b | a <= b].

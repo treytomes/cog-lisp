@@ -146,6 +146,83 @@ h check: 'R-3 ordinary work under the watchdog is unaffected'
 	actual: (LispShellCommand new withMemoryLimit: Smalltalk vm memorySize + 100000000 do: [ev value: '(define (cnt n) (if (= n 0) 0 (+ 1 (cnt (- n 1))))) (cnt 10000)'])
 	expected: 10000.
 
+"C-1 / C-12 self tail calls share scratch temps and evaluate arguments once"
+h check: 'C-1 thirty self tail calls in one procedure compile'
+	actual: (ev value: (String streamContents: [:s |
+		s nextPutAll: '(define (st n a b c) (cond ((= n 0) (list a b c))'.
+		1 to: 30 do: [:i | s nextPutAll: ' ((= n ' , (1000 + i) printString , ') (st (- n 1) b c a))'].
+		s nextPutAll: ' (else (st (- n 1) a b c)))) (st 3 1 2 3)']))
+	expected: (lst value: '(1 2 3)').
+h check: 'C-1 arguments are all evaluated before any is assigned' actual: (ev value: '(define (sw n a b) (if (= n 0) (list a b) (sw (- n 1) b a))) (sw 3 1 2)') expected: (lst value: '(2 1)').
+h check: 'C-1 a non-tail self call inside an argument' actual: (ev value: '(define (nt n acc) (if (= n 0) acc (nt (- n 1) (+ acc (if (= n 1) (nt 0 100) 1))))) (nt 5 0)') expected: 104.
+h check: 'C-12 a macro in a self-tail-call argument expands once'
+	actual: (ev value: '(define expansions 0) (define-macro (counted x) (set!! expansions (+ expansions 1)) x) (define (ce n) (if (= n 0) 0 (ce (counted (- n 1))))) (ce 3) expansions')
+	expected: 1.
+
+"C-8 local procedures (internal define, named let, do) loop too"
+h check: 'C-8 redefining a local procedure with set!! mid-loop is followed'
+	actual: (ev value: '(define (rl) (define (f n) (if (= n 0) (quote old) (begin (if (= n 2) (set!! f (lambda (k) (quote new)))) (f (- n 1))))) (f 5)) (rl)')
+	expected: (LispSymbol named: 'new').
+h check: 'C-8 a name rebound in the body is not a self call'
+	actual: (ev value: '(define (sh) (define (f n) (if (= n 0) 0 (let ((f (lambda (k) 42))) (f (- n 1))))) (f 3)) (sh)')
+	expected: 42.
+h check: 'C-8 closures made in a named let keep each iteration'
+	actual: (ev value: '(map (lambda (g) (g)) (let lp ((i 3) (acc (list))) (if (= i 0) acc (lp (- i 1) (cons (lambda () i) acc)))))')
+	expected: (lst value: '(1 2 3)').
+ev value: '(define (gl n acc) (if (= n 0) acc (gl (- n 1) (+ acc 1)))) (define (nl n) (let lp ((i n) (acc 0)) (if (= i 0) acc (lp (- i 1) (+ acc 1)))))'.
+ev value: '(gl 100000 0) (nl 100000)'.
+Smalltalk garbageCollect.
+h check: 'C-8 a named let runs about as fast as a global self-loop (was ~9x slower)'
+	actual: ([ev value: '(nl 3000000)'] timeToRun asMilliSeconds < (3 * ([ev value: '(gl 3000000 0)'] timeToRun asMilliSeconds max: 20)))
+	expected: true.
+
+"C-9 set!! and define no longer make a closure (behavior unchanged)"
+h check: 'C-9 set!! of a parameter' actual: (ev value: '(define (f9 x) (set!! x (+ x 1)) x) (f9 1)') expected: 2.
+h check: 'C-9 a closure over a set!! variable still sees updates'
+	actual: (ev value: '(define (mkc) (let ((c 0)) (lambda () (set!! c (+ c 1)) c))) (define c9 (mkc)) (c9) (c9)')
+	expected: 2.
+
+"C-10 named let keeps its own text"
+h check: 'C-10 named let source' actual: (ev value: '(procedure-source (let lp ((i 0)) lp))') expected: '(let lp ((i 0)) lp)'.
+h check: 'C-10 let with directLet off keeps the let text'
+	actual: (LispCompiler withoutOptions: #(#directLet) do: [ev value: '(procedure-source (let ((k 1)) (lambda () k)))'])
+	expected: '(lambda () k)'.
+
+"C-11 a top-level begin is top level"
+h check: 'C-11 define-macro in a top-level begin, used later in it' actual: (ev value: '(begin (define-macro (m11) 11) (m11))') expected: 11.
+h check: 'C-11 a macro that defines two macros'
+	actual: (ev value: '(define-macro (two-macros) (quote (begin (define-macro (ma) 1) (define-macro (mb) 2)))) (two-macros) (+ (ma) (mb))')
+	expected: 3.
+h check: 'C-11 an empty top-level begin' actual: (ev value: '(begin)') expected: LispUnspecified default.
+
+"C-13 gensyms survive quoting with literalQuote off"
+h check: 'C-13 a quoted gensym is itself'
+	actual: (LispCompiler withoutOptions: #(#literalQuote) do: [
+		ev value: '(define-macro (qg) (let ((g (gensym))) `(eq? (quote ,g) (quote ,g)))) (qg)'])
+	expected: true.
+
+"C-3 large quasiquote templates"
+h check: 'C-3 sixty unquoted elements'
+	actual: (ev value: '(let ((x 1)) (length `(' , ((1 to: 60) inject: '' into: [:a :i | a , ' ,x']) , ')))')
+	expected: 60.
+h check: 'C-3 splices between runs' actual: (ev value: '(let ((x 1) (ys (list 2 3))) `(0 ,x ,@ys 4 ,x ,@ys . 5))') expected: (lst value: '(0 1 2 3 4 1 2 3 . 5)').
+h check: 'C-3 a dotted unquote tail' actual: (ev value: '(let ((x 2)) `(1 . ,x))') expected: (lst value: '(1 . 2)').
+h check: 'C-3 nested levels still right' actual: (ev value: '`(a `(b ,(c ,(+ 1 2))))') expected: (lst value: '(a (quasiquote (b (unquote (c 3)))))').
+
+"C-4 a let with more than 15 bindings"
+h check: 'C-4 twenty bindings'
+	actual: (ev value: '(let (' , ((1 to: 20) inject: '' into: [:a :i | a , ' (v' , i printString , ' ' , i printString , ')']) , ') (+ v1 v20 (* v10 2)))')
+	expected: 41.
+h check: 'C-4 the values see the outer scope' actual: (ev value: '(let ((v1 100)) (let (' , ((1 to: 16) inject: '' into: [:a :i | a , ' (v' , i printString , ' v1)']) , ') v16))') expected: 100.
+
+"O-1 0 to 4 argument entries"
+h check: 'O-1 + and * have entries for 0 to 4 arguments'
+	actual: ((0 to: 4) allSatisfy: [:n | ((LispEnvironment default lookup: (LispSymbol named: '+')) entryFor: n) notNil
+		and: [((LispEnvironment default lookup: (LispSymbol named: '*')) entryFor: n) notNil]])
+	expected: true.
+h check: 'O-1 four-argument arithmetic' actual: (ev value: '(list (+ 1 2 3 4) (* 1 2 3 4) (- 10 1 2 3) (+) (*))') expected: (lst value: '(10 24 4 0 1)').
+h check: 'O-1 chained comparisons' actual: (ev value: '(list (< 1 2 3) (< 1 3 2) (<= 1 1 2 2) (= 2 2 2 2) (> 3 2 1) (>= 3 3 4))') expected: (lst value: '(#t #f #t #t #t #f)').
+
 h finish
 ] on: Error do: [:e | h harnessError: e].
 !
