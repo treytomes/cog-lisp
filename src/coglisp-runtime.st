@@ -315,7 +315,9 @@ cm value: prims class value: 'installing' value: 'installMacroSupportInto: anEnv
 	 so no symbol the reader produces is ever identical to one."
 	anEnv define: (LispSymbol named: ''gensym'') value: (LispProcedure variadic: [:prefix |
 		GensymCounter := (GensymCounter ifNil: [0]) + 1.
-		LispSymbol new setName: (prefix lispElements ifEmpty: [''g''] ifNotEmpty: [:p | p first]) , GensymCounter printString]
+		"the prefix may be a string or a symbol (review R-19)"
+		LispSymbol new setName: (prefix lispElements ifEmpty: [''g''] ifNotEmpty: [:p |
+			(p first isKindOf: LispSymbol) ifTrue: [p first name] ifFalse: [p first asString]]) , GensymCounter printString]
 		required: 0).
 	anEnv define: (LispSymbol named: ''macroexpand-1'') value: (LispProcedure fixed: [:form | LispCompiler new macroexpand1: form] arity: 1).
 	anEnv define: (LispSymbol named: ''macroexpand'') value: (LispProcedure fixed: [:form | LispCompiler new macroexpand: form] arity: 1).
@@ -447,7 +449,7 @@ cm value: prims class value: 'installing' value: 'installPredicatesInto: anEnv
 	anEnv define: (LispSymbol named: ''boolean?'') value: (LispProcedure fixed: [:x | LispCore isBoolean: x] arity: 1).
 	anEnv define: (LispSymbol named: ''procedure?'') value: (LispProcedure fixed: [:x | x isKindOf: LispProcedure] arity: 1)'.
 cm value: prims class value: 'installing' value: 'installIOInto: anEnv
-	anEnv define: (LispSymbol named: ''display'') value: (LispProcedure fixed: [:x | self output nextPutAll: ((x isKindOf: String) ifTrue: [x] ifFalse: [LispPrinter writeString: x]); flush. LispUnspecified default] arity: 1).
+	anEnv define: (LispSymbol named: ''display'') value: (LispProcedure fixed: [:x | self output nextPutAll: (LispPrinter displayString: x); flush. LispUnspecified default] arity: 1).
 	anEnv define: (LispSymbol named: ''write'') value: (LispProcedure fixed: [:x | self output nextPutAll: (LispPrinter writeString: x); flush. LispUnspecified default] arity: 1).
 	anEnv define: (LispSymbol named: ''newline'') value: (LispProcedure fixed: [self output nextPut: Character lf; flush. LispUnspecified default] arity: 0)'.
 cm value: prims class value: 'installing' value: 'installSystemInto: anEnv

@@ -223,6 +223,50 @@ h check: 'O-1 + and * have entries for 0 to 4 arguments'
 h check: 'O-1 four-argument arithmetic' actual: (ev value: '(list (+ 1 2 3 4) (* 1 2 3 4) (- 10 1 2 3) (+) (*))') expected: (lst value: '(10 24 4 0 1)').
 h check: 'O-1 chained comparisons' actual: (ev value: '(list (< 1 2 3) (< 1 3 2) (<= 1 1 2 2) (= 2 2 2 2) (> 3 2 1) (>= 3 3 4))') expected: (lst value: '(#t #f #t #t #t #f)').
 
+"R-4 list? on a circular list"
+h check: 'R-4 list? of a circular list is #f' actual: (ev value: '(define cy3 (list 1 2)) (set-cdr!! (cdr cy3) cy3) (list? cy3)') expected: false.
+h check: 'R-4 list? still right on proper and dotted lists' actual: (ev value: '(list (list? (quote (1 2 3))) (list? (quote (1 . 2))) (list? (quote ())))') expected: (lst value: '(#t #f #t)').
+
+"R-6 the REPL evaluates forms as it reads them"
+h check: 'R-6 forms before a read error on the same line still run, then the error'
+	actual: ([:input | | o e | o := WriteStream on: String new. e := WriteStream on: String new.
+		(LispRepl in: input readStream out: o err: e) run. { o contents. e contents }] value: '(display 1) (display 2) )
+')
+	expected: { '> 12> ' , (String with: Character lf). 'error: unexpected )' , (String with: Character lf) }.
+h check: 'R-6 a form split across lines runs once, after the forms before it'
+	actual: ([:input | | o e | o := WriteStream on: String new. e := WriteStream on: String new.
+		(LispRepl in: input readStream out: o err: e) run. o contents] value: '(display 1) (display
+ 2)
+(+ 1 2)
+')
+	expected: '> 12> 3' , (String with: Character lf) , '> ' , (String with: Character lf).
+
+"R-8 display shows strings and characters as text, also inside lists"
+h check: 'R-8 display of a character' actual: (LispPrinter displayString: $a) expected: 'a'.
+h check: 'R-8 display of a list with strings and characters' actual: (LispPrinter displayString: (lst value: '("a" #\b c (d "e") . "f")')) expected: '(a b c (d e) . f)'.
+h check: 'R-8 write is unchanged' actual: (LispPrinter writeString: (lst value: '("a" #\b c)')) expected: '("a" #\b c)'.
+h check: 'R-8 display goes through the new printer'
+	actual: (String streamContents: [:s | LispPrimitives withOutput: s do: [ev value: '(display (list "x" #\y))']])
+	expected: '(x y)'.
+
+"R-11 fractions print as n/d"
+h check: 'R-11 a fraction' actual: (LispPrinter writeString: (ev value: '(/ 6 4)')) expected: '3/2'.
+h check: 'R-11 a negative fraction in a list' actual: (LispPrinter writeString: (ev value: '(list (/ -1 3))')) expected: '(-1/3)'.
+
+"R-12 -0.0"
+h check: 'R-12 -0.0 reads with its sign' actual: (lst value: '-0.0') signBit expected: 1.
+h check: 'R-12 -0.0 round-trips' actual: (LispPrinter writeString: (lst value: '-0.0')) expected: '-0.0'.
+h check: 'R-12 eqv? tells 0.0 from -0.0' actual: (ev value: '(list (eqv? 0.0 -0.0) (eqv? -0.0 -0.0) (= 0.0 -0.0))') expected: (lst value: '(#f #t #t)').
+
+"R-19 gensym takes a symbol prefix"
+h check: 'R-19 (gensym (quote pre))' actual: ((LispPrinter writeString: (ev value: '(gensym (quote pre))')) beginsWith: 'pre') expected: true.
+
+"R-20 control characters are written by code"
+h check: 'R-20 character 1' actual: (LispPrinter writeString: (Character value: 1)) expected: '#\x1'.
+h check: 'R-20 character 127' actual: (LispPrinter writeString: (Character value: 127)) expected: '#\x7f'.
+h check: 'R-20 ... and read back' actual: (lst value: (LispPrinter writeString: (Character value: 1))) expected: (Character value: 1).
+h check: 'R-20 named characters unchanged' actual: (LispPrinter writeString: (lst value: '(#\a #\space #\newline)')) expected: '(#\a #\space #\newline)'.
+
 h finish
 ] on: Error do: [:e | h harnessError: e].
 !

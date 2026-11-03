@@ -6,6 +6,12 @@ and, once fixed, the commit.
 
 Verdicts: **fix now** (in Phase 7.5) · **plan → phase** · **keep** (with reason).
 
+**Status (2026-11-03):** every *fix now* finding is fixed, in four batches
+(hygiene & tests; errors; compiler loops & speed; runtime correctness), each with
+regression checks in `tests/phase-7.5-review.st` (114 checks) or a runner
+fixture. What is left is *planned* for a named phase or *kept*; T-3 goes into the
+Phase 7.5 VS Code extension.
+
 Finding ids: **H** repo hygiene, **T** tests & build, **D** docs, **O**
 optimization; **C** compiler & macros and **R** reader, data model, runtime &
 REPL come from the independent reviews.
@@ -177,7 +183,7 @@ re-run and reproduced before being recorded.
 - **Evidence.** A quoted gensym `eq?` itself: `#t` normally, `#f` with the option off.
 - **Fix.** Emit an uninterned symbol as a literal.
 
-### C-14 Special-form names cannot be shadowed; `case` captures a local `memv` — plan → hygienic macros
+### C-14 Special-form names cannot be shadowed; `case` captures a local `memv` — fixed (batch 4; stopgap and docs; hygiene planned → hygienic macros)
 - **Evidence.** `((lambda (if) (if 1 2 3)) +)` → 2 (Scheme: 6; re-run);
   `(let ((memv (lambda (a b) #t))) (case 5 ((1) 'one) (else 'other)))` → `one`.
   The body scanner honours a local `begin`; `translateForm` does not.
@@ -241,7 +247,7 @@ were re-run and reproduced.
   the image that signals a LISP error in the running program well below the
   cap, with the cap as the backstop.
 
-### R-4 Cyclic lists hang `list?`, `length`, `equal?` and printing — fixed (batch 2; length; list? in batch 4)
+### R-4 Cyclic lists hang `list?`, `length`, `equal?` and printing — fixed (batch 4; list? (length in batch 2); cycle-safe equal? and printing planned → self-hosting)
 - **Evidence.** After `(set-cdr! (cdr l) l)`, each of those timed out.
 - **Fix.** Cycle check (two pointers) in `list?` (R7RS: `#f`) and `length`
   (error). Cycle-safe `equal?` and printing: **plan → self-hosting**.
@@ -256,13 +262,13 @@ were re-run and reproduced.
   CogLisp-Core: 1'`, exits 1 and saves nothing. An unhandled error in a test
   suite's load chunk prints its stack and exits 1.
 
-### R-6 The REPL drops forms before a read error on the same line — fix now
+### R-6 The REPL drops forms before a read error on the same line — fixed (batch 4)
 - **Evidence.** `(display 1) (display 2) )` prints nothing, then `error:
   unexpected )` (re-run).
 - **Fix.** Evaluate each datum as soon as it is read; keep only the incomplete
   tail for the next line.
 
-### R-8 `display` writes characters and nested strings — fix now
+### R-8 `display` writes characters and nested strings — fixed (batch 4)
 - **Evidence.** `(display #\a)` → `#\a`; `(display '("a" #\b c))` → `("a" #\b c)`
   (re-run). R7RS: `a`, `(a b c)`.
 - **Fix.** A display mode in `LispPrinter`.
@@ -278,12 +284,12 @@ were re-run and reproduced.
   `(exit 2.5)` → 0.
 - **Fix.** Integers 0–255; `#t` → 0, `#f` → 1 (R7RS); otherwise an error.
 
-### R-11 Fractions print as `(3/2)` — fix now (printer), plan (rest)
+### R-11 Fractions print as `(3/2)` — fixed (batch 4; printer; reading rationals planned → numeric tower)
 - **Evidence.** `(display (/ 6 4))` → `(3/2)` (re-run), which reads back as a list.
 - **Fix.** Write `3/2`. Reading rationals, `integer?` on `2.0`, type checks in
   one-argument arithmetic (`(+ 'a)` → `a`): **plan → numeric tower**.
 
-### R-12 The reader loses the sign of `-0.0`; `eqv?` ignores it — fix now
+### R-12 The reader loses the sign of `-0.0`; `eqv?` ignores it — fixed (batch 4)
 - **Evidence.** `-0.0` reads with sign bit 0; `(eqv? 0.0 -0.0)` → `#t` (R7RS: `#f`).
 - **Fix.** `Float negativeZero` in `parseFloat:`; `eqv:` compares float sign bits.
 
@@ -317,13 +323,13 @@ were re-run and reproduced.
   returns a `LispTailCall`; `LispProcedure` has no `value:`; a Smalltalk `Symbol`
   counts as `string?`; `nil` writes as `nil`; the eof object writes as `an Object`.
 
-### R-19 `(gensym 'pre)` fails — fix now; plain gensym printing — keep
+### R-19 `(gensym 'pre)` fails — fixed (batch 4; prefix; plain printing kept)
 - **Evidence.** `(gensym 'pre)` → MNU `LispSymbol >> #,`. Gensyms print like
   interned symbols.
 - **Verdict.** Accept a symbol prefix. Keep plain printing (easier to read in
   macro expansions); revisit with hygienic macros.
 
-### R-20 Control characters are written raw — fix now (characters), plan (strings)
+### R-20 Control characters are written raw — fixed (batch 4; characters; strings planned → self-hosting)
 - **Evidence.** `(Character value: 1)` writes `#\` plus the raw byte (Phase 1 §8:
   re-escaped).
 - **Fix.** Write `#\x1`. Strings need a `\x..;` reader escape: **plan →

@@ -43,17 +43,26 @@ cm value: core class value: 'predicates' value: 'isInteger: v
 cm value: core class value: 'predicates' value: 'isReal: v
 	^ v isKindOf: Number'.
 cm value: core class value: 'predicates' value: 'isList: v
-	| cur |
+	"False for a circular list, as R7RS requires (review R-4): a second pointer at
+	 half speed meets the first one if the spine loops."
+	| cur slow step |
 	cur := v.
-	[self isPair: cur] whileTrue: [cur := cur cdr].
+	slow := v.
+	step := 0.
+	[self isPair: cur] whileTrue: [
+		cur := cur cdr.
+		step := step + 1.
+		step even ifTrue: [slow := slow cdr. slow == cur ifTrue: [^ false]]].
 	^ self isNull: cur'.
 
 "=== LispCore : equality (class-side) ======================================"
 cm value: core class value: 'equality' value: 'eq: a with: b
 	^ a == b'.
 cm value: core class value: 'equality' value: 'eqv: a with: b
-	((self isNumber: a) and: [self isNumber: b])
-		ifTrue: [^ ((a isKindOf: Float) = (b isKindOf: Float)) and: [a = b]].
+	((self isNumber: a) and: [self isNumber: b]) ifTrue: [
+		"floats also by sign, so 0.0 and -0.0 differ (R7RS; review R-12)"
+		((a isKindOf: Float) and: [b isKindOf: Float]) ifTrue: [^ a = b and: [a signBit = b signBit]].
+		^ ((a isKindOf: Float) = (b isKindOf: Float)) and: [a = b]].
 	((self isChar: a) and: [self isChar: b]) ifTrue: [^ a = b].
 	^ a == b'.
 cm value: core class value: 'equality' value: 'equal: a with: b

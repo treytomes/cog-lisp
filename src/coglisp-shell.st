@@ -151,18 +151,21 @@ cm value: repl value: 'running' value: 'evalAndPrint: datum from: aReader
 		on: Error
 		do: [:e | self report: e]'.
 cm value: repl value: 'running' value: 'process: buffer
-	"Evaluate every complete datum in buffer and answer what is left to keep reading:
-	 the buffer itself if the input so far is an incomplete datum, else the empty string."
-	| reader data d |
+	"Evaluate each complete datum in buffer as soon as it is read, and answer what is
+	 left to keep reading: the text after the last complete datum if the input ends in
+	 an incomplete one, else the empty string. Evaluating as we go means a read error
+	 later on the line no longer discards the forms before it (review R-6)."
+	| reader d consumed |
 	reader := LispReader on: buffer.
-	data := OrderedCollection new.
-	[[(d := reader next) == LispReader eofObject] whileFalse: [data add: d]]
+	consumed := 0.
+	[[(d := reader next) == LispReader eofObject] whileFalse: [
+		consumed := reader position.
+		self evalAndPrint: d from: reader]]
 		on: LispReadError
 		do: [:e |
-			e isIncomplete ifTrue: [^ buffer].
+			e isIncomplete ifTrue: [^ buffer copyFrom: consumed + 1 to: buffer size].
 			self report: e.
 			^ ''''].
-	data do: [:each | self evalAndPrint: each from: reader].
 	^ '''''.
 cm value: repl value: 'running' value: 'run
 	"Loop until end of input. Output from display/write goes to the same stream as results."

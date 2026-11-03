@@ -513,7 +513,8 @@ cm value: comp value: 'translating' value: 'translateScopedBody: dataArray inSco
 						childScope at: ((target isKindOf: LispCons) ifTrue: [target car] ifFalse: [target]) put: nm.
 						defs add: { datum. item second. nm }]
 					ifFalse: [
-						((datum isKindOf: LispCons) and: [datum car == beginSym and: [(childScope includesKey: beginSym) not]])
+						"special-form names cannot be rebound locally (review C-14), here as in translateForm:"
+						((datum isKindOf: LispCons) and: [datum car == beginSym])
 							ifTrue: [(self listToArray: datum cdr) reverseDo: [:d | pending addFirst: { d. item second }]]
 							ifFalse: [rest := OrderedCollection with: item]]]].
 	rest isNil ifTrue: [rest := OrderedCollection new].

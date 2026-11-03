@@ -235,6 +235,9 @@ cm value: rdr value: 'source' value: 'datumStart
 	^ datumStart'.
 cm value: rdr value: 'source' value: 'source
 	^ source'.
+cm value: rdr value: 'source' value: 'position
+	"How many characters have been read so far."
+	^ stream position'.
 cm value: rdr value: 'reading' value: 'atEnd
 	self skipIntertoken.
 	^ stream atEnd'.
@@ -431,6 +434,8 @@ cm value: rdr value: 'number parsing' value: 'parseFloat: str
 	mantissa := intPart * (10 raisedTo: fracLen) + fracPart.
 	value := sign * mantissa / (10 raisedTo: fracLen).
 	value := value * (10 raisedTo: expSign * exp).
+	"-0.0 keeps its sign (Phase 1 round trip; review R-12)"
+	(value = 0 and: [sign = -1]) ifTrue: [^ Float negativeZero].
 	^ value asFloat'.
 cm value: rdr value: 'reading' value: 'readHash
 	| c word |
@@ -507,7 +512,19 @@ cm value: prn class value: 'writing' value: 'writeString: aValue limitedTo: n
 	text := [String streamContents: [:s | self write: aValue on: s] limitedTo: n]
 		on: Error do: [:e | aValue printString].
 	^ text size >= n ifTrue: [(text first: n) , ''...''] ifFalse: [text]'.
+cm value: prn class value: 'writing' value: 'displayString: aValue
+	"As display shows it: strings and characters as their own text, also inside
+	 lists (R7RS; review R-8)."
+	^ String streamContents: [:s | self print: aValue on: s display: true]'.
 cm value: prn class value: 'writing' value: 'write: v on: s
+	^ self print: v on: s display: false'.
+cm value: prn class value: 'writing' value: 'print: v on: s display: displaying
+	displaying ifTrue: [
+		(v isKindOf: String) ifTrue: [^ s nextPutAll: v].
+		(v isKindOf: Character) ifTrue: [^ s nextPut: v]].
+	(v isKindOf: LispCons) ifTrue: [^ self printList: v on: s display: displaying].
+	"3/2, which reads back as a symbol for now; Smalltalk prints (3/2) (review R-11)"
+	(v isKindOf: Fraction) ifTrue: [^ s print: v numerator; nextPut: $/; print: v denominator].
 	v == true ifTrue: [^ s nextPutAll: ''#t''].
 	v == false ifTrue: [^ s nextPutAll: ''#f''].
 	(v isKindOf: LispEmptyList) ifTrue: [^ s nextPutAll: ''()''].
@@ -520,14 +537,16 @@ cm value: prn class value: 'writing' value: 'write: v on: s
 	"Anything else (the unspecified value, procedures, host objects) writes its printString."
 	^ s nextPutAll: v printString'.
 cm value: prn class value: 'writing' value: 'writeList: aCons on: s
+	^ self printList: aCons on: s display: false'.
+cm value: prn class value: 'writing' value: 'printList: aCons on: s display: displaying
 	| cur |
 	s nextPut: $(.
 	cur := aCons.
 	[cur isKindOf: LispCons] whileTrue: [
-		self write: cur car on: s.
+		self print: cur car on: s display: displaying.
 		cur := cur cdr.
 		(cur isKindOf: LispCons) ifTrue: [s nextPut: Character space]].
-	(cur isKindOf: LispEmptyList) ifFalse: [s nextPutAll: '' . ''. self write: cur on: s].
+	(cur isKindOf: LispEmptyList) ifFalse: [s nextPutAll: '' . ''. self print: cur on: s display: displaying].
 	s nextPut: $)'.
 cm value: prn class value: 'writing' value: 'writeFloat: aFloat on: s
 	s nextPutAll: aFloat printString'.
@@ -537,6 +556,8 @@ cm value: prn class value: 'writing' value: 'writeCharacter: c on: s
 	c = Character tab ifTrue: [^ s nextPutAll: ''#\tab''].
 	c = Character cr ifTrue: [^ s nextPutAll: ''#\return''].
 	c = (Character value: 0) ifTrue: [^ s nextPutAll: ''#\null''].
+	"other control characters by code, so they are visible (Phase 1 section 8; review R-20)"
+	(c asInteger < 32 or: [c asInteger = 127]) ifTrue: [^ s nextPutAll: ''#\x''; nextPutAll: (c asInteger printStringBase: 16) asLowercase].
 	s nextPutAll: ''#\''.
 	s nextPut: c'.
 cm value: prn class value: 'writing' value: 'writeStringLiteral: str on: s

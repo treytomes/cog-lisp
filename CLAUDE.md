@@ -202,6 +202,9 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   method is compiled from `cm value: cls value: 'cat' value: '<source>'`, so an
   apostrophe in a comment (`Floyd's`) ends the literal early and the whole file
   fails to load with "End of statement expected". Write `''` (and `!!` for `!`).
+- **`aCharacter value` is the character itself**, not its code (it is
+  `Object>>value`); use `asInteger`. `Character value: n` (class side) does make a
+  character from a code.
 - **Never `^` inside a primitive's block.** A block stored in a `LispProcedure`
   runs after the installing method has returned, so a `^` in it raises
   `BlockCannotReturn`. Use `ifTrue:ifFalse:` instead.

@@ -287,3 +287,19 @@ Where the implementation settled details the spec left open:
   `examples/macros.lisp`, `examples/cl-style.lisp`, and the AC-20 fixture
   `tests/runner/derived-forms.lisp`) 36/36; all earlier suites and the
   benchmarks (12/12) unchanged.
+
+## 12. Notes from the Phase 7.5 review
+
+- **Special-form names cannot be rebound locally** (review C-14). `quote`, `if`,
+  `begin`, `lambda`, `let`, `define`, `set!`, `quasiquote` and `define-macro` are
+  recognized by name before scope is consulted, so `((lambda (if) (if 1 2 3)) +)`
+  is the `if` form, not a call. The body scanner now agrees (it used to honour a
+  local `begin`). Likewise a derived form's expansion refers to globals by name:
+  `case` expands to `memv`, so a local `memv` captures it. Both are resolved by
+  hygienic macros, a later phase.
+- **`,@,@x` at an inner quasiquote level is a compile error** (review C-15, kept):
+  R7RS would splice at the inner level; every other nesting case is correct.
+- **Equal string literals in one form may be one object** (review R-25, kept):
+  `(let ((a "abc") (b "abc")) (eq? a b))` is `#t`. R7RS allows literal sharing;
+  together with read-only string literals (CLAUDE.md), it matters once strings
+  can be mutated.
