@@ -242,7 +242,7 @@ node, or raise and catch an error. These come first (decided 2026-11-03):
   vectors, hash tables), as **native primitives** in cog-lisp's runtime rather
   than LISP names over Smalltalk objects: the world stays readable in LISP
   (Phase 9), and the fixpoint check is simpler without host objects in the loop.
-- **Self-hosting groundwork:** the review findings marked *plan → self-hosting*
+- **Self-hosting groundwork** ([spec accepted](specs/phase-7.9-self-hosting-groundwork.md), Phase 7.9): the review findings marked *plan → self-hosting*
   (`specs/review-phases-1-7.md`): calls nested ~20 deep (C-5), lambdas with
   more than 15 parameters (C-4), cycle-safe `equal?` and printing (R-4), string
   escapes for control characters (R-20), `load` relative to the loading file and
