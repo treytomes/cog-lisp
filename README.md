@@ -235,7 +235,7 @@ node, or raise and catch an error. These come first (decided 2026-11-03):
 - **Conditions and restarts** — ✅ done as Phase 7.7 ([spec](specs/phase-7.7-conditions-restarts.md)): `guard`, `with-exception-handler`, `restart-case`, and a break loop at the console REPL. A LISP-level error system: `error`, condition
   objects, handlers, and restarts, with host errors mapped to conditions (review
   R-2, C-18). Before the primitives below, so they signal proper conditions.
-- **Native strings, characters, vectors and hash tables:** what a reader and a
+- **Native strings, characters, vectors and hash tables** ([spec accepted](specs/phase-7.8-native-data.md), Phase 7.8): what a reader and a
   compiler written in LISP need (`string-ref`, `substring`, `string->symbol`,
   `string->number`, `char->integer`, character predicates, string building,
   vectors, hash tables), as **native primitives** in cog-lisp's runtime rather
@@ -295,6 +295,11 @@ Make the cog-lisp image stand on its own, so the stock Pharo image is not needed
   is LISP; it also resolves special-form shadowing and capture (review C-14).
 - *Acceptance:* a cog-lisp image built without the stock image runs the example
   programs and the acceptance suites, and the user-visible world is LISP.
+
+### Later: a user manual (owner idea, 2026-11-04)
+The examples in `examples/` (each runnable, with its expected output checked by
+the test suites) are written to become the backbone of a cog-lisp user manual:
+one chapter per feature, with the example as its worked, verified code.
 
 ### Later: an expert system in cog-lisp (owner idea, 2026-11-03)
 A first large program written *in* cog-lisp, once the language phases are done:

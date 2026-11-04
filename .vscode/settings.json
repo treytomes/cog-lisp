@@ -3,6 +3,7 @@
         "*.lisp": "cog-lisp"
     },
     "cSpell.words": [
+        "alist",
         "assq",
         "assv",
         "bignum",
@@ -58,9 +59,11 @@
         "Sexpr",
         "shadowable",
         "Sista",
+        "SRFI",
         "Stmts",
         "STON",
         "Subclassing",
+        "subvector",
         "symbolp",
         "tmgrammar",
         "transliterable",
