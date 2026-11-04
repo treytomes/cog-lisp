@@ -124,7 +124,8 @@ function sendToRepl() {
   terminal.sendText(text.replace(/\r\n/g, '\n').trimEnd(), true);
 }
 
-/** The newest of src\*.st and lib\core.lisp, if newer than the built image. */
+/** The newest of src\*.st, lib\core.lisp and lib\compiler\*.lisp (all built
+ * into the image), if newer than the built image. */
 function staleSource(root) {
   const image = path.join(root, 'pharo', 'cog-lisp.image');
   if (!fs.existsSync(image)) return { file: null, missing: true };
@@ -135,6 +136,10 @@ function staleSource(root) {
     for (const name of fs.readdirSync(src)) if (name.endsWith('.st')) sources.push(path.join(src, name));
   }
   sources.push(path.join(root, 'lib', 'core.lisp'));
+  const compiler = path.join(root, 'lib', 'compiler');
+  if (fs.existsSync(compiler)) {
+    for (const name of fs.readdirSync(compiler)) if (name.endsWith('.lisp')) sources.push(path.join(compiler, name));
+  }
   let newest = null;
   for (const file of sources) {
     if (!fs.existsSync(file)) continue;
@@ -180,7 +185,8 @@ function activate(context) {
       const root = cogLispRoot();
       if (!root) return;
       const rel = path.relative(root, doc.uri.fsPath).toLowerCase();
-      if ((rel.startsWith('src' + path.sep) && rel.endsWith('.st')) || rel === path.join('lib', 'core.lisp')) checkStale();
+      if ((rel.startsWith('src' + path.sep) && rel.endsWith('.st')) || rel === path.join('lib', 'core.lisp')
+          || (rel.startsWith(path.join('lib', 'compiler') + path.sep) && rel.endsWith('.lisp'))) checkStale();
     }),
     vscode.tasks.onDidEndTask((e) => {
       if (e.execution.task.definition.type === 'cog-lisp' && e.execution.task.definition.task === 'build') lastStaleWarning = 0;

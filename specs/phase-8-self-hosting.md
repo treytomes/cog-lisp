@@ -185,7 +185,7 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
 | Step | Status |
 |---|---|
 | 8.1 Tests in LISP | **done** — 412 checks moved to `tests/lisp/phase-*.lisp` (list: `tests/lisp/moved-checks.txt`); the total stays 948/948, suite by suite |
-| 8.2 Reader in LISP | not started |
+| 8.2 Reader in LISP | **done** — `lib/compiler/reader.lisp`, built into the image; matches `LispReader` on 52 Phase 1 inputs, 88 feature and error inputs and all 59 `.lisp` files (`tests/phase-8.2-reader.st`, 204 checks); 57 LISP unit tests; 1211/1211 in all |
 | 8.3 Compiler in LISP | not started |
 | 8.4 Bootstrap and fixpoint | not started |
 | 8.5 Switch-over | not started |
@@ -213,3 +213,47 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
   redefines one cannot break the reporting.
 - Checks that compile LISP at test time (definitions, expected compile errors,
   source retention) are written as `(eval-all "…")`; the rest as plain code.
+
+### Step 8.2
+- **`lib/compiler/reader.lisp` mirrors `LispReader` procedure for procedure**
+  (`rd-list-body` is `readListBodyFrom:`, `rd-send-form` is `sendFormFrom:at:`,
+  …), so a difference between the two points at one place. It produces the
+  same objects (`LispCons`, interned symbols, read-only Arrays, `LispLabelHole`
+  filling for datum labels) and signals the same `LispReadError` (made through
+  interop) with the same message, position and incomplete flag.
+- **Interface.** `(make-reader string)`, `(reader-next r)` (a datum or the eof
+  object), `(reader-datum-start r)`, `(reader-position r)`,
+  `(reader-source-for r list)` and `(reader-range-of r list)` (the same 1-based
+  ranges as `sourceFor:`), plus `(read-all string)`, `(read-from-string string)`
+  and `(read-datum port)`.
+- **Deviation from §4.2: it reads a string, not a port.** The state is the text
+  and an offset, as in the Smalltalk reader (whose stream is over the text).
+  `read-datum` reads a string or file port by reading its `ReadStream`'s text
+  from the stream's position and setting the position after the datum, as the
+  `read` primitive leaves it. Ports with no text behind them (stdin, a
+  `LispLineStream`) fall back to `read`.
+- **The build loads it** after `lib/core.lisp` (`build/build.st`, a list of
+  `lib/compiler/` files for 8.3 to extend); the VS Code stale-image check
+  watches `lib/compiler/*.lisp` too. It binds 67 global names: the interface
+  above and `rd-` helpers. No `.lisp` file in the repository defines any of
+  them, but a program that redefines one changes the reader, as with any
+  global; a namespace for the compiler's own names is a question for 8.5.
+- **The comparison** (`tests/phase-8.2-reader.st`) runs both readers over each
+  input and compares event lists: for each datum its start and end offsets and
+  its shape (every list with its source text, every vector with its size and
+  read-only flag, every atom with its class and printed form, shared and
+  cyclic structure as `#seen`), then the end position or the error's class,
+  message, position and incomplete flag. A failure names the first differing
+  event. Four control checks prove the comparison sees a difference in source
+  text, in an error position, and between `1` and `1.0`.
+- **Unit tests** (`tests/lisp/phase-8.2-reader.lisp`, 57 checks): every datum
+  kind, brackets, comments, labels and cycles, source ranges, error messages
+  with positions and incompleteness, `read-datum` on a port, and the reader
+  reading its own file. Example: `examples/read-yourself.lisp`.
+- **Speed: about 21× slower than `LispReader`** (456 ms against 22 ms for the
+  72 K characters of `lib/` and `examples/`). Matching was this step's goal;
+  AC-7 (compile time within 1.5× after 8.5) will need it faster. Likely
+  remedies: accessors as macros instead of procedure calls, reading through
+  the text's `ReadStream` by `send`, and table lookups for character classes.
+- `tests\run-all.bat` now takes about 1 m 40 s on this machine (the runner 27 s,
+  the LISP tests 16 s, this suite 10 s).

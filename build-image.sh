@@ -2,9 +2,9 @@
 # ===========================================================================
 #  cog-lisp : build the cog-lisp image  (bash equivalent of build-image.bat;
 #  specs/phase-5-repl-runner.md 4.1)
-#  Loads src/ and lib/core.lisp into the stock Pharo image and saves the result
-#  as pharo/cog-lisp.image. The stock image is never modified. Rerun after any
-#  change to src/ or lib/core.lisp.
+#  Loads src/, lib/core.lisp and lib/compiler/ into the stock Pharo image and
+#  saves the result as pharo/cog-lisp.image. The stock image is never modified.
+#  Rerun after any change to src/, lib/core.lisp or lib/compiler/.
 # ===========================================================================
 set -u
 

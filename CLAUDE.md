@@ -287,7 +287,7 @@ This project follows spec-driven development: **write the spec before the code.*
   `PASS`/`FAIL` per check, and a final `RESULT: n/n` line.
 - Code changes reference the spec section they satisfy. If reality forces a
   deviation, update the spec first, then the code.
-- **Run everything with `tests\run-all.bat`** (~30 s): each `tests\phase-*.st`
+- **Run everything with `tests\run-all.bat`** (about 1 m 40 s): each `tests\phase-*.st`
   in a fresh stock image, then `tests\phase-5-runner.bat` (which rebuilds
   `pharo\cog-lisp.image`), with a total; exit 0 only if all pass. Benchmarks are
   separate (`bench\run-benchmarks.bat`) and noisy when the machine is busy.

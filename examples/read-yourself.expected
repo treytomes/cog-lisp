@@ -1,0 +1,17 @@
+forms in this file: 27
+  defines square
+  defines forms
+  defines defined-name
+  defines count-others
+  defines r
+  defines sq
+  defines try
+  and 20 other forms
+read: (define (square x) (* x x))
+from: (define (square x)   ; spacing and comments are kept
+  (* x x))
+errors:
+  "(1 2" -> unterminated list at offset 0 (incomplete)
+  "(1 2))" -> unexpected ) at offset 5
+  "#(1 . 2)" -> bad vector: a dotted tail at offset 0
+  "[3 4]" -> bad message send: brackets are Smalltalk sends; use ( ) for grouping at offset 0

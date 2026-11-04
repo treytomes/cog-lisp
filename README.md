@@ -36,7 +36,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 7.7 | Conditions & restarts | ✅ **done** — [spec](specs/phase-7.7-conditions-restarts.md), 54/54, [examples](examples/restarts.lisp) |
 | 7.8 | Strings, characters, vectors & hash tables | ✅ **done** — [spec](specs/phase-7.8-native-data.md), 58/58, [examples](examples/tiny-reader.lisp) |
 | 7.9 | Self-hosting groundwork | ✅ **done** — [spec](specs/phase-7.9-self-hosting-groundwork.md), 46/46, LISP unit tests ([`lib/test.lisp`](lib/test.lisp)); all suites 948/948 |
-| 8 | Self-hosting (meta-circular) | ⬜ |
+| 8 | Self-hosting (meta-circular) | 🟨 in progress — [spec](specs/phase-8-self-hosting.md); 8.1 tests in LISP and 8.2 reader in LISP ([`lib/compiler/reader.lisp`](lib/compiler/reader.lisp), [example](examples/read-yourself.lisp)) done; all suites 1211/1211 |
 | — | CI/CD: tests on every push; image and VS Code extension built for tagged releases | ⬜ planned (see below) |
 | 9 | Pure Lisp image (with the numeric tower and hygienic macros) | ⬜ |
 
@@ -49,8 +49,8 @@ project targets is validated against the live image.
 ## Getting started
 
 One-time setup: download the Pharo VM and stock image, then build the cog-lisp
-image from `src\` (rerun the build after changing anything in `src\` or
-`lib\core.lisp`). Each script has a bash equivalent for Git Bash
+image from `src\` (rerun the build after changing anything in `src\`,
+`lib\core.lisp` or `lib\compiler\`). Each script has a bash equivalent for Git Bash
 (`bootstrap-pharo.sh`, `build-image.sh`, `cog-lisp.sh`):
 
 ```bat
@@ -252,7 +252,9 @@ node, or raise and catch an error. These come first (decided 2026-11-03):
 ### Phase 8 — Self-hosting (meta-circular)
 [Spec accepted](specs/phase-8-self-hosting.md). It starts by moving the
 language-behavior tests from Smalltalk to LISP (owner, 2026-11-04), so the
-self-hosted reader and compiler are checked against the same tests.
+self-hosted reader and compiler are checked against the same tests. Step 8.1
+(tests in LISP) and step 8.2 (the reader in LISP, matching the Smalltalk reader
+on every input and every `.lisp` file in the repository) are done.
 Reimplement cog-lisp **in cog-lisp**: rewrite the reader and the compiler — the
 latter emitting the same `CompiledMethod`s through a LISP-level interface to the
 Opal IR — in the language itself, bootstrapped by the Smalltalk-hosted

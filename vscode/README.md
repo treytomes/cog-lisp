@@ -17,7 +17,7 @@ A thin extension for working on cog-lisp in VS Code
 - **cog-lisp: Send Selection or Form to REPL** (Ctrl+Enter): sends the selection,
   or else the top-level form at the cursor.
 - **cog-lisp: Rebuild Image**: runs `build-image.bat`. The extension also warns
-  when `src\*.st` or `lib\core.lisp` is newer than `pharo\cog-lisp.image` and
+  when `src\*.st`, `lib\core.lisp` or `lib\compiler\*.lisp` is newer than `pharo\cog-lisp.image` and
   offers to rebuild (setting `cogLisp.warnStaleImage`).
 
 The language intelligence (hover with procedure source, completion from the

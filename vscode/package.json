@@ -92,7 +92,7 @@
         "cogLisp.warnStaleImage": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Warn when `src\\*.st` or `lib\\core.lisp` is newer than `pharo\\cog-lisp.image`, so programs would run old code."
+          "markdownDescription": "Warn when `src\\*.st`, `lib\\core.lisp` or `lib\\compiler\\*.lisp` is newer than `pharo\\cog-lisp.image`, so programs would run old code."
         }
       }
     },
