@@ -69,9 +69,10 @@ echo === VM version ============================================================
 if errorlevel 1 ( echo [err ] VM failed to report its version & goto :fail )
 
 rem --- Confirm the image / system version (headless eval, then quit) ----------
+rem  --headless: without it the VM opens a window, and on a CI runner it never returns
 echo(
 echo === Image / system version =================================================
-"%VM_EXE%" "%IMAGE%" eval "SystemVersion current printString"
+"%VM_EXE%" --headless "%IMAGE%" eval "SystemVersion current printString"
 if errorlevel 1 ( echo [err ] image failed to evaluate SystemVersion & goto :fail )
 
 echo(

@@ -10,8 +10,9 @@ const cli = path.join(root, 'node_modules', 'vscode-tmgrammar-test', 'dist', 'un
 const run = spawnSync(process.execPath, [cli, '-g', 'syntaxes/cog-lisp.tmLanguage.json', 'test/*.test.lisp'],
   { cwd: root, encoding: 'utf8' });
 const out = (run.stdout || '') + (run.stderr || '');
-const passed = (out.match(/√ .* run successful/g) || []).length;
-const failed = (out.match(/× .* failed/g) || []).length;
+// the tool's marks depend on the platform: √ and × on Windows, ✓ and ✖ elsewhere
+const passed = (out.match(/[√✓✔] .* run successful/g) || []).length;
+const failed = (out.match(/[×✖✗] .* failed/g) || []).length;
 
 console.log('== cog-lisp VS Code extension : grammar ==');
 process.stdout.write(out.split('\n').filter((l) => !l.startsWith('Assertion failed: !(handle->flags')).join('\n'));
