@@ -427,6 +427,7 @@ cm value: comp value: 'quasiquote' value: 'isTagged: datum as: aName
 		and: [(datum cdr isKindOf: LispCons) and: [datum cdr cdr == LispEmptyList default]]]'.
 cm value: comp value: 'quasiquote' value: 'qqIsConstant: t level: n
 	"True if nothing in t is evaluated at quasiquote level n."
+	(t isKindOf: Array) ifTrue: [^ t allSatisfy: [:e | self qqIsConstant: e level: n]].
 	(t isKindOf: LispCons) ifFalse: [^ true].
 	((self isTagged: t as: ''unquote'') or: [self isTagged: t as: ''unquote-splicing'']) ifTrue: [
 		n = 0 ifTrue: [^ false].
@@ -443,6 +444,9 @@ cm value: comp value: 'quasiquote' value: 'qqNode: t level: n inScope: scope
 	 literals; construction uses LispCons directly, never the global cons/append."
 	| head |
 	(self qqIsConstant: t level: n) ifTrue: [^ self quoteNode: t].
+	"a vector template: build it as a list, then make the vector (Phase 7.8 section 6)"
+	(t isKindOf: Array) ifTrue: [
+		^ self messageNode: (self qqNode: (LispCons fromArray: t) level: n inScope: scope) selector: #asArray arguments: #()].
 	(self isTagged: t as: ''unquote'') ifTrue: [
 		n = 0 ifTrue: [^ self translate: t cdr car inScope: scope].
 		^ self qqTagged: ''unquote'' with: (self qqNode: t cdr car level: n - 1 inScope: scope)].

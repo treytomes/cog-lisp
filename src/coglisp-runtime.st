@@ -9,7 +9,7 @@
  Classes: LispError, LispArityError, LispProcedure, LispTailCall, LispPrimitives,
  LispTextOutput.
  ============================================================================"
-| failures cm lerr aerr proc tcall prims tout facade |
+| failures cm lerr aerr proc tcall prims tout facade htab hkey iport oport |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -23,7 +23,450 @@ tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runt
 prims := (Object << #LispPrimitives) sharedVariables: { #Output. #GensymCounter }; package: 'CogLisp-Runtime'; install.
 "CogLisp: the Smalltalk-side facade for evaluating and calling LISP (Phase 7.6 section 5.2)."
 facade := (Object << #CogLisp) package: 'CogLisp-Runtime'; install.
+"Phase 7.8: hash tables (keys wrapped so a Pharo OrderedDictionary compares them
+ with eq?, eqv? or equal?) and string ports."
+htab := (Object << #LispHashTable) slots: { #dict. #test }; package: 'CogLisp-Runtime'; install.
+hkey := (Object << #LispHashKey) slots: { #key. #test }; package: 'CogLisp-Runtime'; install.
+iport := (Object << #LispInputPort) slots: { #stream }; package: 'CogLisp-Runtime'; install.
+oport := (Object << #LispOutputPort) slots: { #stream }; package: 'CogLisp-Runtime'; install.
 tout  := (Object << #LispTextOutput) slots: { #kind. #handle. #stream. #buffer. #midLine }; sharedVariables: { #Session. #Stdout. #Stderr }; package: 'CogLisp-Runtime'; install.
+
+
+"=== LispHashTable, LispHashKey (Phase 7.8 section 7) ======================="
+cm value: htab class value: 'instance creation' value: 'test: aSymbol
+	"aSymbol: #eq, #eqv or #equal"
+	^ self new setTest: aSymbol'.
+cm value: htab class value: 'equality' value: 'same: a as: b test: t
+	t == #eq ifTrue: [^ a == b].
+	t == #eqv ifTrue: [^ LispCore eqv: a with: b].
+	^ LispCore equal: a with: b'.
+cm value: htab class value: 'equality' value: 'hashOf: x test: t
+	t == #eq ifTrue: [^ x identityHash].
+	t == #eqv ifTrue: [^ self eqvHash: x].
+	^ self equalHash: x depth: 0'.
+cm value: htab class value: 'equality' value: 'eqvHash: x
+	(x isNumber or: [x isKindOf: Character]) ifTrue: [^ x hash].
+	^ x identityHash'.
+cm value: htab class value: 'equality' value: 'equalHash: x depth: d
+	"Consistent with equal?, and bounded in depth so a circular list cannot hang it."
+	| h |
+	d > 4 ifTrue: [^ 7].
+	(x isKindOf: LispCons) ifTrue: [
+		^ ((self equalHash: x car depth: d + 1) * 31 + (self equalHash: x cdr depth: d + 1)) bitAnd: 16r3FFFFFFF].
+	(x isKindOf: Array) ifTrue: [
+		h := x size.
+		(x first: (x size min: 4)) do: [:e | h := (h * 31 + (self equalHash: e depth: d + 1)) bitAnd: 16r3FFFFFFF].
+		^ h].
+	(LispCore isString: x) ifTrue: [^ x hash].
+	^ self eqvHash: x'.
+cm value: htab value: 'private' value: 'setTest: aSymbol
+	test := aSymbol.
+	dict := OrderedDictionary new'.
+cm value: htab value: 'private' value: 'wrap: aKey
+	^ LispHashKey key: aKey test: test'.
+cm value: htab value: 'accessing' value: 'test
+	^ test'.
+cm value: htab value: 'accessing' value: 'at: aKey ifAbsent: aBlock
+	^ dict at: (self wrap: aKey) ifAbsent: aBlock'.
+cm value: htab value: 'accessing' value: 'at: aKey put: aValue
+	^ dict at: (self wrap: aKey) put: aValue'.
+cm value: htab value: 'accessing' value: 'includesKey: aKey
+	^ dict includesKey: (self wrap: aKey)'.
+cm value: htab value: 'accessing' value: 'removeKey: aKey
+	dict removeKey: (self wrap: aKey) ifAbsent: [nil]'.
+cm value: htab value: 'accessing' value: 'removeAll
+	dict := OrderedDictionary new'.
+cm value: htab value: 'accessing' value: 'size
+	^ dict size'.
+cm value: htab value: 'accessing' value: 'keys
+	"in insertion order"
+	^ dict keys asArray collect: [:w | w key]'.
+cm value: htab value: 'accessing' value: 'values
+	^ dict values asArray'.
+cm value: htab value: 'accessing' value: 'pairs
+	^ dict associations asArray collect: [:a | a key key -> a value]'.
+cm value: htab value: 'copying' value: 'copyTable
+	| t |
+	t := LispHashTable test: test.
+	self pairs do: [:a | t at: a key put: a value].
+	^ t'.
+cm value: htab value: 'printing' value: 'printOn: aStream
+	aStream nextPutAll: ''#<hash-table ''; print: dict size; nextPut: $>'.
+cm value: hkey class value: 'instance creation' value: 'key: aKey test: aSymbol
+	^ self new setKey: aKey test: aSymbol'.
+cm value: hkey value: 'private' value: 'setKey: aKey test: aSymbol
+	key := aKey.
+	test := aSymbol'.
+cm value: hkey value: 'accessing' value: 'key
+	^ key'.
+cm value: hkey value: 'comparing' value: '= other
+	^ other class == LispHashKey and: [LispHashTable same: key as: other key test: test]'.
+cm value: hkey value: 'comparing' value: 'hash
+	^ LispHashTable hashOf: key test: test'.
+
+"=== string ports (section 8) ==============================================="
+cm value: iport class value: 'instance creation' value: 'on: aString
+	^ self new setStream: (ReadStream on: aString)'.
+cm value: iport value: 'private' value: 'setStream: aStream
+	stream := aStream'.
+cm value: iport value: 'accessing' value: 'stream
+	^ stream'.
+cm value: iport value: 'printing' value: 'printOn: aStream
+	aStream nextPutAll: ''#<input-port>'''.
+cm value: oport class value: 'instance creation' value: 'open
+	^ self new setStream: (WriteStream on: String new)'.
+cm value: oport value: 'private' value: 'setStream: aStream
+	stream := aStream'.
+cm value: oport value: 'writing' value: 'nextPutAll: aString
+	stream nextPutAll: aString'.
+cm value: oport value: 'writing' value: 'nextPut: aCharacter
+	stream nextPut: aCharacter'.
+cm value: oport value: 'writing' value: 'flush
+	^ self'.
+cm value: oport value: 'accessing' value: 'contents
+	^ stream contents'.
+cm value: oport value: 'printing' value: 'printOn: aStream
+	aStream nextPutAll: ''#<output-port>'''.
+
+"=== argument checks shared by the Phase 7.8 primitives (section 9) ========="
+cm value: prims class value: 'checks' value: 'fail: who with: aString
+	^ (LispError new) signal: who , '': '' , aString'.
+cm value: prims class value: 'checks' value: 'show: x
+	^ LispPrinter writeString: x limitedTo: 60'.
+cm value: prims class value: 'checks' value: 'string: x for: who
+	(LispCore isString: x) ifFalse: [self fail: who with: ''not a string: '' , (self show: x)].
+	^ x'.
+cm value: prims class value: 'checks' value: 'char: x for: who
+	(x isKindOf: Character) ifFalse: [self fail: who with: ''not a character: '' , (self show: x)].
+	^ x'.
+cm value: prims class value: 'checks' value: 'vector: x for: who
+	(x isKindOf: Array) ifFalse: [self fail: who with: ''not a vector: '' , (self show: x)].
+	^ x'.
+cm value: prims class value: 'checks' value: 'table: x for: who
+	(x isKindOf: LispHashTable) ifFalse: [self fail: who with: ''not a hash table: '' , (self show: x)].
+	^ x'.
+cm value: prims class value: 'checks' value: 'inPort: x for: who
+	(x isKindOf: LispInputPort) ifFalse: [self fail: who with: ''not an input port: '' , (self show: x)].
+	^ x'.
+cm value: prims class value: 'checks' value: 'outPort: x for: who
+	(x isKindOf: LispOutputPort) ifFalse: [self fail: who with: ''not an output port: '' , (self show: x)].
+	^ x'.
+cm value: prims class value: 'checks' value: 'count: x for: who
+	((x isKindOf: Integer) and: [x >= 0]) ifFalse: [self fail: who with: ''not a non-negative integer: '' , (self show: x)].
+	^ x'.
+cm value: prims class value: 'checks' value: 'index: i size: n for: who what: what
+	"The 1-based Smalltalk index for the 0-based LISP index i."
+	((i isKindOf: Integer) and: [i between: 0 and: n - 1]) ifFalse: [
+		self fail: who with: ''index '' , (self show: i) , '' out of range for a '' , what , '' of length '' , n printString].
+	^ i + 1'.
+cm value: prims class value: 'checks' value: 'range: optional size: n for: who
+	"optional: 0, 1 or 2 LISP arguments start [end]. Answer { first. last } as
+	 1-based Smalltalk indexes (last may be first - 1: empty)."
+	| s e |
+	s := optional size >= 1 ifTrue: [optional first] ifFalse: [0].
+	e := optional size >= 2 ifTrue: [optional second] ifFalse: [n].
+	((s isKindOf: Integer) and: [(e isKindOf: Integer) and: [0 <= s and: [s <= e and: [e <= n]]]])
+		ifFalse: [self fail: who with: ''bad range '' , (self show: s) , '' to '' , (self show: e) , '' for length '' , n printString].
+	^ { s + 1. e }'.
+cm value: prims class value: 'checks' value: 'mutable: x for: who what: what
+	x isReadOnlyObject ifTrue: [self fail: who with: what , '' is immutable (a literal); copy it first''].
+	^ x'.
+cm value: prims class value: 'checks' value: 'chain: values with: aBlock
+	"true when aBlock holds for every adjacent pair"
+	1 to: values size - 1 do: [:i | (aBlock value: (values at: i) value: (values at: i + 1)) ifFalse: [^ false]].
+	^ true'.
+cm value: prims class value: 'checks' value: 'stringFrom: characters
+	"A new mutable string; becomes a WideString as needed (lambda, etc.)."
+	^ String streamContents: [:s | characters do: [:c | s nextPut: c]]'.
+cm value: prims class value: 'checks' value: 'compare: a with: b
+	"-1, 0 or 1, by character codes."
+	1 to: (a size min: b size) do: [:i | | x y |
+		x := (a at: i) asInteger. y := (b at: i) asInteger.
+		x < y ifTrue: [^ -1].
+		x > y ifTrue: [^ 1]].
+	^ (a size - b size) sign'.
+cm value: prims class value: 'checks' value: 'numberFrom: s radix: radix
+	"string->number: what the reader reads as a number, or #f."
+	| r d neg digits v |
+	radix = 10 ifTrue: [
+		^ [r := LispReader on: s.
+		   d := r next.
+		   (d isNumber and: [r atEnd]) ifTrue: [d] ifFalse: [false]] on: LispReadError do: [:e | false]].
+	neg := s notEmpty and: [s first = $-].
+	digits := neg ifTrue: [s allButFirst] ifFalse: [s].
+	digits isEmpty ifTrue: [^ false].
+	v := 0.
+	digits do: [:c | | dv |
+		dv := c asUppercase digitValue.
+		(dv between: 0 and: radix - 1) ifFalse: [^ false].
+		v := v * radix + dv].
+	^ neg ifTrue: [v negated] ifFalse: [v]'.
+cm value: prims class value: 'checks' value: 'equalityTest: p in: anEnv
+	p isNil ifTrue: [^ #equal].
+	p == (anEnv lookup: (LispSymbol named: ''eq?'')) ifTrue: [^ #eq].
+	p == (anEnv lookup: (LispSymbol named: ''eqv?'')) ifTrue: [^ #eqv].
+	p == (anEnv lookup: (LispSymbol named: ''equal?'')) ifTrue: [^ #equal].
+	^ self fail: ''make-hash-table'' with: ''the equality must be eq?, eqv? or equal?: '' , (self show: p)'.
+
+"=== characters (section 4) ================================================="
+cm value: prims class value: 'installing' value: 'installCharactersInto: anEnv
+	| def ch cmp unspec |
+	def := [:name :proc | anEnv define: (LispSymbol named: name) value: proc].
+	ch := [:x :who | self char: x for: who].
+	def value: ''char->integer'' value: (LispProcedure fixed: [:c | (ch value: c value: ''char->integer'') asInteger] arity: 1).
+	def value: ''integer->char'' value: (LispProcedure fixed: [:n |
+		((n isKindOf: Integer) and: [n between: 0 and: 16r10FFFF])
+			ifTrue: [Character value: n]
+			ifFalse: [self fail: ''integer->char'' with: ''not a character code: '' , (self show: n)]] arity: 1).
+	cmp := [:name :key :test | def value: name value: (LispProcedure variadic: [:first :rest | | all |
+		all := ({ first } , rest lispElements asArray) collect: [:c | key value: (ch value: c value: name)].
+		self chain: all with: test] required: 1)].
+	cmp value: ''char=?'' value: [:c | c asInteger] value: [:a :b | a = b].
+	cmp value: ''char<?'' value: [:c | c asInteger] value: [:a :b | a < b].
+	cmp value: ''char>?'' value: [:c | c asInteger] value: [:a :b | a > b].
+	cmp value: ''char<=?'' value: [:c | c asInteger] value: [:a :b | a <= b].
+	cmp value: ''char>=?'' value: [:c | c asInteger] value: [:a :b | a >= b].
+	cmp value: ''char-ci=?'' value: [:c | c asLowercase asInteger] value: [:a :b | a = b].
+	def value: ''char-alphabetic?'' value: (LispProcedure fixed: [:c | (ch value: c value: ''char-alphabetic?'') isLetter] arity: 1).
+	def value: ''char-numeric?'' value: (LispProcedure fixed: [:c | (ch value: c value: ''char-numeric?'') isDigit] arity: 1).
+	def value: ''char-whitespace?'' value: (LispProcedure fixed: [:c | (ch value: c value: ''char-whitespace?'') isSeparator] arity: 1).
+	def value: ''char-upper-case?'' value: (LispProcedure fixed: [:c | (ch value: c value: ''char-upper-case?'') isUppercase] arity: 1).
+	def value: ''char-lower-case?'' value: (LispProcedure fixed: [:c | (ch value: c value: ''char-lower-case?'') isLowercase] arity: 1).
+	def value: ''char-upcase'' value: (LispProcedure fixed: [:c | (ch value: c value: ''char-upcase'') asUppercase] arity: 1).
+	def value: ''char-downcase'' value: (LispProcedure fixed: [:c | (ch value: c value: ''char-downcase'') asLowercase] arity: 1).
+	def value: ''digit-value'' value: (LispProcedure fixed: [:c |
+		(ch value: c value: ''digit-value'') isDigit ifTrue: [c digitValue] ifFalse: [false]] arity: 1)'.
+
+"=== strings and symbols (section 5) ========================================"
+cm value: prims class value: 'installing' value: 'installStringsInto: anEnv
+	| def str opt cmp unspec |
+	def := [:name :proc | anEnv define: (LispSymbol named: name) value: proc].
+	str := [:x :who | self string: x for: who].
+	opt := [:rest | rest lispElements asArray].
+	unspec := LispUnspecified default.
+	def value: ''make-string'' value: (LispProcedure variadic: [:k :rest | | c |
+		self count: k for: ''make-string''.
+		c := (opt value: rest) ifEmpty: [Character space] ifNotEmpty: [:r | self char: r first for: ''make-string''].
+		self stringFrom: (Array new: k withAll: c)] required: 1).
+	def value: ''string'' value: (LispProcedure variadic: [:chars |
+		self stringFrom: ((opt value: chars) collect: [:c | self char: c for: ''string''])] required: 0).
+	def value: ''string-length'' value: (LispProcedure fixed: [:s | (str value: s value: ''string-length'') size] arity: 1).
+	def value: ''string-ref'' value: (LispProcedure fixed: [:s :i |
+		(str value: s value: ''string-ref'') at: (self index: i size: s size for: ''string-ref'' what: ''string'')] arity: 2).
+	def value: ''substring'' value: (LispProcedure variadic: [:s :rest | | r |
+		r := self range: (opt value: rest) size: (str value: s value: ''substring'') size for: ''substring''.
+		s copyFrom: r first to: r second] required: 1).
+	def value: ''string-copy'' value: (LispProcedure variadic: [:s :rest | | r |
+		r := self range: (opt value: rest) size: (str value: s value: ''string-copy'') size for: ''string-copy''.
+		s copyFrom: r first to: r second] required: 1).
+	def value: ''string-append'' value: (LispProcedure variadic: [:ss |
+		String streamContents: [:o | (opt value: ss) do: [:s | o nextPutAll: (str value: s value: ''string-append'')]]] required: 0).
+	def value: ''string->list'' value: (LispProcedure variadic: [:s :rest | | r |
+		r := self range: (opt value: rest) size: (str value: s value: ''string->list'') size for: ''string->list''.
+		LispCons fromArray: (s copyFrom: r first to: r second) asArray] required: 1).
+	def value: ''list->string'' value: (LispProcedure fixed: [:l |
+		self stringFrom: ((LispCons elementsOf: l for: ''list->string'') collect: [:c | self char: c for: ''list->string''])] arity: 1).
+	def value: ''string->symbol'' value: (LispProcedure fixed: [:s | LispSymbol named: (str value: s value: ''string->symbol'') copy] arity: 1).
+	def value: ''symbol->string'' value: (LispProcedure fixed: [:y |
+		(y isKindOf: LispSymbol) ifTrue: [y name copy] ifFalse: [self fail: ''symbol->string'' with: ''not a symbol: '' , (self show: y)]] arity: 1).
+	def value: ''string->number'' value: (LispProcedure variadic: [:s :rest |
+		self numberFrom: (str value: s value: ''string->number'') radix: ((opt value: rest) ifEmpty: [10] ifNotEmpty: [:r | r first])] required: 1).
+	def value: ''number->string'' value: (LispProcedure variadic: [:z :rest | | radix |
+		z isNumber ifFalse: [self fail: ''number->string'' with: ''not a number: '' , (self show: z)].
+		radix := (opt value: rest) ifEmpty: [10] ifNotEmpty: [:r | r first].
+		(radix = 10 or: [(z isKindOf: Integer) not])
+			ifTrue: [LispPrinter writeString: z]
+			ifFalse: [(z printStringBase: radix) asLowercase]] required: 1).
+	cmp := [:name :key :test | def value: name value: (LispProcedure variadic: [:first :rest | | all |
+		all := ({ first } , rest lispElements asArray) collect: [:s | key value: (str value: s value: name)].
+		self chain: all with: [:a :b | test value: (self compare: a with: b)]] required: 1)].
+	cmp value: ''string=?'' value: [:s | s] value: [:c | c = 0].
+	cmp value: ''string<?'' value: [:s | s] value: [:c | c < 0].
+	cmp value: ''string>?'' value: [:s | s] value: [:c | c > 0].
+	cmp value: ''string<=?'' value: [:s | s] value: [:c | c <= 0].
+	cmp value: ''string>=?'' value: [:s | s] value: [:c | c >= 0].
+	cmp value: ''string-ci=?'' value: [:s | s asLowercase] value: [:c | c = 0].
+	def value: ''string-set!!'' value: (LispProcedure fixed: [:s :i :c | | k |
+		k := self index: i size: (str value: s value: ''string-set!!'') size for: ''string-set!!'' what: ''string''.
+		self mutable: s for: ''string-set!!'' what: ''string''.
+		s at: k put: (self char: c for: ''string-set!!'').
+		unspec] arity: 3).
+	def value: ''string-fill!!'' value: (LispProcedure fixed: [:s :c |
+		self mutable: (str value: s value: ''string-fill!!'') for: ''string-fill!!'' what: ''string''.
+		s atAllPut: (self char: c for: ''string-fill!!'').
+		unspec] arity: 2).
+	def value: ''string-copy!!'' value: (LispProcedure variadic: [:to :at :from :rest | | r n |
+		self mutable: (str value: to value: ''string-copy!!'') for: ''string-copy!!'' what: ''string''.
+		r := self range: (opt value: rest) size: (str value: from value: ''string-copy!!'') size for: ''string-copy!!''.
+		n := r second - r first + 1.
+		((at isKindOf: Integer) and: [at >= 0 and: [at + n <= to size]])
+			ifFalse: [self fail: ''string-copy!!'' with: ''does not fit at '' , (self show: at)].
+		to replaceFrom: at + 1 to: at + n with: from startingAt: r first.
+		unspec] required: 3).
+	def value: ''string-upcase'' value: (LispProcedure fixed: [:s | (str value: s value: ''string-upcase'') asUppercase] arity: 1).
+	def value: ''string-downcase'' value: (LispProcedure fixed: [:s | (str value: s value: ''string-downcase'') asLowercase] arity: 1).
+	def value: ''string-index'' value: (LispProcedure fixed: [:s :c | | i |
+		i := (str value: s value: ''string-index'') indexOf: (self char: c for: ''string-index'').
+		i = 0 ifTrue: [false] ifFalse: [i - 1]] arity: 2).
+	def value: ''string-search'' value: (LispProcedure fixed: [:s :p | | i |
+		i := (str value: s value: ''string-search'') findString: (str value: p value: ''string-search'') startingAt: 1.
+		i = 0 ifTrue: [false] ifFalse: [i - 1]] arity: 2).
+	def value: ''string-split'' value: (LispProcedure fixed: [:s :c | | parts cur |
+		self char: c for: ''string-split''.
+		parts := OrderedCollection new.
+		cur := WriteStream on: String new.
+		(str value: s value: ''string-split'') do: [:x |
+			x = c ifTrue: [parts add: cur contents. cur := WriteStream on: String new] ifFalse: [cur nextPut: x]].
+		parts add: cur contents.
+		LispCons fromArray: parts asArray] arity: 2).
+	def value: ''string-join'' value: (LispProcedure variadic: [:l :rest | | sep |
+		sep := (opt value: rest) ifEmpty: ['' ''] ifNotEmpty: [:r | str value: r first value: ''string-join''].
+		String streamContents: [:o |
+			(LispCons elementsOf: l for: ''string-join'')
+				do: [:x | o nextPutAll: (str value: x value: ''string-join'')]
+				separatedBy: [o nextPutAll: sep]]] required: 1).
+	def value: ''string-trim'' value: (LispProcedure fixed: [:s | (str value: s value: ''string-trim'') trimBoth copy] arity: 1)'.
+
+"=== vectors (section 6) ===================================================="
+cm value: prims class value: 'installing' value: 'installVectorsInto: anEnv
+	| def vec opt unspec |
+	def := [:name :proc | anEnv define: (LispSymbol named: name) value: proc].
+	vec := [:x :who | self vector: x for: who].
+	opt := [:rest | rest lispElements asArray].
+	unspec := LispUnspecified default.
+	def value: ''vector?'' value: (LispProcedure fixed: [:x | x isKindOf: Array] arity: 1).
+	def value: ''make-vector'' value: (LispProcedure variadic: [:k :rest |
+		Array new: (self count: k for: ''make-vector'') withAll: ((opt value: rest) ifEmpty: [false] ifNotEmpty: [:r | r first])] required: 1).
+	def value: ''vector'' value: (LispProcedure variadic: [:xs | (opt value: xs) copy] required: 0).
+	def value: ''vector-length'' value: (LispProcedure fixed: [:v | (vec value: v value: ''vector-length'') size] arity: 1).
+	def value: ''vector-ref'' value: (LispProcedure fixed: [:v :i |
+		(vec value: v value: ''vector-ref'') at: (self index: i size: v size for: ''vector-ref'' what: ''vector'')] arity: 2).
+	def value: ''vector-set!!'' value: (LispProcedure fixed: [:v :i :x | | k |
+		k := self index: i size: (vec value: v value: ''vector-set!!'') size for: ''vector-set!!'' what: ''vector''.
+		self mutable: v for: ''vector-set!!'' what: ''vector''.
+		v at: k put: x.
+		unspec] arity: 3).
+	def value: ''vector->list'' value: (LispProcedure variadic: [:v :rest | | r |
+		r := self range: (opt value: rest) size: (vec value: v value: ''vector->list'') size for: ''vector->list''.
+		LispCons fromArray: (v copyFrom: r first to: r second)] required: 1).
+	def value: ''list->vector'' value: (LispProcedure fixed: [:l | (LispCons elementsOf: l for: ''list->vector'') asArray] arity: 1).
+	def value: ''vector-fill!!'' value: (LispProcedure fixed: [:v :x |
+		self mutable: (vec value: v value: ''vector-fill!!'') for: ''vector-fill!!'' what: ''vector''.
+		v atAllPut: x.
+		unspec] arity: 2).
+	def value: ''vector-copy'' value: (LispProcedure variadic: [:v :rest | | r |
+		r := self range: (opt value: rest) size: (vec value: v value: ''vector-copy'') size for: ''vector-copy''.
+		v copyFrom: r first to: r second] required: 1).
+	def value: ''subvector'' value: (LispProcedure fixed: [:v :s :e | | r |
+		r := self range: { s. e } size: (vec value: v value: ''subvector'') size for: ''subvector''.
+		v copyFrom: r first to: r second] arity: 3).
+	def value: ''vector-append'' value: (LispProcedure variadic: [:vs |
+		(opt value: vs) inject: Array new into: [:acc :v | acc , (vec value: v value: ''vector-append'')]] required: 0).
+	def value: ''vector-map'' value: (LispProcedure fixed: [:p :v |
+		(vec value: v value: ''vector-map'') collect: [:x | LispProcedure apply: p to: { x }]] arity: 2).
+	def value: ''vector-for-each'' value: (LispProcedure fixed: [:p :v |
+		(vec value: v value: ''vector-for-each'') do: [:x | LispProcedure apply: p to: { x }].
+		unspec] arity: 2)'.
+
+"=== hash tables (section 7) ================================================"
+cm value: prims class value: 'installing' value: 'installHashTablesInto: anEnv
+	| def tbl opt unspec missing |
+	def := [:name :proc | anEnv define: (LispSymbol named: name) value: proc].
+	tbl := [:x :who | self table: x for: who].
+	opt := [:rest | rest lispElements asArray].
+	unspec := LispUnspecified default.
+	missing := [:who :k :rest | (opt value: rest)
+		ifEmpty: [self fail: who with: ''no key: '' , (self show: k)]
+		ifNotEmpty: [:r | LispProcedure apply: r first to: #()]].
+	def value: ''make-hash-table'' value: (LispProcedure variadic: [:rest |
+		LispHashTable test: (self equalityTest: ((opt value: rest) ifEmpty: [nil] ifNotEmpty: [:r | r first]) in: anEnv)] required: 0).
+	def value: ''hash-table?'' value: (LispProcedure fixed: [:x | x isKindOf: LispHashTable] arity: 1).
+	def value: ''hash-table-set!!'' value: (LispProcedure fixed: [:t :k :v | (tbl value: t value: ''hash-table-set!!'') at: k put: v. unspec] arity: 3).
+	def value: ''hash-table-ref'' value: (LispProcedure variadic: [:t :k :rest |
+		(tbl value: t value: ''hash-table-ref'') at: k ifAbsent: [missing value: ''hash-table-ref'' value: k value: rest]] required: 2).
+	def value: ''hash-table-ref/default'' value: (LispProcedure fixed: [:t :k :d |
+		(tbl value: t value: ''hash-table-ref/default'') at: k ifAbsent: [d]] arity: 3).
+	def value: ''hash-table-delete!!'' value: (LispProcedure fixed: [:t :k | (tbl value: t value: ''hash-table-delete!!'') removeKey: k. unspec] arity: 2).
+	def value: ''hash-table-contains?'' value: (LispProcedure fixed: [:t :k | (tbl value: t value: ''hash-table-contains?'') includesKey: k] arity: 2).
+	def value: ''hash-table-exists?'' value: (anEnv lookup: (LispSymbol named: ''hash-table-contains?'')).
+	def value: ''hash-table-count'' value: (LispProcedure fixed: [:t | (tbl value: t value: ''hash-table-count'') size] arity: 1).
+	def value: ''hash-table-size'' value: (anEnv lookup: (LispSymbol named: ''hash-table-count'')).
+	def value: ''hash-table-keys'' value: (LispProcedure fixed: [:t | LispCons fromArray: (tbl value: t value: ''hash-table-keys'') keys] arity: 1).
+	def value: ''hash-table-values'' value: (LispProcedure fixed: [:t | LispCons fromArray: (tbl value: t value: ''hash-table-values'') values] arity: 1).
+	def value: ''hash-table->alist'' value: (LispProcedure fixed: [:t |
+		LispCons fromArray: ((tbl value: t value: ''hash-table->alist'') pairs collect: [:a | LispCons car: a key cdr: a value])] arity: 1).
+	def value: ''hash-table-walk'' value: (LispProcedure fixed: [:t :p |
+		(tbl value: t value: ''hash-table-walk'') pairs do: [:a | LispProcedure apply: p to: { a key. a value }].
+		unspec] arity: 2).
+	def value: ''hash-table-update!!'' value: (LispProcedure variadic: [:t :k :p :rest | | cur |
+		cur := (tbl value: t value: ''hash-table-update!!'') at: k ifAbsent: [missing value: ''hash-table-update!!'' value: k value: rest].
+		t at: k put: (LispProcedure apply: p to: { cur }).
+		unspec] required: 3).
+	def value: ''hash-table-update!!/default'' value: (LispProcedure fixed: [:t :k :p :d |
+		(tbl value: t value: ''hash-table-update!!/default'') at: k put: (LispProcedure apply: p to: { t at: k ifAbsent: [d] }).
+		unspec] arity: 4).
+	def value: ''hash-table-copy'' value: (LispProcedure fixed: [:t | (tbl value: t value: ''hash-table-copy'') copyTable] arity: 1).
+	def value: ''hash-table-clear!!'' value: (LispProcedure fixed: [:t | (tbl value: t value: ''hash-table-clear!!'') removeAll. unspec] arity: 1).
+	def value: ''alist->hash-table'' value: (LispProcedure variadic: [:al :rest | | t |
+		t := LispHashTable test: (self equalityTest: ((opt value: rest) ifEmpty: [nil] ifNotEmpty: [:r | r first]) in: anEnv).
+		(LispCons elementsOf: al for: ''alist->hash-table'') do: [:pair |
+			(pair isKindOf: LispCons) ifFalse: [self fail: ''alist->hash-table'' with: ''not a pair: '' , (self show: pair)].
+			(t includesKey: pair car) ifFalse: [t at: pair car put: pair cdr]].
+		t] required: 1)'.
+
+"=== string ports, read, and output to a port (section 8) =================="
+cm value: prims class value: 'installing' value: 'installPortsInto: anEnv
+	| def opt inArg outArg eof unspec |
+	def := [:name :proc | anEnv define: (LispSymbol named: name) value: proc].
+	opt := [:rest | rest lispElements asArray].
+	eof := LispReader eofObject.
+	unspec := LispUnspecified default.
+	inArg := [:rest :who | (opt value: rest)
+		ifEmpty: [self fail: who with: ''needs a port (reading stdin comes with file ports, Phase 7.9)'']
+		ifNotEmpty: [:r | (self inPort: r first for: who) stream]].
+	outArg := [:rest :who | (opt value: rest) ifEmpty: [self output] ifNotEmpty: [:r | self outPort: r first for: who]].
+	def value: ''open-input-string'' value: (LispProcedure fixed: [:s | LispInputPort on: (self string: s for: ''open-input-string'')] arity: 1).
+	def value: ''read-char'' value: (LispProcedure variadic: [:rest | | st |
+		st := inArg value: rest value: ''read-char''.
+		st atEnd ifTrue: [eof] ifFalse: [st next]] required: 0).
+	def value: ''peek-char'' value: (LispProcedure variadic: [:rest | | st |
+		st := inArg value: rest value: ''peek-char''.
+		st atEnd ifTrue: [eof] ifFalse: [st peek]] required: 0).
+	def value: ''read-line'' value: (LispProcedure variadic: [:rest | | st line |
+		st := inArg value: rest value: ''read-line''.
+		st atEnd
+			ifTrue: [eof]
+			ifFalse: [
+				line := st upTo: Character lf.
+				(line notEmpty and: [line last = Character cr]) ifTrue: [line := line allButLast].
+				line]] required: 0).
+	def value: ''read-string'' value: (LispProcedure variadic: [:k :rest | | st |
+		self count: k for: ''read-string''.
+		st := inArg value: rest value: ''read-string''.
+		st atEnd
+			ifTrue: [eof]
+			ifFalse: [String streamContents: [:o | | n | n := 0. [n < k and: [st atEnd not]] whileTrue: [o nextPut: st next. n := n + 1]]]] required: 1).
+	def value: ''char-ready?'' value: (LispProcedure variadic: [:rest | true] required: 0).
+	def value: ''eof-object'' value: (LispProcedure fixed: [eof] arity: 0).
+	def value: ''eof-object?'' value: (LispProcedure fixed: [:x | x == eof] arity: 1).
+	def value: ''read'' value: (LispProcedure variadic: [:rest | (LispReader on: (inArg value: rest value: ''read'')) next] required: 0).
+	def value: ''open-output-string'' value: (LispProcedure fixed: [LispOutputPort open] arity: 0).
+	def value: ''get-output-string'' value: (LispProcedure fixed: [:p | (self outPort: p for: ''get-output-string'') contents] arity: 1).
+	def value: ''write-char'' value: (LispProcedure variadic: [:c :rest |
+		(outArg value: rest value: ''write-char'') nextPut: (self char: c for: ''write-char''); flush. unspec] required: 1).
+	def value: ''write-string'' value: (LispProcedure variadic: [:s :rest |
+		(outArg value: rest value: ''write-string'') nextPutAll: (self string: s for: ''write-string''); flush. unspec] required: 1).
+	"display, write and newline take an optional port (R7RS)"
+	def value: ''display'' value: (LispProcedure variadic: [:x :rest |
+		(outArg value: rest value: ''display'') nextPutAll: (LispPrinter displayString: x); flush. unspec] required: 1).
+	def value: ''write'' value: (LispProcedure variadic: [:x :rest |
+		(outArg value: rest value: ''write'') nextPutAll: (LispPrinter writeString: x); flush. unspec] required: 1).
+	def value: ''newline'' value: (LispProcedure variadic: [:rest |
+		(outArg value: rest value: ''newline'') nextPut: Character lf; flush. unspec] required: 0).
+	def value: ''with-output-to-string'' value: (LispProcedure fixed: [:thunk | | o |
+		o := WriteStream on: String new.
+		self withOutput: o do: [LispProcedure apply: thunk to: #()].
+		o contents] arity: 1)'.
 
 "=== LispTextOutput =========================================================
  Text output to stdout or stderr that encodes properly. Pharo's Stdio streams
@@ -362,6 +805,11 @@ cm value: prims class value: 'installing' value: 'installInto: anEnv
 	self installListSearchInto: anEnv.
 	self installInteropInto: anEnv.
 	self installConditionsInto: anEnv.
+	self installCharactersInto: anEnv.
+	self installStringsInto: anEnv.
+	self installVectorsInto: anEnv.
+	self installHashTablesInto: anEnv.
+	self installPortsInto: anEnv.
 	"every primitive knows its name, for printing and error messages (review R-7)"
 	anEnv cellsDo: [:c | | v |
 		v := c valueIfUnbound: [nil].
@@ -470,7 +918,7 @@ cm value: prims class value: 'installing' value: 'installInteropInto: anEnv
 	def value: ''smalltalk-object?'' value: (LispProcedure fixed: [:x |
 		(x class package name beginsWith: ''CogLisp'') not
 			and: [(x isKindOf: Boolean) not and: [x isNumber not
-			and: [(x isKindOf: Character) not and: [(LispCore isString: x) not]]]]] arity: 1)'.
+			and: [(x isKindOf: Character) not and: [(LispCore isString: x) not and: [(x isKindOf: Array) not]]]]]] arity: 1)'.
 cm value: facade class value: 'evaluating' value: 'eval: aString
 	"Evaluate LISP source in the global environment; answer the last value."
 	^ LispCompiler new evalAll: aString'.

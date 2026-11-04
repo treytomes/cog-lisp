@@ -75,6 +75,8 @@ cm value: core class value: 'equality' value: 'equal: a with: b
 	((self isPair: a) and: [self isPair: b])
 		ifTrue: [^ (self equal: a car with: b car) and: [self equal: a cdr with: b cdr]].
 	((self isString: a) and: [self isString: b]) ifTrue: [^ a = b].
+	((a isKindOf: Array) and: [b isKindOf: Array]) ifTrue: [
+		^ a size = b size and: [(1 to: a size) allSatisfy: [:i | self equal: (a at: i) with: (b at: i)]]].
 	^ self eqv: a with: b'.
 
 "=== LispCore : truthiness (class-side) ===================================="

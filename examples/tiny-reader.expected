@@ -1,0 +1,9 @@
+(define (square x) (* x x))
+(display "squares: ")
+(map square (quote (1 2 3 -4)))
+42
+hello
+"a \"quoted\" word"
+same as the built-in reader: #t
+7
+tiny-read: unterminated list

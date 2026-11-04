@@ -37,7 +37,7 @@ to successor).
 | 7.5 | [Review & Tooling](phase-7.5-review-and-tooling.md) | Implemented (114/114 review checks; all suites 627/627; extension checked in VS Code) |
 | 7.6 | [Smalltalk Interop](phase-7.6-smalltalk-interop.md) | Implemented (82/82; all suites 719/719) |
 | 7.7 | [Conditions & Restarts](phase-7.7-conditions-restarts.md) | Implemented (55/55; all suites 785/785) |
-| 7.8 | [Strings, Characters, Vectors & Hash Tables](phase-7.8-native-data.md) | Accepted |
+| 7.8 | [Strings, Characters, Vectors & Hash Tables](phase-7.8-native-data.md) | Implemented (58/58; all suites 853/853) |
 
 Later phases (2–7, see the [project plan](../README.md#project-plan)) get their
 specs here as we reach them.

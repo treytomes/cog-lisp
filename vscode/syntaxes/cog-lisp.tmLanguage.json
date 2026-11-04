@@ -20,6 +20,9 @@
           "include": "#string"
         },
         {
+          "include": "#vector-open"
+        },
+        {
           "include": "#character"
         },
         {
@@ -183,6 +186,11 @@
       "comment": "A capitalized name: a Smalltalk global in brackets and in (smalltalk Name).",
       "name": "entity.name.type.class.cog-lisp",
       "match": "(?<![^\\s(\\[])[A-Z][A-Za-z0-9_]*(?=[\\s()\\[\\]\";]|$)"
+    },
+    "vector-open": {
+      "comment": "#( starts a vector (Phase 7.8).",
+      "name": "punctuation.section.vector.begin.cog-lisp",
+      "match": "#\\("
     }
   }
 }

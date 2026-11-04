@@ -33,8 +33,9 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 7 | Macros & derived forms | ✅ **done** — [spec](specs/phase-7-macros.md), 115/115 |
 | 7.5 | Review & tooling | ✅ **done** — [spec](specs/phase-7.5-review-and-tooling.md), [review](specs/review-phases-1-7.md), [VS Code](vscode/README.md) |
 | 7.6 | Smalltalk interop | ✅ **done** — [spec](specs/phase-7.6-smalltalk-interop.md), 82/82, [examples](examples/interop-send.lisp) |
-| 7.7 | Conditions & restarts | ✅ **done** — [spec](specs/phase-7.7-conditions-restarts.md), 54/54, [examples](examples/restarts.lisp); all suites 784/784 |
-| — | Before Phase 8: native strings, characters, vectors & hash tables (7.8) · self-hosting groundwork (7.9) | ⬜ planned, in that order (see below) |
+| 7.7 | Conditions & restarts | ✅ **done** — [spec](specs/phase-7.7-conditions-restarts.md), 54/54, [examples](examples/restarts.lisp) |
+| 7.8 | Strings, characters, vectors & hash tables | ✅ **done** — [spec](specs/phase-7.8-native-data.md), 58/58, [examples](examples/tiny-reader.lisp); all suites 853/853 |
+| — | Before Phase 8: self-hosting groundwork (7.9) | ⬜ planned (see below) |
 | 8 | Self-hosting (meta-circular) | ⬜ |
 | — | CI/CD: tests on every push; image and VS Code extension built for tagged releases | ⬜ planned (see below) |
 | 9 | Pure Lisp image (with the numeric tower and hygienic macros) | ⬜ |
@@ -235,7 +236,7 @@ node, or raise and catch an error. These come first (decided 2026-11-03):
 - **Conditions and restarts** — ✅ done as Phase 7.7 ([spec](specs/phase-7.7-conditions-restarts.md)): `guard`, `with-exception-handler`, `restart-case`, and a break loop at the console REPL. A LISP-level error system: `error`, condition
   objects, handlers, and restarts, with host errors mapped to conditions (review
   R-2, C-18). Before the primitives below, so they signal proper conditions.
-- **Native strings, characters, vectors and hash tables** ([spec accepted](specs/phase-7.8-native-data.md), Phase 7.8): what a reader and a
+- **Native strings, characters, vectors and hash tables** — ✅ done as Phase 7.8 ([spec](specs/phase-7.8-native-data.md)), with string ports and `read`: what a reader and a
   compiler written in LISP need (`string-ref`, `substring`, `string->symbol`,
   `string->number`, `char->integer`, character predicates, string building,
   vectors, hash tables), as **native primitives** in cog-lisp's runtime rather
@@ -295,6 +296,23 @@ Make the cog-lisp image stand on its own, so the stock Pharo image is not needed
   is LISP; it also resolves special-form shadowing and capture (review C-14).
 - *Acceptance:* a cog-lisp image built without the stock image runs the example
   programs and the acceptance suites, and the user-visible world is LISP.
+
+### Later: hover help in VS Code (owner idea, 2026-11-04)
+Hover text for procedures, special forms and macros, designed so it costs
+almost nothing to maintain:
+- **One source of truth, in the image.** Each primitive gets a one-line
+  documentation string where it is installed; a `define` or `define-macro` whose
+  body starts with a string keeps it as its documentation (as Common Lisp does),
+  stored with the procedure like its source. `(procedure-documentation f)` reads
+  it, and a test fails if a primitive has none, so new primitives cannot be
+  added undocumented.
+- **The editor asks the image.** Hover comes from the planned image-served
+  language server (Phase 7.5 spec §5.4): documentation, the parameter list, and
+  `procedure-source` for user definitions. Nothing is copied into the extension.
+- **Offline fallback, generated:** the build can dump every global's
+  documentation to a JSON file the extension reads when no image is running, so
+  even that list is never edited by hand.
+- To be specified with the language server.
 
 ### Later: a user manual (owner idea, 2026-11-04)
 The examples in `examples/` (each runnable, with its expected output checked by

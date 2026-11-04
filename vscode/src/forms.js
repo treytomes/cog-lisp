@@ -43,6 +43,8 @@ function topLevelForms(text) {
     if (depth === 0 && start < 0) start = i;
     if (c === "'" || c === '`') { i++; continue; }
     if (c === ',') { i += text[i + 1] === '@' ? 2 : 1; continue; }
+    // #( starts a vector (Phase 7.8)
+    if (c === '#' && text[i + 1] === '(') { depth++; i += 2; continue; }
     // [ ] (Smalltalk sends, Phase 7.6) nest like ( )
     if (c === '(' || c === '[') { depth++; i++; continue; }
     if (c === ')' || c === ']') {

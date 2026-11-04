@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 7.8 (the third step before Phase 8; README "Before Phase 8") |
-| **Status** | Accepted (2026-11-04) |
+| **Status** | Implemented (2026-11-04) — `tests/phase-7.8-native-data.st` 58/58; five examples; all suites 853/853 |
 | **Depends on** | Phases 1–7.7 (primitives signal conditions, §7) |
 | **Feeds** | Phase 8 (a reader and compiler written in LISP), the expert system (fact indexing) |
 | **Approach** | Native primitives (owner decision): LISP procedures in the runtime, not LISP names over interop |
@@ -166,3 +166,28 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
 3. **Literal strings (and vectors) are immutable**; `string-copy`, `make-string`
    and `vector-copy` make mutable ones.
 4. **String ports and `read` are in this phase**; file ports come with 7.9.
+
+## 13. As implemented
+
+- **Tests:** `tests/phase-7.8-native-data.st` 58/58 (AC-1 to AC-11); five
+  examples in the runner suite (73/73); all suites 853/853; benchmarks
+  unchanged.
+- **`read` and `read-char` need a port** in this phase: reading stdin a
+  character or a datum at a time comes with file ports in 7.9 (the REPL owns
+  stdin today). The error says so.
+- **Hash tables** wrap each key in a `LispHashKey` whose `=` and `hash` follow the
+  table's equality, kept in a Pharo `OrderedDictionary` for insertion order.
+  `equal?` hashing is bounded in depth (a circular key cannot hang it); the
+  equality must be `eq?`, `eqv?` or `equal?` (others are an error). SRFI 69's
+  `hash-table-exists?` and `hash-table-size` are aliases of `-contains?` and
+  `-count`.
+- **Literal vectors are read-only** (`beReadOnlyObject` when read), like literal
+  strings; `vector-copy`, `vector` and `make-vector` make writable ones.
+- **Strings** are built through a stream, so a wide character (λ) makes a
+  `WideString` as needed; `string-set!` of a wide character into a byte string
+  works.
+- **`display`, `write` and `newline`** take an optional output port;
+  `with-output-to-string` captures `display` output.
+- **The end-of-file object** prints `#<eof>` (review R-18).
+- **Smalltalk `Array`s print as vectors** (`#(3 1 2)`), so
+  `examples/interop-values.expected` changed one line.

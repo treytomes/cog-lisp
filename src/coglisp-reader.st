@@ -11,7 +11,7 @@
  Classes: LispCons, LispSymbol, LispEmptyList, LispReadError, LispReader,
  LispPrinter.
  ============================================================================"
-| failures cm cons sym empty unspec lerr err loc ferr rdr prn |
+| failures cm cons sym empty unspec lerr err loc ferr eofc rdr prn |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -33,6 +33,8 @@ err   := (lerr   << #LispReadError) slots: { #position. #incomplete }; package: 
 "An error raised while running a file, with where it happened (review R-1). The
  runner prints it as path:line:col: error: message, which editors can parse."
 loc   := (lerr   << #LispLocatedError) slots: { #cause. #file. #line. #column }; package: 'CogLisp-Reader'; install.
+"The end-of-file object: read, read-char and friends answer it (Phase 7.8)."
+eofc  := (Object << #LispEofObject) package: 'CogLisp-Reader'; install.
 rdr   := (Object << #LispReader) slots: { #stream. #source. #ranges. #datumStart }; sharedVariables: { #Eof }; package: 'CogLisp-Reader'; install.
 prn   := (Object << #LispPrinter) package: 'CogLisp-Reader'; install.
 
@@ -522,10 +524,23 @@ cm value: rdr value: 'reading' value: 'readHash
 	stream atEnd ifTrue: [^ self signalIncomplete: ''unexpected # at end of input'' at: stream position - 1].
 	c := stream peek.
 	c = $\ ifTrue: [stream next. ^ self readCharacter].
+	c = $( ifTrue: [^ self readVector].
 	word := self readHashWord.
 	(word = ''t'' or: [word = ''true'']) ifTrue: [^ true].
 	(word = ''f'' or: [word = ''false'']) ifTrue: [^ false].
 	^ self signalError: ''unknown # syntax: #'' , word'.
+cm value: eofc value: 'printing' value: 'printOn: aStream
+	aStream nextPutAll: ''#<eof>'''.
+cm value: rdr value: 'reading' value: 'readVector
+	"#(...) reads as a vector (a Smalltalk Array), read-only like every literal
+	 (Phase 7.8 section 6)."
+	| start list |
+	start := stream position.
+	list := self readListBodyFrom: start.
+	(list == LispEmptyList default or: [list isProperList])
+		ifFalse: [^ self signalError: ''bad vector: a dotted tail'' at: start - 1 incomplete: false].
+	^ (list == LispEmptyList default ifTrue: [Array new] ifFalse: [list lispElements asArray])
+		beReadOnlyObject; yourself'.
 cm value: rdr value: 'reading' value: 'readHashWord
 	| s |
 	s := WriteStream on: String new.
@@ -571,7 +586,7 @@ cm value: rdr class value: 'source' value: 'lineAndColumnOf: anOffset in: aStrin
 	1 to: limit do: [:i | (aString at: i) = Character lf ifTrue: [line := line + 1. lineStart := i + 1]].
 	^ { line. limit + 1 - lineStart + 1 }'.
 cm value: rdr class value: 'accessing' value: 'eofObject
-	Eof isNil ifTrue: [Eof := Object new].
+	Eof isNil ifTrue: [Eof := LispEofObject new].
 	^ Eof'.
 cm value: rdr class value: 'reading' value: 'read: aString
 	^ (self on: aString) readSingle'.
@@ -601,6 +616,10 @@ cm value: prn class value: 'writing' value: 'print: v on: s display: displaying
 	displaying ifTrue: [
 		((v isKindOf: String) and: [v isSymbol not]) ifTrue: [^ s nextPutAll: v].
 		(v isKindOf: Character) ifTrue: [^ s nextPut: v]].
+	(v isKindOf: Array) ifTrue: [
+		s nextPutAll: ''#(''.
+		v do: [:e | self print: e on: s display: displaying] separatedBy: [s nextPut: Character space].
+		^ s nextPut: $)].
 	(v isKindOf: LispCons) ifTrue: [^ self printList: v on: s display: displaying].
 	"3/2, which reads back as a symbol for now; Smalltalk prints (3/2) (review R-11)"
 	(v isKindOf: Fraction) ifTrue: [^ s print: v numerator; nextPut: $/; print: v denominator].

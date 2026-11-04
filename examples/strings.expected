@@ -1,0 +1,15 @@
+15
+(H cog-lisp)
+"cog-lisp"
+(5 11)
+("red" "green" "" "blue")
+"a, b, c"
+(#t #t #t)
+(SHOUT quiet)
+(65 λ Q)
+((a #t #f) (1 #f #t) (  #f #f))
+(42 2500.0 255 #f 11111111)
+bat
+string-set!: string is immutable (a literal); copy it first
+Dwwdfn dw gdzq!
+Attack at dawn!

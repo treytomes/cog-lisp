@@ -62,3 +62,7 @@
 (guard (e (#t 0)) (restart-case (f) (use-value (v) v)))
 ;^^^^^ keyword.control.macro.cog-lisp
 ;                  ^^^^^^^^^^^^ keyword.control.macro.cog-lisp
+
+(define v #(1 2))
+;         ^^ punctuation.section.vector.begin.cog-lisp
+;           ^ constant.numeric.cog-lisp

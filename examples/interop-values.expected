@@ -4,7 +4,7 @@ nil is true in LISP
 #<#hello>
 (#f #f #t)
 #t
-#<#(3 1 2)>
+#(3 1 2)
 #<a SortedCollection(1 2 3)>
 (2 1 3)
 (1 4 9 16 25)

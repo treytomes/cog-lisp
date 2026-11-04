@@ -1,0 +1,7 @@
+(12 + 3 * ( 45 - 6 ))
+(name "Ada")
+(born 1815)
+42
+("first line" "second line" #t)
+"total: 6!"
+"captured (a b)"

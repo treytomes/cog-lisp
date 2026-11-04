@@ -39,6 +39,8 @@ check('a bracket send is a form', texts('[coll size] (a [b c: 1])'), ['[coll siz
 check('cursor inside a bracket inside a form', at('(define c [OrderedCollection |new])'), '(define c [OrderedCollection new])');
 check('#\\[ is a character, not a bracket', texts('(list #\\[ #\\]) (z)'), ['(list #\\[ #\\])', '(z)']);
 
+check('a vector is one form', texts('(a #(1 2)) #(3) x'), ['(a #(1 2))', '#(3)', 'x']);
+
 console.log('');
 console.log('== RESULT: ' + pass + '/' + total + ' checks passed ==');
 process.exit(pass === total ? 0 : 1);
