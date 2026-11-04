@@ -39,6 +39,7 @@ to successor).
 | 7.7 | [Conditions & Restarts](phase-7.7-conditions-restarts.md) | Implemented (55/55; all suites 785/785) |
 | 7.8 | [Strings, Characters, Vectors & Hash Tables](phase-7.8-native-data.md) | Implemented (58/58; all suites 853/853) |
 | 7.9 | [Self-Hosting Groundwork](phase-7.9-self-hosting-groundwork.md) | Implemented (46/46; all suites 948/948; compile speed short of target, §12) |
+| 8 | [Self-Hosting](phase-8-self-hosting.md) | Accepted |
 
 Later phases (2–7, see the [project plan](../README.md#project-plan)) get their
 specs here as we reach them.

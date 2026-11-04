@@ -250,6 +250,9 @@ node, or raise and catch an error. These come first (decided 2026-11-03):
   template parsing (C-18).
 
 ### Phase 8 — Self-hosting (meta-circular)
+[Spec accepted](specs/phase-8-self-hosting.md). It starts by moving the
+language-behavior tests from Smalltalk to LISP (owner, 2026-11-04), so the
+self-hosted reader and compiler are checked against the same tests.
 Reimplement cog-lisp **in cog-lisp**: rewrite the reader and the compiler — the
 latter emitting the same `CompiledMethod`s through a LISP-level interface to the
 Opal IR — in the language itself, bootstrapped by the Smalltalk-hosted
