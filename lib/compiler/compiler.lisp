@@ -970,6 +970,18 @@
     (when (pair? source-map) (c-source-map! c (car source-map)))
     (lc-eval c datum #f 0)))
 
+;; What LispCompiler>>compile:context: and eval:context:steps: call when this
+;; compiler is the one in use (step 8.5): map is a reader or #f, text a string or #f.
+(define (lisp-compile-from datum map text)
+  (let ((c (make-lisp-compiler)))
+    (c-source-map! c map)
+    (lc-compile c datum text)))
+
+(define (lisp-eval-from datum map text steps)
+  (let ((c (make-lisp-compiler)))
+    (c-source-map! c map)
+    (lc-eval c datum text steps)))
+
 ;; every datum of a string, read by the LISP reader so procedures keep their text
 (define (lisp-eval-string s)
   (let ((r (make-reader s)))

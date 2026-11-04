@@ -148,6 +148,13 @@ cm value: cell value: 'accessing' value: 'assign: aValue
 	^ aValue'.
 cm value: cell value: 'private' value: 'signalUnbound
 	^ (LispUnboundError new) symbol: symbol; signal: ''unbound variable: '' , symbol name'.
+cm value: cell value: 'copying' value: 'frozenCopy
+	"A private cell with this one''s name and present value, in no environment: what
+	 sealed code reads instead (specs/phase-8-self-hosting.md step 8.5)."
+	| copy |
+	copy := self class symbol: symbol.
+	bound ifTrue: [copy define: value].
+	^ copy'.
 "=== LispRaise (Phase 7.7 section 4.1) ====================================="
 cm value: raise value: 'accessing' value: 'payload
 	^ payload'.

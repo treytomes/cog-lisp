@@ -4,8 +4,9 @@
 ;;; Special forms are a table from name to translator. A translator takes the
 ;;; compiler's state, the form, the scope and whether the form is in tail
 ;;; position, and answers Opal nodes -- here, by translating an equivalent form.
-;;; Until Phase 8 step 8.5 the REPL and load still use the Smalltalk compiler, so
-;;; this example compiles through lisp-eval-string.
+;;; The code that uses the new forms goes through lisp-eval-string, the LISP
+;;; compiler whichever is in use: with COGLISP_COMPILER=smalltalk, eval and load
+;;; use the Smalltalk compiler, which has no table to extend.
 
 ;; (repeat n body ...) runs body n times, compiled directly as a loop: no macro,
 ;; no procedure call per iteration.

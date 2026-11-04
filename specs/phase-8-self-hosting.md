@@ -188,7 +188,7 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
 | 8.2 Reader in LISP | **done** — `lib/compiler/reader.lisp`, built into the image; matches `LispReader` on 52 Phase 1 inputs, 88 feature and error inputs and all 59 `.lisp` files (`tests/phase-8.2-reader.st`, 204 checks); 57 LISP unit tests; 1211/1211 in all |
 | 8.3 Compiler in LISP | **done** — `lib/compiler/opal.lisp` and `compiler.lisp`, built into the image; byte-identical to `LispCompiler` on the corpus (also with each optimization off), 37 path forms, 36 malformed forms and every top-level form of `lib/` and `examples/` (`tests/phase-8.3-compiler.st`, now compared by fingerprint, see step 8.4); 25 LISP unit tests; 2278/2278 in all |
 | 8.4 Bootstrap and fixpoint | **done** — `lib/compiler/bootstrap.lisp`; stages 0–3 make identical methods for all 225 forms of the compiler's source (`tests/lisp/phase-8.4-bootstrap.lisp`, 18 checks; `examples/bootstrap.lisp`); 2336/2336 in all |
-| 8.5 Switch-over | not started |
+| 8.5 Switch-over | **done** — eval, load, the REPL, the runner and `read` use the LISP reader and compiler, sealed; `COGLISP_COMPILER=smalltalk` goes back; every suite, example and LISP test passes both ways (2384/2384 each), benchmarks 14/14; compile time 1.2× (AC-7); `examples/sealed-compiler.lisp` |
 | 8.6 Direct code generation | not started |
 
 ## 12. As implemented
@@ -350,3 +350,70 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
 - Example: `examples/bootstrap.lisp` runs the bootstrap from its own location
   and reports each stage (about 5 s).
 - `tests\run-all.bat` takes about 2 m 10 s.
+
+### Step 8.5
+- **The switch is on `LispCompiler`'s class side.** `implementation` answers
+  `#lisp`, or `#smalltalk` when the environment variable `COGLISP_COMPILER` is
+  `smalltalk`, read once per image session. `compile:context:` and
+  `eval:context:steps:` delegate to LISP entry procedures (`lisp-compile-from`,
+  `lisp-eval-from`) when the LISP compiler is in use; `LispReader on:` (and so
+  `read:`, `readAll:`, `evalAll:`, the REPL, the `read` primitive and
+  `string->number`) answers a `LispReaderInLisp`, LispReader's protocol over
+  the LISP reader, for a string or a `ReadStream` over one (a stream is left just
+  after what was read); stdin's line stream still goes to the Smalltalk reader.
+  The Smalltalk ones stay reachable as `smalltalkCompile:context:`,
+  `smalltalkEval:context:steps:` and `LispReader basicOn:`, which stage 0 of
+  the bootstrap and the 8.2/8.3 comparisons now use (they would otherwise
+  compare the LISP versions with themselves). `(compiler-implementation)`
+  answers `lisp` or `smalltalk`.
+- **The build installs it with the fixpoint check**
+  (`installLispCompilerWithFixpoint`): `lib/core.lisp` and `lib/compiler/` loaded
+  by stage 0, the bootstrap of step 8.4 run (the build fails if the stages
+  differ), then the result sealed and made the one in use. It takes about 12 s.
+  A **stock image installs it on demand** at its first compile, without the
+  bootstrap, so every Smalltalk suite runs on the LISP compiler too; the
+  harness prints which one a suite ran on (`== compiler: lisp ==`). Installing
+  restores the gensym counter, so it is invisible to the program that caused it
+  (the Phase 7.9 bytecode corpus pins gensym names).
+- **Sealing**, for the namespace problem found in 8.3: every global cell the
+  compiler's code reads, found by walking the code of the values of every name
+  `reader.lisp`, `opal.lisp` and `compiler.lisp` define (and the procedures in
+  the special-form table), is replaced by a private cell holding the value it
+  has then (`LispGlobal>>frozenCopy`). A program may now define `append`, `cons`,
+  `make-reader`, even `lc-translate-if`: only the program sees it. Extending
+  the compiler still works through `define-special-form`, since the table is
+  shared and only the cell holding it is private. Changing the compiler's code
+  means editing `lib/compiler/` and rebuilding. `bootstrap.lisp` is not sealed:
+  it must see the stages it installs. `Smalltalk vm voidCogVMState` afterwards,
+  in case machine code holds the old cells.
+- **A bug the seal exposed, fixed:** `make-hash-table` recognized `eq?`, `eqv?`
+  and `equal?` by identity with what those names were bound to at the moment,
+  so the sealed reader's `eq?` was refused after `LispPrimitives installDefault`
+  made new primitives (the benchmark does), and a program's own `eq?` would have
+  been taken for the real one. The primitives are now registered, weakly, as
+  they are made, and a table knows its test by the procedure itself.
+- **The reader is about 4× faster** (751 ms to 164 ms over the 136 K characters
+  of `lib/` and `examples/`, against 46 ms for the Smalltalk reader: from 16× to
+  3.9×), found by profiling, not guessing: the variadic `char=?` built an
+  argument list for every character comparison, and `vector-ref` and
+  `string-ref` were calls with checks. Characters (immediate objects) are now
+  compared with `eq?`, which compiles to `==`; the per-character accessors are
+  macros over Smalltalk sends (`at:`, `asInteger`); character classes come from
+  a 128-entry table. The 8.2 comparison passes unchanged. (A first attempt,
+  macros alone, gained only 20%.)
+- **Results.** Every suite, example and LISP test passes with the LISP
+  compiler (2384/2384) and again with `COGLISP_COMPILER=smalltalk` (2384/2384);
+  `tests\run-all.bat` names the implementation in its header. Benchmarks 14/14
+  with the LISP compiler; compile time 1.2× the Smalltalk compiler's (AC-7,
+  1.5× allowed); reading the compile benchmark's 6.8 K characters 5.8× (a
+  reader's set-up cost weighs more on small text). Run-time benchmarks are
+  unchanged within noise (the bytecode is the same). AC-6: `procedure-source`
+  works on the compiler's own procedures, and compile-error messages and the
+  runner's `path:line:col` positions are unchanged (the runner suite).
+- **The 8.3 comparison now tests the installed, sealed compiler**
+  (`LispCompiler entries at: #compile`) rather than a copy it loaded from
+  source. The new example redefines `cons` and `append`, and the suite runs the
+  examples' definitions, which broke the unsealed copy: the suite was testing a
+  compiler nothing uses.
+- Tests: `tests/lisp/phase-8.5-switch-over.lisp` (17 checks, either way).
+  Example: `examples/sealed-compiler.lisp` (the same output either way).

@@ -41,7 +41,7 @@ benchDir := Smalltalk imageDirectory parent / 'bench'.
 !
 
 "--- Chunk 2: run, report, check -------------------------------------------"
-| out benches configs median compiledRun walkerRun stRun rows report checks pass total check fmt ratio file sizeNote sendTimes compileForms compileMs |
+| out benches configs median compiledRun walkerRun stRun rows report checks pass total check fmt ratio file sizeNote sendTimes compileForms compileMs stCompileMs readText readMs stReadMs |
 out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
 LispPrimitives installDefault.
 
@@ -136,13 +136,27 @@ check value: 'Phase 7.6 AC-20 (send acc + 1) within 1.5x of (+ acc 1) (' , (rati
  examples/tiny-reader.lisp (expanders and procedures), compiled 20 times."
 out value: '  timing compilation ...'.
 compileForms := OrderedCollection new.
+readText := (Smalltalk imageDirectory parent / 'lib' / 'core.lisp') contents ,
+	(Smalltalk imageDirectory parent / 'examples' / 'tiny-reader.lisp') contents.
 [:r | | d | [(d := r next) == LispReader eofObject] whileFalse: [compileForms add: d]]
-	value: (LispReader on: (Smalltalk imageDirectory parent / 'lib' / 'core.lisp') contents ,
-		(Smalltalk imageDirectory parent / 'examples' / 'tiny-reader.lisp') contents).
+	value: (LispReader on: readText).
 LispCompiler new evalFile: (Smalltalk imageDirectory parent / 'lib' / 'core.lisp') fullName.
 3 timesRepeat: [compileForms do: [:f | LispCompiler new compile: f]].
 Smalltalk garbageCollect.
 compileMs := (([60 timesRepeat: [compileForms do: [:f | LispCompiler new compile: f]]] timeToRun asMilliSeconds) / 60.0).
+"Phase 8 step 8.5: compile: and LispReader on: use the compiler and reader in use
+ (the ones written in LISP unless COGLISP_COMPILER=smalltalk); the Smalltalk ones
+ are timed beside them (AC-7)."
+3 timesRepeat: [compileForms do: [:f | LispCompiler new smalltalkCompile: f context: nil]].
+Smalltalk garbageCollect.
+stCompileMs := (([60 timesRepeat: [compileForms do: [:f | LispCompiler new smalltalkCompile: f context: nil]]] timeToRun asMilliSeconds) / 60.0).
+3 timesRepeat: [LispReader readAll: readText].
+Smalltalk garbageCollect.
+readMs := (([20 timesRepeat: [LispReader readAll: readText]] timeToRun asMilliSeconds) / 20.0).
+Smalltalk garbageCollect.
+stReadMs := (([200 timesRepeat: [ | r | r := LispReader basicOn: readText. [r next == LispReader eofObject] whileFalse]] timeToRun asMilliSeconds) / 200.0).
+check value: 'Phase 8 AC-7 compile time with the compiler in use (' , LispCompiler implementation , ') within 1.5x of the Smalltalk compiler (' , (ratio value: compileMs value: stCompileMs) , ')'
+	value: compileMs <= (1.5 * stCompileMs).
 
 report := String streamContents: [:s |
 	s nextPutAll: '# cog-lisp benchmark results'; lf; lf.
@@ -171,7 +185,11 @@ report := String streamContents: [:s |
 			s nextPutAll: ' |'].
 		s lf].
 	s lf; nextPutAll: '## Compilation'; lf; lf.
-	s nextPutAll: 'Compiling the ' , compileForms size printString , ' forms of `lib/core.lisp` and `examples/tiny-reader.lisp`: ' , (fmt value: compileMs) , ' ms.'; lf.
+	s nextPutAll: 'Compiling the ' , compileForms size printString , ' forms of `lib/core.lisp` and `examples/tiny-reader.lisp`: ' , (fmt value: compileMs)
+		, ' ms with the compiler in use (' , LispCompiler implementation , '); ' , (fmt value: stCompileMs) , ' ms with the Smalltalk compiler ('
+		, (ratio value: compileMs value: stCompileMs) , ').'; lf; lf.
+	s nextPutAll: 'Reading the same ' , readText size printString , ' characters: ' , (fmt value: readMs) , ' ms with the reader in use; '
+		, (fmt value: stReadMs) , ' ms with the Smalltalk reader (' , (ratio value: readMs value: stReadMs) , ').'; lf.
 	s lf; nextPutAll: '## Smalltalk interop'; lf; lf.
 	s nextPutAll: 'A loop of 1,000,000 `(send acc + 1)`: ' , (fmt value: sendTimes first) , ' ms; the same loop with `(+ acc 1)`: '
 		, (fmt value: sendTimes last) , ' ms (' , (ratio value: sendTimes first value: sendTimes last) , ').'; lf.

@@ -49,7 +49,7 @@ describe := [:blk | | m err |
 stCompile := [:datum :map :ctx | describe value: [ | c |
 	c := LispCompiler new.
 	c instVarNamed: 'sourceMap' put: map.
-	c compile: datum context: ctx]].
+	c smalltalkCompile: datum context: ctx]].
 compileForm := nil.
 lispCompile := [:datum :map :ctx | describe value: [
 	LispProcedure apply: compileForm to: { datum. map ifNil: [false]. ctx ifNil: [false] }]].
@@ -107,9 +107,12 @@ visit := [:datum :reader :ctx :label | | m |
 h say: '== cog-lisp Phase 8.3 : the compiler in LISP =='.
 LispPrimitives installDefault.
 LispCompiler new evalFile: (root / 'lib' / 'core.lisp') fullName.
-#('reader.lisp' 'opal.lisp' 'compiler.lisp') do: [:name |
-	LispCompiler new evalFile: (root / 'lib' / 'compiler' / name) fullName].
-compileForm := LispCompiler new evalString: 'compile-form'.
+"The compiler under test is the installed one, sealed (step 8.5), whichever
+ compiler eval uses: the forms of the examples that run here define names such
+ as cons and append (examples/sealed-compiler.lisp), which an unsealed copy
+ loaded from source would then call."
+LispCompiler hasLispCompiler ifFalse: [LispCompiler installLispCompiler].
+compileForm := LispCompiler entries at: #compile.
 
 "the comparison itself must see differences"
 h check: 'control: (+ 1 2) and (+ 1 3) differ'
@@ -120,7 +123,7 @@ h check: 'control: the LISP compiler compiles (+ 1 2)'
 
 "AC-3 the bytecode corpus"
 count := 0.
-r := LispReader on: (root / 'tests' / 'bytecode-corpus.lisp') contents.
+r := LispReader basicOn: (root / 'tests' / 'bytecode-corpus.lisp') contents.
 [(d := r next) == LispReader eofObject] whileFalse: [
 	count := count + 1.
 	compare value: 'AC-3 corpus ' , count printString , ' ' , (LispPrinter writeString: d limitedTo: 50) value: d value: nil value: nil].
@@ -191,7 +194,7 @@ files := files asOrderedCollection , (((root / 'examples') allChildrenMatching: 
 count := 0.
 files do: [:f | | rd label |
 	label := 'AC-3 ' , (f relativeTo: root) pathString.
-	rd := LispReader on: f contents.
+	rd := LispReader basicOn: f contents.
 	[[(d := rd next) == LispReader eofObject] whileFalse: [visit value: d value: rd value: nil value: label]]
 		on: LispReadError do: [:e | nil]].
 h check: 'AC-3 forms compared from lib/ and examples/' actual: count > 300 expected: true.
@@ -200,7 +203,7 @@ h check: 'AC-3 forms compared from lib/ and examples/' actual: count > 300 expec
 LispCompiler allOptions do: [:opt |
 	LispCompiler withoutOptions: { opt } do: [
 		count := 0.
-		r := LispReader on: (root / 'tests' / 'bytecode-corpus.lisp') contents.
+		r := LispReader basicOn: (root / 'tests' / 'bytecode-corpus.lisp') contents.
 		[(d := r next) == LispReader eofObject] whileFalse: [
 			count := count + 1.
 			compare value: 'AC-3 without ' , opt , ' corpus ' , count printString value: d value: nil value: nil]]].

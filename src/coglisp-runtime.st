@@ -20,7 +20,7 @@ lerr  := LispError.  "defined by the reader package"
 aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp-Runtime'; install.
 proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries. #inline. #packed }; package: 'CogLisp-Runtime'; install.
 tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runtime'; install.
-prims := (Object << #LispPrimitives) sharedVariables: { #Output. #Input. #CommandLine. #GensymCounter }; package: 'CogLisp-Runtime'; install.
+prims := (Object << #LispPrimitives) sharedVariables: { #Output. #Input. #CommandLine. #GensymCounter. #EqualityTests }; package: 'CogLisp-Runtime'; install.
 "CogLisp: the Smalltalk-side facade for evaluating and calling LISP (Phase 7.6 section 5.2)."
 facade := (Object << #CogLisp) package: 'CogLisp-Runtime'; install.
 "Phase 7.8: hash tables (keys wrapped so a Pharo OrderedDictionary compares them
@@ -244,12 +244,16 @@ cm value: prims class value: 'checks' value: 'numberFrom: s radix: radix
 		(dv between: 0 and: radix - 1) ifFalse: [^ false].
 		v := v * radix + dv].
 	^ neg ifTrue: [v negated] ifFalse: [v]'.
+cm value: prims class value: 'checks' value: 'equalityTests
+	"The eq?, eqv? and equal? primitives ever installed, with the test each makes.
+	 A table knows its test by the procedure itself, not by what the names are
+	 bound to now: code sealed with an earlier eq? (the compiler, Phase 8 step 8.5)
+	 still makes eq? tables, and a procedure that merely took the name does not."
+	^ EqualityTests ifNil: [EqualityTests := WeakIdentityKeyDictionary new]'.
 cm value: prims class value: 'checks' value: 'equalityTest: p in: anEnv
 	p isNil ifTrue: [^ #equal].
-	p == (anEnv lookup: (LispSymbol named: ''eq?'')) ifTrue: [^ #eq].
-	p == (anEnv lookup: (LispSymbol named: ''eqv?'')) ifTrue: [^ #eqv].
-	p == (anEnv lookup: (LispSymbol named: ''equal?'')) ifTrue: [^ #equal].
-	^ self fail: ''make-hash-table'' with: ''the equality must be eq?, eqv? or equal?: '' , (self show: p)'.
+	^ self equalityTests at: p ifAbsent: [
+		self fail: ''make-hash-table'' with: ''the equality must be eq?, eqv? or equal?: '' , (self show: p)]'.
 
 "=== characters (section 4) ================================================="
 cm value: prims class value: 'installing' value: 'installCharactersInto: anEnv
@@ -879,7 +883,10 @@ cm value: prims class value: 'installing' value: 'installMacroSupportInto: anEnv
 		required: 0).
 	anEnv define: (LispSymbol named: ''macroexpand-1'') value: (LispProcedure fixed: [:form | LispCompiler new macroexpand1: form] arity: 1).
 	anEnv define: (LispSymbol named: ''macroexpand'') value: (LispProcedure fixed: [:form | LispCompiler new macroexpand: form] arity: 1).
-	anEnv define: (LispSymbol named: ''eval'') value: (LispProcedure fixed: [:form | LispCompiler new eval: form] arity: 1)'.
+	anEnv define: (LispSymbol named: ''eval'') value: (LispProcedure fixed: [:form | LispCompiler new eval: form] arity: 1).
+	"lisp or smalltalk: the reader and compiler in use (Phase 8 step 8.5)"
+	anEnv define: (LispSymbol named: ''compiler-implementation'') value: (LispProcedure fixed: [
+		LispSymbol named: (LispCompiler usesLisp ifTrue: [''lisp''] ifFalse: [''smalltalk''])] arity: 0)'.
 cm value: prims class value: 'installing' value: 'installConditionsInto: anEnv
 	"Phase 7.7: conditions are Pharo exceptions. Handlers catch Error (which includes
 	 LispRaise), never Notifications, Warnings or restart transfers. A handler gets
@@ -1160,9 +1167,15 @@ cm value: prims class value: 'installing' value: 'installComparisonsInto: anEnv
 	(e value: ''<='') entry: 2 is: [:a :b | a <= b].
 	(e value: ''>='') entry: 2 is: [:a :b | a >= b]'.
 cm value: prims class value: 'installing' value: 'installPredicatesInto: anEnv
-	anEnv define: (LispSymbol named: ''eq?'') value: (LispProcedure fixed: [:a :b | LispCore eq: a with: b] arity: 2).
-	anEnv define: (LispSymbol named: ''eqv?'') value: (LispProcedure fixed: [:a :b | LispCore eqv: a with: b] arity: 2).
-	anEnv define: (LispSymbol named: ''equal?'') value: (LispProcedure fixed: [:a :b | LispCore equal: a with: b] arity: 2).
+	| equality |
+	"each registered, so make-hash-table knows it (equalityTests)"
+	equality := [:name :test :aBlock | | p |
+		p := LispProcedure fixed: aBlock arity: 2.
+		self equalityTests at: p put: test.
+		anEnv define: (LispSymbol named: name) value: p].
+	equality value: ''eq?'' value: #eq value: [:a :b | LispCore eq: a with: b].
+	equality value: ''eqv?'' value: #eqv value: [:a :b | LispCore eqv: a with: b].
+	equality value: ''equal?'' value: #equal value: [:a :b | LispCore equal: a with: b].
 	anEnv define: (LispSymbol named: ''not'') value: (LispProcedure fixed: [:x | x == false] arity: 1).
 	anEnv define: (LispSymbol named: ''symbol?'') value: (LispProcedure fixed: [:x | LispCore isSymbol: x] arity: 1).
 	anEnv define: (LispSymbol named: ''number?'') value: (LispProcedure fixed: [:x | LispCore isNumber: x] arity: 1).

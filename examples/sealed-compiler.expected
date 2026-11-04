@@ -1,0 +1,5 @@
+compiler in use is lisp or smalltalk: #t
+(append '(1) '(2)) = my-append
+(cons 1 2) = (my-cons 1 2)
+(wrap '(a b)) = (begin a b end)
+read: (x . y)

@@ -632,6 +632,14 @@ cm value: rdr value: 'reading' value: 'readSingle
 	self next == self class eofObject ifFalse: [^ (LispReadError new) signal: ''read: more than one datum''].
 	^ d'.
 cm value: rdr class value: 'instance creation' value: 'on: aStringOrStream
+	"The reader eval, load, the REPL and read use: the reader written in LISP when
+	 it is the one in use, else this one (specs/phase-8-self-hosting.md step 8.5).
+	 The compiler package loads after this one, so it is looked up by name."
+	(Smalltalk at: #LispCompiler ifAbsent: [nil]) ifNotNil: [:compiler |
+		(compiler readerOn: aStringOrStream) ifNotNil: [:r | ^ r]].
+	^ self basicOn: aStringOrStream'.
+cm value: rdr class value: 'instance creation' value: 'basicOn: aStringOrStream
+	"This reader, the Smalltalk one, whichever is in use."
 	aStringOrStream isString ifTrue: [^ self new setStream: aStringOrStream readStream source: aStringOrStream].
 	^ self new setStream: aStringOrStream source: nil'.
 cm value: rdr class value: 'source' value: 'lineAndColumnOf: anOffset in: aString

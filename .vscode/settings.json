@@ -50,6 +50,7 @@
         "noimage",
         "nthcdr",
         "numberp",
+        "OCIR",
         "oddp",
         "persistable",
         "pharo",

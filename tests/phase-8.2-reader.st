@@ -63,7 +63,7 @@ events := [:next :datumStart :position :sourceFor | | out d |
 	out asArray].
 
 stEvents := [:src | | r |
-	r := LispReader on: src.
+	r := LispReader basicOn: src.
 	events value: [r next] value: [r datumStart] value: [r position] value: [:c | r sourceFor: c]].
 
 lispEvents := [:src | | r mk nx ds ps sf |

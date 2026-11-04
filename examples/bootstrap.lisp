@@ -17,7 +17,7 @@
   (display "  stage ") (write j) (display " vs stage ") (write i) (display ": ")
   (let ((diffs (bootstrap-differences b i j)))
     (if (null? diffs)
-        (begin (write (length (vector-ref b j))) (display " methods, all identical"))
+        (display "every method identical")
         (begin (display "different: ") (write diffs))))
   (newline))
 

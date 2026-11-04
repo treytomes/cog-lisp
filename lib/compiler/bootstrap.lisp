@@ -27,7 +27,7 @@
 
 ;; A source: (next-datum-thunk . source-map), over a file's text
 (define (smalltalk-source text)
-  (let ((r [(smalltalk LispReader) on: text]))
+  (let ((r [(smalltalk LispReader) basicOn: text]))     ; the Smalltalk reader itself
     (cons (lambda () [r next]) r)))
 
 (define (lisp-source text)
@@ -44,7 +44,7 @@
 (define (smalltalk-compile datum map context)
   (let ((c [(smalltalk LispCompiler) new]))
     [c instVarNamed: "sourceMap" put: map]
-    [c compile: datum context: (or context (smalltalk-nil))]))
+    [c smalltalkCompile: datum context: (or context (smalltalk-nil))]))   ; not the one in use
 
 (define (lisp-compile datum map context)              ; whichever stage is installed
   (compile-form datum map context))
@@ -52,7 +52,9 @@
 ;;; Stages
 
 (define bootstrap-gensym-key (smalltalk-symbol "GensymCounter"))
-(define (gensym-counter) [[(smalltalk LispPrimitives) classPool] at: bootstrap-gensym-key])
+(define (gensym-counter)                     ; nil until the first gensym: 0
+  (let ((n [[(smalltalk LispPrimitives) classPool] at: bootstrap-gensym-key]))
+    (if (smalltalk-nil? n) 0 n)))
 (define (gensym-counter! n) [[(smalltalk LispPrimitives) classPool] at: bootstrap-gensym-key put: n])
 
 ;; every top-level form of the sources, as eval sees one (a begin's forms and a

@@ -255,6 +255,27 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 
 ## Writing the compiler in LISP (Phase 8)
 
+- **Since 8.5 the LISP reader and compiler are the ones in use**, in the built
+  image and in a stock image (installed at the first compile, about 1 s, without
+  the fixpoint check the build does). `COGLISP_COMPILER=smalltalk` selects the
+  Smalltalk ones; run `tests\run-all.bat` both ways after compiler changes. The
+  Smalltalk ones are always reachable as `LispCompiler new smalltalkCompile:
+  datum context: nil` and `LispReader basicOn:`: a test that compares the two
+  must use those, or it compares the LISP versions with themselves.
+- **The installed compiler is sealed:** its code reads private copies of the
+  global cells it uses, so redefining `append` (or `lc-translate-if`) in a
+  program changes nothing for the compiler. To change the compiler, edit
+  `lib/compiler/` and rebuild; `define-special-form` extends it live.
+- **Hot LISP code: compare characters with `eq?`, not `char=?`.** `char=?` is
+  variadic and builds an argument list per call; characters are immediate, so
+  `eq?` (inlined to `==`) is exact. `vector-ref` and `string-ref` are checked
+  calls, not inlined; a Smalltalk send (`[v at: i]`) runs as a primitive. Profile
+  before optimizing: `MessageTally new spyEvery: 1 on: [...]`, then
+  `leavesPrintExactOn:` (macros alone gave the reader 20%; these, 4x).
+- **`voidCogVMState` is on `Smalltalk vm`**, not `Smalltalk`, in Pharo 14.
+- **A Windows path inside generated LISP text is full of escapes** (`\U`, `\c`):
+  build the datum (`LispCons fromArray: {...}`) instead of reading text.
+
 - **cog-lisp has no `list-ref`, and `for-each` takes one list** (`for-each:
   expected 2 arguments, got 3`). `map`'s order is not guaranteed by R7RS;
   `lib/compiler/` uses its own strictly left-to-right `lc-map` and `lc-map2`.

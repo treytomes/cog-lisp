@@ -84,6 +84,12 @@ cm value: #total value: 'total
 	^ total'.
 cm value: #finish value: 'finish
 	self say: ''''.
+	"which compiler this suite ran on (Phase 8 step 8.5): the one written in LISP is
+	 installed at the first compile unless COGLISP_COMPILER=smalltalk"
+	(Smalltalk at: #LispCompiler ifAbsent: [nil]) ifNotNil: [:c |
+		self say: ''== compiler: '' , ((c hasLispCompiler and: [c implementation = #lisp])
+			ifTrue: [''lisp'']
+			ifFalse: [''smalltalk'']) , '' ==''].
 	self say: ''== RESULT: '' , pass printString , ''/'' , total printString , '' checks passed ==''.
 	Smalltalk exit: ((total > 0 and: [pass = total]) ifTrue: [0] ifFalse: [1])'.
 cm value: #harnessError: value: 'harnessError: anError

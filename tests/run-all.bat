@@ -24,7 +24,12 @@ mkdir "%TMPD%"
 set PASS=0
 set TOTAL=0
 set FAILED=0
-echo == cog-lisp : all suites ==
+rem  the reader and compiler in use (Phase 8 step 8.5): LISP unless COGLISP_COMPILER=smalltalk
+if /i "%COGLISP_COMPILER%"=="smalltalk" (
+  echo == cog-lisp : all suites, on the Smalltalk reader and compiler ^(COGLISP_COMPILER=smalltalk^) ==
+) else (
+  echo == cog-lisp : all suites, on the LISP reader and compiler ==
+)
 
 for %%T in (tests\phase-*.st) do call :suite "%%~fT" "%%~nT"
 call :runner

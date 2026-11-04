@@ -22,7 +22,7 @@
  LispCompiler withoutOptions: #(...) do: [...] switches some off, for
  benchmarks and debugging.
  ============================================================================"
-| failures cm comp err lpath |
+| failures cm comp err lpath lread |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -31,12 +31,14 @@ cm := [:cls :cat :src |
 
 comp := (Object << #LispCompiler)
 	slots: { #counter. #sourceMap. #options. #selfLoop. #inlineTemps. #topForm. #sourceContext. #inBody. #expansionDepth. #exprDepth };
-	sharedVariables: { #DefaultOptions. #SpecialForms. #TemplateCache };
+	sharedVariables: { #DefaultOptions. #SpecialForms. #TemplateCache. #Implementation. #ImplementationSession. #LispEntries. #Installing };
 	package: 'CogLisp-Compiler';
 	install.
 err  := (LispError << #LispCompileError) package: 'CogLisp-Compiler'; install.
 "The full path of the file being loaded or run, per process (Phase 7.9 section 5.3)."
 lpath := (DynamicVariable << #LispLoadPath) package: 'CogLisp-Compiler'; install.
+"The reader written in LISP, behind LispReader's protocol (Phase 8 step 8.5)."
+lread := (Object << #LispReaderInLisp) slots: { #state. #stream. #source }; package: 'CogLisp-Compiler'; install.
 
 "=== options ==============================================================="
 cm value: comp class value: 'options' value: 'allOptions
@@ -942,7 +944,14 @@ cm value: comp value: 'translating' value: 'translateSet: form inScope: scope
 cm value: comp value: 'compiling' value: 'compile: datum
 	^ self compile: datum context: nil'.
 cm value: comp value: 'compiling' value: 'compile: datum context: text
-	"A top-level form is not in tail position: its calls are ordinary calls."
+	"Compile with the compiler in use: the one written in LISP (lib/compiler/), or
+	 this one (Phase 8 step 8.5)."
+	self class usesLisp ifTrue: [
+		^ (LispEntries at: #compile) value: datum value: (self class lispSourceMap: sourceMap) value: (text ifNil: [false])].
+	^ self smalltalkCompile: datum context: text'.
+cm value: comp value: 'compiling' value: 'smalltalkCompile: datum context: text
+	"This compiler, whichever is in use. A top-level form is not in tail position:
+	 its calls are ordinary calls."
 	| exprNode method |
 	counter := 0.
 	selfLoop := nil.
@@ -974,7 +983,13 @@ cm value: comp value: 'compiling' value: 'describeBackEndError: anError
 cm value: comp value: 'evaluating' value: 'eval: datum
 	^ self eval: datum context: nil steps: 0'.
 cm value: comp value: 'evaluating' value: 'eval: datum context: text steps: n
-	"At top level, the forms of a begin and the expansion of a macro call are
+	"Evaluate with the compiler in use (Phase 8 step 8.5)."
+	self class usesLisp ifTrue: [
+		^ (Smalltalk at: #LispProcedure) apply: (LispEntries at: #eval)
+			to: { datum. self class lispSourceMap: sourceMap. text ifNil: [false]. n }].
+	^ self smalltalkEval: datum context: text steps: n'.
+cm value: comp value: 'evaluating' value: 'smalltalkEval: datum context: text steps: n
+	"This compiler''s eval, whichever is in use. At top level, the forms of a begin and the expansion of a macro call are
 	 themselves top-level forms, compiled and run one after another (R7RS; review
 	 C-11). So a define-macro there is at top level, and a macro it defines can be
 	 used by the forms after it. text is the source a made-up lambda takes."
@@ -982,14 +997,14 @@ cm value: comp value: 'evaluating' value: 'eval: datum context: text steps: n
 	n > self class maxExpansions ifTrue: [^ self expansionTooDeep: datum].
 	((datum isKindOf: LispCons) and: [datum car == (LispSymbol named: ''begin'')]) ifTrue: [
 		result := LispUnspecified default.
-		(self listToArray: datum cdr) do: [:f | result := self eval: f context: text steps: n].
+		(self listToArray: datum cdr) do: [:f | result := self smalltalkEval: f context: text steps: n].
 		^ result].
 	m := (datum isKindOf: LispCons) ifTrue: [self macroFor: datum car inScope: IdentityDictionary new] ifFalse: [nil].
 	m notNil ifTrue: [
-		^ self eval: (self expand: datum with: m)
+		^ self smalltalkEval: (self expand: datum with: m)
 			context: ((self recordedSourceOf: datum) ifNil: [text])
 			steps: n + 1].
-	^ (self compile: datum context: text) valueWithReceiver: nil arguments: #()'.
+	^ (self smalltalkCompile: datum context: text) valueWithReceiver: nil arguments: #()'.
 cm value: comp value: 'evaluating' value: 'eval: datum from: aReader
 	"Evaluate a datum read by aReader, so procedures can keep their exact source text."
 	sourceMap := aReader.
@@ -1042,6 +1057,186 @@ cm value: comp class value: 'paths' value: 'resolveInput: aPath
 	ref := self resolve: aPath.
 	(ref exists or: [self isAbsolute: aPath]) ifTrue: [^ ref].
 	^ aPath asFileReference exists ifTrue: [aPath asFileReference] ifFalse: [ref]'.
+
+"=== which reader and compiler are in use (Phase 8 step 8.5) =============="
+cm value: comp class value: 'implementation' value: 'implementation
+	"#lisp or #smalltalk: the reader and compiler eval, load, the REPL, the runner
+	 and read use. The environment variable COGLISP_COMPILER=smalltalk selects the
+	 Smalltalk ones, for diagnosis; otherwise the ones written in LISP. Read once
+	 per image session."
+	ImplementationSession == Smalltalk session ifFalse: [
+		ImplementationSession := Smalltalk session.
+		Implementation := ((OSEnvironment current at: ''COGLISP_COMPILER'' ifAbsent: ['''']) asLowercase = ''smalltalk'')
+			ifTrue: [#smalltalk]
+			ifFalse: [#lisp]].
+	^ Implementation'.
+cm value: comp class value: 'implementation' value: 'implementation: aSymbol
+	"Choose the implementation for this session (tests): #lisp or #smalltalk."
+	ImplementationSession := Smalltalk session.
+	Implementation := aSymbol'.
+cm value: comp class value: 'implementation' value: 'usesLisp
+	"True when the LISP reader and compiler are the ones in use. An image that does
+	 not have them yet (a stock image running a suite) installs them now."
+	Installing == true ifTrue: [^ false].
+	self implementation = #lisp ifFalse: [^ false].
+	LispEntries isNil ifTrue: [self installLispCompiler].
+	^ true'.
+cm value: comp class value: 'implementation' value: 'hasLispCompiler
+	^ LispEntries notNil'.
+cm value: comp class value: 'implementation' value: 'lispSourceDirectory
+	^ Smalltalk imageDirectory parent / ''lib'''.
+cm value: comp class value: 'implementation' value: 'compilerSourceNames
+	"The compiler''s source, in lib/compiler/, in load order. bootstrap.lisp is the
+	 tool that compiles it to a fixpoint; it is not part of it, nor of the seal."
+	^ #(''reader.lisp'' ''opal.lisp'' ''compiler.lisp'')'.
+cm value: comp class value: 'implementation' value: 'installLispCompiler
+	"Load the LISP reader and compiler, compiled by this one (stage 0), seal them,
+	 and use them. The build does more: installLispCompilerWithFixpoint."
+	self installLispCompilerDo: [:lib | nil]'.
+cm value: comp class value: 'implementation' value: 'installLispCompilerWithFixpoint
+	"As installLispCompiler, after compiling the compiler with itself until it makes
+	 the same methods as the stage before (lib/compiler/bootstrap.lisp, Phase 8
+	 step 8.4). Fails if it does not. Used by the build."
+	self installLispCompilerDo: [:lib | | ok |
+		"built as a datum, not read from text: a Windows path is full of backslashes"
+		ok := self new smalltalkEval: (LispCons fromArray: {
+				LispSymbol named: ''bootstrap-fixpoint?''.
+				LispCons fromArray: { LispSymbol named: ''bootstrap-compiler''. (lib / ''compiler'') fullName } })
+			context: nil steps: 0.
+		ok == true ifFalse: [self error: ''the compiler did not reach a fixpoint'']]'.
+cm value: comp class value: 'implementation' value: 'installLispCompilerDo: aBlock
+	"Installing is invisible to the program that caused it: the gensym counter the
+	 compiler''s own macro expansions advance is put back (gensyms are uninterned,
+	 so a name used again is still a new symbol)."
+	| lib prims gensyms |
+	Installing := true.
+	prims := Smalltalk at: #LispPrimitives.
+	gensyms := prims classPool at: #GensymCounter.
+	[lib := self lispSourceDirectory.
+	 (LispEnvironment default cellFor: (LispSymbol named: ''car'')) isBound ifFalse: [prims installDefault].
+	 self new evalFile: (lib / ''core.lisp'') fullName.
+	 self compilerSourceNames , #(''bootstrap.lisp'') do: [:name |
+		self new evalFile: (lib / ''compiler'' / name) fullName].
+	 aBlock value: lib.
+	 self sealLispCompiler: lib.
+	 LispEntries := self lispEntries]
+		ensure: [
+			prims classPool at: #GensymCounter put: gensyms.
+			Installing := false]'.
+cm value: comp class value: 'implementation' value: 'lispEntries
+	"The LISP procedures the Smalltalk side calls, taken now, after sealing: later
+	 definitions of these names do not change what eval and the reader use."
+	| at |
+	at := [:name | (LispEnvironment default cellFor: (LispSymbol named: name)) value].
+	^ Dictionary new
+		at: #compile put: (at value: ''lisp-compile-from'');
+		at: #eval put: (at value: ''lisp-eval-from'');
+		at: #makeReader put: (at value: ''make-reader'');
+		at: #next put: (at value: ''reader-next'');
+		at: #datumStart put: (at value: ''reader-datum-start'');
+		at: #position put: (at value: ''reader-position'');
+		at: #setPosition put: (at value: ''rd-pos!!'');
+		at: #sourceFor put: (at value: ''reader-source-for'');
+		at: #skipIntertoken put: (at value: ''rd-skip-intertoken!!'');
+		at: #atEnd put: (at value: ''rd-at-end?'');
+		yourself'.
+cm value: comp class value: 'implementation' value: 'definedNamesIn: aFile
+	"The names a file of LISP defines at top level."
+	| r d names |
+	r := LispReader basicOn: aFile contents.
+	names := OrderedCollection new.
+	[(d := r next) == LispReader eofObject] whileFalse: [
+		((d isKindOf: LispCons) and: [d car == (LispSymbol named: ''define'') and: [d cdr isKindOf: LispCons]]) ifTrue: [
+			names add: ((d cdr car isKindOf: LispCons) ifTrue: [d cdr car car] ifFalse: [d cdr car])]].
+	^ names'.
+cm value: comp class value: 'implementation' value: 'sealLispCompiler: lib
+	"Make the compiler independent of later definitions: every global cell its code
+	 reads (car, append, its own procedures, ...) becomes a private cell holding the
+	 value it has now, so a program that defines append, or make-reader, changes
+	 its own world, not the compiler. The code is everything reachable from the
+	 values of the names the compiler''s source defines: procedures, and the
+	 procedures in its tables (the special forms). define-special-form still
+	 extends it: the table is shared; only the cell is private."
+	| frozen seen walk walkProc |
+	frozen := IdentityDictionary new.
+	seen := IdentitySet new.
+	walk := nil.
+	walk := [:code |
+		(seen includes: code) ifFalse: [
+			seen add: code.
+			1 to: code numLiterals do: [:i | | lit |
+				lit := code literalAt: i.
+				(lit isKindOf: LispGlobal)
+					ifTrue: [code literalAt: i put: (frozen at: lit ifAbsentPut: [lit frozenCopy])]
+					ifFalse: [
+						(lit isKindOf: CompiledBlock) ifTrue: [walk value: lit].
+						(lit isKindOf: BlockClosure) ifTrue: [walk value: lit compiledBlock]]]]].
+	walkProc := [:v |
+		((v isKindOf: (Smalltalk at: #LispProcedure)) and: [v block isKindOf: BlockClosure])
+			ifTrue: [walk value: v block compiledBlock]].
+	self compilerSourceNames do: [:name |
+		(self definedNamesIn: lib / ''compiler'' / name) do: [:sym | | v |
+			v := (LispEnvironment default cellFor: sym) valueIfUnbound: [nil].
+			walkProc value: v.
+			(v isKindOf: (Smalltalk at: #LispHashTable)) ifTrue: [v values do: [:x | walkProc value: x]]]].
+	"machine code made before sealing may still read the old cells"
+	Smalltalk vm voidCogVMState'.
+cm value: comp class value: 'implementation' value: 'lispSourceMap: aSourceMap
+	"What the LISP compiler takes as a source map: the LISP reader inside an
+	 adapter, a Smalltalk reader as it is, or #f."
+	aSourceMap isNil ifTrue: [^ false].
+	(aSourceMap isKindOf: LispReaderInLisp) ifTrue: [^ aSourceMap state].
+	^ aSourceMap'.
+cm value: comp class value: 'implementation' value: 'readerOn: aStringOrStream
+	"The LISP reader over aStringOrStream when it is in use and can read it (a
+	 string, or a ReadStream over one), else nil."
+	self usesLisp ifFalse: [^ nil].
+	^ LispReaderInLisp on: aStringOrStream entries: LispEntries'.
+cm value: comp class value: 'implementation' value: 'entries
+	^ LispEntries'.
+
+"=== LispReaderInLisp: LispReader's protocol over the LISP reader ==========="
+cm value: lread class value: 'instance creation' value: 'on: aStringOrStream entries: entries
+	aStringOrStream isString ifTrue: [
+		^ self new setState: ((entries at: #makeReader) value: aStringOrStream) stream: nil source: aStringOrStream].
+	((aStringOrStream isKindOf: ReadStream) and: [aStringOrStream originalContents isString]) ifTrue: [ | r |
+		r := (entries at: #makeReader) value: aStringOrStream originalContents.
+		(entries at: #setPosition) value: r value: aStringOrStream position.
+		^ self new setState: r stream: aStringOrStream source: aStringOrStream originalContents].
+	^ nil'.
+cm value: lread value: 'private' value: 'setState: aReader stream: aStream source: aString
+	state := aReader.
+	stream := aStream.
+	source := aString'.
+cm value: lread value: 'private' value: 'entry: aSymbol
+	^ LispCompiler entries at: aSymbol'.
+cm value: lread value: 'private' value: 'syncStream
+	"A stream read from is left just after what was read, as LispReader leaves it."
+	stream ifNotNil: [:s | s position: ((self entry: #position) value: state)]'.
+cm value: lread value: 'accessing' value: 'state
+	^ state'.
+cm value: lread value: 'reading' value: 'next
+	"The next datum, or the eof object."
+	^ [(self entry: #next) value: state] ensure: [self syncStream]'.
+cm value: lread value: 'reading' value: 'atEnd
+	[(self entry: #skipIntertoken) value: state] ensure: [self syncStream].
+	^ (self entry: #atEnd) value: state'.
+cm value: lread value: 'reading' value: 'readSingle
+	| d |
+	d := self next.
+	d == LispReader eofObject ifTrue: [^ (LispReadError new) incomplete: true; signal: ''read: empty input''].
+	self next == LispReader eofObject ifFalse: [^ (LispReadError new) signal: ''read: more than one datum''].
+	^ d'.
+cm value: lread value: 'source' value: 'datumStart
+	^ (self entry: #datumStart) value: state'.
+cm value: lread value: 'source' value: 'position
+	^ (self entry: #position) value: state'.
+cm value: lread value: 'source' value: 'source
+	^ source'.
+cm value: lread value: 'source' value: 'sourceFor: aCons
+	| s |
+	s := (self entry: #sourceFor) value: state value: aCons.
+	^ s == false ifTrue: [nil] ifFalse: [s]'.
 
 "=== load report ==========================================================="
 Stdio stdout

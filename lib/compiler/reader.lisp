@@ -14,14 +14,21 @@
 
 ;;; ---------------------------------------------------------------------------
 ;;; The reader's state: a vector, with an accessor and a setter per field.
+;;; The ones every character goes through are macros over Smalltalk sends (at:,
+;;; asInteger), which the VM runs as primitives, rather than calls of vector-ref
+;;; and string-ref with their checks; characters are compared with eq? (they are
+;;; immediate objects), which compiles to ==, not with the variadic char=? (step
+;;; 8.5: the reader in use reads every file). rd-pos! and rd-at-end? stay
+;;; procedures too: LispReaderInLisp calls them.
 
 (define (make-reader source)
   (vector source 0 (string-length source) (make-hash-table eq?) #f 0))
 
-(define (rd-source r) (vector-ref r 0))
-(define (rd-pos r) (vector-ref r 1))
-(define (rd-pos! r n) (vector-set! r 1 n))
-(define (rd-len r) (vector-ref r 2))
+(define-macro (rd-source r) `[,r at: 1])
+(define-macro (rd-pos r) `[,r at: 2])
+(define-macro (rd-set-pos! r n) `[,r at: 2 put: ,n])
+(define (rd-pos! r n) (rd-set-pos! r n))
+(define-macro (rd-len r) `[,r at: 3])
 (define (rd-ranges r) (vector-ref r 3))
 (define (rd-labels r)                       ; made when first needed
   (or (vector-ref r 4)
@@ -29,13 +36,17 @@
 (define (reader-datum-start r) (vector-ref r 5))
 (define (reader-position r) (rd-pos r))
 
-(define (rd-at-end? r) (>= (rd-pos r) (rd-len r)))
-(define (rd-peek r) (if (rd-at-end? r) #f (string-ref (rd-source r) (rd-pos r))))
-(define (rd-next! r)
-  (let ((c (string-ref (rd-source r) (rd-pos r))))
-    (rd-pos! r (+ (rd-pos r) 1))
-    c))
-(define (rd-peek-is? r ch) (let ((c (rd-peek r))) (and c (char=? c ch))))
+(define-macro (rd-end? r) `(>= [,r at: 2] [,r at: 3]))
+(define (rd-at-end? r) (rd-end? r))
+(define-macro (rd-peek r)
+  `(let ((%rd-p [,r at: 2]))
+     (if (>= %rd-p [,r at: 3]) #f [[,r at: 1] at: (+ %rd-p 1)])))
+(define-macro (rd-next! r)
+  `(let ((%rd-p [,r at: 2]))
+     [,r at: 2 put: (+ %rd-p 1)]
+     [[,r at: 1] at: (+ %rd-p 1)]))
+(define-macro (rd-peek-is? r ch)
+  `(eq? (rd-peek ,r) ,ch))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Errors: a LispReadError, as the Smalltalk reader signals it.
@@ -52,12 +63,20 @@
 ;;; ---------------------------------------------------------------------------
 ;;; Characters
 
-(define (rd-separator? c)
-  (and c (memv (char->integer c) '(32 9 10 13 12)) #t))
+;; The class of each ASCII character: 1 a separator (as Smalltalk's isSeparator:
+;; space, tab, lf, cr, form feed), 2 another delimiter, 0 neither. Every other
+;; character is 0. The tests take a character, never #f.
+(define rd-classes
+  (let ((v (make-vector 128 0)))
+    (for-each (lambda (k) (vector-set! v k 1)) '(32 9 10 13 12))
+    (for-each (lambda (c) (vector-set! v (char->integer c) 2))
+              '(#\( #\) #\[ #\] #\" #\; #\' #\` #\,))
+    v))
 
-(define (rd-delimiter? c)
-  (or (rd-separator? c)
-      (and (memv c '(#\( #\) #\[ #\] #\" #\; #\' #\` #\,)) #t)))
+(define-macro (rd-class c)
+  `(let ((%rd-k [,c asInteger])) (if (< %rd-k 128) [rd-classes at: (+ %rd-k 1)] 0)))
+(define-macro (rd-separator? c) `(= (rd-class ,c) 1))
+(define-macro (rd-delimiter? c) `(> (rd-class ,c) 0))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Whitespace and comments
@@ -67,35 +86,35 @@
     (let ((c (rd-peek r)))
       (cond ((not c) #f)
             ((rd-separator? c) (rd-next! r) (loop))
-            ((char=? c #\;) (rd-skip-line-comment! r) (loop))
-            ((and (char=? c #\#) (rd-block-comment-ahead? r)) (rd-skip-block-comment! r) (loop))
+            ((eq? c #\;) (rd-skip-line-comment! r) (loop))
+            ((and (eq? c #\#) (rd-block-comment-ahead? r)) (rd-skip-block-comment! r) (loop))
             (else #f)))))
 
 (define (rd-block-comment-ahead? r)
   (let ((p (+ (rd-pos r) 1)))
-    (and (< p (rd-len r)) (char=? (string-ref (rd-source r) p) #\|))))
+    (and (< p (rd-len r)) (eq? (string-ref (rd-source r) p) #\|))))
 
 (define (rd-skip-line-comment! r)
   (let loop ()
     (let ((c (rd-peek r)))
       (cond ((not c) #f)
-            ((char=? c #\newline) (rd-next! r))
+            ((eq? c #\newline) (rd-next! r))
             (else (rd-next! r) (loop))))))
 
 (define (rd-try-consume! r a b)
   (let ((p (rd-pos r)) (src (rd-source r)))
     (if (and (< (+ p 1) (rd-len r))
-             (char=? (string-ref src p) a)
-             (char=? (string-ref src (+ p 1)) b))
-        (begin (rd-pos! r (+ p 2)) #t)
+             (eq? (string-ref src p) a)
+             (eq? (string-ref src (+ p 1)) b))
+        (begin (rd-set-pos! r (+ p 2)) #t)
         #f)))
 
 (define (rd-skip-block-comment! r)
   (let ((start (rd-pos r)))
-    (rd-pos! r (+ start 2))
+    (rd-set-pos! r (+ start 2))
     (let loop ((depth 1))
       (when (> depth 0)
-        (when (rd-at-end? r) (rd-incomplete "unterminated block comment" start))
+        (when (rd-end? r) (rd-incomplete "unterminated block comment" start))
         (cond ((rd-try-consume! r #\# #\|) (loop (+ depth 1)))
               ((rd-try-consume! r #\| #\#) (loop (- depth 1)))
               (else (rd-next! r) (loop depth)))))))
@@ -105,31 +124,31 @@
 
 (define (reader-next r)
   (rd-skip-intertoken! r)
-  (if (rd-at-end? r)
+  (if (rd-end? r)
       (eof-object)
       (begin (vector-set! r 5 (rd-pos r))
              (rd-datum r))))
 
 (define (rd-next-datum r)
   (rd-skip-intertoken! r)
-  (when (rd-at-end? r) (rd-incomplete "unexpected end of input" (rd-pos r)))
+  (when (rd-end? r) (rd-incomplete "unexpected end of input" (rd-pos r)))
   (rd-datum r))
 
 (define (rd-datum r)
   (let ((c (rd-peek r)))
-    (cond ((char=? c #\() (rd-list r))
-          ((char=? c #\)) (rd-error r "unexpected )"))
-          ((char=? c #\[) (rd-bracket r))
-          ((char=? c #\]) (rd-error r "unexpected ]"))
-          ((char=? c #\') (rd-next! r) (rd-abbreviation r 'quote))
-          ((char=? c #\`) (rd-next! r) (rd-abbreviation r 'quasiquote))
-          ((char=? c #\,)
+    (cond ((eq? c #\() (rd-list r))
+          ((eq? c #\)) (rd-error r "unexpected )"))
+          ((eq? c #\[) (rd-bracket r))
+          ((eq? c #\]) (rd-error r "unexpected ]"))
+          ((eq? c #\') (rd-next! r) (rd-abbreviation r 'quote))
+          ((eq? c #\`) (rd-next! r) (rd-abbreviation r 'quasiquote))
+          ((eq? c #\,)
            (rd-next! r)
            (if (rd-peek-is? r #\@)
                (begin (rd-next! r) (rd-abbreviation r 'unquote-splicing))
                (rd-abbreviation r 'unquote)))
-          ((char=? c #\") (rd-string r))
-          ((char=? c #\#) (rd-hash r))
+          ((eq? c #\") (rd-string r))
+          ((eq? c #\#) (rd-hash r))
           (else (rd-token r)))))
 
 (define (rd-abbreviation r name)
@@ -148,7 +167,7 @@
   (rd-next! r)                                  ; the (
   (let loop ((items '()))
     (rd-skip-intertoken! r)
-    (when (rd-at-end? r) (rd-incomplete "unterminated list" start))
+    (when (rd-end? r) (rd-incomplete "unterminated list" start))
     (cond ((rd-peek-is? r #\))
            (rd-next! r)
            (reverse items))
@@ -157,7 +176,7 @@
            (rd-next! r)
            (let ((tail (rd-next-datum r)))
              (rd-skip-intertoken! r)
-             (when (rd-at-end? r) (rd-incomplete "unterminated list" start))
+             (when (rd-end? r) (rd-incomplete "unterminated list" start))
              (unless (rd-peek-is? r #\)) (rd-error r "bad dotted pair"))
              (rd-next! r)
              (append (reverse items) tail)))
@@ -175,7 +194,7 @@
     (rd-next! r)                                ; the [
     (let loop ((parts '()))
       (rd-skip-intertoken! r)
-      (when (rd-at-end? r) (rd-incomplete "unterminated [" start))
+      (when (rd-end? r) (rd-incomplete "unterminated [" start))
       (if (rd-peek-is? r #\])
           (begin
             (rd-next! r)
@@ -233,33 +252,33 @@
         (out (open-output-string)))
     (rd-next! r)                                ; the opening "
     (let loop ()
-      (when (rd-at-end? r) (rd-incomplete "unterminated string" start))
+      (when (rd-end? r) (rd-incomplete "unterminated string" start))
       (let ((c (rd-next! r)))
-        (cond ((char=? c #\") (get-output-string out))
-              ((char=? c #\\) (write-char (rd-escape r start) out) (loop))
+        (cond ((eq? c #\") (get-output-string out))
+              ((eq? c #\\) (write-char (rd-escape r start) out) (loop))
               (else (write-char c out) (loop)))))))
 
 (define (rd-escape r start)
-  (when (rd-at-end? r) (rd-incomplete "unterminated string" start))
+  (when (rd-end? r) (rd-incomplete "unterminated string" start))
   (let ((c (rd-next! r)))
-    (cond ((char=? c #\") #\")
-          ((char=? c #\\) #\\)
-          ((char=? c #\n) #\newline)
-          ((char=? c #\t) #\tab)
-          ((char=? c #\r) #\return)
-          ((char=? c #\0) (integer->char 0))
-          ((char=? c #\a) (integer->char 7))
-          ((char=? c #\b) (integer->char 8))
-          ((char=? c #\x) (rd-hex-escape r start))
+    (cond ((eq? c #\") #\")
+          ((eq? c #\\) #\\)
+          ((eq? c #\n) #\newline)
+          ((eq? c #\t) #\tab)
+          ((eq? c #\r) #\return)
+          ((eq? c #\0) (integer->char 0))
+          ((eq? c #\a) (integer->char 7))
+          ((eq? c #\b) (integer->char 8))
+          ((eq? c #\x) (rd-hex-escape r start))
           (else (rd-error r "unknown string escape")))))
 
 (define (rd-hex-digit? c) (and (string-index "0123456789abcdefABCDEF" c) #t))
 
 (define (rd-hex-escape r start)
   (let loop ((digits '()))
-    (when (rd-at-end? r) (rd-incomplete "unterminated string" start))
+    (when (rd-end? r) (rd-incomplete "unterminated string" start))
     (let ((c (rd-next! r)))
-      (cond ((char=? c #\;)
+      (cond ((eq? c #\;)
              (when (null? digits) (rd-error r "bad \\x escape: expected hex digits and ;"))
              (let ((code (string->number (list->string (reverse digits)) 16)))
                (when (> code 1114111) (rd-error r "bad \\x escape: no such character"))
@@ -273,7 +292,7 @@
   (let ((start (rd-pos r)))
     (let loop ()
       (let ((c (rd-peek r)))
-        (unless (or (not c) (rd-delimiter? c) (and (char=? c #\#) (rd-block-comment-ahead? r)))
+        (unless (or (not c) (rd-delimiter? c) (and (eq? c #\#) (rd-block-comment-ahead? r)))
           (rd-next! r)
           (loop))))
     (let ((s (substring (rd-source r) start (rd-pos r))))
@@ -286,7 +305,7 @@
         ((rd-float-text? s) (rd-parse-float s))
         (else (string->symbol s))))
 
-(define (rd-sign? c) (or (char=? c #\+) (char=? c #\-)))
+(define (rd-sign? c) (or (eq? c #\+) (eq? c #\-)))
 
 (define (rd-integer-text? s)
   (let* ((n (string-length s))
@@ -296,7 +315,7 @@
            (or (= k n) (and (char-numeric? (string-ref s k)) (loop (+ k 1))))))))
 
 (define (rd-parse-integer s)
-  (let* ((neg (char=? (string-ref s 0) #\-))
+  (let* ((neg (eq? (string-ref s 0) #\-))
          (i (if (rd-sign? (string-ref s 0)) 1 0)))
     (let loop ((k i) (v 0))
       (if (= k (string-length s))
@@ -311,7 +330,7 @@
   (let* ((n (string-length s))
          (i0 (if (and (> n 0) (rd-sign? (string-ref s 0))) 1 0))
          (i1 (rd-skip-digits s i0))
-         (has-dot (and (< i1 n) (char=? (string-ref s i1) #\.)))
+         (has-dot (and (< i1 n) (eq? (string-ref s i1) #\.)))
          (i2 (if has-dot (+ i1 1) i1))
          (i3 (rd-skip-digits s i2)))
     (and (> (+ (- i1 i0) (- i3 i2)) 0)
@@ -331,11 +350,11 @@
 
 (define (rd-parse-float s)
   (let* ((n (string-length s))
-         (sign (if (char=? (string-ref s 0) #\-) -1 1))
+         (sign (if (eq? (string-ref s 0) #\-) -1 1))
          (i0 (if (rd-sign? (string-ref s 0)) 1 0))
          (i1 (rd-skip-digits s i0))
          (int-part (rd-digits-value s i0 i1))
-         (has-dot (and (< i1 n) (char=? (string-ref s i1) #\.)))
+         (has-dot (and (< i1 n) (eq? (string-ref s i1) #\.)))
          (i2 (if has-dot (+ i1 1) i1))
          (i3 (rd-skip-digits s i2))
          (frac-part (rd-digits-value s i2 i3))
@@ -343,7 +362,7 @@
          (exponent
           (if (< i3 n)
               (let* ((j0 (+ i3 1))
-                     (neg (char=? (string-ref s j0) #\-))
+                     (neg (eq? (string-ref s j0) #\-))
                      (j1 (if (rd-sign? (string-ref s j0)) (+ j0 1) j0))
                      (e (rd-digits-value s j1 n)))
                 (if neg (- e) e))
@@ -358,10 +377,10 @@
 
 (define (rd-hash r)
   (rd-next! r)                                  ; the #
-  (when (rd-at-end? r) (rd-incomplete "unexpected # at end of input" (- (rd-pos r) 1)))
+  (when (rd-end? r) (rd-incomplete "unexpected # at end of input" (- (rd-pos r) 1)))
   (let ((c (rd-peek r)))
-    (cond ((char=? c #\\) (rd-next! r) (rd-character r))
-          ((char=? c #\() (rd-vector r))
+    (cond ((eq? c #\\) (rd-next! r) (rd-character r))
+          ((eq? c #\() (rd-vector r))
           ((char-numeric? c) (rd-label-start r))
           (else
            (let ((word (rd-hash-word r)))
@@ -372,7 +391,7 @@
 (define (rd-hash-word r)
   (let ((start (rd-pos r)))
     (let loop ()
-      (unless (or (rd-at-end? r) (rd-delimiter? (rd-peek r)))
+      (unless (or (rd-end? r) (rd-delimiter? (rd-peek r)))
         (rd-next! r)
         (loop)))
     (substring (rd-source r) start (rd-pos r))))
@@ -396,7 +415,7 @@
 
 (define (rd-label r n kind)
   (let ((labels (rd-labels r)))
-    (if (char=? kind #\#)
+    (if (eq? kind #\#)
         (hash-table-ref labels n
           (lambda () (rd-error r (string-append "unknown datum label #" (number->string n) "#"))))
         (let ((hole [(smalltalk LispLabelHole) new]))
@@ -427,11 +446,11 @@
             (loop (cdr cur)))))))
 
 (define (rd-character r)
-  (when (rd-at-end? r) (rd-incomplete "unterminated character literal" (- (rd-pos r) 2)))
+  (when (rd-end? r) (rd-incomplete "unterminated character literal" (- (rd-pos r) 2)))
   (let ((start (rd-pos r)))
     (rd-next! r)
     (let loop ()
-      (unless (or (rd-at-end? r) (rd-delimiter? (rd-peek r)))
+      (unless (or (rd-end? r) (rd-delimiter? (rd-peek r)))
         (rd-next! r)
         (loop)))
     (rd-decode-character r (substring (rd-source r) start (rd-pos r)))))
