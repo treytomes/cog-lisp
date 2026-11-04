@@ -102,7 +102,7 @@ h check: 'AC-9 output port: display, write, write-char, newline'
 	expected: '"x\"y\"z\nw"'.
 h check: 'AC-9 with-output-to-string' actual: (w value: '(with-output-to-string (lambda () (display 1) (display "a")))') expected: '"1a"'.
 h check: 'AC-9 the eof object prints' actual: (w value: '(eof-object)') expected: '#<eof>'.
-h check: 'AC-9 read without a port says why' actual: (msg value: '(read)') expected: 'read: needs a port (reading stdin comes with file ports, Phase 7.9)'.
+h check: 'AC-9 read without a port reads the current input (none here: eof; Phase 7.9)' actual: (w value: '(eof-object? (read))') expected: '#t'.
 
 "AC-10 errors are LispErrors naming the procedure"
 #( '(string-ref "abc" 9)' 'string-ref: index 9 out of range for a string of length 3'

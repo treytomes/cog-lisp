@@ -132,14 +132,14 @@ re-run and reproduced before being recorded.
   arguments is fine (brace arrays). Code-generating macros will hit this.
 - **Fix.** Build each run of elements between splices from one brace array.
 
-### C-4 More than 15 parameters or `let` bindings fail — fixed (batch 3; let; lambda still planned)
+### C-4 More than 15 parameters or `let` bindings fail — fixed (lambda in 7.9)
 - **Evidence.** 16: `OCCompilationError … Too many arguments` (Pharo's block
   argument limit).
 - **Verdict.** `let`: compile as a zero-argument block with temporaries. `lambda`:
   **plan → self-hosting** (arguments passed as one array past 15). C-2 gives a
   clean error meanwhile.
 
-### C-5 Calls nested ~20 deep fail — plan → self-hosting
+### C-5 Calls nested ~20 deep fail — fixed (7.9)
 - **Evidence.** `(g 1 (g 1 … 0))` works at 15 levels, fails at 20; 60 internal
   defines in one body also overflow.
 - **Verdict.** Plan: hoist arguments into temps past a depth budget. C-2 makes it
@@ -208,7 +208,7 @@ re-run and reproduced before being recorded.
 - **Fix.** `define` (global and internal) and the primitive installer name the
   procedure; `#<procedure sq>`; "sq: expected 1 argument, got 0".
 
-### C-18 Smaller structural notes — plan
+### C-18 Smaller structural notes — fixed (7.9: dispatch table, template cache; qqAppend in 7.7; error positions planned → language server)
 - `qqAppend:to:` signals a plain `Error` → **conditions & restarts**.
 - `LispCompileError` carries no form or position → **language server**.
 - Special-form dispatch by string comparison; `messageNode:` re-parses a template
@@ -252,7 +252,7 @@ were re-run and reproduced.
   the image that signals a LISP error in the running program well below the
   cap, with the cap as the backstop.
 
-### R-4 Cyclic lists hang `list?`, `length`, `equal?` and printing — fixed (batch 4; list? (length in batch 2); cycle-safe equal? and printing planned → self-hosting)
+### R-4 Cyclic lists hang `list?`, `length`, `equal?` and printing — fixed (equal? and printing in 7.9)
 - **Evidence.** After `(set-cdr! (cdr l) l)`, each of those timed out.
 - **Fix.** Cycle check (two pointers) in `list?` (R7RS: `#f`) and `length`
   (error). Cycle-safe `equal?` and printing: **plan → self-hosting**.
@@ -334,7 +334,7 @@ were re-run and reproduced.
 - **Verdict.** Accept a symbol prefix. Keep plain printing (easier to read in
   macro expansions); revisit with hygienic macros.
 
-### R-20 Control characters are written raw — fixed (batch 4; characters; strings planned → self-hosting)
+### R-20 Control characters are written raw — fixed (strings in 7.9)
 - **Evidence.** `(Character value: 1)` writes `#\` plus the raw byte (Phase 1 §8:
   re-escaped).
 - **Fix.** Write `#\x1`. Strings need a `\x..;` reader escape: **plan →
@@ -342,7 +342,7 @@ were re-run and reproduced.
 
 ### R-21 Infinity and NaN print as `Float infinity` / `Float nan` — plan → numeric tower
 
-### R-22 `load` resolves against the current directory; programs can't see arguments — plan → self-hosting
+### R-22 `load` resolves against the current directory; programs can't see arguments — fixed (7.9)
 - **Evidence.** `(load "b.lisp")` in `sub\a.lisp` loads `.\b.lisp`;
   `cog-lisp.bat e1.lisp extra` ignores `extra`.
 

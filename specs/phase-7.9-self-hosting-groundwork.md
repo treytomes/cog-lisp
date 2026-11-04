@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 7.9 (the last step before Phase 8; README "Before Phase 8") |
-| **Status** | Accepted (2026-11-04) |
+| **Status** | Implemented (2026-11-04) — 46/46 + LISP unit tests; all suites 948/948; compile speed 1.2–1.4× (target 2×, §12) |
 | **Depends on** | Phases 1–7.8 |
 | **Feeds** | Phase 8 (a reader and compiler written in cog-lisp, compiling itself) |
 | **Owns** | Review findings C-4 (lambda), C-5, C-18, R-4 (`equal?`, printing), R-20 (strings), R-22; the file ports deferred from 7.8 |
@@ -129,6 +129,27 @@ with the array. Callers do not change; it is only slower for those procedures.
   generated code byte-identical (the disassembly of a corpus of procedures is
   unchanged).
 
+## 8a. Unit tests written in cog-lisp (added 2026-11-04, owner request)
+
+Phase 8's reader and compiler will be cog-lisp, so their tests should be too.
+`lib/test.lisp` is a small test framework, written in cog-lisp:
+
+- `(define-test name body …)` registers a test; `(check expr expected)` compares
+  with `equal?`; `(check-true expr)`, `(check-false expr)`;
+  `(check-error expr)` passes when `expr` signals an error, and
+  `(check-error expr "text")` when its message contains `text`.
+- A failing check records the test name, the expression, what it gave and what
+  was expected, and the test goes on; an unexpected error fails the test with
+  its message.
+- `(run-tests)` runs every registered test in order and prints, in the same
+  format as the Smalltalk suites, `PASS`/`FAIL` per check and a final
+  `== RESULT: n/n checks passed ==`, then exits 0 or 1.
+- `tests/lisp/*.lisp` are LISP test files (each loads `lib/test.lisp`, defines
+  tests, and calls `(run-tests)`); `testsun-all.bat` runs each with
+  `cog-lisp.bat` and counts them like any suite.
+- The first LISP test files test 7.8 and 7.9 features (strings, hash tables,
+  ports, cycles), so the framework is proven before Phase 8 depends on it.
+
 ## 9. Acceptance criteria
 
 **`tests/phase-7.9-groundwork.st`** (headless):
@@ -155,7 +176,12 @@ with the array. Callers do not change; it is only slower for those procedures.
   read back.
 - AC-11 The special-form table and template cache are in place; the
   compile-speed benchmark shows at least 2× (bench), and AC-2 holds.
-- AC-12 All earlier suites, the runner suite (with the examples) and the
+- AC-12 `lib/test.lisp`: passing and failing checks are reported as specified,
+  an error inside a test fails only that test, `check-error` works with and
+  without a message, and the exit code is 0 only when all pass (checked by
+  running small LISP test files with known failures from the suite).
+- AC-13 `tests/lisp/*.lisp` run in `testsun-all.bat` and count in its total.
+- AC-14 All earlier suites, the runner suite (with the examples) and the
   benchmarks pass.
 
 ## 10. Examples
@@ -179,3 +205,43 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
    like `load`.
 3. **`read` at the REPL with no port** reads the next lines typed.
 4. **Compile speed: at least 2×**, measured by a benchmark.
+
+## 12. As implemented
+
+- **Tests:** `tests/phase-7.9-groundwork.st` 46/46; six examples (`files`,
+  `cycles`, `escapes`, `big-code`, `echo` with `echo.input`, and the two-file
+  `program/` with `main.args`) in the runner suite (83/83); the first LISP unit
+  tests, `tests/lisp/test-data.lisp` (23) and `test-groundwork.lisp` (16), in
+  `tests\run-all.bat`. All suites 948/948; benchmarks 13/13, unchanged.
+- **AC-11 compile speed: 1.2–1.4×, not 2×** (deviation). Profiling before the
+  work showed where compile time goes: about a quarter in cog-lisp's translation
+  to a Smalltalk syntax tree, a quarter in Pharo's semantic analysis and half in
+  Pharo's bytecode generation. The dispatch table and template cache roughly
+  halved translation time, which caps the whole gain near 1.3×; measured over
+  three interleaved runs of 60 compilations of 29 forms, 1.38×, 1.24×, 1.20×.
+  Reaching 2× needs cog-lisp to stop going through Opal's AST: emitting IR or
+  bytecode directly (the `EncoderForSistaV1` option in CLAUDE.md), which is
+  Phase 8/9 territory. The benchmark report now records compile time.
+- **Nesting spill:** a non-tail form deeper than 10 levels compiles inside
+  `[form] value`; each procedure body starts its own budget. Bytecode of code
+  within the budget is unchanged, checked against `tests/bytecode-corpus.*`.
+- **Long argument arrays** (more than 16 elements) are filled one element at a
+  time, found while writing `big-code.lisp`: 26 arguments to a 26-parameter
+  procedure overflowed the frame.
+- **Packed procedures** (more than 15 parameters) take one Array; they tail-call
+  themselves through the trampoline rather than as a loop (their parameters,
+  per-iteration copies and scratch temps would not fit one frame). Pharo's limit
+  of 64 temporaries per frame still caps a single procedure at about 60
+  parameters (a clean compile error beyond).
+- **Relative paths** resolve against the loading file's directory and, when the
+  file is not there, the current directory, so programs written before 7.9
+  (`(load "lib/cl.lisp")` from the repo root) keep working.
+- **Stdin** is read through a `LispLineStream` over the REPL's input or the
+  runner's `LispStdin`, so `(read)` at the REPL reads the following lines.
+  File input ports read the whole file (UTF-8) when opened; output ports write
+  through a UTF-8 file stream, closed by `close-port` or the `call-with-`/`with-`
+  forms.
+- **Datum labels** are parsed directly by the reader (a `#` after the digits
+  would otherwise be part of the word, which broke `#0=#(…)`).
+- **`equal?`** starts remembering compared pairs past depth 200, so short data
+  pays nothing and long lists pay a little.

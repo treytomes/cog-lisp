@@ -9,7 +9,7 @@
  Classes: LispError, LispArityError, LispProcedure, LispTailCall, LispPrimitives,
  LispTextOutput.
  ============================================================================"
-| failures cm lerr aerr proc tcall prims tout facade htab hkey iport oport |
+| failures cm lerr aerr proc tcall prims tout facade htab hkey iport oport lines |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -18,9 +18,9 @@ cm := [:cls :cat :src |
 
 lerr  := LispError.  "defined by the reader package"
 aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp-Runtime'; install.
-proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries. #inline }; package: 'CogLisp-Runtime'; install.
+proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries. #inline. #packed }; package: 'CogLisp-Runtime'; install.
 tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runtime'; install.
-prims := (Object << #LispPrimitives) sharedVariables: { #Output. #GensymCounter }; package: 'CogLisp-Runtime'; install.
+prims := (Object << #LispPrimitives) sharedVariables: { #Output. #Input. #CommandLine. #GensymCounter }; package: 'CogLisp-Runtime'; install.
 "CogLisp: the Smalltalk-side facade for evaluating and calling LISP (Phase 7.6 section 5.2)."
 facade := (Object << #CogLisp) package: 'CogLisp-Runtime'; install.
 "Phase 7.8: hash tables (keys wrapped so a Pharo OrderedDictionary compares them
@@ -29,6 +29,8 @@ htab := (Object << #LispHashTable) slots: { #dict. #test }; package: 'CogLisp-Ru
 hkey := (Object << #LispHashKey) slots: { #key. #test }; package: 'CogLisp-Runtime'; install.
 iport := (Object << #LispInputPort) slots: { #stream }; package: 'CogLisp-Runtime'; install.
 oport := (Object << #LispOutputPort) slots: { #stream }; package: 'CogLisp-Runtime'; install.
+"Characters from a line source (stdin, the REPL) with the stream protocol the reader needs (Phase 7.9 section 5.2)."
+lines := (Object << #LispLineStream) slots: { #source. #text. #pos }; package: 'CogLisp-Runtime'; install.
 tout  := (Object << #LispTextOutput) slots: { #kind. #handle. #stream. #buffer. #midLine }; sharedVariables: { #Session. #Stdout. #Stderr }; package: 'CogLisp-Runtime'; install.
 
 
@@ -113,6 +115,47 @@ cm value: iport value: 'accessing' value: 'stream
 	^ stream'.
 cm value: iport value: 'printing' value: 'printOn: aStream
 	aStream nextPutAll: ''#<input-port>'''.
+cm value: oport class value: 'instance creation' value: 'on: aStream
+	^ self new setStream: aStream'.
+cm value: oport value: 'accessing' value: 'stream
+	^ stream'.
+cm value: oport value: 'closing' value: 'close
+	(stream respondsTo: #close) ifTrue: [stream close]'.
+cm value: iport class value: 'instance creation' value: 'onStream: aStream
+	^ self new setStream: aStream'.
+cm value: iport value: 'closing' value: 'close
+	^ self'.
+cm value: lines class value: 'instance creation' value: 'on: aLineSource
+	"aLineSource answers atEnd and nextLine (LispStdin, a ReadStream)."
+	^ self new setSource: aLineSource'.
+cm value: lines value: 'private' value: 'setSource: aLineSource
+	source := aLineSource.
+	text := ''''.
+	pos := 0'.
+cm value: lines value: 'reading' value: 'atEnd
+	"Waits for another line when the text read so far is used up."
+	[pos < text size] whileFalse: [
+		source atEnd ifTrue: [^ true].
+		pos > 4096 ifTrue: [text := text copyFrom: pos + 1 to: text size. pos := 0].
+		text := text , source nextLine , (String with: Character lf)].
+	^ false'.
+cm value: lines value: 'reading' value: 'next
+	self atEnd ifTrue: [^ nil].
+	pos := pos + 1.
+	^ text at: pos'.
+cm value: lines value: 'reading' value: 'peek
+	self atEnd ifTrue: [^ nil].
+	^ text at: pos + 1'.
+cm value: lines value: 'positioning' value: 'position
+	^ pos'.
+cm value: lines value: 'positioning' value: 'position: n
+	pos := n'.
+cm value: lines value: 'reading' value: 'upTo: aCharacter
+	| out |
+	out := WriteStream on: String new.
+	[self atEnd or: [self peek = aCharacter]] whileFalse: [out nextPut: self next].
+	self atEnd ifFalse: [self next].
+	^ out contents'.
 cm value: oport class value: 'instance creation' value: 'open
 	^ self new setStream: (WriteStream on: String new)'.
 cm value: oport value: 'private' value: 'setStream: aStream
@@ -122,7 +165,7 @@ cm value: oport value: 'writing' value: 'nextPutAll: aString
 cm value: oport value: 'writing' value: 'nextPut: aCharacter
 	stream nextPut: aCharacter'.
 cm value: oport value: 'writing' value: 'flush
-	^ self'.
+	stream flush'.
 cm value: oport value: 'accessing' value: 'contents
 	^ stream contents'.
 cm value: oport value: 'printing' value: 'printOn: aStream
@@ -422,7 +465,7 @@ cm value: prims class value: 'installing' value: 'installPortsInto: anEnv
 	eof := LispReader eofObject.
 	unspec := LispUnspecified default.
 	inArg := [:rest :who | (opt value: rest)
-		ifEmpty: [self fail: who with: ''needs a port (reading stdin comes with file ports, Phase 7.9)'']
+		ifEmpty: [self input stream]
 		ifNotEmpty: [:r | (self inPort: r first for: who) stream]].
 	outArg := [:rest :who | (opt value: rest) ifEmpty: [self output] ifNotEmpty: [:r | self outPort: r first for: who]].
 	def value: ''open-input-string'' value: (LispProcedure fixed: [:s | LispInputPort on: (self string: s for: ''open-input-string'')] arity: 1).
@@ -638,11 +681,19 @@ cm value: proc value: 'applying' value: 'signalArity: givenCount
 	^ (LispArityError new) proc: self; given: givenCount;
 		signal: (name ifNil: [''procedure'']) , '': expected '' , wanted , '', got '' , givenCount printString'.
 cm value: proc value: 'applying' value: 'applyTo: anArray
+	| args |
 	hasRest ifFalse: [
 		anArray size = required ifFalse: [^ self signalArity: anArray size].
+		packed == true ifTrue: [^ block value: anArray].
 		^ block valueWithArguments: anArray].
 	anArray size >= required ifFalse: [^ self signalArity: anArray size].
-	^ block valueWithArguments: ((anArray first: required) , { LispCons fromArray: (anArray allButFirst: required) })'.
+	args := (anArray first: required) , { LispCons fromArray: (anArray allButFirst: required) }.
+	packed == true ifTrue: [^ block value: args].
+	^ block valueWithArguments: args'.
+cm value: proc value: 'applying' value: 'packed
+	"The block takes one Array of all the arguments: a procedure with more parameters
+	 than a block may have (15; Phase 7.9 section 4.2). Answers the procedure."
+	packed := true'.
 cm value: proc class value: 'instance creation' value: 'fixed: aBlock arity: n
 	^ self new setBlock: aBlock required: n rest: false'.
 cm value: proc class value: 'instance creation' value: 'variadic: aBlock required: n
@@ -810,6 +861,7 @@ cm value: prims class value: 'installing' value: 'installInto: anEnv
 	self installVectorsInto: anEnv.
 	self installHashTablesInto: anEnv.
 	self installPortsInto: anEnv.
+	self installFilesInto: anEnv.
 	"every primitive knows its name, for printing and error messages (review R-7)"
 	anEnv cellsDo: [:c | | v |
 		v := c valueIfUnbound: [nil].
@@ -972,6 +1024,61 @@ cm value: prims class value: 'installing' value: 'installDefault
 cm value: prims class value: 'output' value: 'output
 	"Where display/write/newline/disassemble write. Defaults to stdout; the REPL and tests redirect it."
 	^ Output ifNil: [LispTextOutput stdout]'.
+cm value: prims class value: 'input' value: 'input
+	"The current input port: set by the REPL and the runner to read stdin."
+	^ Input ifNil: [Input := LispInputPort onStream: (LispLineStream on: (ReadStream on: #()))]'.
+cm value: prims class value: 'input' value: 'withInput: aPort do: aBlock
+	| previous |
+	previous := Input.
+	Input := aPort.
+	^ aBlock ensure: [Input := previous]'.
+cm value: prims class value: 'system' value: 'commandLine: anArray
+	CommandLine := anArray'.
+cm value: prims class value: 'installing' value: 'installFilesInto: anEnv
+	"Phase 7.9 section 5: file ports, standard ports, and programs."
+	| def opt unspec inFile outFile closing |
+	def := [:name :proc | anEnv define: (LispSymbol named: name) value: proc].
+	opt := [:rest | rest lispElements asArray].
+	unspec := LispUnspecified default.
+	inFile := [:path :who | | ref |
+		ref := LispCompiler resolveInput: (self string: path for: who).
+		ref exists ifFalse: [(LispFileError new) signal: who , '': file not found: '' , path].
+		LispInputPort on: ref contents].
+	outFile := [:path :who | | ref |
+		ref := LispCompiler resolve: (self string: path for: who).
+		[ref ensureDelete. LispOutputPort on: ref writeStream]
+			on: FileException do: [:e | (LispFileError new) signal: who , '': cannot write '' , path]].
+	closing := [:port :blk | [blk value: port] ensure: [port close]].
+	def value: ''open-input-file'' value: (LispProcedure fixed: [:p | inFile value: p value: ''open-input-file''] arity: 1).
+	def value: ''open-output-file'' value: (LispProcedure fixed: [:p | outFile value: p value: ''open-output-file''] arity: 1).
+	def value: ''close-port'' value: (LispProcedure fixed: [:p | p close. unspec] arity: 1).
+	def value: ''close-input-port'' value: (LispProcedure fixed: [:p | (self inPort: p for: ''close-input-port'') close. unspec] arity: 1).
+	def value: ''close-output-port'' value: (LispProcedure fixed: [:p | (self outPort: p for: ''close-output-port'') close. unspec] arity: 1).
+	def value: ''call-with-input-file'' value: (LispProcedure fixed: [:path :proc |
+		closing value: (inFile value: path value: ''call-with-input-file'') value: [:port | LispProcedure apply: proc to: { port }]] arity: 2).
+	def value: ''call-with-output-file'' value: (LispProcedure fixed: [:path :proc |
+		closing value: (outFile value: path value: ''call-with-output-file'') value: [:port | LispProcedure apply: proc to: { port }]] arity: 2).
+	def value: ''with-input-from-file'' value: (LispProcedure fixed: [:path :thunk |
+		closing value: (inFile value: path value: ''with-input-from-file'') value: [:port |
+			self withInput: port do: [LispProcedure apply: thunk to: #()]]] arity: 2).
+	def value: ''with-output-to-file'' value: (LispProcedure fixed: [:path :thunk |
+		closing value: (outFile value: path value: ''with-output-to-file'') value: [:port |
+			self withOutput: port do: [LispProcedure apply: thunk to: #()]]] arity: 2).
+	def value: ''file-exists?'' value: (LispProcedure fixed: [:p | (LispCompiler resolveInput: (self string: p for: ''file-exists?'')) exists] arity: 1).
+	def value: ''delete-file'' value: (LispProcedure fixed: [:p | | ref |
+		ref := LispCompiler resolve: (self string: p for: ''delete-file'').
+		ref exists ifFalse: [(LispFileError new) signal: ''delete-file: file not found: '' , p].
+		ref delete.
+		unspec] arity: 1).
+	def value: ''current-input-port'' value: (LispProcedure fixed: [self input] arity: 0).
+	def value: ''current-output-port'' value: (LispProcedure fixed: [LispOutputPort on: self output] arity: 0).
+	def value: ''current-error-port'' value: (LispProcedure fixed: [LispOutputPort on: LispTextOutput stderr] arity: 0).
+	def value: ''command-line'' value: (LispProcedure fixed: [LispCons fromArray: (CommandLine ifNil: [#()])] arity: 0).
+	def value: ''current-load-path'' value: (LispProcedure fixed: [LispLoadPath value ifNil: [false]] arity: 0).
+	def value: ''write-shared'' value: (LispProcedure variadic: [:x :rest |
+		((opt value: rest) ifEmpty: [self output] ifNotEmpty: [:r | self outPort: r first for: ''write-shared''])
+			nextPutAll: (LispPrinter writeSharedString: x); flush.
+		unspec] required: 1)'.
 cm value: prims class value: 'output' value: 'withOutput: aStream do: aBlock
 	| previous |
 	previous := Output.

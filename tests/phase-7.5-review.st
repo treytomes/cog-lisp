@@ -121,8 +121,8 @@ h check: 'R-7 a self-looping procedure is named too' actual: (LispPrinter writeS
 h check: 'C-6 well-formed forms still compile' actual: (ev value: '(let ((a 1)) ((lambda (x . r) (list x r)) a 2 3))') expected: (lst value: '(1 (2 3))').
 
 "C-2 Pharo's limits are compile errors"
-h check: 'C-2 sixteen parameters is a LispCompileError'
-	actual: ([ev value: '(lambda (a b c d e f g h i j k l m n o p) a)'. #none] on: LispCompileError do: [:e | e messageText beginsWith: 'too many parameters'])
+h check: 'C-2 more parameters than a frame holds (70) is a LispCompileError (16 work since Phase 7.9)'
+	actual: ([ev value: '(lambda (' , ((1 to: 70) inject: '' into: [:a :k | a , ' p' , k printString]) , ') p1)'. #none] on: LispCompileError do: [:e | e messageText beginsWith: 'too large'])
 	expected: true.
 
 "C-7 a macro that expands forever is an error, not a hang"

@@ -233,6 +233,15 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **`aCharacter value` is the character itself**, not its code (it is
   `Object>>value`); use `asInteger`. `Character value: n` (class side) does make a
   character from a code.
+- **A frame holds at most 64 temporaries, and pushed values count against the
+  same frame.** Deep nesting and long brace arrays (`{a. b. …}` pushes every
+  element) overflow it; the compiler spills deep forms into `[…] value` and fills
+  long arrays element by element (Phase 7.9).
+- **A procedure body in a method's literals is a clean `BlockClosure`**, not a
+  `CompiledBlock`: to disassemble everything, recurse into `lit compiledBlock`
+  too (`tests/phase-7.9-groundwork.st` AC-2). `symbolic` shows one level only.
+- **Compile time is mostly Opal's**: about half bytecode generation and a quarter
+  semantic analysis; cog-lisp's own translation is the remaining quarter.
 - **Never `^` inside a primitive's block.** A block stored in a `LispProcedure`
   runs after the installing method has returned, so a `^` in it raises
   `BlockCannotReturn`. Use `ifTrue:ifFalse:` instead.

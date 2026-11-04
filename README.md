@@ -34,8 +34,8 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 7.5 | Review & tooling | ✅ **done** — [spec](specs/phase-7.5-review-and-tooling.md), [review](specs/review-phases-1-7.md), [VS Code](vscode/README.md) |
 | 7.6 | Smalltalk interop | ✅ **done** — [spec](specs/phase-7.6-smalltalk-interop.md), 82/82, [examples](examples/interop-send.lisp) |
 | 7.7 | Conditions & restarts | ✅ **done** — [spec](specs/phase-7.7-conditions-restarts.md), 54/54, [examples](examples/restarts.lisp) |
-| 7.8 | Strings, characters, vectors & hash tables | ✅ **done** — [spec](specs/phase-7.8-native-data.md), 58/58, [examples](examples/tiny-reader.lisp); all suites 853/853 |
-| — | Before Phase 8: self-hosting groundwork (7.9) | ⬜ planned (see below) |
+| 7.8 | Strings, characters, vectors & hash tables | ✅ **done** — [spec](specs/phase-7.8-native-data.md), 58/58, [examples](examples/tiny-reader.lisp) |
+| 7.9 | Self-hosting groundwork | ✅ **done** — [spec](specs/phase-7.9-self-hosting-groundwork.md), 46/46, LISP unit tests ([`lib/test.lisp`](lib/test.lisp)); all suites 948/948 |
 | 8 | Self-hosting (meta-circular) | ⬜ |
 | — | CI/CD: tests on every push; image and VS Code extension built for tagged releases | ⬜ planned (see below) |
 | 9 | Pure Lisp image (with the numeric tower and hygienic macros) | ⬜ |
@@ -242,7 +242,7 @@ node, or raise and catch an error. These come first (decided 2026-11-03):
   vectors, hash tables), as **native primitives** in cog-lisp's runtime rather
   than LISP names over Smalltalk objects: the world stays readable in LISP
   (Phase 9), and the fixpoint check is simpler without host objects in the loop.
-- **Self-hosting groundwork** ([spec accepted](specs/phase-7.9-self-hosting-groundwork.md), Phase 7.9): the review findings marked *plan → self-hosting*
+- **Self-hosting groundwork** — ✅ done as Phase 7.9 ([spec](specs/phase-7.9-self-hosting-groundwork.md)), with unit tests written in cog-lisp (`lib/test.lisp`, `tests/lisp/`): the review findings marked *plan → self-hosting*
   (`specs/review-phases-1-7.md`): calls nested ~20 deep (C-5), lambdas with
   more than 15 parameters (C-4), cycle-safe `equal?` and printing (R-4), string
   escapes for control characters (R-20), `load` relative to the loading file and

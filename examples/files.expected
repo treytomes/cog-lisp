@@ -1,0 +1,6 @@
+#t
+(("ada" 98) ("grace" 95) ("alan" 87))
+#t
+(total 280)
+#f
+open-input-file: file not found: no-such-file.txt

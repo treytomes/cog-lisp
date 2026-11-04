@@ -72,12 +72,28 @@ cm value: core class value: 'equality' value: 'eqv: a with: b
 	((self isChar: a) and: [self isChar: b]) ifTrue: [^ a = b].
 	^ a == b'.
 cm value: core class value: 'equality' value: 'equal: a with: b
-	((self isPair: a) and: [self isPair: b])
-		ifTrue: [^ (self equal: a car with: b car) and: [self equal: a cdr with: b cdr]].
-	((self isString: a) and: [self isString: b]) ifTrue: [^ a = b].
-	((a isKindOf: Array) and: [b isKindOf: Array]) ifTrue: [
-		^ a size = b size and: [(1 to: a size) allSatisfy: [:i | self equal: (a at: i) with: (b at: i)]]].
-	^ self eqv: a with: b'.
+	^ self equal: a with: b depth: 0 seen: nil'.
+cm value: core class value: 'equality' value: 'equal: a with: b depth: d seen: aSeen
+	"Deep equality that terminates on cycles: past a depth, every pair of nodes being
+	 compared is remembered, and meeting the same pair again counts as equal (two
+	 cyclic structures that unfold to the same infinite tree are equal?, R7RS;
+	 Phase 7.9 section 6). Shallow data never pays for the bookkeeping."
+	| seen |
+	(((self isPair: a) and: [self isPair: b]) or: [(a isKindOf: Array) and: [b isKindOf: Array]]) ifFalse: [
+		((self isString: a) and: [self isString: b]) ifTrue: [^ a = b].
+		^ self eqv: a with: b].
+	a == b ifTrue: [^ true].
+	seen := aSeen.
+	d > 200 ifTrue: [
+		seen isNil ifTrue: [seen := IdentityDictionary new].
+		((seen at: a ifAbsent: [nil]) ifNil: [false] ifNotNil: [:set | set includes: b]) ifTrue: [^ true].
+		(seen at: a ifAbsentPut: [IdentitySet new]) add: b].
+	(a isKindOf: Array) ifTrue: [
+		a size = b size ifFalse: [^ false].
+		1 to: a size do: [:i | (self equal: (a at: i) with: (b at: i) depth: d + 1 seen: seen) ifFalse: [^ false]].
+		^ true].
+	^ (self equal: a car with: b car depth: d + 1 seen: seen)
+		and: [self equal: a cdr with: b cdr depth: d + 1 seen: seen]'.
 
 "=== LispCore : truthiness (class-side) ===================================="
 cm value: core class value: 'truth' value: 'isTruthy: v

@@ -3,7 +3,7 @@
 #  cog-lisp : run a program or start the REPL  (bash equivalent of
 #  cog-lisp.bat; specs/phase-5-repl-runner.md)
 #    ./cog-lisp.sh                 start the REPL
-#    ./cog-lisp.sh program.lisp    run a program, then exit
+#    ./cog-lisp.sh program.lisp [arg ...]   run a program, then exit
 #  Exit code: 0 on success, 1 on an uncaught LISP error, or the code given to
 #  (exit n). Set COGLISP_IMAGE to use an image other than pharo/cog-lisp.image.
 #  In mintty (the Git Bash window), stdin is not a Windows console, so for an
@@ -38,5 +38,6 @@ case "$1" in
   *) PROG="$(pwd)/$1" ;;
 esac
 command -v cygpath >/dev/null 2>&1 && PROG="$(cygpath -w "$PROG")"
-"$VM" --headless "$CAP" "$IMG" lisp run "$PROG"
+shift
+"$VM" --headless "$CAP" "$IMG" lisp run "$PROG" "$@"
 exit $?

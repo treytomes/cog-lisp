@@ -39,6 +39,8 @@ rem --- runner and REPL fixtures, then the examples ----------------------------
 for %%F in (tests\runner\*.lisp) do call :runcase "%%~fF" prog
 for %%F in (tests\runner\*.stdin) do call :runcase "%%~fF" repl
 for %%F in (examples\*.lisp) do call :runcase "%%~fF" prog
+rem  multi-file example programs: examples\NAME\main.lisp
+for %%F in (examples\*\main.lisp) do call :runcase "%%~fF" prog
 
 rem --- REPL input that arrives late, as at an interactive prompt ---------------------
 rem  Pharo's stdin never blocks, so the REPL must wait for input rather than treat
@@ -79,10 +81,15 @@ rem ---------------------------------------------------------------------------
 rem  %1 = full path of a .lisp or .stdin fixture, %2 = prog or repl
 set "BASE=%~dpn1"
 set "NAME=%~n1"
+rem  a program may have NAME.args (one line of arguments) and NAME.input (its stdin)
+set "ARGS="
+if exist "%BASE%.args" set /p ARGS=<"%BASE%.args"
 if "%~2"=="repl" (
   call "%CL%" <"%~1" >"%TMPD%\%NAME%.out" 2>"%TMPD%\%NAME%.err"
+) else if exist "%BASE%.input" (
+  call "%CL%" "%~1" !ARGS! <"%BASE%.input" >"%TMPD%\%NAME%.out" 2>"%TMPD%\%NAME%.err"
 ) else (
-  call "%CL%" "%~1" >"%TMPD%\%NAME%.out" 2>"%TMPD%\%NAME%.err"
+  call "%CL%" "%~1" !ARGS! >"%TMPD%\%NAME%.out" 2>"%TMPD%\%NAME%.err"
 )
 set RC=!ERRORLEVEL!
 set WANT=0

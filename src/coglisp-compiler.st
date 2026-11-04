@@ -22,7 +22,7 @@
  LispCompiler withoutOptions: #(...) do: [...] switches some off, for
  benchmarks and debugging.
  ============================================================================"
-| failures cm comp err |
+| failures cm comp err lpath |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -30,11 +30,13 @@ cm := [:cls :cat :src |
     do: [:e | failures add: cls name , ' >> ' , src lines first , '  --  ' , e messageText]].
 
 comp := (Object << #LispCompiler)
-	slots: { #counter. #sourceMap. #options. #selfLoop. #inlineTemps. #topForm. #sourceContext. #inBody. #expansionDepth };
-	sharedVariables: { #DefaultOptions };
+	slots: { #counter. #sourceMap. #options. #selfLoop. #inlineTemps. #topForm. #sourceContext. #inBody. #expansionDepth. #exprDepth };
+	sharedVariables: { #DefaultOptions. #SpecialForms. #TemplateCache };
 	package: 'CogLisp-Compiler';
 	install.
 err  := (LispError << #LispCompileError) package: 'CogLisp-Compiler'; install.
+"The full path of the file being loaded or run, per process (Phase 7.9 section 5.3)."
+lpath := (DynamicVariable << #LispLoadPath) package: 'CogLisp-Compiler'; install.
 
 "=== options ==============================================================="
 cm value: comp class value: 'options' value: 'allOptions
@@ -74,8 +76,10 @@ cm value: comp value: 'nodes' value: 'templateFor: aSelector
 		s nextPutAll: ''0''.
 		aSelector keywords do: [:kw | s nextPutAll: '' ''; nextPutAll: kw; nextPutAll: '' 0'']]'.
 cm value: comp value: 'nodes' value: 'messageNode: receiverNode selector: aSelector arguments: argNodes
+	"Each selector''s template is parsed once and copied (review C-18)."
 	| m |
-	m := OCParser parseExpression: (self templateFor: aSelector).
+	TemplateCache isNil ifTrue: [TemplateCache := IdentityDictionary new].
+	m := (TemplateCache at: aSelector ifAbsentPut: [OCParser parseExpression: (self templateFor: aSelector)]) copy.
 	m receiver: receiverNode.
 	m arguments: argNodes.
 	^ m'.
@@ -113,7 +117,19 @@ cm value: comp value: 'nodes' value: 'blockWithArgs: argNodes temps: tempNodes s
 cm value: comp value: 'nodes' value: 'blockWithArgs: argNodes statements: statementNodes
 	^ self blockWithArgs: argNodes temps: #() statements: statementNodes'.
 cm value: comp value: 'nodes' value: 'arrayNode: elementNodes
-	| n |
+	"{e1. e2. ...}, which pushes every element before making the array. A long one
+	 is filled an element at a time instead, so a call with many arguments does not
+	 overflow the frame (Phase 7.9 section 4): true ifTrue: [| a | a := Array new: n.
+	 a at: 1 put: e1. ... a]. Short arrays compile as before."
+	| n t |
+	elementNodes size > 16 ifTrue: [
+		t := self nextName.
+		^ self messageNode: (self literalNode: true) selector: #ifTrue: arguments: {
+			self blockWithArgs: #() temps: { self var: t } statements:
+				{ self assign: t value: (self messageNode: (self var: ''Array'') selector: #new: arguments: { self literalNode: elementNodes size }) } ,
+				((1 to: elementNodes size) collect: [:i |
+					self messageNode: (self var: t) selector: #at:put: arguments: { self literalNode: i. elementNodes at: i }]) ,
+				{ self var: t } }].
 	n := OCParser parseExpression: ''{0}''.
 	n statements: elementNodes.
 	^ n'.
@@ -315,10 +331,28 @@ cm value: comp value: 'inlining' value: 'translateInline: prim op: op args: argD
 cm value: comp value: 'translating' value: 'translate: datum inScope: scope
 	^ self translate: datum inScope: scope tail: false'.
 cm value: comp value: 'translating' value: 'translate: datum inScope: scope tail: tail
-	(datum isKindOf: LispCons) ifTrue: [^ self translateForm: datum inScope: scope tail: tail].
+	(datum isKindOf: LispCons) ifTrue: [^ self translateNested: datum inScope: scope tail: tail].
 	(datum isKindOf: LispSymbol) ifTrue: [^ self translateVariable: datum inScope: scope].
 	(datum == LispEmptyList default) ifTrue: [^ self emptyListNode].
 	^ self literalNode: datum'.
+cm value: comp value: 'translating' value: 'translateNested: form inScope: scope tail: tail
+	"Every nested form costs stack in the one frame of its procedure, and too many
+	 fail to compile. Past a depth budget, a form not in tail position is compiled
+	 inside a block of its own, [form] value, which starts a fresh frame; the block
+	 captures the variables it uses (Phase 7.9 section 4.1; review C-5). Code within
+	 the budget compiles exactly as before."
+	| saved node |
+	exprDepth := (exprDepth ifNil: [0]) + 1.
+	^ [(tail not and: [exprDepth > self class nestingBudget])
+		ifTrue: [
+			saved := exprDepth.
+			exprDepth := 0.
+			node := [self translateForm: form inScope: scope tail: false] ensure: [exprDepth := saved].
+			self messageNode: (self blockWithArgs: #() statements: { node }) selector: #value arguments: #()]
+		ifFalse: [self translateForm: form inScope: scope tail: tail]]
+		ensure: [exprDepth := exprDepth - 1]'.
+cm value: comp class value: 'limits' value: 'nestingBudget
+	^ 10'.
 cm value: comp value: 'translating' value: 'translateVariable: sym inScope: scope
 	| name |
 	name := scope at: sym ifAbsent: [nil].
@@ -327,26 +361,59 @@ cm value: comp value: 'translating' value: 'translateVariable: sym inScope: scop
 		^ self compileError: ''macro used as a value: '' , sym name].
 	^ self globalRead: sym'.
 cm value: comp value: 'translating' value: 'translateForm: form inScope: scope tail: tail
-	| op opName |
+	"Special forms dispatch through a table from symbol to method (review C-18)."
+	| op sel |
 	op := form car.
-	opName := (op isKindOf: LispSymbol) ifTrue: [op name] ifFalse: [nil].
-	opName = ''quote'' ifTrue: [self check: form operands: 1 to: 1. ^ self quoteNode: form cdr car].
-	opName = ''if'' ifTrue: [self check: form operands: 2 to: 3. ^ self translateIf: form inScope: scope tail: tail].
-	opName = ''begin'' ifTrue: [^ self translateBegin: (self listToArray: form cdr) inScope: scope tail: tail].
-	opName = ''lambda'' ifTrue: [self check: form operands: 1 to: nil. ^ self translateLambda: form inScope: scope].
-	opName = ''let'' ifTrue: [self check: form operands: 1 to: nil. ^ self translateLet: form inScope: scope tail: tail].
-	opName = ''define'' ifTrue: [self checkDefine: form. ^ self translateDefine: form inScope: scope].
-	opName = ''set!!'' ifTrue: [
-		self check: form operands: 2 to: 2.
-		(form cdr car isKindOf: LispSymbol) ifFalse: [^ self compileError: ''set!!: bad name: '' , (self show: form cdr car)].
-		^ self translateSet: form inScope: scope].
-	opName = ''quasiquote'' ifTrue: [self check: form operands: 1 to: 1. ^ self qqNode: form cdr car level: 0 inScope: scope].
-	opName = ''define-macro'' ifTrue: [self check: form operands: 2 to: nil. ^ self translateDefineMacro: form inScope: scope].
-	opName = ''send'' ifTrue: [^ self translateSend: form inScope: scope].
-	opName = ''smalltalk'' ifTrue: [^ self translateSmalltalkGlobal: form].
+	(op isKindOf: LispSymbol) ifTrue: [
+		sel := self class specialForms at: op ifAbsent: [nil].
+		sel notNil ifTrue: [^ self perform: sel with: form with: scope with: tail]].
 	(self macroFor: op inScope: scope) ifNotNil: [:m |
 		^ self translateMacroCall: form macro: m inScope: scope tail: tail].
 	^ self translateApplication: form inScope: scope tail: tail'.
+
+"=== special forms, one method each (review C-18) ========================="
+cm value: comp class value: 'special forms' value: 'specialForms
+	"The names special forms are known by, and the method that translates each."
+	SpecialForms isNil ifTrue: [
+		SpecialForms := IdentityDictionary new.
+		#(''quote'' #sfQuote:inScope:tail: ''if'' #sfIf:inScope:tail: ''begin'' #sfBegin:inScope:tail:
+		  ''lambda'' #sfLambda:inScope:tail: ''let'' #sfLet:inScope:tail: ''define'' #sfDefine:inScope:tail:
+		  ''set!!'' #sfSet:inScope:tail: ''quasiquote'' #sfQuasiquote:inScope:tail:
+		  ''define-macro'' #sfDefineMacro:inScope:tail: ''send'' #sfSend:inScope:tail:
+		  ''smalltalk'' #sfSmalltalk:inScope:tail:)
+			pairsDo: [:name :sel | SpecialForms at: (LispSymbol named: name) put: sel]].
+	^ SpecialForms'.
+cm value: comp value: 'special forms' value: 'sfQuote: form inScope: scope tail: tail
+	self check: form operands: 1 to: 1.
+	^ self quoteNode: form cdr car'.
+cm value: comp value: 'special forms' value: 'sfIf: form inScope: scope tail: tail
+	self check: form operands: 2 to: 3.
+	^ self translateIf: form inScope: scope tail: tail'.
+cm value: comp value: 'special forms' value: 'sfBegin: form inScope: scope tail: tail
+	^ self translateBegin: (self listToArray: form cdr) inScope: scope tail: tail'.
+cm value: comp value: 'special forms' value: 'sfLambda: form inScope: scope tail: tail
+	self check: form operands: 1 to: nil.
+	^ self translateLambda: form inScope: scope'.
+cm value: comp value: 'special forms' value: 'sfLet: form inScope: scope tail: tail
+	self check: form operands: 1 to: nil.
+	^ self translateLet: form inScope: scope tail: tail'.
+cm value: comp value: 'special forms' value: 'sfDefine: form inScope: scope tail: tail
+	self checkDefine: form.
+	^ self translateDefine: form inScope: scope'.
+cm value: comp value: 'special forms' value: 'sfSet: form inScope: scope tail: tail
+	self check: form operands: 2 to: 2.
+	(form cdr car isKindOf: LispSymbol) ifFalse: [^ self compileError: ''set!!: bad name: '' , (self show: form cdr car)].
+	^ self translateSet: form inScope: scope'.
+cm value: comp value: 'special forms' value: 'sfQuasiquote: form inScope: scope tail: tail
+	self check: form operands: 1 to: 1.
+	^ self qqNode: form cdr car level: 0 inScope: scope'.
+cm value: comp value: 'special forms' value: 'sfDefineMacro: form inScope: scope tail: tail
+	self check: form operands: 2 to: nil.
+	^ self translateDefineMacro: form inScope: scope'.
+cm value: comp value: 'special forms' value: 'sfSend: form inScope: scope tail: tail
+	^ self translateSend: form inScope: scope'.
+cm value: comp value: 'special forms' value: 'sfSmalltalk: form inScope: scope tail: tail
+	^ self translateSmalltalkGlobal: form'.
 
 "=== macros (Phase 7 section 5) ============================================"
 cm value: comp value: 'macros' value: 'macroFor: op inScope: scope
@@ -637,7 +704,7 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 	"nameSym is the name this lambda is being defined as, or nil: a global, or a local
 	 held in the temp localTemp (internal define, named let; review C-8). A defined,
 	 fixed-arity procedure compiles its self tail calls as a loop (section 4.2)."
-	| parts parsed fixed restSym allParams childScope bound savedLoop savedInlineTemps loop tail body bodyNodes iterNames iterInits localNodes statements temps block procNode procName |
+	| parts parsed fixed restSym allParams childScope bound savedLoop savedInlineTemps savedDepth loop tail body bodyNodes iterNames iterInits localNodes statements temps block procNode procName packed |
 	parts := self listToArray: form cdr.
 	parsed := self parseParams: parts first.
 	fixed := parsed first.
@@ -645,11 +712,25 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 	allParams := restSym isNil ifTrue: [fixed] ifFalse: [fixed , { restSym }].
 	childScope := scope copy.
 	bound := self bindParams: allParams into: childScope.
+	"More parameters than a block may take (15): the block takes one Array of them,
+	 and copies each into its temporary (Phase 7.9 section 4.2; review C-4)."
+	packed := allParams size > 15.
+	packed ifTrue: [ | pk |
+		pk := self nextName.
+		bound := {
+			{ self var: pk }.
+			bound at: 2.
+			(1 to: (bound at: 4) size) collect: [:i |
+				self assign: ((bound at: 4) at: i)
+					value: (self messageNode: (self var: pk) selector: #at: arguments: { self literalNode: i })].
+			bound at: 4 }].
 	tail := self uses: #tailCalls.
 	loop := nil.
 	iterNames := #().
 	iterInits := #().
-	(tail and: [nameSym notNil and: [restSym isNil]]) ifTrue: [
+	"a packed procedure tail-calls itself through the trampoline: its parameters, their
+	 per-iteration copies and the loop''s scratch temps would not fit in one frame"
+	(tail and: [nameSym notNil and: [restSym isNil and: [packed not]]]) ifTrue: [
 		loop := IdentityDictionary new.
 		loop at: #name put: nameSym; at: #local put: localTemp; at: #params put: (bound at: 4);
 			at: #proc put: self nextName; at: #again put: self nextName; at: #result put: self nextName;
@@ -664,8 +745,11 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 	savedInlineTemps := inlineTemps.
 	selfLoop := loop.
 	inlineTemps := 0.
+	"the procedure''s block is a new frame: its nesting budget starts afresh"
+	savedDepth := exprDepth.
+	exprDepth := 0.
 	body := [self translateScopedBody: parts allButFirst inScope: childScope tail: tail]
-		ensure: [selfLoop := savedLoop. inlineTemps := savedInlineTemps].
+		ensure: [selfLoop := savedLoop. inlineTemps := savedInlineTemps. exprDepth := savedDepth].
 	bodyNodes := body at: 2.
 	localNodes := (iterNames , (body at: 1) asArray) collect: [:nm | self var: nm].
 	(loop notNil and: [loop at: #used])
@@ -690,6 +774,7 @@ cm value: comp value: 'translating' value: 'translateLambda: form inScope: scope
 	procNode := self messageNode: (self var: ''LispProcedure'')
 		selector: (restSym isNil ifTrue: [#fixed:arity:source:] ifFalse: [#variadic:required:source:])
 		arguments: { block. self literalNode: fixed size. self literalNode: sourceText }.
+	packed ifTrue: [procNode := self messageNode: procNode selector: #packed arguments: #()].
 	(loop notNil and: [loop at: #used]) ifFalse: [^ procNode].
 	"The loop compares the global with this very procedure, so bind it to a variable
 	 the block can see: [| p | p := LispProcedure fixed: [...p...] .... p] value"
@@ -938,9 +1023,25 @@ cm value: comp value: 'evaluating' value: 'evalAll: aString named: aName
 	^ result'.
 cm value: comp value: 'evaluating' value: 'evalFile: aPath
 	| file |
-	file := aPath asFileReference.
+	file := self class resolveInput: aPath.
 	file exists ifFalse: [^ (LispFileError new) signal: ''file not found: '' , aPath].
-	^ self evalAll: file contents named: file fullName'.
+	^ LispLoadPath value: file fullName during: [self evalAll: file contents named: file fullName]'.
+cm value: comp class value: 'paths' value: 'isAbsolute: aPath
+	^ aPath notEmpty and: [aPath first = $/ or: [aPath first = $\ or: [aPath size > 1 and: [(aPath at: 2) = $:]]]]'.
+cm value: comp class value: 'paths' value: 'resolve: aPath
+	"A relative path names a file beside the file being loaded or run, else in the
+	 current directory (section 5.3)."
+	| base |
+	base := LispLoadPath value.
+	((self isAbsolute: aPath) or: [base isNil]) ifTrue: [^ aPath asFileReference].
+	^ base asFileReference parent resolveString: aPath'.
+cm value: comp class value: 'paths' value: 'resolveInput: aPath
+	"As resolve:, but a file that is not beside the loading file is also looked for in
+	 the current directory, where programs written before Phase 7.9 expect it."
+	| ref |
+	ref := self resolve: aPath.
+	(ref exists or: [self isAbsolute: aPath]) ifTrue: [^ ref].
+	^ aPath asFileReference exists ifTrue: [aPath asFileReference] ifFalse: [ref]'.
 
 "=== load report ==========================================================="
 Stdio stdout

@@ -3,7 +3,7 @@ setlocal
 rem ===========================================================================
 rem  cog-lisp : run a program or start the REPL  (specs/phase-5-repl-runner.md)
 rem    cog-lisp.bat                 start the REPL
-rem    cog-lisp.bat program.lisp    run a program, then exit
+rem    cog-lisp.bat program.lisp [arg ...]   run a program, then exit
 rem  Exit code: 0 on success, 1 on an uncaught LISP error, or the code given to
 rem  (exit n). Set COGLISP_IMAGE to use an image other than pharo\cog-lisp.image.
 rem ===========================================================================
@@ -20,7 +20,16 @@ set "CAP=--maxOldSpaceSize=8589934592"
 if not exist "%IMG%" goto :noimage
 
 if "%~1"=="" goto :repl
-"%VM%" --headless %CAP% "%IMG%" lisp run "%~f1"
+rem  the program, then any arguments for it: (command-line) answers them all
+set "PROG=%~f1"
+set "ARGS="
+:collect
+shift
+if "%~1"=="" goto :run
+set ARGS=%ARGS% "%~1"
+goto :collect
+:run
+"%VM%" --headless %CAP% "%IMG%" lisp run "%PROG%"%ARGS%
 exit /b %ERRORLEVEL%
 
 :repl

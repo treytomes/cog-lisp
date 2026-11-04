@@ -193,7 +193,9 @@ cm value: repl value: 'running' value: 'process: buffer
 	^ '''''.
 cm value: repl value: 'running' value: 'run
 	"Loop until end of input. Output from display/write goes to the same stream as results."
-	LispPrimitives withOutput: out do: [self loop].
+	"read and read-char with no port read the lines typed after the form (Phase 7.9)"
+	LispPrimitives withOutput: out do: [
+		LispPrimitives withInput: (LispInputPort onStream: (LispLineStream on: in)) do: [self loop]].
 	out nextPut: Character lf; flush'.
 cm value: repl value: 'running' value: 'loop
 	| buffer |
@@ -287,7 +289,9 @@ cm value: shell value: 'running' value: 'runFile: aPath
 	"(abort) in a program ends it, as a failure (Phase 7.7 section 5.2)"
 	LispRestart
 		withRestarts: { LispRestart name: ''abort'' action: [self failReport: ''error: aborted''] }
-		do: [self withMemoryLimitDo: [LispCompiler new evalFile: aPath]].
+		do: [self withMemoryLimitDo: [
+			LispPrimitives withInput: (LispInputPort onStream: (LispLineStream on: LispStdin new))
+				do: [LispCompiler new evalFile: aPath]]].
 	LispTextOutput stdout flush.
 	Smalltalk exit: 0'.
 cm value: shell value: 'running' value: 'execute
@@ -295,7 +299,10 @@ cm value: shell value: 'running' value: 'execute
 	args := (self positional: #args) asArray.
 	[[self warnIfStale.
 	  (args isEmpty or: [args first = ''repl'']) ifTrue: [^ self runRepl].
-	  args first = ''run'' ifTrue: [^ self runFile: (args at: 2 ifAbsent: [nil])].
+	  args first = ''run'' ifTrue: [
+		"(command-line): the program, then its arguments (Phase 7.9 section 5.3)"
+		LispPrimitives commandLine: (args allButFirst collect: [:a | a asString]).
+		^ self runFile: (args at: 2 ifAbsent: [nil])].
 	  self fail: ''unknown lisp command: '' , args first]
 		on: Warning do: [:w | w resume]]
 		on: Error do: [:e |

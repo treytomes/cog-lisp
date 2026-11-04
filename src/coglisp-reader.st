@@ -11,7 +11,7 @@
  Classes: LispCons, LispSymbol, LispEmptyList, LispReadError, LispReader,
  LispPrinter.
  ============================================================================"
-| failures cm cons sym empty unspec lerr err loc ferr eofc rdr prn |
+| failures cm cons sym empty unspec lerr err loc ferr eofc hole rdr prn |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -35,8 +35,10 @@ err   := (lerr   << #LispReadError) slots: { #position. #incomplete }; package: 
 loc   := (lerr   << #LispLocatedError) slots: { #cause. #file. #line. #column }; package: 'CogLisp-Reader'; install.
 "The end-of-file object: read, read-char and friends answer it (Phase 7.8)."
 eofc  := (Object << #LispEofObject) package: 'CogLisp-Reader'; install.
-rdr   := (Object << #LispReader) slots: { #stream. #source. #ranges. #datumStart }; sharedVariables: { #Eof }; package: 'CogLisp-Reader'; install.
-prn   := (Object << #LispPrinter) package: 'CogLisp-Reader'; install.
+"A datum label not yet filled in, while #n=datum is being read (Phase 7.9 section 6)."
+hole  := (Object << #LispLabelHole) package: 'CogLisp-Reader'; install.
+rdr   := (Object << #LispReader) slots: { #stream. #source. #ranges. #datumStart. #labels }; sharedVariables: { #Eof }; package: 'CogLisp-Reader'; install.
+prn   := (Object << #LispPrinter) sharedVariables: { #Labels. #LabelCount }; package: 'CogLisp-Reader'; install.
 
 "=== LispCons =============================================================="
 cm value: cons value: 'accessing' value: 'car
@@ -451,7 +453,22 @@ cm value: rdr value: 'reading' value: 'readEscapeFrom: start
 	c = $t ifTrue: [^ Character tab].
 	c = $r ifTrue: [^ Character cr].
 	c = $0 ifTrue: [^ Character value: 0].
+	c = $a ifTrue: [^ Character value: 7].
+	c = $b ifTrue: [^ Character value: 8].
+	c = $x ifTrue: [^ self readHexEscapeFrom: start].
 	^ self signalError: ''unknown string escape''.'.
+cm value: rdr value: 'reading' value: 'readHexEscapeFrom: start
+	"\xHH...; : any character by its code (R7RS; Phase 7.9 section 7)."
+	| digits c code |
+	digits := WriteStream on: String new.
+	[stream atEnd ifTrue: [^ self signalIncomplete: ''unterminated string'' at: start].
+	 (c := stream next) = $;] whileFalse: [
+		(''0123456789abcdefABCDEF'' includes: c) ifFalse: [^ self signalError: ''bad \x escape: expected hex digits and ;''].
+		digits nextPut: c].
+	digits contents isEmpty ifTrue: [^ self signalError: ''bad \x escape: expected hex digits and ;''].
+	code := Integer readFrom: digits contents asUppercase readStream base: 16.
+	code > 16r10FFFF ifTrue: [^ self signalError: ''bad \x escape: no such character''].
+	^ Character value: code'.
 cm value: rdr value: 'reading' value: 'readToken
 	| s str |
 	s := WriteStream on: String new.
@@ -525,6 +542,13 @@ cm value: rdr value: 'reading' value: 'readHash
 	c := stream peek.
 	c = $\ ifTrue: [stream next. ^ self readCharacter].
 	c = $( ifTrue: [^ self readVector].
+	c isDigit ifTrue: [ | n |
+		"a datum label: #n= or #n#"
+		n := 0.
+		[stream atEnd not and: [stream peek isDigit]] whileTrue: [n := n * 10 + stream next digitValue].
+		(stream atEnd not and: [stream peek = $= or: [stream peek = $#]])
+			ifFalse: [^ self signalError: ''bad datum label: expected = or # after #'' , n printString].
+		^ self readLabel: n kind: stream next].
 	word := self readHashWord.
 	(word = ''t'' or: [word = ''true'']) ifTrue: [^ true].
 	(word = ''f'' or: [word = ''false'']) ifTrue: [^ false].
@@ -541,6 +565,39 @@ cm value: rdr value: 'reading' value: 'readVector
 		ifFalse: [^ self signalError: ''bad vector: a dotted tail'' at: start - 1 incomplete: false].
 	^ (list == LispEmptyList default ifTrue: [Array new] ifFalse: [list lispElements asArray])
 		beReadOnlyObject; yourself'.
+cm value: rdr value: 'reading' value: 'readLabel: n kind: aCharacter
+	"#n=datum labels a datum; #n# refers to it, also from inside it, which makes a
+	 cycle (R7RS datum labels; Phase 7.9 section 6)."
+	| hole datum |
+	labels isNil ifTrue: [labels := Dictionary new].
+	aCharacter = $# ifTrue: [
+		^ labels at: n ifAbsent: [self signalError: ''unknown datum label #'' , n printString , ''#'']].
+	hole := LispLabelHole new.
+	labels at: n put: hole.
+	datum := self readNextDatum.
+	labels at: n put: datum.
+	self fill: hole with: datum in: datum seen: IdentitySet new.
+	^ datum'.
+cm value: rdr value: 'reading' value: 'fill: hole with: datum in: x seen: seen
+	"Replace hole by datum everywhere inside x."
+	| cur |
+	cur := x.
+	[((cur isKindOf: LispCons) or: [cur isKindOf: Array]) and: [(seen includes: cur) not]] whileTrue: [
+		seen add: cur.
+		(cur isKindOf: Array)
+			ifTrue: [ | ro |
+				ro := cur isReadOnlyObject.
+				ro ifTrue: [cur beWritableObject].
+				1 to: cur size do: [:i |
+					(cur at: i) == hole
+						ifTrue: [cur at: i put: datum]
+						ifFalse: [self fill: hole with: datum in: (cur at: i) seen: seen]].
+				ro ifTrue: [cur beReadOnlyObject].
+				cur := nil]
+			ifFalse: [
+				cur car == hole ifTrue: [cur car: datum] ifFalse: [self fill: hole with: datum in: cur car seen: seen].
+				cur cdr == hole ifTrue: [cur cdr: datum].
+				cur := cur cdr]]'.
 cm value: rdr value: 'reading' value: 'readHashWord
 	| s |
 	s := WriteStream on: String new.
@@ -600,6 +657,58 @@ cm value: rdr class value: 'reading' value: 'readAll: aString
 "=== LispPrinter (stateless, class-side) ==================================="
 cm value: prn class value: 'writing' value: 'writeString: aValue
 	^ String streamContents: [:s | self write: aValue on: s]'.
+cm value: prn class value: 'writing' value: 'writeSharedString: aValue
+	"write-shared: labels every shared pair or vector, not only cycles."
+	^ String streamContents: [:s | self printTop: aValue on: s display: false shared: true]'.
+cm value: prn class value: 'labels' value: 'printTop: v on: s display: displaying shared: sharedToo
+	"Print v; pairs and vectors on a cycle (or, with sharedToo, met twice) are written
+	 with datum labels #n= and #n#, so printing never loops (R7RS write; Phase 7.9
+	 section 6). Values with no cycles print exactly as before."
+	| labels savedLabels savedCount |
+	labels := self labelsFor: v shared: sharedToo.
+	labels isEmpty ifTrue: [^ self print: v on: s display: displaying].
+	savedLabels := Labels.
+	savedCount := LabelCount.
+	Labels := labels.
+	LabelCount := 0.
+	[self print: v on: s display: displaying] ensure: [Labels := savedLabels. LabelCount := savedCount]'.
+cm value: prn class value: 'labels' value: 'labelsFor: v shared: sharedToo
+	| labels |
+	((v isKindOf: LispCons) or: [v isKindOf: Array]) ifFalse: [^ #()].
+	labels := IdentityDictionary new.
+	self scan: v visited: IdentitySet new onPath: IdentitySet new labels: labels shared: sharedToo.
+	^ labels'.
+cm value: prn class value: 'labels' value: 'scan: v visited: visited onPath: onPath labels: labels shared: sharedToo
+	"Depth first, iterative along cdrs: a node met again while it is on the path
+	 being printed is on a cycle."
+	| cur pushed done |
+	pushed := OrderedCollection new.
+	cur := v.
+	done := false.
+	[done not and: [(cur isKindOf: LispCons) or: [cur isKindOf: Array]]] whileTrue: [
+		(onPath includes: cur)
+			ifTrue: [labels at: cur put: nil. done := true]
+			ifFalse: [(visited includes: cur)
+				ifTrue: [sharedToo ifTrue: [labels at: cur put: nil]. done := true]
+				ifFalse: [
+					visited add: cur. onPath add: cur. pushed add: cur.
+					(cur isKindOf: Array)
+						ifTrue: [
+							cur do: [:e | self scan: e visited: visited onPath: onPath labels: labels shared: sharedToo].
+							done := true]
+						ifFalse: [
+							self scan: cur car visited: visited onPath: onPath labels: labels shared: sharedToo.
+							cur := cur cdr]]]].
+	pushed do: [:x | onPath remove: x]'.
+cm value: prn class value: 'labels' value: 'printLabel: v on: s
+	"Write #n# and answer true if v was labelled already; else write #n= and answer false."
+	| n |
+	n := Labels at: v.
+	n notNil ifTrue: [s nextPut: $#; print: n; nextPut: $#. ^ true].
+	Labels at: v put: LabelCount.
+	s nextPut: $#; print: LabelCount; nextPut: $=.
+	LabelCount := LabelCount + 1.
+	^ false'.
 cm value: prn class value: 'writing' value: 'writeString: aValue limitedTo: n
 	"At most n characters, ending in ... when cut short: safe on circular lists."
 	| text |
@@ -609,10 +718,11 @@ cm value: prn class value: 'writing' value: 'writeString: aValue limitedTo: n
 cm value: prn class value: 'writing' value: 'displayString: aValue
 	"As display shows it: strings and characters as their own text, also inside
 	 lists (R7RS; review R-8)."
-	^ String streamContents: [:s | self print: aValue on: s display: true]'.
+	^ String streamContents: [:s | self printTop: aValue on: s display: true shared: false]'.
 cm value: prn class value: 'writing' value: 'write: v on: s
-	^ self print: v on: s display: false'.
+	^ self printTop: v on: s display: false shared: false'.
 cm value: prn class value: 'writing' value: 'print: v on: s display: displaying
+	(Labels notNil and: [(Labels includesKey: v) and: [self printLabel: v on: s]]) ifTrue: [^ self].
 	displaying ifTrue: [
 		((v isKindOf: String) and: [v isSymbol not]) ifTrue: [^ s nextPutAll: v].
 		(v isKindOf: Character) ifTrue: [^ s nextPut: v]].
@@ -645,10 +755,11 @@ cm value: prn class value: 'writing' value: 'printList: aCons on: s display: dis
 	| cur |
 	s nextPut: $(.
 	cur := aCons.
-	[cur isKindOf: LispCons] whileTrue: [
-		self print: cur car on: s display: displaying.
-		cur := cur cdr.
-		(cur isKindOf: LispCons) ifTrue: [s nextPut: Character space]].
+	[self print: cur car on: s display: displaying.
+	 cur := cur cdr.
+	 "a labelled cdr is written after a dot: (1 2 . #0#)"
+	 (cur isKindOf: LispCons) and: [Labels isNil or: [(Labels includesKey: cur) not]]]
+		whileTrue: [s nextPut: Character space].
 	(cur isKindOf: LispEmptyList) ifFalse: [s nextPutAll: '' . ''. self print: cur on: s display: displaying].
 	s nextPut: $)'.
 cm value: prn class value: 'writing' value: 'writeFloat: aFloat on: s
@@ -672,7 +783,9 @@ cm value: prn class value: 'writing' value: 'writeStringLiteral: str on: s
 		ifFalse: [ch = Character tab ifTrue: [s nextPut: $\. s nextPut: $t]
 		ifFalse: [ch = Character cr ifTrue: [s nextPut: $\. s nextPut: $r]
 		ifFalse: [ch = (Character value: 0) ifTrue: [s nextPut: $\. s nextPut: $0]
-		ifFalse: [s nextPut: ch]]]]]]].
+		ifFalse: [(ch asInteger < 32 or: [ch asInteger = 127])
+			ifTrue: [s nextPutAll: ''\x''; nextPutAll: (ch asInteger printStringBase: 16) asLowercase; nextPut: $;]
+			ifFalse: [s nextPut: ch]]]]]]]].
 	s nextPut: $"'.
 
 "=== load report ==========================================================="

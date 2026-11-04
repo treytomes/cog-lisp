@@ -1,0 +1,5 @@
+loaded util.lisp
+this file: main.lisp
+arguments: ("alpha" "beta")
+ALPHA!
+BETA!

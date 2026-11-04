@@ -4,7 +4,7 @@ rem ===========================================================================
 rem  cog-lisp : run every acceptance suite  (specs/phase-7.5-review-and-tooling.md AC-5)
 rem    tests\run-all.bat
 rem  Runs each tests\phase-*.st in a fresh stock image, then the runner suite
-rem  (which rebuilds pharo\cog-lisp.image), and prints each suite's RESULT and a
+rem  (which rebuilds pharo\cog-lisp.image), then the LISP unit tests tests\lisp\*.lisp, and prints each suite's RESULT and a
 rem  total. Exit code 0 only if every suite passed. Benchmarks are separate:
 rem  bench\run-benchmarks.bat.
 rem ===========================================================================
@@ -28,6 +28,8 @@ echo == cog-lisp : all suites ==
 
 for %%T in (tests\phase-*.st) do call :suite "%%~fT" "%%~nT"
 call :runner
+rem  unit tests written in cog-lisp (lib/test.lisp; Phase 7.9), on the image the runner built
+for %%T in (tests\lisp\*.lisp) do call :lisptest "%%~fT" "%%~nT"
 
 echo.
 if "!FAILED!"=="0" (
@@ -49,6 +51,12 @@ exit /b 0
 call "%CD%\tests\phase-5-runner.bat" >"%TMPD%\phase-5-runner.out" 2>&1
 set RC=!ERRORLEVEL!
 call :tally "phase-5-runner" "%TMPD%\phase-5-runner.out" !RC!
+exit /b 0
+
+:lisptest
+call "%CD%\cog-lisp.bat" "%~1" >"%TMPD%\lisp-%~2.out" 2>&1
+set RC=!ERRORLEVEL!
+call :tally "lisp/%~2" "%TMPD%\lisp-%~2.out" !RC!
 exit /b 0
 
 :tally
