@@ -266,6 +266,13 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **Comparing compilers needs one gensym counter.** Both compilers expand the
   macros in a form; reset `LispPrimitives classPool at: #GensymCounter` before
   each, or gensym names differ (`tests/phase-8.3-compiler.st`).
+- **Do not compare methods by `symbolic` when they have nested blocks.**
+  Printing a block literal makes Pharo look up the block's source node, which
+  fails for many cog-lisp methods (`OCSequenceNode does not understand
+  #sourceNodeForPC:`). Compare fingerprints instead: `method-listing`
+  (`lib/compiler/bootstrap.lisp`) gives the header, the bytecode bytes and the
+  literals, blocks recursively. And never let a comparison catch errors into
+  strings: two identical error texts compare equal and the check passes.
 - **Order is output:** temp names `l1`, `l2`, … appear in the bytecode listing,
   so the LISP compiler must make names and translate forms in exactly the
   Smalltalk method's order.
@@ -304,7 +311,7 @@ This project follows spec-driven development: **write the spec before the code.*
   `PASS`/`FAIL` per check, and a final `RESULT: n/n` line.
 - Code changes reference the spec section they satisfy. If reality forces a
   deviation, update the spec first, then the code.
-- **Run everything with `tests\run-all.bat`** (about 2 m 30 s): each `tests\phase-*.st`
+- **Run everything with `tests\run-all.bat`** (about 2 m 10 s): each `tests\phase-*.st`
   in a fresh stock image, then `tests\phase-5-runner.bat` (which rebuilds
   `pharo\cog-lisp.image`), with a total; exit 0 only if all pass. Benchmarks are
   separate (`bench\run-benchmarks.bat`) and noisy when the machine is busy.

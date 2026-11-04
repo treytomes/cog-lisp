@@ -36,7 +36,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 7.7 | Conditions & restarts | ✅ **done** — [spec](specs/phase-7.7-conditions-restarts.md), 54/54, [examples](examples/restarts.lisp) |
 | 7.8 | Strings, characters, vectors & hash tables | ✅ **done** — [spec](specs/phase-7.8-native-data.md), 58/58, [examples](examples/tiny-reader.lisp) |
 | 7.9 | Self-hosting groundwork | ✅ **done** — [spec](specs/phase-7.9-self-hosting-groundwork.md), 46/46, LISP unit tests ([`lib/test.lisp`](lib/test.lisp)); all suites 948/948 |
-| 8 | Self-hosting (meta-circular) | 🟨 in progress — [spec](specs/phase-8-self-hosting.md); 8.1 tests in LISP, 8.2 reader and 8.3 compiler in LISP ([`lib/compiler/`](lib/compiler/), examples [read-yourself](examples/read-yourself.lisp), [compile-yourself](examples/compile-yourself.lisp), [extend-the-compiler](examples/extend-the-compiler.lisp)) done; all suites 2278/2278 |
+| 8 | Self-hosting (meta-circular) | 🟨 in progress — [spec](specs/phase-8-self-hosting.md); 8.1 tests in LISP, 8.2 reader and 8.3 compiler in LISP, 8.4 the compiler compiles itself to a fixpoint ([`lib/compiler/`](lib/compiler/), examples [read-yourself](examples/read-yourself.lisp), [compile-yourself](examples/compile-yourself.lisp), [extend-the-compiler](examples/extend-the-compiler.lisp), [bootstrap](examples/bootstrap.lisp)) done; all suites 2336/2336 |
 | — | CI/CD: tests on every push; image and VS Code extension built for tagged releases | ⬜ planned (see below) |
 | 9 | Pure Lisp image (with the numeric tower and hygienic macros) | ⬜ |
 
@@ -256,7 +256,8 @@ self-hosted reader and compiler are checked against the same tests. Step 8.1
 (tests in LISP) and step 8.2 (the reader in LISP, matching the Smalltalk reader
 on every input and every `.lisp` file in the repository) are done, and so is step
 8.3: the compiler in LISP, which compiles every form in `lib/` and `examples/`
-to the same bytecode as the Smalltalk compiler.
+to the same bytecode as the Smalltalk compiler; and step 8.4: compiled by
+itself, twice, it still makes the same methods (a fixpoint).
 Reimplement cog-lisp **in cog-lisp**: rewrite the reader and the compiler — the
 latter emitting the same `CompiledMethod`s through a LISP-level interface to the
 Opal IR — in the language itself, bootstrapped by the Smalltalk-hosted

@@ -1,10 +1,10 @@
 "============================================================================
  cog-lisp : Phase 8 step 8.3 suite  (specs/phase-8-self-hosting.md AC-3)
  The LISP compiler (lib/compiler/compiler.lisp) against the Smalltalk compiler
- (LispCompiler): every form compiles to the same method, compared as the
- bytecode corpus is (tests/phase-7.9-groundwork.st AC-2: the symbolic listing
- of the method and of every block in its literals), or fails with the same
- error. Inputs: the bytecode corpus, malformed forms, every top-level form of
+ (LispCompiler): every form compiles to the same method, compared by its
+ fingerprint (the header, the bytecode bytes, and every literal, blocks
+ recursively), or fails with the same error. Not the symbolic listing: Pharo
+ cannot print many nested blocks of these methods (CLAUDE.md). Inputs: the bytecode corpus, malformed forms, every top-level form of
  lib/ and examples/ (read with source text, so procedures keep it), and the
  same with each Phase 6 optimization switched off.
  The compiler's own unit tests are tests/lisp/phase-8.3-compiler.lisp.
@@ -25,14 +25,26 @@ h := LispTestHarness new.
 root := Smalltalk imageDirectory parent.
 lf := String with: Character lf.
 
-"the corpus rule: symbolic listings of the method and its blocks"
+"a method's fingerprint: header, bytecode bytes, literals; blocks recursively.
+ A literal block's own listing (symbolic) is not used: printing a nested block
+ makes Pharo look up its source node, which fails for many of these methods."
 dump := nil.
-dump := [:code :s | s nextPutAll: code symbolic; nextPut: Character lf.
+dump := [:code :s |
+	s nextPutAll: 'code header '; print: code header; nextPutAll: ' bytes'.
+	code initialPC to: code endPC do: [:i | s space; print: (code at: i)].
+	s nextPut: Character lf.
 	code literals do: [:lit |
-		(lit isKindOf: CompiledBlock) ifTrue: [dump value: lit value: s].
-		(lit isKindOf: BlockClosure) ifTrue: [dump value: lit compiledBlock value: s]]].
-describe := [:blk | [ | m | m := blk value. String streamContents: [:s | dump value: m value: s]]
-	on: Error do: [:e | 'ERROR ' , e class name , ': ' , (e messageText ifNil: [''])]].
+		(lit isKindOf: CompiledBlock)
+			ifTrue: [dump value: lit value: s]
+			ifFalse: [(lit isKindOf: BlockClosure)
+				ifTrue: [s nextPutAll: 'closure '; print: lit numArgs; nextPut: Character lf. dump value: lit compiledBlock value: s]
+				ifFalse: [s nextPutAll: 'lit '; nextPutAll: lit class name; space; nextPutAll: (lit printStringLimitedTo: 2000); nextPut: Character lf]]]].
+"a compile error is a result; an error while taking the fingerprint is not (it
+ would make two failures compare equal), so it is not caught here"
+describe := [:blk | | m err |
+	err := nil.
+	m := [blk value] on: Error do: [:e | err := 'ERROR ' , e class name , ': ' , (e messageText ifNil: ['']). nil].
+	err ifNil: [String streamContents: [:s | dump value: m value: s]]].
 
 stCompile := [:datum :map :ctx | describe value: [ | c |
 	c := LispCompiler new.

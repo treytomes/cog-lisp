@@ -14,10 +14,11 @@
 (vector-for-each (lambda (line) (display "  ") (display line) (newline))
                  [[method symbolic] lines])
 
-;; It is the same code the Smalltalk compiler makes, byte for byte.
+;; It is the same code the Smalltalk compiler makes, byte for byte: method-listing
+;; shows a method's header, bytecode bytes and literals, and its blocks'.
 (define (same-code? form)
-  (equal? [(compile-form form) symbolic]
-          [[[(smalltalk LispCompiler) new] compile: form] symbolic]))
+  (equal? (method-listing (compile-form form))
+          (method-listing [[(smalltalk LispCompiler) new] compile: form])))
 (display "same as the Smalltalk compiler: ")
 (write (map same-code? '((lambda (x) (* x x))
                          (define (fact n) (if (= n 0) 1 (* n (fact (- n 1)))))

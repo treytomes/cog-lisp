@@ -186,8 +186,8 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
 |---|---|
 | 8.1 Tests in LISP | **done** — 412 checks moved to `tests/lisp/phase-*.lisp` (list: `tests/lisp/moved-checks.txt`); the total stays 948/948, suite by suite |
 | 8.2 Reader in LISP | **done** — `lib/compiler/reader.lisp`, built into the image; matches `LispReader` on 52 Phase 1 inputs, 88 feature and error inputs and all 59 `.lisp` files (`tests/phase-8.2-reader.st`, 204 checks); 57 LISP unit tests; 1211/1211 in all |
-| 8.3 Compiler in LISP | **done** — `lib/compiler/opal.lisp` and `compiler.lisp`, built into the image; byte-identical to `LispCompiler` on the corpus (also with each optimization off), 37 path forms, 36 malformed forms and every top-level form of `lib/` and `examples/` (`tests/phase-8.3-compiler.st`, 1032 checks); 25 LISP unit tests; 2278/2278 in all |
-| 8.4 Bootstrap and fixpoint | not started |
+| 8.3 Compiler in LISP | **done** — `lib/compiler/opal.lisp` and `compiler.lisp`, built into the image; byte-identical to `LispCompiler` on the corpus (also with each optimization off), 37 path forms, 36 malformed forms and every top-level form of `lib/` and `examples/` (`tests/phase-8.3-compiler.st`, now compared by fingerprint, see step 8.4); 25 LISP unit tests; 2278/2278 in all |
+| 8.4 Bootstrap and fixpoint | **done** — `lib/compiler/bootstrap.lisp`; stages 0–3 make identical methods for all 225 forms of the compiler's source (`tests/lisp/phase-8.4-bootstrap.lisp`, 18 checks; `examples/bootstrap.lisp`); 2336/2336 in all |
 | 8.5 Switch-over | not started |
 | 8.6 Direct code generation | not started |
 
@@ -311,3 +311,42 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
   `examples/extend-the-compiler.lisp` (a `repeat` special form, and one that
   rejects bad syntax).
 - `tests\run-all.bat` takes about 2 m 30 s (this suite about 25 s).
+
+### Step 8.4
+- **`lib/compiler/bootstrap.lisp`** runs the stages. `(bootstrap-compiler dir)`
+  compiles every top-level form of `compiler-sources` (`reader.lisp`,
+  `opal.lisp`, `compiler.lisp`) with stage 0 (`LispCompiler`, reading with
+  `LispReader`) and with stage 1 (the image's LISP compiler, reading with the
+  LISP reader); installs stage 1's methods, making stage 2; compiles again;
+  installs, making stage 3; compiles again. It answers the four stages'
+  fingerprints and leaves stage 3 installed. `(bootstrap-differences b i j)`
+  names the forms that differ; `(bootstrap-fixpoint? b)`.
+- **A stage is compiled completely before it is installed.** The compiler calls
+  its own procedures through global cells, so installing as it went would have
+  the new compiler compile the rest of itself. The driver is not among the
+  sources, so installing never replaces it mid-run.
+- **Result: stages 0, 1, 2 and 3 make identical methods** for all 225 forms of
+  the compiler's source. Stage 3 then compiles as `LispCompiler` does, reads,
+  runs programs, and its procedures keep their source. A check that
+  `compile-form` is a different procedure afterwards shows the stages really
+  were installed.
+- **Forms are visited as `eval` sees them** (a `begin`'s forms and a macro
+  call's expansion are top-level forms), and each starts from the same gensym
+  counter in every stage, as in the 8.3 suite.
+- **A bug found in the 8.3 comparison, and fixed.** Pharo cannot produce the
+  `symbolic` listing of many nested blocks in these methods: printing a block
+  literal looks up its source node, and the lookup lands on an `OCSequenceNode`
+  (`does not understand #sourceNodeForPC:`), 326 times in the compiler's own
+  source. The 8.3 suite caught every error into a string, so where both
+  compilers' listings failed it compared two identical error texts and passed.
+  Both comparisons now use a **fingerprint** instead (`method-listing` here, the
+  same rule in `tests/phase-8.3-compiler.st`): each method's header, its bytecode
+  bytes, and every literal, blocks recursively. That is stricter than the
+  listing, and an error while taking it now fails the check. With fingerprints
+  the 8.3 suite still passes in full (the compilers did agree) and runs in 11 s
+  instead of 25. The 8.3 LISP unit tests and `examples/compile-yourself.lisp`
+  use `method-listing` too. The Phase 7.9 corpus test keeps `symbolic`, which
+  works for its forms and is pinned by its `.expected` file.
+- Example: `examples/bootstrap.lisp` runs the bootstrap from its own location
+  and reports each stage (about 5 s).
+- `tests\run-all.bat` takes about 2 m 10 s.

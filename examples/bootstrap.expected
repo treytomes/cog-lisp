@@ -1,0 +1,6 @@
+compiling ("reader.lisp" "opal.lisp" "compiler.lisp")
+  stage 1 vs stage 0: 225 methods, all identical
+  stage 2 vs stage 1: 225 methods, all identical
+  stage 3 vs stage 2: 225 methods, all identical
+fixpoint: #t
+stage 3 compiled fib; (fib 20) = 6765

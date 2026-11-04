@@ -6,8 +6,9 @@
 (load "../../lib/test.lisp")
 
 (define (run-form d) (opal-run (compile-form d)))
-(define (st-listing d) [[[(smalltalk LispCompiler) new] compile: d] symbolic])
-(define (lisp-listing d) [(compile-form d) symbolic])
+;; method-listing (lib/compiler/bootstrap.lisp): header, bytes and literals, blocks too
+(define (st-listing d) (method-listing [[(smalltalk LispCompiler) new] compile: d]))
+(define (lisp-listing d) (method-listing (compile-form d)))
 
 ;; the compile error a form gives, or no-error
 (define (compile-failure d)
