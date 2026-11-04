@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 8 |
-| **Status** | Accepted (2026-11-04) |
+| **Status** | Implemented (2026-11-04): steps 8.1–8.6 done |
 | **Depends on** | Phases 1–7.9 |
 | **Feeds** | CI/CD, Phase 9 (the pure LISP image: Opal can go once code generation is LISP) |
 | **Shape** | Six steps, 8.1–8.6, each committed and green before the next (§4) |
@@ -189,7 +189,7 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
 | 8.3 Compiler in LISP | **done** — `lib/compiler/opal.lisp` and `compiler.lisp`, built into the image; byte-identical to `LispCompiler` on the corpus (also with each optimization off), 37 path forms, 36 malformed forms and every top-level form of `lib/` and `examples/` (`tests/phase-8.3-compiler.st`, now compared by fingerprint, see step 8.4); 25 LISP unit tests; 2278/2278 in all |
 | 8.4 Bootstrap and fixpoint | **done** — `lib/compiler/bootstrap.lisp`; stages 0–3 make identical methods for all 225 forms of the compiler's source (`tests/lisp/phase-8.4-bootstrap.lisp`, 18 checks; `examples/bootstrap.lisp`); 2336/2336 in all |
 | 8.5 Switch-over | **done** — eval, load, the REPL, the runner and `read` use the LISP reader and compiler, sealed; `COGLISP_COMPILER=smalltalk` goes back; every suite, example and LISP test passes both ways (2384/2384 each), benchmarks 14/14; compile time 1.2× (AC-7); `examples/sealed-compiler.lisp` |
-| 8.6 Direct code generation | not started |
+| 8.6 Direct code generation | **done** — `lib/compiler/codegen.lisp` writes bytecode itself; compiling the benchmark's 29 forms takes 17.1 ms against 36.4 ms for the Smalltalk compiler (2.1×; Phase 7.9: 36.3 ms); run-time benchmarks equal or faster; fixpoint of the new generator holds (stages 1 = 2 = 3); 2506/2506 both ways |
 
 ## 12. As implemented
 
@@ -417,3 +417,70 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
   compiler nothing uses.
 - Tests: `tests/lisp/phase-8.5-switch-over.lisp` (17 checks, either way).
   Example: `examples/sealed-compiler.lisp` (the same output either way).
+
+### Step 8.6
+- **Measured first.** Of the LISP compiler's 43–48 ms for the benchmark's 29
+  forms, translation to Opal nodes took 11–15, semantic analysis 9–11 and code
+  generation 21–24, spread over hundreds of small costs (parent walks, option
+  checks, IR sequences, collection growth). Only replacing the AST, the analysis
+  and the IR together could halve it.
+- **The translator is unchanged.** `lib/compiler/opal.lisp` now builds light
+  trees (`#(lit x)`, `#(var name)`, `#(assign name node)`, `#(send receiver
+  selector args)`, `#(block args temps statements)`, `#(brace elements)`,
+  `#(method node)`) instead of Opal's nodes, behind the same `opal-*` procedures,
+  and `opal-generate` compiles a tree one of two ways: `direct`
+  (`lib/compiler/codegen.lisp`, the default) or `opal` (the tree converted to
+  exactly the Opal AST of 8.3, compiled by Opal). `(set-code-generator! 'opal)`
+  switches, in the sealed compiler too (the setting is a box).
+- **`codegen.lisp` does Opal's work for the translator's trees** and writes the
+  bytes with Pharo's own `EncoderForSistaV1`. Analysis in evaluation order
+  decides each variable's place: a frame temporary, a value copied into a
+  closure, or a slot of a temp vector (a variable written after a closure has
+  captured it, or written by another frame), made when its scope is entered, so
+  a loop body gets a fresh one each time round. A loop is analyzed twice, so a
+  write early in the body counts as after a capture late in the previous
+  iteration. The blocks of `ifTrue:`, `ifTrue:ifFalse:` and `whileTrue:` are
+  inlined; a block that captures nothing becomes a `CleanBlockClosure` (or
+  `ConstantBlockClosure`) made once at compile time, as Opal does. Each branch is
+  emitted on its own first, so every jump's distance is known when it is
+  written. String literals are made read-only, as Opal makes them.
+- **Better code than Opal's, in three places:** `(LispCore isTruthy: x)
+  ifTrue:...` is an inline `x == false` test; `true ifTrue: [...]`, the
+  translator's sequencing, is just its statements; and a global that is bound at
+  compile time is read with `pushLiteralVariable` (a `LispGlobal`'s value is its
+  second slot, where the VM reads a binding's value) instead of a send of
+  `value`. A cell is never unbound again, so only a forward reference needs the
+  checked send. `LispGlobal>>key` answers its name for the tools that list such
+  code. Also, in the runtime: `pair?` and `symbol?` are inlined as one send
+  (`isLispPair`, `isLispSymbol` on `Object`) instead of a call that runs
+  `isKindOf:`.
+- **The generator's own speed** came from what the profile named: record fields
+  through macros over `at:`/`at:put:` sends, not checked `vector-ref`; selector
+  symbols and global bindings cached by the translator's literal strings.
+- **Results.** Compiling the 29 forms: 17.1 ms, against 36.4 ms for the
+  Smalltalk compiler in the same run, 2.1× faster (Phase 7.9: 36.3 ms, so 2.1×
+  that too); on busier runs 1.8–2.2×. The benchmark checks a 1.5× margin. Run-time
+  benchmarks are equal or faster (loop 100000: 1.97 to 1.04 ms; tak 2.81 to 2.02;
+  globals 2.67 to 1.75), within noise elsewhere. Reading got faster too, since
+  the reader runs on generated code: 3.7× the Smalltalk reader, from 5.8×.
+- **The fixpoint for the new generator:** stages 1, 2 and 3 make the same
+  methods (`bootstrap-fixpoint?` compares stage 0 only through Opal, whose code
+  stage 0 shares); the build checks it, and `tests/lisp/phase-8.4-bootstrap.lisp`
+  runs both bootstraps. A bootstrap keeps the generator it started with across
+  the stages it installs.
+- **Byte-identity with the Smalltalk compiler is still checked, through Opal:**
+  `tests/phase-8.3-compiler.st` and the 8.3 LISP tests switch to `opal`. The
+  Phase 7.9 corpus test now pins the Smalltalk compiler's code
+  (`smalltalkCompile:context:`), which it was written to check.
+- **Bugs found on the way:** a loop's second analysis pass made a new frame for
+  a closure in the loop body while the inlined scopes inside it kept the old one
+  (found by compiling the compiler's own source: `(let loop () ...)` around a
+  `let`); `examples/compile-yourself.lisp` compared the LISP compiler with itself
+  (plain `compile:` delegates since 8.5).
+- Tests: `tests/lisp/phase-8.6-codegen.lisp` (23 checks, either way): closures
+  in loops, shared captured variables, letrec, loops in a `let`, truth, globals
+  as they are now and forward references, big and deep code, the frame limit,
+  read-only literals. Examples: `bootstrap.lisp` runs both bootstraps;
+  `compile-yourself.lisp` shows both generators.
+- Owner, 2026-11-04: 1.8× would have been accepted as done; the cheap last round
+  (accessors, caches, two inlined predicates) reached 2.1×.

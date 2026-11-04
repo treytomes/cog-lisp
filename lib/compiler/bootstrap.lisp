@@ -17,7 +17,7 @@
 ;;; This file is not among the sources it compiles, so installing a stage never
 ;;; replaces the procedures running the bootstrap.
 
-(define compiler-sources '("reader.lisp" "opal.lisp" "compiler.lisp"))
+(define compiler-sources '("reader.lisp" "opal.lisp" "codegen.lisp" "compiler.lisp"))
 
 ;;; Source
 
@@ -127,16 +127,25 @@
 
 ;; answers a vector of the four stages' listings, each a list of (label . text);
 ;; stage 3 is left installed
+;; Every stage generates code as the running compiler does when the bootstrap
+;; starts (code-generator: direct or opal, step 8.6). Installing a stage defines
+;; its own setting afresh, so the choice is put back after each install. The
+;; result records it in a fifth slot.
 (define (bootstrap-compiler dir)
   (let* ((base (gensym-counter))
+         (generator (code-generator))
          (m0 (stage-compile smalltalk-compile smalltalk-source dir base))
          (m1 (stage-compile lisp-compile lisp-source dir base)))
     (stage-install m1)                                  ; stage 2
+    (set-code-generator! generator)
     (let ((m2 (stage-compile lisp-compile lisp-source dir base)))
       (stage-install m2)                                ; stage 3
+      (set-code-generator! generator)
       (let ((m3 (stage-compile lisp-compile lisp-source dir base)))
         (gensym-counter! (+ (gensym-counter) 1))
-        (vector (stage-listings m0) (stage-listings m1) (stage-listings m2) (stage-listings m3))))))
+        (vector (stage-listings m0) (stage-listings m1) (stage-listings m2) (stage-listings m3) generator)))))
+
+(define (bootstrap-generator b) (vector-ref b 4))
 
 ;; the labels of the forms whose methods differ between stages i and j
 (define (bootstrap-differences b i j)
@@ -146,7 +155,10 @@
           ((string=? (cdr (car a)) (cdr (car c))) (loop (cdr a) (cdr c) acc))
           (else (loop (cdr a) (cdr c) (cons (car (car a)) acc))))))
 
+;; Stages 1, 2 and 3 make the same methods. Through Opal, stage 1 also makes what
+;; stage 0, the Smalltalk compiler, makes (8.4); the direct generator makes
+;; different code from Opal's, so there stage 0 is not compared (8.6).
 (define (bootstrap-fixpoint? b)
-  (and (null? (bootstrap-differences b 0 1))
+  (and (or (eq? (bootstrap-generator b) 'direct) (null? (bootstrap-differences b 0 1)))
        (null? (bootstrap-differences b 1 2))
        (null? (bootstrap-differences b 2 3))))

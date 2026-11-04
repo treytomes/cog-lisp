@@ -113,6 +113,10 @@ LispCompiler new evalFile: (root / 'lib' / 'core.lisp') fullName.
  loaded from source would then call."
 LispCompiler hasLispCompiler ifFalse: [LispCompiler installLispCompiler].
 compileForm := LispCompiler entries at: #compile.
+"Byte-identical is the 8.3 check of the translator: it holds through Opal. The
+ direct generator (step 8.6) makes different code, checked by every other suite
+ and the fixpoint, so this suite compiles through Opal."
+LispCompiler new evalString: '(set-code-generator!! (quote opal))'.
 
 "the comparison itself must see differences"
 h check: 'control: (+ 1 2) and (+ 1 3) differ'

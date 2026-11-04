@@ -51,7 +51,9 @@ corpus := String streamContents: [:s | | r d |
 	r := LispReader on: (root / 'tests' / 'bytecode-corpus.lisp') contents.
 	[(d := r next) == LispReader eofObject] whileFalse: [
 		s nextPutAll: '=== '; nextPutAll: (LispPrinter writeString: d); nextPut: Character lf.
-		dump value: (LispCompiler new compile: d) value: s]].
+		"the Smalltalk compiler's code (the corpus pins it; the LISP compiler's
+		 is compared with it byte for byte in tests/phase-8.3-compiler.st)"
+		dump value: (LispCompiler new smalltalkCompile: d context: nil) value: s]].
 h check: 'AC-2 the bytecode corpus is unchanged (tests/bytecode-corpus.expected)'
 	actual: corpus = (root / 'tests' / 'bytecode-corpus.expected') contents
 	expected: true.

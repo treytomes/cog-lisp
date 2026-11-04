@@ -1025,7 +1025,10 @@ cm value: prims class value: 'installing' value: 'installInlineFormsInto: anEnv
 	(e value: ''car'') inline: #(1 #send #car).
 	(e value: ''cdr'') inline: #(1 #send #cdr).
 	(e value: ''not'') inline: { 1. #identity. false }.
-	(e value: ''null?'') inline: { 1. #identity. LispEmptyList default }'.
+	(e value: ''null?'') inline: { 1. #identity. LispEmptyList default }.
+	"Phase 8 step 8.6: one send, not a call of the primitive"
+	(e value: ''pair?'') inline: #(1 #send #isLispPair).
+	(e value: ''symbol?'') inline: #(1 #send #isLispSymbol)'.
 cm value: prims class value: 'installing' value: 'installDefault
 	^ self installInto: LispEnvironment default'.
 cm value: prims class value: 'output' value: 'output

@@ -29,12 +29,23 @@ rst  := (Object << #LispRestart) slots: { #name. #action. #escape }; package: 'C
 rstvar := (DynamicVariable << #LispRestarts) package: 'CogLisp-Core'; install.
 
 "=== LispCore : type predicates (class-side) ==============================="
+"isLispPair and isLispSymbol answer false for everything but a pair and a symbol:
+ one send, where isKindOf: walks the class chain (Phase 8 step 8.6). pair? and
+ symbol? are inlined as these sends."
+cm value: Object value: '*CogLisp-Core' value: 'isLispPair
+	^ false'.
+cm value: Object value: '*CogLisp-Core' value: 'isLispSymbol
+	^ false'.
+cm value: LispCons value: 'testing' value: 'isLispPair
+	^ true'.
+cm value: LispSymbol value: 'testing' value: 'isLispSymbol
+	^ true'.
 cm value: core class value: 'predicates' value: 'isPair: v
-	^ v isKindOf: LispCons'.
+	^ v isLispPair'.
 cm value: core class value: 'predicates' value: 'isNull: v
 	^ v == LispEmptyList default'.
 cm value: core class value: 'predicates' value: 'isSymbol: v
-	^ v isKindOf: LispSymbol'.
+	^ v isLispSymbol'.
 cm value: core class value: 'predicates' value: 'isBoolean: v
 	^ (v == true) or: [v == false]'.
 cm value: core class value: 'predicates' value: 'isString: v
@@ -148,6 +159,11 @@ cm value: cell value: 'accessing' value: 'assign: aValue
 	^ aValue'.
 cm value: cell value: 'private' value: 'signalUnbound
 	^ (LispUnboundError new) symbol: symbol; signal: ''unbound variable: '' , symbol name'.
+cm value: cell value: 'accessing' value: 'key
+	"Code compiled by the LISP compiler reads a bound cell as a literal variable,
+	 as a binding is read (Phase 8 step 8.6); the tools that list such code ask the
+	 literal for its key."
+	^ symbol'.
 cm value: cell value: 'copying' value: 'frozenCopy
 	"A private cell with this one''s name and present value, in no environment: what
 	 sealed code reads instead (specs/phase-8-self-hosting.md step 8.5)."

@@ -24,13 +24,16 @@
   (check (run-form '(quasiquote (1 (unquote (+ 1 1)) (unquote-splicing (list 3 4))))) '(1 2 3 4))
   (check (run-form '[(smalltalk Array) with: 1 with: 2]) #(1 2)))
 
-(define-test "AC-3 the same code as the Smalltalk compiler"
+;; through Opal: the direct generator (step 8.6) makes different code
+(define-test "AC-3 the same code as the Smalltalk compiler, through Opal"
+  (set-code-generator! 'opal)
   (for-each (lambda (d) (check (lisp-listing d) (st-listing d)))
             '((+ 1 2)
               (define (fact n) (if (= n 0) 1 (* n (fact (- n 1)))))
               (lambda (x) (let loop ((i 0)) (if (< i x) (loop (+ i 1)) i)))
               (cond ((assq 'a '((a . 1))) => cdr) (else #f))
-              (send (smalltalk OrderedCollection) new))))
+              (send (smalltalk OrderedCollection) new)))
+  (set-code-generator! 'direct))
 
 (define-test "AC-3 lisp-eval defines, and procedures keep their source"
   (lisp-eval-string "(define (lc-test-square x)   ; a comment\n  (* x x))")

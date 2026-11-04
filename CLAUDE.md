@@ -273,6 +273,17 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   before optimizing: `MessageTally new spyEvery: 1 on: [...]`, then
   `leavesPrintExactOn:` (macros alone gave the reader 20%; these, 4x).
 - **`voidCogVMState` is on `Smalltalk vm`**, not `Smalltalk`, in Pharo 14.
+- **Since 8.6 the LISP compiler writes bytecode itself** (`lib/compiler/codegen.lisp`,
+  through Pharo's `EncoderForSistaV1`); `(set-code-generator! 'opal)` goes back to
+  Opal, whose output is byte-identical to the Smalltalk compiler's. Compare with
+  the Smalltalk compiler only through Opal. `EncoderForSistaV1` has `stream:`
+  but no getter; Pharo has no `isSmallInteger`.
+- **A bound global is read with `pushLiteralVariable`:** the VM reads a
+  `LispGlobal`'s second slot (`value`) as a binding's value. Keep `value` the
+  second slot, and keep cells from ever becoming unbound.
+- **Generator bugs show up compiling the compiler's own source.** Before
+  rebuilding the image (whose bootstrap runs the generator), compile every form
+  of `lib/compiler/*.lisp` with it in a stock image and list the failures.
 - **A Windows path inside generated LISP text is full of escapes** (`\U`, `\c`):
   build the datum (`LispCons fromArray: {...}`) instead of reading text.
 

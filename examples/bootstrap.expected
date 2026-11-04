@@ -1,6 +1,12 @@
-compiling ("reader.lisp" "opal.lisp" "compiler.lisp")
+compiling ("reader.lisp" "opal.lisp" "codegen.lisp" "compiler.lisp")
+through Opal:
   stage 1 vs stage 0: every method identical
   stage 2 vs stage 1: every method identical
   stage 3 vs stage 2: every method identical
-fixpoint: #t
+  fixpoint: #t
+writing bytecode itself:
+  stage 1 vs stage 0: different code, as expected
+  stage 2 vs stage 1: every method identical
+  stage 3 vs stage 2: every method identical
+  fixpoint: #t
 stage 3 compiled fib; (fib 20) = 6765

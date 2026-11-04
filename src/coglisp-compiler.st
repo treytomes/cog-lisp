@@ -1088,7 +1088,7 @@ cm value: comp class value: 'implementation' value: 'lispSourceDirectory
 cm value: comp class value: 'implementation' value: 'compilerSourceNames
 	"The compiler''s source, in lib/compiler/, in load order. bootstrap.lisp is the
 	 tool that compiles it to a fixpoint; it is not part of it, nor of the seal."
-	^ #(''reader.lisp'' ''opal.lisp'' ''compiler.lisp'')'.
+	^ #(''reader.lisp'' ''opal.lisp'' ''codegen.lisp'' ''compiler.lisp'')'.
 cm value: comp class value: 'implementation' value: 'installLispCompiler
 	"Load the LISP reader and compiler, compiled by this one (stage 0), seal them,
 	 and use them. The build does more: installLispCompilerWithFixpoint."
