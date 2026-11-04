@@ -14,7 +14,8 @@
   ],
   "main": "./src/extension.js",
   "activationEvents": [
-    "workspaceContains:cog-lisp.bat"
+    "workspaceContains:cog-lisp.bat",
+    "workspaceContains:cog-lisp.sh"
   ],
   "contributes": {
     "languages": [
@@ -87,7 +88,7 @@
         "cogLisp.root": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Folder holding `cog-lisp.bat` and `pharo\\`. Empty: the workspace folder that contains `cog-lisp.bat`."
+          "markdownDescription": "Folder holding `cog-lisp.bat` (Windows) or `cog-lisp.sh` (Linux) and `pharo/`: a checkout or an unpacked release. Empty: the workspace folder that contains it."
         },
         "cogLisp.warnStaleImage": {
           "type": "boolean",
@@ -127,7 +128,7 @@
           "absolute"
         ],
         "pattern": {
-          "regexp": "([A-Za-z]:[\\\\/][^:]*):(\\d+):(\\d+): error: (.*)$",
+          "regexp": "((?:[A-Za-z]:[\\\\/]|/)[^:]*):(\\d+):(\\d+): error: (.*)$",
           "file": 1,
           "line": 2,
           "column": 3,

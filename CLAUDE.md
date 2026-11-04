@@ -144,6 +144,44 @@ ame.bat`. The VS Code extension does this.
   is called in a session (e.g. `Smalltalk os`; use `OSPlatform current`), which
   corrupts program output. Byte-exact `.expected` checks catch it.
 
+## Linux, CI and releases (Phase 8.9)
+
+- **cog-lisp runs on Linux too.** The bash scripts find the VM through
+  `scripts/pharo-vm.sh`: `pharo/pharo` (the launcher in the Linux VM zip) on
+  Linux, `pharo/PharoConsole.exe` under Git Bash. `bootstrap-pharo.sh` picks the
+  VM zip by `uname -s`. Keep every `.bat`/`.sh` pair in step, now including
+  `tests/run-all.sh`, `tests/phase-5-runner.sh` and `bench/run-benchmarks.sh`.
+- **Linux stdin is different from Windows, and from itself.** From a pipe,
+  `Stdio stdin next:` blocks until data and answers 0 at the end. At a terminal it
+  answers 0 bytes at once with `atEnd` false, before input and after Ctrl+D
+  alike, so it cannot tell waiting from ended. `LispStdin` therefore reads all
+  Unix input with libc's `read(0, ...)` (uFFI, `libc.so.6`): it blocks, the
+  terminal does echo and line editing, and 0 means end. `isatty(0)` marks a
+  terminal (`#terminal`), which gets the break loop as a Windows console does.
+- **Test a terminal without a person:** `script -qfec "<command>" /dev/null`
+  gives it a pseudo-terminal; pipe in lines with `sleep`s between them, and
+  `printf '\004'` for Ctrl+D. The terminal echoes input and ends lines with CR LF
+  (`tr -d '\r'`). `tests/phase-5-runner.sh` does this on Linux.
+- **One image serves every platform:** an image built on Linux runs on the
+  Windows VM unchanged (checked by every release). So platform choices are made at
+  run time (`OSPlatform current isWindows`), never at build time.
+- **Docker is the local Linux:** there is no WSL. A container with the repository
+  mounted read-only and copied into `/work` (leave out `pharo/`, `.git`, `dist/`)
+  runs the bash scripts; copy the image zip from `pharo/downloads/` rather than
+  downloading it again (`files.pharo.org` is slow from inside a container here).
+  From PowerShell, write scripts to a file and `docker cp` them in: inline
+  quoting through `docker exec bash -c` breaks.
+- **Workflows:** `.github/workflows/ci.yml` (every push and pull request; also
+  called by the release), `release.yml` (a tag `vMAJOR.MINOR.PATCH[-suffix]`),
+  `benchmarks.yml` (by hand). Actions are pinned to commit SHAs: get a tag's
+  commit with `git ls-remote <repo> refs/tags/<tag>^{}` (the peeled line; the
+  plain one is the tag object for an annotated tag). Lint with
+  `docker run --rm -v <repo>:/repo:ro --workdir /repo rhysd/actionlint:latest`.
+- **Release bundles** come from `release/package.sh VERSION` (Linux, after the
+  build) and are checked by `release/smoke-test.sh DIR` on each platform. Git on
+  this machine has `core.fileMode false`: give a new `.sh` file its executable
+  bit with `git update-index --chmod=+x`.
+
 ## Timing and benchmarking (Pharo 14) — Phase 6
 
 - **The VM clock has millisecond resolution**, even through
@@ -343,7 +381,7 @@ This project follows spec-driven development: **write the spec before the code.*
   `PASS`/`FAIL` per check, and a final `RESULT: n/n` line.
 - Code changes reference the spec section they satisfy. If reality forces a
   deviation, update the spec first, then the code.
-- **Run everything with `tests\run-all.bat`** (about 2 m 10 s): each `tests\phase-*.st`
+- **Run everything with `tests\run-all.bat`** (about 2 m 10 s; `tests/run-all.sh` on Linux): each `tests\phase-*.st`
   in a fresh stock image, then `tests\phase-5-runner.bat` (which rebuilds
   `pharo\cog-lisp.image`), with a total; exit 0 only if all pass. Benchmarks are
   separate (`bench\run-benchmarks.bat`) and noisy when the machine is busy.

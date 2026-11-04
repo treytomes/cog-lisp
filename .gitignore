@@ -13,6 +13,10 @@ PharoDebug.log
 # The VM writes a minidump here when it aborts (e.g. at --maxOldSpaceSize).
 crash.dmp
 
+# --- Releases ----------------------------------------------------------------
+# release/package.sh writes the bundles here.
+/dist/
+
 # --- Editor / tooling --------------------------------------------------------
 # Workspace settings are shared (the .lisp association and the spelling
 # dictionary); anything else VS Code writes there stays local.

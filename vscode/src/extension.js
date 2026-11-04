@@ -15,24 +15,32 @@ const REPL_NAME = 'cog-lisp REPL';
 let replTerminal = null;
 let lastStaleWarning = 0;
 
-/** The folder holding cog-lisp.bat: the cogLisp.root setting, else the workspace folder that has it. */
+// The scripts the extension runs: the .bat files on Windows, the .sh files on
+// Linux (Phase 8.9). macOS is not supported yet.
+const WINDOWS = process.platform === 'win32';
+const SUPPORTED = WINDOWS || process.platform === 'linux';
+function script(name) { return name + (WINDOWS ? '.bat' : '.sh'); }
+
+/** The folder holding the cog-lisp script (a checkout or an unpacked release):
+ *  the cogLisp.root setting, else the workspace folder that has it. */
 function cogLispRoot() {
+  const launcher = script('cog-lisp');
   const configured = vscode.workspace.getConfiguration('cogLisp').get('root');
-  if (configured && fs.existsSync(path.join(configured, 'cog-lisp.bat'))) return configured;
+  if (configured && fs.existsSync(path.join(configured, launcher))) return configured;
   for (const folder of vscode.workspace.workspaceFolders || []) {
-    if (fs.existsSync(path.join(folder.uri.fsPath, 'cog-lisp.bat'))) return folder.uri.fsPath;
+    if (fs.existsSync(path.join(folder.uri.fsPath, launcher))) return folder.uri.fsPath;
   }
   return null;
 }
 
 function requireRoot() {
-  const root = cogLispRoot();
-  if (!root) {
-    vscode.window.showErrorMessage('cog-lisp: no cog-lisp.bat found. Open the cog-lisp repo, or set cogLisp.root.');
+  if (!SUPPORTED) {
+    vscode.window.showErrorMessage('cog-lisp: running programs needs Windows or Linux.');
     return null;
   }
-  if (process.platform !== 'win32') {
-    vscode.window.showErrorMessage('cog-lisp: running programs needs Windows (the runner reads stdin through Win32).');
+  const root = cogLispRoot();
+  if (!root) {
+    vscode.window.showErrorMessage('cog-lisp: no ' + script('cog-lisp') + ' found. Open the cog-lisp folder, or set cogLisp.root.');
     return null;
   }
   return root;
@@ -42,16 +50,18 @@ function requireRoot() {
  *  The script is named as .\x.bat: cmd may not search the current directory for a
  *  bare name (NoDefaultCurrentDirectoryInExePath), and a relative path keeps the
  *  command line free of the quotes cmd /c mangles when the root has spaces. */
-function scriptArgs(script, args) {
-  return ['/d', '/c', '.\\' + script, ...args];
+function scriptArgs(name, args) {
+  return ['/d', '/c', '.\\' + name, ...args];
 }
 
-/** A process run through cmd.exe from the repo root. */
-function scriptExecution(root, script, args) {
-  return new vscode.ProcessExecution('cmd.exe', scriptArgs(script, args), { cwd: root });
+/** A process that runs one of the scripts from the root: through cmd.exe on
+ *  Windows, through bash elsewhere. */
+function scriptExecution(root, name, args) {
+  if (WINDOWS) return new vscode.ProcessExecution('cmd.exe', scriptArgs(name, args), { cwd: root });
+  return new vscode.ProcessExecution('/bin/bash', [path.join(root, name), ...args], { cwd: root });
 }
 
-/** Run the active file with cog-lisp.bat as a task, so errors become problems. */
+/** Run the active file with the cog-lisp script as a task, so errors become problems. */
 async function runFile() {
   const editor = vscode.window.activeTextEditor;
   if (!editor) return;
@@ -69,13 +79,13 @@ async function runFile() {
     vscode.TaskScope.Workspace,
     'run ' + path.basename(file),
     'cog-lisp',
-    scriptExecution(root, 'cog-lisp.bat', [file]),
+    scriptExecution(root, script('cog-lisp'), [file]),
     ['$cog-lisp']);
   task.presentationOptions = { reveal: vscode.TaskRevealKind.Always, clear: true, focus: false };
   await vscode.tasks.executeTask(task);
 }
 
-/** Rebuild pharo\cog-lisp.image with build-image.bat (review T-3). */
+/** Rebuild pharo/cog-lisp.image with the build-image script (review T-3). */
 async function rebuildImage() {
   const root = requireRoot();
   if (!root) return;
@@ -84,14 +94,15 @@ async function rebuildImage() {
     vscode.TaskScope.Workspace,
     'build image',
     'cog-lisp',
-    scriptExecution(root, 'build-image.bat', []),
+    scriptExecution(root, script('build-image'), []),
     []);
   task.presentationOptions = { reveal: vscode.TaskRevealKind.Always, clear: true };
   await vscode.tasks.executeTask(task);
 }
 
 function replOptions(root) {
-  return { name: REPL_NAME, shellPath: 'cmd.exe', shellArgs: scriptArgs('cog-lisp.bat', []), cwd: root };
+  if (WINDOWS) return { name: REPL_NAME, shellPath: 'cmd.exe', shellArgs: scriptArgs('cog-lisp.bat', []), cwd: root };
+  return { name: REPL_NAME, shellPath: '/bin/bash', shellArgs: [path.join(root, 'cog-lisp.sh')], cwd: root };
 }
 
 /** The REPL terminal, started if there is none (one per window). */

@@ -1,5 +1,7 @@
 # cog-lisp
 
+[![CI](https://github.com/treytomes/cog-lisp/actions/workflows/ci.yml/badge.svg)](https://github.com/treytomes/cog-lisp/actions/workflows/ci.yml)
+
 An **image-based LISP** that compiles to **Cog/Spur bytecode** and runs
 JIT-native inside a Pharo image.
 
@@ -37,7 +39,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 7.8 | Strings, characters, vectors & hash tables | ✅ **done** — [spec](specs/phase-7.8-native-data.md), 58/58, [examples](examples/tiny-reader.lisp) |
 | 7.9 | Self-hosting groundwork | ✅ **done** — [spec](specs/phase-7.9-self-hosting-groundwork.md), 46/46, LISP unit tests ([`lib/test.lisp`](lib/test.lisp)); all suites 948/948 |
 | 8 | Self-hosting (meta-circular) | ✅ **done** — [spec](specs/phase-8-self-hosting.md); 8.1 tests in LISP, 8.2 reader and 8.3 compiler in LISP, 8.4 the compiler compiles itself to a fixpoint, 8.5 the LISP reader and compiler are the ones in use, 8.6 it writes bytecode itself, compiling 2.1× faster than Phase 7.9 ([`lib/compiler/`](lib/compiler/), examples [read-yourself](examples/read-yourself.lisp), [compile-yourself](examples/compile-yourself.lisp), [extend-the-compiler](examples/extend-the-compiler.lisp), [bootstrap](examples/bootstrap.lisp), [sealed-compiler](examples/sealed-compiler.lisp)) done; all suites 2506/2506, with either compiler |
-| — | CI/CD: tests on every push; image and VS Code extension built for tagged releases | ⬜ planned (see below) |
+| 8.9 | CI/CD, and running on Linux | ✅ **done** — [spec](specs/phase-8.9-ci-cd.md); every push tested on Linux (both compilers) and Windows; a `v*` tag publishes Linux and Windows bundles and the `.vsix` |
 | 9 | Pure Lisp image (with the numeric tower and hygienic macros) | ⬜ |
 
 Phase 0 is proven, not just planned: [`poc/answer.st`](poc/answer.st) builds
@@ -46,12 +48,21 @@ and a branching `max` — runs them, disassembles the branch to real SistaV1
 bytecode, and JIT-hammers one. 6/6 checks pass. The backend the rest of the
 project targets is validated against the live image.
 
+## Installing a release
+
+Each [release](https://github.com/treytomes/cog-lisp/releases) has a bundle for
+Linux and one for Windows (x86-64), with the Pharo VM, the cog-lisp image, the
+LISP library and the examples: unpack it and run `./cog-lisp.sh` (Linux) or
+`cog-lisp.bat` (Windows). The VS Code extension is the release's `.vsix`.
+`INSTALL.md` in the bundle has the details.
+
 ## Getting started
 
-One-time setup: download the Pharo VM and stock image, then build the cog-lisp
+To build from a checkout instead, on Windows or Linux. One-time setup: download the Pharo VM and stock image, then build the cog-lisp
 image from `src\` (rerun the build after changing anything in `src\`,
-`lib\core.lisp` or `lib\compiler\`). Each script has a bash equivalent for Git Bash
-(`bootstrap-pharo.sh`, `build-image.sh`, `cog-lisp.sh`):
+`lib\core.lisp` or `lib\compiler\`). Each script has a bash equivalent, for Linux
+and for Git Bash on Windows (`bootstrap-pharo.sh`, `build-image.sh`,
+`cog-lisp.sh`, `tests/run-all.sh`); on Linux, use those:
 
 ```bat
 bootstrap-pharo.bat
@@ -103,11 +114,16 @@ stderr as `path:line:col: error: …`), or whatever it passes to `(exit n)`. The
 
 ### Running the tests
 
-Run every suite (about 30 seconds) with:
+Run every suite (about 2 minutes) with:
 
 ```bat
 tests\run-all.bat
 ```
+
+or `tests/run-all.sh` on Linux. GitHub Actions runs them on every push, on Linux
+with both compilers and on Windows ([`ci.yml`](.github/workflows/ci.yml)); pushing
+a tag `vMAJOR.MINOR.PATCH` builds and publishes a release
+([`release.yml`](.github/workflows/release.yml)).
 
 The in-image suites run headless against the stock image, for example:
 
@@ -279,8 +295,11 @@ implementation of Phases 1–4 (and macros from Phase 7).
   itself to a fixpoint (the compiler built by stage 2 produces byte-identical
   output to the one built by stage 3).
 
-### After Phase 8: CI/CD (numbered when specified)
-A GitHub Actions pipeline on a Windows runner:
+### Phase 8.9 — CI/CD, and running on Linux ✅
+[Spec](specs/phase-8.9-ci-cd.md). cog-lisp runs on Linux as well as Windows (the
+console and stdin layer reads through libc there), and GitHub Actions tests and
+releases it, on Linux runners with a Windows job beside them. The plan before the
+spec, for the record, was a pipeline on a Windows runner:
 - **On every push and pull request:** bootstrap Pharo (cached), then
   `tests\run-all.bat` and the VS Code extension's `npm test`.
 - **On a tagged release:** build `cog-lisp.image` (with its `.changes`) and the

@@ -37,7 +37,13 @@ shell := (ClapApplication << #LispShellCommand) sharedVariables: { #BuildTime };
  editing. That blocks the VM until a line is entered, which is what a REPL
  waiting at its prompt wants.
  Bytes are decoded as UTF-8 one complete line at a time, so a partly received
- character is never decoded early."
+ character is never decoded early.
+ On Linux (Phase 8.9) Pharo's stdin is no better at a terminal: reads answer 0
+ bytes at once and atEnd stays false, before input and after Ctrl+D alike. So
+ every kind of input is read with libc's read(0, ...): it blocks until there is
+ data, a terminal in canonical mode gives a line at a time with its own echo and
+ line editing, and it answers 0 at end of input (Ctrl+D, a closed pipe, the end
+ of a file). isatty(0) tells a terminal (#terminal) from the rest (#unix)."
 cm value: stdin class value: 'win32' value: 'readConsole: h buffer: b size: n read: r control: c
 	^ self ffiCall: #(int ReadConsoleW(void* h, void* b, uint32 n, void* r, void* c)) module: ''kernel32.dll'''.
 cm value: stdin class value: 'instance creation' value: 'onConsoleHandle: aHandle
@@ -75,6 +81,10 @@ cm value: stdin value: 'private' value: 'utf16: bytes count: n
 				out nextPut: (Character value: unit).
 				i := i + 1]].
 	^ out contents'.
+cm value: stdin class value: 'unix' value: 'unixRead: fd into: buffer count: n
+	^ self ffiCall: #(long read(int fd, void* buffer, ulong n)) module: ''libc.so.6'''.
+cm value: stdin class value: 'unix' value: 'unixIsatty: fd
+	^ self ffiCall: #(int isatty(int fd)) module: ''libc.so.6'''.
 cm value: stdin class value: 'win32' value: 'getStdHandle: n
 	^ self ffiCall: #(void* GetStdHandle(long n)) module: ''kernel32.dll'''.
 cm value: stdin class value: 'win32' value: 'getFileType: h
@@ -88,7 +98,10 @@ cm value: stdin value: 'initialization' value: 'initialize
 	pending := OrderedCollection new.
 	eof := false.
 	kind := #unknown.
-	OSPlatform current isWindows ifFalse: [^ self].
+	OSPlatform current isWindows ifFalse: [
+		[kind := (self class unixIsatty: 0) = 1 ifTrue: [#terminal] ifFalse: [#unix]]
+			on: Error do: [:e | kind := #unknown].
+		^ self].
 	[handle := self class getStdHandle: -10.
 	 type := self class getFileType: handle.
 	 kind := type = 1 ifTrue: [#file] ifFalse: [
@@ -97,6 +110,22 @@ cm value: stdin value: 'initialization' value: 'initialize
 		on: Error do: [:e | kind := #unknown]'.
 cm value: stdin value: 'accessing' value: 'kind
 	^ kind'.
+cm value: stdin value: 'testing' value: 'isInteractive
+	"A person types the input: a Windows console or a Unix terminal. The REPL
+	 offers a break loop only then (Phase 7.7)."
+	^ kind = #console or: [kind = #terminal]'.
+cm value: stdin value: 'private' value: 'readUnix
+	"Block until read(0, ...) answers. More than 0 bytes are queued; 0 is the end
+	 of input. -1 is an error: retried a few times (a signal can interrupt a
+	 read), then taken as the end."
+	| buffer n tries |
+	buffer := ByteArray new: 4096.
+	tries := 0.
+	[n := [self class unixRead: 0 into: buffer count: buffer size] on: Error do: [:e | -1].
+	 n < 0 and: [(tries := tries + 1) < 10]] whileTrue: [(Delay forMilliseconds: 10) wait].
+	n > 0
+		ifTrue: [pending addAll: (buffer first: n)]
+		ifFalse: [eof := true]'.
 cm value: stdin value: 'private' value: 'noInputMeansEnd
 	"Called when a read found no bytes. Answer whether input has really ended."
 	kind = #console ifTrue: [^ false].
@@ -109,6 +138,9 @@ cm value: stdin value: 'private' value: 'waitForInput
 	| chunk |
 	kind = #console ifTrue: [
 		[pending isEmpty and: [eof not]] whileTrue: [self readConsoleLine].
+		^ self].
+	(kind = #terminal or: [kind = #unix]) ifTrue: [
+		[pending isEmpty and: [eof not]] whileTrue: [self readUnix].
 		^ self].
 	[pending isEmpty and: [eof not]] whileTrue: [
 		chunk := Stdio stdin next: 4096.
@@ -244,7 +276,8 @@ cm value: shell value: 'running' value: 'warnIfStale
 	srcDir exists ifFalse: [^ self].
 	(srcDir filesMatching: ''*.st'') detect: [:f | f modificationTime > built] ifFound: [:f |
 		LispTextOutput stderr
-			nextPutAll: ''warning: '' , f basename , '' is newer than this image; run build-image.bat to rebuild'';
+			nextPutAll: ''warning: '' , f basename , '' is newer than this image; run build-image.'' ,
+				(OSPlatform current isWindows ifTrue: [''bat''] ifFalse: [''sh'']) , '' to rebuild'';
 			nextPut: Character lf; flush]'.
 cm value: shell class value: 'memory' value: 'memoryLimit
 	"Bytes of heap a program may grow to before it is stopped with an error (review
@@ -278,11 +311,11 @@ cm value: shell value: 'memory' value: 'withMemoryLimit: limit do: aBlock
 cm value: shell value: 'running' value: 'runRepl
 	self withMemoryLimitDo: [ | stdin |
 		stdin := LispStdin new.
-		"a break loop only at a console; piped and file input report and go on"
+		"a break loop only at a console or a terminal; piped and file input report and go on"
 		(LispRepl
 			in: stdin
 			out: LispTextOutput stdout
-			err: LispTextOutput stderr) interactive: stdin kind = #console; run].
+			err: LispTextOutput stderr) interactive: stdin isInteractive; run].
 	Smalltalk exit: 0'.
 cm value: shell value: 'running' value: 'runFile: aPath
 	aPath isNil ifTrue: [^ self fail: ''no program file given''].

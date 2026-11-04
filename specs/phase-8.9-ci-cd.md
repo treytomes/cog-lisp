@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-11-04): the leanings of section 8 are the decisions |
+| **Status** | Implemented (2026-11-04), except AC-4/5/7 on GitHub (they need a push and a tag) and AC-10 (the owner's install) |
 | **Depends on** | Phase 8 (complete) |
 | **Replaces** | README "After Phase 8: CI/CD", which assumed a Windows runner |
 
@@ -163,3 +163,43 @@ hand (`workflow_dispatch`) and upload `results.md` as an artifact.
    between 7 and 8.
 5. **macOS:** out of scope (the VM exists, but there is no machine to verify it
    on). The `.sh` scripts and Unix stdio code should make it a small follow-up.
+
+## 9. As implemented
+
+- **Linux stdin was measured, not assumed.** In a container with the Linux VM:
+  from a pipe, `Stdio stdin next:` blocks until data and answers 0 at the end (as
+  `LispStdin` already assumed off Windows), so pipes and files worked unchanged.
+  At a terminal it answers 0 bytes at once with `atEnd` false, before input and
+  after Ctrl+D alike: the REPL printed its prompt and ended. libc's `read(0, ...)`
+  blocks at a terminal, answers each line as typed (UTF-8 intact), and 0 on Ctrl+D;
+  fd 0 is in blocking mode. So all Unix input goes through `read` (section 3.1's
+  fallback became the only Unix path), and `isatty(0)` marks a terminal, which
+  gets the break loop as a Windows console does (`LispStdin>>isInteractive`).
+  Output needed nothing: `LispTextOutput` already wrote UTF-8 off Windows.
+- **Scripts.** `scripts/pharo-vm.sh` finds the VM for the bash scripts;
+  `bootstrap-pharo.sh` picks the VM zip by platform; new `tests/run-all.sh`,
+  `tests/phase-5-runner.sh` and `bench/run-benchmarks.sh` match their `.bat`
+  files. Programs run without input get `/dev/null` as stdin, so a suite never
+  waits on a terminal.
+- **The first Linux run passed 2505 of 2508.** One failure was the new runner's
+  own bug; the other two were `examples/program/lib/util.lisp`, whose `file-name`
+  split paths on `\` only. Now 2509/2509 on Linux both ways (the extra check is
+  the REPL at a pseudo-terminal: echo, UTF-8, the break loop, Ctrl+D), and
+  2506/2506 on Windows, where that check does not run.
+- **One image, both platforms, checked.** A test release built in the container:
+  the Linux bundle passes `release/smoke-test.sh` (32/32: every example, piped
+  REPL input), and the Windows bundle, holding the image built on Linux, passes
+  it on Windows (33/33, including `cog-lisp.bat`).
+- **The VS Code extension** runs `cog-lisp.sh`/`build-image.sh` through bash
+  off Windows, activates on either launcher, finds an unpacked release as well as
+  a checkout, and its problem matcher accepts Linux paths (two new checks).
+- **Workflows** (`ci.yml`, `release.yml`, `benchmarks.yml`) pass `actionlint`.
+  `release.yml` reuses `ci.yml`, builds once on Linux, tests each bundle on its
+  own platform, then publishes with `gh release create` (pre-release for a tag
+  with a suffix). The `.vsix` takes the tag's version.
+- **Licenses.** The Pharo zips carry no license files, so the bundles have
+  `THIRD-PARTY-NOTICES.md` pointing to the Pharo and pharo-vm repositories (MIT)
+  and to the libraries the VM folder ships. cog-lisp itself has no LICENSE file
+  yet: the owner's decision.
+- Not yet checked: AC-4 and AC-5 (a push to GitHub), AC-7 (a tag), AC-10 (the
+  owner's install on a Linux laptop).

@@ -1,0 +1,93 @@
+# cog-lisp CI (specs/phase-8.9-ci-cd.md section 4.1): every suite on Linux with
+# both compilers, every suite on Windows, and the VS Code extension's tests, on
+# every push and pull request. release.yml calls this workflow before it builds a
+# release. Actions are pinned to commits; the version is in the comment.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux (${{ matrix.compiler }} compiler)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [lisp, smalltalk]
+    env:
+      COGLISP_COMPILER: ${{ matrix.compiler == 'smalltalk' && 'smalltalk' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Cache the Pharo downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: pharo/downloads
+          key: pharo-linux-${{ hashFiles('bootstrap-pharo.sh') }}
+      - name: Bootstrap Pharo
+        run: ./bootstrap-pharo.sh
+      - name: Run every suite
+        env:
+          COGLISP_TEST_OUTPUT: ${{ runner.temp }}/coglisp-run-all
+        run: tests/run-all.sh
+      - name: Keep the suite outputs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-output-linux-${{ matrix.compiler }}
+          path: ${{ runner.temp }}/coglisp-run-all
+
+  windows:
+    name: Windows
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Cache the Pharo downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: pharo\downloads
+          key: pharo-windows-${{ hashFiles('bootstrap-pharo.bat') }}
+      - name: Bootstrap Pharo
+        shell: cmd
+        run: bootstrap-pharo.bat
+      - name: Run every suite
+        shell: cmd
+        run: tests\run-all.bat
+      - name: Keep the suite outputs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-output-windows
+          path: ${{ runner.temp }}\coglisp-run-all
+
+  vscode:
+    name: VS Code extension
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: vscode
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - name: The extension packages
+        run: npm run package

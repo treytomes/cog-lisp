@@ -32,6 +32,12 @@ check('a path with spaces',
 check('a message containing colons',
   'C:\\p\\a.lisp:1:1: error: let: bad binding: (x)',
   { file: 'C:\\p\\a.lisp', line: '1', column: '1', message: 'let: bad binding: (x)' });
+check('a Linux path (Phase 8.9)',
+  '/home/me/cog-lisp/examples/hello.lisp:4:3: error: car: not a pair: 5',
+  { file: '/home/me/cog-lisp/examples/hello.lisp', line: '4', column: '3', message: 'car: not a pair: 5' });
+check('a Linux path after program output on the same line',
+  'Hello from cog-lisp!/home/me/x.lisp:2:1: error: unbound variable: x',
+  { file: '/home/me/x.lisp', line: '2', column: '1', message: 'unbound variable: x' });
 check('an unlocated error is not a problem', 'error: no program file given', null);
 check('ordinary output is not a problem', 'Hello from cog-lisp!', null);
 

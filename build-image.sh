@@ -10,13 +10,14 @@ set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PHARO="$ROOT/pharo"
-VM="$PHARO/PharoConsole.exe"
+. "$ROOT/scripts/pharo-vm.sh"
+VM="$(pharo_vm "$PHARO")"
 
 STOCK=""
 for f in "$PHARO"/Pharo*.image; do
   [ -f "$f" ] && { STOCK="$f"; break; }
 done
-if [ -z "$STOCK" ] || [ ! -f "$VM" ]; then
+if [ -z "$STOCK" ] || [ -z "$VM" ]; then
   echo "build-image: no stock Pharo image or VM under pharo/ - run bootstrap-pharo.sh first" >&2
   exit 1
 fi

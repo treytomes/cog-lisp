@@ -10,13 +10,13 @@ A thin extension for working on cog-lisp in VS Code
 - **Brackets and comments**: matching and auto-closing `()`, `""` and `#| |#`;
   *Toggle Line Comment* uses `;`.
 - **cog-lisp: Run File** (the ▷ button in the editor title): runs the file with
-  `cog-lisp.bat` in a task. An error (`path:line:col: error: message`) appears in
+  `cog-lisp.bat` (Windows) or `cog-lisp.sh` (Linux) in a task. An error (`path:line:col: error: message`) appears in
   *Problems* and is underlined in the file.
 - **cog-lisp: Start REPL**: the REPL in an integrated terminal, one per window.
   Also offered as the *cog-lisp REPL* terminal profile.
 - **cog-lisp: Send Selection or Form to REPL** (Ctrl+Enter): sends the selection,
   or else the top-level form at the cursor.
-- **cog-lisp: Rebuild Image**: runs `build-image.bat`. The extension also warns
+- **cog-lisp: Rebuild Image**: runs `build-image.bat` or `build-image.sh` (in a checkout). The extension also warns
   when `src\*.st`, `lib\core.lisp` or `lib\compiler\*.lisp` is newer than `pharo\cog-lisp.image` and
   offers to rebuild (setting `cogLisp.warnStaleImage`).
 
@@ -26,7 +26,8 @@ that the cog-lisp image serves itself (§5.4), not for this extension.
 
 `.lisp` is associated with cog-lisp only in this workspace
 (`.vscode/settings.json`), so a Common Lisp extension elsewhere is unaffected.
-Running programs needs Windows, as cog-lisp's runner does.
+Running programs works on Windows and Linux (Phase 8.9), in a checkout or in an
+unpacked release; macOS is not supported yet.
 
 ## Build, test, install
 

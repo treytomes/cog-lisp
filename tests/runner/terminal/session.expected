@@ -1,0 +1,8 @@
+> (+ 1 2)
+3
+> (display "λ café")
+λ café> (car 5)
+error: car: not a pair: 5
+restarts: abort
+1> (abort)
+> 

@@ -148,7 +148,8 @@ corpus add: (String with: Character tab with: (Character value: 12) with: Charac
 corpus keysAndValuesDo: [:i :src | compare value: 'AC-2 feature #' , i printString value: src].
 
 "AC-2 every .lisp file in the repository (all but the VM and node_modules)"
-skip := [:f | (f pathString includesSubstring: 'node_modules') or: [(f relativeTo: root) segments first = 'pharo']].
+"all but the VM, node_modules, and release bundles (copies of lib/ and examples/)"
+skip := [:f | (f pathString includesSubstring: 'node_modules') or: [#('pharo' 'dist') includes: (f relativeTo: root) segments first]].
 files := ((root allChildrenMatching: '*.lisp') reject: skip) asSortedCollection: [:x :y | x pathString <= y pathString].
 count := 0.
 files do: [:f |

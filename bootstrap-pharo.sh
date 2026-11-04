@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # ===========================================================================
 #  cog-lisp : Pharo bootstrap  (bash equivalent of bootstrap-pharo.bat)
-#  Downloads the stable Pharo VM + image for 64-bit Windows, extracts them
-#  into ./pharo/, and confirms the VM build and the image/system version.
+#  Downloads the stable 64-bit Pharo VM for this platform (Linux, or Windows
+#  under Git Bash) and the Pharo image, extracts them into ./pharo/, and
+#  confirms the VM build and the image/system version.
 #  Idempotent: cached zips are reused, so re-running is cheap.
-#  Runs under Git Bash on Windows (cog-lisp's shell uses Win32 calls for stdin,
-#  so Windows is the supported platform).
 # ===========================================================================
 set -u
 
@@ -15,9 +14,14 @@ PHARO_VERSION=140
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PHARO_DIR="$ROOT/pharo"
 DL_DIR="$PHARO_DIR/downloads"
-VM_ZIP="$DL_DIR/pharo-vm.zip"
+. "$ROOT/scripts/pharo-vm.sh"
+case "$COGLISP_PLATFORM" in
+  linux)   VM_ZIP="$DL_DIR/pharo-vm-linux.zip"; VM_OS=Linux ;;
+  windows) VM_ZIP="$DL_DIR/pharo-vm.zip"; VM_OS=Windows ;;
+  *) echo "bootstrap-pharo: unsupported platform $(uname -s) (Linux and Windows are)" >&2; exit 1 ;;
+esac
 IMG_ZIP="$DL_DIR/pharo-image.zip"
-VM_URL="https://files.pharo.org/get-files/$PHARO_VERSION/pharo-vm-Windows-x86_64-stable.zip"
+VM_URL="https://files.pharo.org/get-files/$PHARO_VERSION/pharo-vm-$VM_OS-x86_64-stable.zip"
 IMG_URL="https://files.pharo.org/get-files/$PHARO_VERSION/pharoImage-x86_64.zip"
 
 fail() {
@@ -71,9 +75,9 @@ extract "$VM_ZIP" "$PHARO_DIR" || fail
 echo "[xtr ] image -> pharo/"
 extract "$IMG_ZIP" "$PHARO_DIR" || fail
 
-# --- Locate the console VM exe (prefer PharoConsole.exe: it writes stdout) --
-VM_EXE="$(find "$PHARO_DIR" -name PharoConsole.exe -print -quit)"
-[ -n "$VM_EXE" ] || VM_EXE="$(find "$PHARO_DIR" -name Pharo.exe -print -quit)"
+# --- Locate the VM to run headless (Linux: the pharo launcher; Windows:
+#     PharoConsole.exe, which writes stdout) ---------------------------------
+VM_EXE="$(pharo_vm "$PHARO_DIR")"
 [ -n "$VM_EXE" ] || { echo "[err ] no Pharo VM executable found under pharo/"; fail; }
 
 # --- Locate the stock image file (not a built cog-lisp image) ---------------
@@ -98,7 +102,9 @@ echo "=== Image / system version ===============================================
 echo
 echo "=== OK ====================================================================="
 echo "Pharo $PHARO_VERSION is ready."
-echo "Launch the GUI with:"
-echo "    \"${VM_EXE%PharoConsole.exe}Pharo.exe\" \"$IMAGE\""
+if [ "$COGLISP_PLATFORM" = windows ]; then
+  echo "Launch the GUI with:"
+  echo "    \"${VM_EXE%PharoConsole.exe}Pharo.exe\" \"$IMAGE\""
+fi
 echo
 exit 0
