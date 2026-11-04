@@ -291,6 +291,12 @@ This project follows spec-driven development: **write the spec before the code.*
   in a fresh stock image, then `tests\phase-5-runner.bat` (which rebuilds
   `pharo\cog-lisp.image`), with a total; exit 0 only if all pass. Benchmarks are
   separate (`bench\run-benchmarks.bat`) and noisy when the machine is busy.
+- **Language behavior is tested in LISP** (Phase 8 step 8.1): `tests/lisp/*.lisp`
+  with `lib/test.lisp` (`define-test`, `check`, `check-error`, `check-written`,
+  `check-error-class`, `eval-all`, `run-tests`). Smalltalk suites are for what
+  LISP cannot test about itself: the reader and core, bytecode, options, REPL and
+  stdin plumbing, the `CogLisp` facade, the test framework's self-test. A new
+  LISP test file in `tests/lisp/` runs in `run-all.bat` with no other change.
 - **Suites use `tests/harness.st`** (`LispTestHarness`): file it in after the
   packages, then `h check:actual:expected:`, `h check:raises:do:`,
   `h check:raises:containing:do:` (or the `h checkBlock`-style blocks), and end

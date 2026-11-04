@@ -45,69 +45,79 @@ core := [:tag |
 out value: '== cog-lisp Phase 6 : tail calls & optimization =='.
 
 "AC-1 self tail calls run as loops, in constant stack"
-check value: 'AC-1 loop of 1,000,000' value: (ev value: '(define (loop n acc) (if (= n 0) acc (loop (- n 1) (+ acc 1)))) (loop 1000000 0)') value: 1000000.
+[ev value: '(define (loop n acc) (if (= n 0) acc (loop (- n 1) (+ acc 1)))) (loop 1000000 0)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
 check value: 'AC-1 stack depth constant across iterations'
 	value: (ev value: '(define (d n first) (if (= n 0) (list first (stack-depth)) (d (- n 1) (if (= n 1000) (stack-depth) first)))) (d 1000 0)') lispElements asSet size
 	value: 1.
 
 "AC-2 mutual tail calls use the trampoline, in constant stack"
-check value: 'AC-2 even?/odd? of 100,000' value: (ev value: '(define (ev? n) (if (= n 0) #t (od? (- n 1)))) (define (od? n) (if (= n 0) #f (ev? (- n 1)))) (ev? 100000)') value: true.
-check value: 'AC-2 stack depth constant'
-	value: (ev value: '(define (pe n) (if (= n 0) (stack-depth) (po (- n 1)))) (define (po n) (if (= n 0) (stack-depth) (pe (- n 1)))) (= (pe 10) (pe 10000))')
-	value: true.
+[ev value: '(define (ev? n) (if (= n 0) #t (od? (- n 1)))) (define (od? n) (if (= n 0) #f (ev? (- n 1)))) (ev? 100000)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (pe n) (if (= n 0) (stack-depth) (po (- n 1)))) (define (po n) (if (= n 0) (stack-depth) (pe (- n 1)))) (= (pe 10) (pe 10000))'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
 
 "AC-3 tail position through if, begin and let"
 check value: 'AC-3 if / begin / let in tail position, constant stack'
 	value: (ev value: '(define (b n samples) (begin 1 (let ((m (- n 1))) (if (= n 0) samples (b m (if (= n 500) (cons (stack-depth) samples) (if (= n 2) (cons (stack-depth) samples) samples))))))) (b 500 (list))') lispElements asSet size
 	value: 1.
-check value: 'AC-3 tail call from the else branch of a nested if'
-	value: (ev value: '(define (z n) (if (> n 0) (if (= n 1) (z 0) (z (- n 1))) (quote done))) (z 100000)')
-	value: (LispSymbol named: 'done').
+[ev value: '(define (z n) (if (> n 0) (if (= n 1) (z 0) (z (- n 1))) (quote done))) (z 100000)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
 
 "AC-4 non-tail calls are unaffected"
-check value: 'AC-4 fact 20' value: (ev value: '(define (fact n) (if (= n 0) 1 (* n (fact (- n 1))))) (fact 20)') value: 2432902008176640000.
-check value: 'AC-4 non-tail recursion grows the stack'
-	value: (ev value: '(define (nt n) (if (= n 0) (stack-depth) (+ 0 (nt (- n 1))))) (< (nt 10) (nt 100))')
-	value: true.
+[ev value: '(define (fact n) (if (= n 0) 1 (* n (fact (- n 1))))) (fact 20)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (nt n) (if (= n 0) (stack-depth) (+ 0 (nt (- n 1))))) (< (nt 10) (nt 100))'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
 
 "AC-5 redefinition: an old procedure that self-tail-calls its name reaches the new definition"
-check value: 'AC-5 redefinition followed'
-	value: (ev value: '(define (rf n) (if (= n 0) (quote old) (rf (- n 1)))) (define saved rf) (define (rf n) (quote new)) (saved 3)')
-	value: (LispSymbol named: 'new').
-check value: 'AC-5 unredefined still loops' value: (ev value: '(define (rg n) (if (= n 0) (quote ok) (rg (- n 1)))) (rg 100000)') value: (LispSymbol named: 'ok').
+[ev value: '(define (rf n) (if (= n 0) (quote old) (rf (- n 1)))) (define saved rf) (define (rf n) (quote new)) (saved 3)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (rg n) (if (= n 0) (quote ok) (rg (- n 1)))) (rg 100000)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
 
 "AC-6 a bounce never escapes through map, for-each or apply"
 ev value: '(define (inc x) (+ x 1))'.
-check value: 'AC-6 map' value: (ev value: '(map (lambda (x) (inc x)) ''(1 2 3))') value: (lst value: '(2 3 4)').
-check value: 'AC-6 apply' value: (ev value: '(apply (lambda (x y) (inc (+ x y))) ''(1 2))') value: 4.
-check value: 'AC-6 for-each' value: (ev value: '(define acc 0) (for-each (lambda (x) (set!! acc (inc (+ acc x)))) ''(1 2 3)) acc') value: 9.
-check value: 'AC-6 a procedure value returned from a tail call' value: (ev value: '(define (mk) (inc 1)) (mk)') value: 2.
-check value: 'AC-6 a tail call through apply runs in constant stack'
-	value: (ev value: '(define (ap n) (if (= n 0) (stack-depth) (apply ap (list (- n 1))))) (= (ap 10) (ap 10000))')
-	value: true.
-check value: 'AC-6 a tail call to a primitive returns its value' value: (ev value: '(define (tp a b) (+ a b)) (tp 2 3)') value: 5.
+
+[ev value: '(define acc 0) (for-each (lambda (x) (set!! acc (inc (+ acc x)))) ''(1 2 3)) acc'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (mk) (inc 1)) (mk)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (ap n) (if (= n 0) (stack-depth) (apply ap (list (- n 1))))) (= (ap 10) (ap 10000))'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (tp a b) (+ a b)) (tp 2 3)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
 
 "AC-7 errors still occur through fast calls and tail calls"
-checkErr value: 'AC-7 arity error, fast path' value: LispArityError value: [ev value: '((lambda (x) x) 1 2)'].
-checkErr value: 'AC-7 arity error, tail call' value: LispArityError value: [ev value: '(define (t1) ((lambda (x) x))) (t1)'].
-checkErr value: 'AC-7 not applicable, tail call' value: LispError value: [ev value: '(define (t2) (5 6)) (t2)'].
-checkErr value: 'AC-7 not applicable, fast path' value: LispError value: [ev value: '(5 6)'].
+
+[ev value: '(define (t1) ((lambda (x) x))) (t1)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (t2) (5 6)) (t2)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
 
 "AC-8 fast calls of every shape"
-check value: 'AC-8 zero arguments' value: (ev value: '((lambda () 7))') value: 7.
-check value: 'AC-8 four arguments' value: (ev value: '((lambda (a b c d) (list a b c d)) 1 2 3 4)') value: (lst value: '(1 2 3 4)').
-check value: 'AC-8 six arguments' value: (ev value: '((lambda (a b c d e f) (+ a b c d e f)) 1 2 3 4 5 6)') value: 21.
-check value: 'AC-8 variadic primitive' value: (ev value: '(list 1 2 3 4 5 6)') value: (lst value: '(1 2 3 4 5 6)').
-check value: 'AC-8 direct entries of variadic primitives agree with the general path'
-	value: (ev value: '(list (+ 7) (+ 1 2) (+ 1 2 3) (+ 1 2 3 4) (- 5) (- 10 3) (- 10 3 2) (* 3 4) (/ 8 2) (< 1 2) (< 1 3 2) (= 2 2) (> 1 2) (<= 2 2) (>= 1 2) (min 3 1) (max 3 1))')
-	value: (lst value: '(7 3 6 10 -5 7 5 12 4 #t #f #t #f #t #f 1 3)').
-checkErr value: 'AC-8 an entry still type-checks its arguments' value: Error value: [ev value: '(+ 1 (quote a))'].
 
 "AC-9 global cells"
-check value: 'AC-9 forward reference' value: (ev value: '(define (fwa) (fwb 4)) (define (fwb x) (* x 10)) (fwa)') value: 40.
-check value: 'AC-9 redefinition visible to compiled code' value: (ev value: '(define v 1) (define (get-v) v) (define v 2) (get-v)') value: 2.
-checkErr value: 'AC-9 unbound reference raises' value: LispUnboundError value: [ev value: '(define (bad) not-yet-defined-anywhere) (bad)'].
-checkErr value: 'AC-9 set-bang of unbound raises' value: LispUnboundError value: [ev value: '(set!! also-not-defined 1)'].
+[ev value: '(define (fwa) (fwb 4)) (define (fwb x) (* x 10)) (fwa)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define v 1) (define (get-v) v) (define v 2) (get-v)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (bad) not-yet-defined-anywhere) (bad)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(set!! also-not-defined 1)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
 check value: 'AC-9 environment API: lookup' value: (LispEnvironment default lookup: (LispSymbol named: 'v')) value: 2.
 check value: 'AC-9 environment API: a referenced-but-undefined name is not bound'
 	value: (LispEnvironment default isBound: (LispSymbol named: 'not-yet-defined-anywhere'))
@@ -117,37 +127,37 @@ check value: 'AC-9 environment API: at:ifAbsent: on an unbound cell'
 	value: #absent.
 
 "AC-10 quoted constants are literals"
-check value: 'AC-10 same object each evaluation' value: (ev value: '(define (k) ''(1 2)) (eq? (k) (k))') value: true.
+[ev value: '(define (k) ''(1 2)) (eq? (k) (k))'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
 
 "AC-11 let still scopes correctly"
-check value: 'AC-11 two bindings' value: (ev value: '(let ((x 1) (y 2)) (+ x y))') value: 3.
-check value: 'AC-11 bindings see the outer scope' value: (ev value: '(let ((x 1)) (let ((x 2) (y x)) y))') value: 1.
-check value: 'AC-11 five bindings' value: (ev value: '(let ((a 1) (b 2) (c 3) (d 4) (e 5)) (+ a b c d e))') value: 15.
-check value: 'AC-11 a fresh binding per evaluation'
-	value: (ev value: '(define (mk n acc) (if (= n 0) acc (mk (- n 1) (cons (let ((k n)) (lambda () k)) acc)))) (map (lambda (f) (f)) (mk 3 (list)))')
-	value: (lst value: '(1 2 3)').
+
+[ev value: '(define (mk n acc) (if (= n 0) acc (mk (- n 1) (cons (let ((k n)) (lambda () k)) acc)))) (map (lambda (f) (f)) (mk 3 (list)))'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
 
 "AC-19..23 guarded inlining of primitives (section 11)"
-check value: 'AC-19 every inline form gives the call result'
-	value: (ev value: '(list (+ 2 3) (- 2 3) (* 2 3) (= 2 2) (< 2 3) (> 2 3) (<= 3 3) (>= 2 3) (eq? (quote a) (quote a)) (car (cons 1 2)) (cdr (cons 1 2)) (not #f) (not 0) (null? (list)) (null? (list 1)))')
-	value: (lst value: '(5 -1 6 #t #t #f #t #f #t 1 2 #t #f #t #f)').
-check value: 'AC-19 inline form in tail position' value: (ev value: '(define (in-tail a b) (* a b)) (in-tail 6 7)') value: 42.
-check value: 'AC-19 nested inline forms' value: (ev value: '(define (poly x) (+ (* x (+ (* x 2) 3)) 4)) (poly 5)') value: 69.
-checkErr value: 'AC-19 an inlined form still type-checks' value: Error value: [ev value: '(define (bad-car x) (car x)) (bad-car 5)'].
-check value: 'AC-20 compiled with the primitive, then + is redefined'
-	value: (ev value: '(define (add2 a b) (+ a b)) (define orig-plus +) (define (+ a b) (quote plus)) (add2 1 2)')
-	value: (LispSymbol named: 'plus').
-check value: 'AC-21 compiled while + is redefined'
-	value: (ev value: '(define (add3 a b) (+ a b)) (add3 1 2)')
-	value: (LispSymbol named: 'plus').
-check value: 'AC-20 restoring + restores the result'
-	value: (ev value: '(define + orig-plus) (list (add2 1 2) (add3 1 2))')
-	value: (lst value: '(3 3)').
-check value: 'AC-19 a wide expression stays within the frame limit'
-	value: (ev value: '(define (wide p) (list (car p) (+ (car p) (cdr p)) (* (car p) (car p)) (- (cdr p) (car p)) (+ (car p) (car p)) (+ (cdr p) (cdr p)) (* (cdr p) (car p)) (+ (car p) (* 2 (cdr p))) (- (car p) (+ 1 (cdr p))) (+ (+ (car p) 1) (+ (cdr p) 1)) (* (+ (car p) 1) (- (cdr p) 1)) (+ (car p) (+ (car p) (+ (car p) (cdr p)))) (- (* (car p) 3) (* (cdr p) 2)) (+ (* (car p) (car p)) (* (cdr p) (cdr p))))) (wide (cons 2 3))')
-	value: (lst value: '(2 5 4 1 4 6 6 8 -2 7 6 9 0 13)').
-check value: 'AC-22 a local named + is not inlined' value: (ev value: '(let ((+ -)) (+ 5 3))') value: 2.
-check value: 'AC-22 a parameter named car is not inlined' value: (ev value: '((lambda (car x) (car x)) (lambda (v) (* v 10)) 4)') value: 40.
+
+[ev value: '(define (in-tail a b) (* a b)) (in-tail 6 7)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (poly x) (+ (* x (+ (* x 2) 3)) 4)) (poly 5)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (bad-car x) (car x)) (bad-car 5)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (add2 a b) (+ a b)) (define orig-plus +) (define (+ a b) (quote plus)) (add2 1 2)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (add3 a b) (+ a b)) (add3 1 2)'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define + orig-plus) (list (add2 1 2) (add3 1 2))'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
+[ev value: '(define (wide p) (list (car p) (+ (car p) (cdr p)) (* (car p) (car p)) (- (cdr p) (car p)) (+ (car p) (car p)) (+ (cdr p) (cdr p)) (* (cdr p) (car p)) (+ (car p) (* 2 (cdr p))) (- (car p) (+ 1 (cdr p))) (+ (+ (car p) 1) (+ (cdr p) 1)) (* (+ (car p) 1) (- (cdr p) 1)) (+ (car p) (+ (car p) (+ (car p) (cdr p)))) (- (* (car p) 3) (* (cdr p) 2)) (+ (* (car p) (car p)) (* (cdr p) (cdr p))))) (wide (cons 2 3))'] on: Error do: [:e | nil].
+"(the check itself moved to tests/lisp/phase-6-tail-calls.lisp)"
+
 ev value: '(define (inl a b) (+ a b))'.
 check value: 'AC-23 the compiled code contains the + send'
 	value: (((LispEnvironment default lookup: (LispSymbol named: 'inl')) block compiledBlock symbolic) includesSubstring: 'send: +')
@@ -158,7 +168,6 @@ core value: 'AC-12 all on:'.
 LispCompiler allOptions do: [:opt |
 	LispCompiler withoutOptions: { opt } do: [core value: 'AC-12 without ' , opt , ':']].
 check value: 'AC-12 options restored afterwards' value: LispCompiler defaultOptions size value: LispCompiler allOptions size.
-
 h finish
 ]
 	on: Error

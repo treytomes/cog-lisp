@@ -1,0 +1,413 @@
+# Checks moved from the Smalltalk suites to tests/lisp/ (Phase 8 step 8.1)
+phase-3-compiler: AC-1 42
+phase-3-compiler: AC-1 string
+phase-3-compiler: AC-1 #t
+phase-3-compiler: AC-1 #\a
+phase-3-compiler: AC-1 ()
+phase-3-compiler: AC-2 (quote x)
+phase-3-compiler: AC-2 'x
+phase-3-compiler: AC-3 '(1 2 3)
+phase-3-compiler: AC-3 '(1 . 2)
+phase-3-compiler: AC-4 global read
+phase-3-compiler: AC-5 unbound read signals
+phase-3-compiler: AC-6 (if #t 1 2)
+phase-3-compiler: AC-6 (if #f 1 2)
+phase-3-compiler: AC-6 (if 0 1 2) [0 truthy]
+phase-3-compiler: AC-7 (if #f 1) unspecified
+phase-3-compiler: AC-8 (begin 1 2 3)
+phase-3-compiler: AC-8 begin order
+phase-3-compiler: AC-9 ((lambda (x) x) 5)
+phase-3-compiler: AC-10 ((lambda (x y) (+ x y)) 2 3)
+phase-3-compiler: AC-12 closure capture
+phase-3-compiler: AC-13 let
+phase-3-compiler: AC-14 let shadowing
+phase-3-compiler: AC-15 define value
+phase-3-compiler: AC-16 define fn sugar
+phase-3-compiler: AC-17 global set!
+phase-3-compiler: AC-17 set! unbound signals
+phase-3-compiler: AC-18 local set!
+phase-3-compiler: AC-19 (fact 5)=120
+phase-3-compiler: AC-20 evalAll last
+phase-4-runtime: AC-1 procedure? of lambda
+phase-4-runtime: AC-2 fixed arity call
+phase-4-runtime: AC-2 wrong count signals LispArityError
+phase-4-runtime: AC-3 (lambda args args)
+phase-4-runtime: AC-3 (lambda (a . r) r)
+phase-4-runtime: AC-3 empty rest
+phase-4-runtime: AC-3 too few for variadic signals
+phase-4-runtime: AC-4 variadic define
+phase-4-runtime: AC-5 car of cons
+phase-4-runtime: AC-5 cdr of cons
+phase-4-runtime: AC-6 list
+phase-4-runtime: AC-6 length
+phase-4-runtime: AC-6 null? of (list)
+phase-4-runtime: AC-7 append
+phase-4-runtime: AC-7 reverse
+phase-4-runtime: AC-8 set-car
+phase-4-runtime: AC-8 set-cdr
+phase-4-runtime: AC-9 map square
+phase-4-runtime: AC-10 (+ 1 2 3)
+phase-4-runtime: AC-10 (+)
+phase-4-runtime: AC-10 (* 2 3 4)
+phase-4-runtime: AC-10 (*)
+phase-4-runtime: AC-11 (- 5)
+phase-4-runtime: AC-11 (- 10 3 2)
+phase-4-runtime: AC-12 (< 1 2 3)
+phase-4-runtime: AC-12 (< 1 3 2)
+phase-4-runtime: AC-12 (= 2 2 2)
+phase-4-runtime: AC-13 (modulo 7 3)
+phase-4-runtime: AC-13 (quotient 7 2)
+phase-4-runtime: AC-13 (zero? 0)
+phase-4-runtime: AC-14 equal? lists
+phase-4-runtime: AC-14 eq? symbols
+phase-4-runtime: AC-14 (not #f)
+phase-4-runtime: AC-14 (not 0)
+phase-4-runtime: AC-15 number?
+phase-4-runtime: AC-15 symbol?
+phase-4-runtime: AC-15 procedure? car
+phase-4-runtime: AC-16 (apply + (list 1 2 3))
+phase-4-runtime: AC-17 (5 6) signals LispError
+phase-4-runtime: AC-18 (sum (1 2 3 4 5)) = 15
+phase-4-runtime: AC-19 compose = 25
+phase-4-runtime: AC-20 fact 5
+phase-4-runtime: AC-20 closure capture
+phase-5-shell: AC-17 bind and compare
+phase-5-shell: AC-17 unspecified is truthy
+phase-5-shell: AC-17 unbound still raises LispUnboundError
+phase-5-shell: AC-15 load of a missing file raises
+phase-5-shell: AC-19 an anonymous lambda keeps its own text
+phase-5-shell: AC-19 a nested lambda keeps its own text
+phase-5-shell: AC-19 value-form define keeps the lambda text
+phase-5-shell: AC-20 primitives have no source
+phase-5-shell: AC-20 source text is a string
+phase-6-tail-calls: AC-1 loop of 1,000,000
+phase-6-tail-calls: AC-2 even?/odd? of 100,000
+phase-6-tail-calls: AC-2 stack depth constant
+phase-6-tail-calls: AC-3 tail call from the else branch of a nested if
+phase-6-tail-calls: AC-4 fact 20
+phase-6-tail-calls: AC-4 non-tail recursion grows the stack
+phase-6-tail-calls: AC-5 redefinition followed
+phase-6-tail-calls: AC-5 unredefined still loops
+phase-6-tail-calls: AC-6 map
+phase-6-tail-calls: AC-6 apply
+phase-6-tail-calls: AC-6 for-each
+phase-6-tail-calls: AC-6 a procedure value returned from a tail call
+phase-6-tail-calls: AC-6 a tail call through apply runs in constant stack
+phase-6-tail-calls: AC-6 a tail call to a primitive returns its value
+phase-6-tail-calls: AC-7 arity error, fast path
+phase-6-tail-calls: AC-7 arity error, tail call
+phase-6-tail-calls: AC-7 not applicable, tail call
+phase-6-tail-calls: AC-7 not applicable, fast path
+phase-6-tail-calls: AC-8 zero arguments
+phase-6-tail-calls: AC-8 four arguments
+phase-6-tail-calls: AC-8 six arguments
+phase-6-tail-calls: AC-8 variadic primitive
+phase-6-tail-calls: AC-8 direct entries of variadic primitives agree with the general path
+phase-6-tail-calls: AC-8 an entry still type-checks its arguments
+phase-6-tail-calls: AC-9 forward reference
+phase-6-tail-calls: AC-9 redefinition visible to compiled code
+phase-6-tail-calls: AC-9 unbound reference raises
+phase-6-tail-calls: AC-9 set-bang of unbound raises
+phase-6-tail-calls: AC-10 same object each evaluation
+phase-6-tail-calls: AC-11 two bindings
+phase-6-tail-calls: AC-11 bindings see the outer scope
+phase-6-tail-calls: AC-11 five bindings
+phase-6-tail-calls: AC-11 a fresh binding per evaluation
+phase-6-tail-calls: AC-19 every inline form gives the call result
+phase-6-tail-calls: AC-19 inline form in tail position
+phase-6-tail-calls: AC-19 nested inline forms
+phase-6-tail-calls: AC-19 an inlined form still type-checks
+phase-6-tail-calls: AC-20 compiled with the primitive, then + is redefined
+phase-6-tail-calls: AC-21 compiled while + is redefined
+phase-6-tail-calls: AC-20 restoring + restores the result
+phase-6-tail-calls: AC-19 a wide expression stays within the frame limit
+phase-6-tail-calls: AC-22 a local named + is not inlined
+phase-6-tail-calls: AC-22 a parameter named car is not inlined
+phase-7-macros: AC-2 unquote and splice
+phase-7-macros: AC-2 dotted tail
+phase-7-macros: AC-2 splice at the end
+phase-7-macros: AC-2 splice of the empty list
+phase-7-macros: AC-2 constant template
+phase-7-macros: AC-2 unquote of a local
+phase-7-macros: AC-2 splice of a non-list is an error
+phase-7-macros: AC-2 splice outside a list is an error
+phase-7-macros: AC-3 only level-0 unquotes run
+phase-7-macros: AC-4 cons and append redefined
+phase-7-macros: AC-5 swap! on globals
+phase-7-macros: AC-5 swap! on locals
+phase-7-macros: AC-6 a macro expanding into macro calls
+phase-7-macros: AC-6 a user macro over a core macro
+phase-7-macros: AC-6 a macro used inside a lambda
+phase-7-macros: AC-7 self loop through cond
+phase-7-macros: AC-7 mutual recursion through cond, constant stack
+phase-7-macros: AC-7 mutual recursion through and / or
+phase-7-macros: AC-8 macroexpand-1 of when
+phase-7-macros: AC-8 macroexpand-1 expands once
+phase-7-macros: AC-8 macroexpand expands the top repeatedly
+phase-7-macros: AC-8 a non-macro form is unchanged
+phase-7-macros: AC-8 an atom is unchanged
+phase-7-macros: AC-9 two gensyms differ
+phase-7-macros: AC-9 a gensym macro does not capture a user variable
+phase-7-macros: AC-9 core or does not capture either
+phase-7-macros: AC-10 let-bound when is a variable
+phase-7-macros: AC-10 let-bound when is called
+phase-7-macros: AC-10 a lambda parameter shadows
+phase-7-macros: AC-11 a macro used as a value
+phase-7-macros: AC-11 define-macro inside a body
+phase-7-macros: AC-11 define-macro inside an expression
+phase-7-macros: AC-11 an expander error names the macro
+phase-7-macros: AC-12 eval of a built list
+phase-7-macros: AC-12 eval of a quasiquoted form
+phase-7-macros: AC-12 eval of a define
+phase-7-macros: AC-13 internal defines in a lambda body
+phase-7-macros: AC-13 mutually recursive local procedures
+phase-7-macros: AC-13 internal defines do not leak
+phase-7-macros: AC-13 ... and are not global
+phase-7-macros: AC-13 internal defines in a let body
+phase-7-macros: AC-13 internal define with set!
+phase-7-macros: AC-13 local procedure as a closure
+phase-7-macros: AC-13 a define after an expression is an error
+phase-7-macros: AC-13 a macro expanding to define makes a local
+phase-7-macros: AC-13 ... not a global
+phase-7-macros: AC-13 ... and keeps the macro call text
+phase-7-macros: AC-13 a macro expanding to several defines (begin is spliced)
+phase-7-macros: AC-13 ... not globals
+phase-7-macros: AC-13 a begin of defines at the start of a body
+phase-7-macros: AC-13 a local define shadows a macro in later forms
+phase-7-macros: AC-13 a define inside an expression is an error
+phase-7-macros: AC-13 a macro define after an expression is an error
+phase-7-macros: AC-13 top level: a begin of defines is still global
+phase-7-macros: AC-14 cond
+phase-7-macros: AC-14 cond else
+phase-7-macros: AC-14 cond test only
+phase-7-macros: AC-14 cond =>
+phase-7-macros: AC-14 case
+phase-7-macros: AC-14 case else
+phase-7-macros: AC-14 case on symbols
+phase-7-macros: AC-14 and
+phase-7-macros: AC-14 or
+phase-7-macros: AC-14 (and) and (or)
+phase-7-macros: AC-14 when
+phase-7-macros: AC-14 unless
+phase-7-macros: AC-14 let*
+phase-7-macros: AC-14 let* with no bindings
+phase-7-macros: AC-14 letrec
+phase-7-macros: AC-14 letrec*
+phase-7-macros: AC-14 named let
+phase-7-macros: AC-14 do
+phase-7-macros: AC-14 do with a body and a stepless variable
+phase-7-macros: AC-15 and stops at the first false
+phase-7-macros: AC-15 or stops at the first true
+phase-7-macros: AC-15 or evaluates its operand once
+phase-7-macros: AC-16 named let 100,000
+phase-7-macros: AC-16 do 100,000
+phase-7-macros: AC-16 named let sum
+phase-7-macros: AC-17 a procedure defined by a user macro keeps the call text
+phase-7-macros: AC-17 ... and still works
+phase-7-macros: AC-17 an internal define keeps its text
+phase-7-macros: AC-18 defun
+phase-7-macros: AC-18 defun keeps its text
+phase-7-macros: AC-18 defun with &rest
+phase-7-macros: AC-18 defmacro and defvar
+phase-7-macros: AC-18 defparameter
+phase-7-macros: AC-18 setq with pairs
+phase-7-macros: AC-18 progn and prog1
+phase-7-macros: AC-18 dolist
+phase-7-macros: AC-18 dotimes
+phase-7-macros: AC-18 labels
+phase-7-macros: AC-18 flet
+phase-7-macros: AC-18 push and pop
+phase-7-macros: AC-18 mapcar
+phase-7-macros: AC-18 funcall
+phase-7-macros: AC-18 nth and nthcdr
+phase-7-macros: AC-18 first second third rest last
+phase-7-macros: AC-18 predicates
+phase-7-macros: AC-18 cond with null and t
+phase-7-macros: regression: closures in a self-loop capture each iteration
+phase-7-macros: regression: ... with a set! inside the loop
+phase-7.5-review: R-2 car of a number
+phase-7.5-review: R-2 car of the empty list
+phase-7.5-review: R-2 set-car! of a number
+phase-7.5-review: R-2 length of a number
+phase-7.5-review: R-2 map over a non-list
+phase-7.5-review: R-2 assq over a non-list
+phase-7.5-review: R-2 arithmetic on a string
+phase-7.5-review: R-2 division by zero
+phase-7.5-review: R-9 length of a dotted list is an error
+phase-7.5-review: R-9 apply of a dotted list is an error
+phase-7.5-review: R-9 append keeps an improper last argument
+phase-7.5-review: R-9 append of () and an atom is the atom
+phase-7.5-review: R-9 append shares its last argument
+phase-7.5-review: R-9 append with no arguments
+phase-7.5-review: R-4 length of a circular list is an error, not a hang
+phase-7.5-review: R-7 arity message names the procedure
+phase-7.5-review: R-7 arity message for a primitive
+phase-7.5-review: R-7 arity message for a variadic procedure
+phase-7.5-review: C-6 well-formed forms still compile
+phase-7.5-review: C-7 deep but finite expansion still works
+phase-7.5-review: C-1 arguments are all evaluated before any is assigned
+phase-7.5-review: C-1 a non-tail self call inside an argument
+phase-7.5-review: C-12 a macro in a self-tail-call argument expands once
+phase-7.5-review: C-8 redefining a local procedure with set! mid-loop is followed
+phase-7.5-review: C-8 a name rebound in the body is not a self call
+phase-7.5-review: C-8 closures made in a named let keep each iteration
+phase-7.5-review: C-9 set! of a parameter
+phase-7.5-review: C-9 a closure over a set! variable still sees updates
+phase-7.5-review: C-10 named let source
+phase-7.5-review: C-11 define-macro in a top-level begin, used later in it
+phase-7.5-review: C-11 a macro that defines two macros
+phase-7.5-review: C-11 an empty top-level begin
+phase-7.5-review: C-3 splices between runs
+phase-7.5-review: C-3 a dotted unquote tail
+phase-7.5-review: C-3 nested levels still right
+phase-7.5-review: O-1 four-argument arithmetic
+phase-7.5-review: O-1 chained comparisons
+phase-7.5-review: R-4 list? of a circular list is #f
+phase-7.5-review: R-4 list? still right on proper and dotted lists
+phase-7.5-review: R-12 eqv? tells 0.0 from -0.0
+phase-7.6-interop: AC-1 unary
+phase-7.6-interop: AC-1 binary
+phase-7.6-interop: AC-1 keyword
+phase-7.6-interop: AC-1 a send in tail position answers its value
+phase-7.6-interop: AC-1 an inlined selector runs the real method
+phase-7.6-interop: AC-1 and: with a LISP block
+phase-7.6-interop: AC-4 receiver then arguments, left to right, once
+phase-7.6-interop: AC-5 brackets evaluate
+phase-7.6-interop: AC-8 smalltalk-global of an unknown name
+phase-7.6-interop: AC-9 with a LISP symbol
+phase-7.6-interop: AC-9 with a string
+phase-7.6-interop: AC-9 with a Smalltalk symbol
+phase-7.6-interop: AC-10 smalltalk-nil?
+phase-7.6-interop: AC-10 nil is true in if
+phase-7.6-interop: AC-10 a method answering nil
+phase-7.6-interop: AC-11 round trip
+phase-7.6-interop: AC-11 a Smalltalk symbol is neither string? nor symbol?
+phase-7.6-interop: AC-12 array->list
+phase-7.6-interop: AC-12 the empty list
+phase-7.6-interop: AC-12 array->list of an Interval
+phase-7.6-interop: AC-12 list->array of an improper list is an error
+phase-7.6-interop: AC-14 collect:
+phase-7.6-interop: AC-14 select:
+phase-7.6-interop: AC-14 inject:into: with a primitive
+phase-7.6-interop: AC-14 detect:ifNone:
+phase-7.6-interop: AC-14 sort:
+phase-7.6-interop: AC-14 at:ifAbsent:
+phase-7.6-interop: AC-14 arity is checked
+phase-7.6-interop: AC-15 collect: with a tail-calling procedure
+phase-7.6-interop: AC-16 on:do: with LISP block and handler
+phase-7.6-interop: AC-16 the handler gets the exception
+phase-7.6-interop: AC-16 no error: the block's value
+phase-7.6-interop: AC-16 ensure: runs the cleanup
+phase-7.6-interop: AC-19 an unknown message
+phase-7.7-conditions: AC-1 message and written irritants
+phase-7.7-conditions: AC-1 accessors
+phase-7.7-conditions: AC-1 no irritants
+phase-7.7-conditions: AC-2 a raised symbol
+phase-7.7-conditions: AC-2 a raised list
+phase-7.7-conditions: AC-2 car of a number
+phase-7.7-conditions: AC-2 division by zero
+phase-7.7-conditions: AC-2 a send not understood
+phase-7.7-conditions: AC-2 =>
+phase-7.7-conditions: AC-2 else
+phase-7.7-conditions: AC-2 no matching clause reaches the outer guard
+phase-7.7-conditions: AC-2 uncaught, a raise is reported
+phase-7.7-conditions: AC-3 the body's value when nothing is raised
+phase-7.7-conditions: AC-3 the innermost guard catches first
+phase-7.7-conditions: AC-4 raise-continuable resumes with the handler's value
+phase-7.7-conditions: AC-4 the handler runs before unwinding: dynamic-wind after has not run
+phase-7.7-conditions: AC-4 returning from a plain raise is an error
+phase-7.7-conditions: AC-4 a raise in the handler goes to the next handler out
+phase-7.7-conditions: AC-5 condition?
+phase-7.7-conditions: AC-5 read-error?
+phase-7.7-conditions: AC-5 file-error?
+phase-7.7-conditions: AC-5 condition-report
+phase-7.7-conditions: AC-7 normal exit
+phase-7.7-conditions: AC-7 an error unwinding to a guard: after runs before the clause
+phase-7.7-conditions: AC-7 a restart unwinding through it
+phase-7.7-conditions: AC-8 a restart from a handler gives the restart-case its value
+phase-7.7-conditions: AC-8 several arguments
+phase-7.7-conditions: AC-8 no restart invoked: the form's value
+phase-7.7-conditions: AC-8 the restart body runs after unwinding (its own restarts are gone)
+phase-7.7-conditions: AC-9 find-restart
+phase-7.7-conditions: AC-9 find-restart of none
+phase-7.7-conditions: AC-9 invoke-restart of an inactive restart
+phase-7.7-conditions: AC-9 a restart object, used after its restart-case ended
+phase-7.7-conditions: AC-10 through on: Error do: and ensure:
+phase-7.7-conditions: AC-11 use-value
+phase-7.7-conditions: AC-11 store-value
+phase-7.7-conditions: AC-11 ... defines the global
+phase-7.7-conditions: AC-16 handler-case by type
+phase-7.7-conditions: AC-16 handler-case with no matching type passes it on
+phase-7.7-conditions: AC-16 handler-bind declines by returning, then an outer handler acts
+phase-7.7-conditions: AC-16 handler-bind choosing a restart
+phase-7.7-conditions: AC-16 ignore-errors
+phase-7.7-conditions: AC-16 unwind-protect
+phase-7.8-native-data: AC-1 char->integer, integer->char (lambda)
+phase-7.8-native-data: AC-1 comparisons, chained
+phase-7.8-native-data: AC-1 classes
+phase-7.8-native-data: AC-1 case and digits
+phase-7.8-native-data: AC-2 make-string, string, length, ref
+phase-7.8-native-data: AC-2 substring and string-copy with optional ranges
+phase-7.8-native-data: AC-2 append, ->list, list->
+phase-7.8-native-data: AC-2 symbols
+phase-7.8-native-data: AC-2 comparisons
+phase-7.8-native-data: AC-2 conveniences
+phase-7.8-native-data: AC-2 number->string
+phase-7.8-native-data: AC-3 string-set! on a made string
+phase-7.8-native-data: AC-3 a wide character into a byte string
+phase-7.8-native-data: AC-3 fill! and copy!
+phase-7.8-native-data: AC-3 string-set! on a literal is an error
+phase-7.8-native-data: AC-4 numbers and not
+phase-7.8-native-data: AC-5 self-evaluating, quoted or not
+phase-7.8-native-data: AC-5 equal? and eqv?
+phase-7.8-native-data: AC-6 construct and inspect
+phase-7.8-native-data: AC-6 conversions with ranges
+phase-7.8-native-data: AC-6 set!, fill!, map, for-each
+phase-7.8-native-data: AC-6 vector-set! on a literal is an error
+phase-7.8-native-data: AC-6 list->array is still there and makes a vector
+phase-7.8-native-data: AC-7 unquote and splicing
+phase-7.8-native-data: AC-7 a constant vector template
+phase-7.8-native-data: AC-7 nested in a list
+phase-7.8-native-data: AC-8 equal? keys
+phase-7.8-native-data: AC-8 eq? table: distinct strings are different keys
+phase-7.8-native-data: AC-8 eqv? table: numbers by value, 1 and 1.0 differ
+phase-7.8-native-data: AC-8 ref with a thunk, and missing
+phase-7.8-native-data: AC-8 missing without a default is an error
+phase-7.8-native-data: AC-8 insertion order of keys, values, alist
+phase-7.8-native-data: AC-8 update!, update!/default, delete!, count, clear!
+phase-7.8-native-data: AC-8 walk, copy, alist->hash-table, printing
+phase-7.8-native-data: AC-8 an unsupported equality
+phase-7.8-native-data: AC-9 read-char, peek-char, read-line, eof
+phase-7.8-native-data: AC-9 read-string
+phase-7.8-native-data: AC-9 read several datums, then eof
+phase-7.8-native-data: AC-9 output port: display, write, write-char, newline
+phase-7.8-native-data: AC-9 with-output-to-string
+phase-7.8-native-data: AC-9 the eof object prints
+phase-7.8-native-data: AC-9 read without a port reads the current input (none here: eof; Phase 7.9)
+phase-7.8-native-data: AC-10 guard catches them
+phase-7.8-native-data: AC-11 a LISP vector is a Smalltalk Array
+phase-7.8-native-data: AC-11 strings unchanged
+phase-7.9-groundwork: AC-3 20 plus a rest parameter
+phase-7.9-groundwork: AC-3 arity is checked
+phase-7.9-groundwork: AC-3 a 20-parameter procedure tail-calling itself 100000 times
+phase-7.9-groundwork: AC-4 write, then read lines and data
+phase-7.9-groundwork: AC-4 read-char and peek-char on a file
+phase-7.9-groundwork: AC-4 with-output-to-file and with-input-from-file
+phase-7.9-groundwork: AC-4 file-exists? and delete-file
+phase-7.9-groundwork: AC-4 a missing file is a file-error
+phase-7.9-groundwork: AC-4 open-output-file and close-port
+phase-7.9-groundwork: AC-8 equal cyclic lists
+phase-7.9-groundwork: AC-8 different cyclic lists
+phase-7.9-groundwork: AC-8 a cyclic vector
+phase-7.9-groundwork: AC-8 long acyclic lists unchanged
+phase-7.9-groundwork: AC-9 a cyclic list
+phase-7.9-groundwork: AC-9 a cyclic vector
+phase-7.9-groundwork: AC-9 a list whose car is itself
+phase-7.9-groundwork: AC-9 two cycles
+phase-7.9-groundwork: AC-9 sharing alone is not labelled by write
+phase-7.9-groundwork: AC-9 read of a label round-trips
+phase-7.9-groundwork: AC-9 a labelled vector reads back
+phase-7.9-groundwork: AC-10 \x...; reads any character
+phase-7.9-groundwork: AC-10 \a and \b
+phase-7.9-groundwork: AC-10 control characters write as \x..;
+phase-7.9-groundwork: AC-10 and read back

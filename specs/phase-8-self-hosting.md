@@ -184,9 +184,32 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
 
 | Step | Status |
 |---|---|
-| 8.1 Tests in LISP | not started |
+| 8.1 Tests in LISP | **done** — 412 checks moved to `tests/lisp/phase-*.lisp` (list: `tests/lisp/moved-checks.txt`); the total stays 948/948, suite by suite |
 | 8.2 Reader in LISP | not started |
 | 8.3 Compiler in LISP | not started |
 | 8.4 Bootstrap and fixpoint | not started |
 | 8.5 Switch-over | not started |
 | 8.6 Direct code generation | not started |
+
+## 12. As implemented
+
+### Step 8.1
+- `tests/lisp/convert-suites.py` moved every check that only evaluates LISP and
+  compares the result (or expects an error) from the Phase 3–7.9 suites into
+  `tests/lisp/phase-N.lisp`, one `define-test` per check, named by its label
+  (spec references kept). 412 checks moved; 5 that depend on running inside a
+  Smalltalk test (a top-level `abort` restart and a load path exist under the
+  runner; one needs a Smalltalk-side definition) stayed. The script is kept as
+  the record of the move; it is not meant to be run again.
+- **Definitions travel both ways.** A check that stays in Smalltalk but defines
+  something is copied into the LISP file as a setup; a check that moves but
+  defines something stays behind in the suite as a guarded setup. That keeps
+  every suite's state as it was.
+- **`lib/test.lisp` gained what the moved checks need:** `eval-all` (compile and
+  run a string at top level through the compiler, so procedures keep their source
+  text), `check-written`, `check-error-class`; `define-test` now compiles its body
+  when the test runs (a test can use macros defined by earlier tests); and the
+  framework holds its own references to `+`, `display`, … so a test that
+  redefines one cannot break the reporting.
+- Checks that compile LISP at test time (definitions, expected compile errors,
+  source retention) are written as `(eval-all "…")`; the rest as plain code.
