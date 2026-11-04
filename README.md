@@ -256,6 +256,10 @@ Opal IR — in the language itself, bootstrapped by the Smalltalk-hosted
 implementation of Phases 1–4 (and macros from Phase 7).
 - The Smalltalk-hosted compiler compiles the cog-lisp-written compiler once; from
   then on the system compiles its own source.
+- **Compile speed to 2×** (accepted at 1.3× in Phase 7.9, owner 2026-11-04): a
+  compiler written in LISP can emit IR or bytecode directly instead of going
+  through Opal's AST, semantic analysis and code generation, which take three
+  quarters of compile time today.
 - This is the real proof the language is complete: it can express its own
   front end and code generator.
 - *Acceptance:* the self-hosted reader and compiler reproduce the Smalltalk-hosted
