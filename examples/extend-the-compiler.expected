@@ -1,0 +1,3 @@
+total after (repeat 5 ...): 50
+hello hello 
+error: twice: bad syntax: (twice 1 2)

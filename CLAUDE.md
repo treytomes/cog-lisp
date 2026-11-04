@@ -253,6 +253,23 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   name any of them. Since Phase 7.5 a package that fails to compile a method
   signals an error at the end of its file-in, so the build and the suites stop.
 
+## Writing the compiler in LISP (Phase 8)
+
+- **cog-lisp has no `list-ref`, and `for-each` takes one list** (`for-each:
+  expected 2 arguments, got 3`). `map`'s order is not guaranteed by R7RS;
+  `lib/compiler/` uses its own strictly left-to-right `lc-map` and `lc-map2`.
+- **The LISP compiler's errors hide its own bugs.** As in `LispCompiler>>compile:`,
+  an unexpected error while translating becomes `bad syntax: <form>`, so a bug in
+  `lib/compiler/*.lisp` (an unbound helper, say) shows only as "bad syntax" on
+  every form. To see the real error, call the translator directly:
+  `(lc-translate (make-lisp-compiler) '<form> (scope-new) #f)`.
+- **Comparing compilers needs one gensym counter.** Both compilers expand the
+  macros in a form; reset `LispPrimitives classPool at: #GensymCounter` before
+  each, or gensym names differ (`tests/phase-8.3-compiler.st`).
+- **Order is output:** temp names `l1`, `l2`, … appear in the bytecode listing,
+  so the LISP compiler must make names and translate forms in exactly the
+  Smalltalk method's order.
+
 ## Verified Opal / IRBuilder API (Pharo 14, build 788)
 
 Memory of this API is unreliable across versions — these were confirmed live:
@@ -287,7 +304,7 @@ This project follows spec-driven development: **write the spec before the code.*
   `PASS`/`FAIL` per check, and a final `RESULT: n/n` line.
 - Code changes reference the spec section they satisfy. If reality forces a
   deviation, update the spec first, then the code.
-- **Run everything with `tests\run-all.bat`** (about 1 m 40 s): each `tests\phase-*.st`
+- **Run everything with `tests\run-all.bat`** (about 2 m 30 s): each `tests\phase-*.st`
   in a fresh stock image, then `tests\phase-5-runner.bat` (which rebuilds
   `pharo\cog-lisp.image`), with a total; exit 0 only if all pass. Benchmarks are
   separate (`bench\run-benchmarks.bat`) and noisy when the machine is busy.

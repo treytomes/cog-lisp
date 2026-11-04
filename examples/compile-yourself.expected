@@ -1,0 +1,22 @@
+compiled: a CompiledMethod
+(square 12) = 144
+bytecode of the method:
+  57 <10> pushLit: LispProcedure
+  58 <21> pushConstant: [ ] in UndefinedObject>>#doIt
+  59 <51> pushConstant: 1
+  60 <22> pushConstant: '(lambda (x) (* x x))'
+  61 <EA 1B> send: fixed:arity:source:
+  63 <5C> returnTop
+same as the Smalltalk compiler: (#t #t #t)
+(cube 3) = 27
+how the compiler translates if:
+(define (lc-translate-if c form scope tail)
+  (let ((args (lc-items (cdr form))))
+    (when (< (length args) 2) (lc-error "if needs a test and a then-branch"))
+    (let* ((test-node (lc-translate c (car args) scope #f))
+           (then-node (lc-translate c (car (cdr args)) scope tail))
+           (else-node (if (>= (length args) 3)
+                          (lc-translate c (car (cdr (cdr args))) scope tail)
+                          (lc-unspecified-node)))
+           (truthy (opal-send (opal-var "LispCore") "isTruthy:" (vector test-node))))
+      (opal-send truthy "ifTrue:ifFalse:" (vector (opal-thunk then-node) (opal-thunk else-node))))))

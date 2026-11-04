@@ -26,7 +26,7 @@ ok := [LispPrimitives installDefault.
 	  "the derived forms (cond, and, or, let*, do, ...) -- specs/phase-7-macros.md section 7"
 	  LispCompiler new evalFile: (Smalltalk imageDirectory parent / 'lib' / 'core.lisp') fullName.
 	  "the reader and compiler written in LISP -- specs/phase-8-self-hosting.md section 3"
-	  #('reader.lisp') do: [:name |
+	  #('reader.lisp' 'opal.lisp' 'compiler.lisp') do: [:name |
 		LispCompiler new evalFile: (Smalltalk imageDirectory parent / 'lib' / 'compiler' / name) fullName].
 	  "defines nothing, so the image ships with only the primitives, core.lisp and lib/compiler bound"
 	  ((LispCompiler new evalString: '((lambda (n) (* n n)) 7)') = 49)

@@ -186,7 +186,7 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
 |---|---|
 | 8.1 Tests in LISP | **done** — 412 checks moved to `tests/lisp/phase-*.lisp` (list: `tests/lisp/moved-checks.txt`); the total stays 948/948, suite by suite |
 | 8.2 Reader in LISP | **done** — `lib/compiler/reader.lisp`, built into the image; matches `LispReader` on 52 Phase 1 inputs, 88 feature and error inputs and all 59 `.lisp` files (`tests/phase-8.2-reader.st`, 204 checks); 57 LISP unit tests; 1211/1211 in all |
-| 8.3 Compiler in LISP | not started |
+| 8.3 Compiler in LISP | **done** — `lib/compiler/opal.lisp` and `compiler.lisp`, built into the image; byte-identical to `LispCompiler` on the corpus (also with each optimization off), 37 path forms, 36 malformed forms and every top-level form of `lib/` and `examples/` (`tests/phase-8.3-compiler.st`, 1032 checks); 25 LISP unit tests; 2278/2278 in all |
 | 8.4 Bootstrap and fixpoint | not started |
 | 8.5 Switch-over | not started |
 | 8.6 Direct code generation | not started |
@@ -257,3 +257,57 @@ Settled 2026-11-04 (owner sign-off); the spec is Accepted on these.
   the text's `ReadStream` by `send`, and table lookups for character classes.
 - `tests\run-all.bat` now takes about 1 m 40 s on this machine (the runner 27 s,
   the LISP tests 16 s, this suite 10 s).
+
+### Step 8.3
+- **Two files.** `lib/compiler/opal.lisp` builds Opal nodes through interop
+  (`opal-literal`, `opal-var`, `opal-assign`, `opal-send` with its own template
+  cache, `opal-block`, `opal-thunk`, `opal-brace`, `opal-method-node`,
+  `opal-generate`, `opal-run`). `lib/compiler/compiler.lisp` has one procedure
+  per `LispCompiler` method, in the same order, named after it (`lc-translate-if`
+  is `translateIf:inScope:tail:`).
+- **The state is a vector** passed first, where the Smalltalk has `self`; a scope
+  is a Smalltalk `IdentityDictionary`, as there. Unwinding uses Smalltalk's own
+  `ensure:`, `ifCurtailed:` and `on:do:` through interop, so a compile error
+  restores state exactly as in the Smalltalk compiler.
+- **Order is part of the output.** Temporary names (`l1`, `l2`, …) appear in the
+  generated code, so every name and every translation is made in the Smalltalk
+  method's order: `let*` and a strictly left-to-right `lc-map`, never `map`.
+- **Special forms are a LISP table** (`define-special-form`), as
+  `LispCompiler class>>specialForms` is a Smalltalk one; adding a form needs no
+  Smalltalk (`examples/extend-the-compiler.lisp`).
+- **Interface.** `(compile-form datum [source-map [context]])` answers a
+  `CompiledMethod`, as `compile:context:` (`source-map` a LISP or Smalltalk
+  reader); `(lisp-eval datum [source-map])` evaluates as `eval:` does, a
+  top-level `begin` or macro call form by form; `(lisp-eval-string s)` reads with
+  the LISP reader and evaluates each form, so procedures keep their text.
+- **One deliberate difference: which errors pass through.** The Smalltalk
+  compiler turns a host error during translation into "bad syntax" but lets any
+  `LispError` through. The LISP compiler lets only `LispCompileError` through,
+  since a primitive's `LispError` (`car: not a pair`) raised inside the compiler
+  plays the part a host error does there. The malformed-form corpus shows the
+  messages agree.
+- **The comparison** (`tests/phase-8.3-compiler.st`) compiles each form with both
+  compilers and compares them as the bytecode corpus does: the `symbolic`
+  listing of the method and of every block in its literals, or the error. Each
+  compiler starts from the same gensym counter, since both expand the macros in
+  the form. Forms of `lib/` and `examples/` are visited as `eval` sees them (a
+  `begin`'s forms and a macro call's expansion are top-level forms), with the
+  reader as source map; definitions run, so later forms compile in the same
+  world, but nothing else does (examples read input and write files).
+- **The forms written for the compiler's limits found a bug** the corpus and the
+  834 library forms did not: a `let` of more than 15 bindings, where
+  `for-each` was called with two lists (cog-lisp's takes one).
+- **Speed: 1.26× the Smalltalk compiler** (57 ms against 45 ms for the 29 forms
+  of the compile benchmark), because Opal's semantic analysis and code
+  generation dominate both. Within AC-7's 1.5× already, before reading.
+- **For 8.5: the compiler's procedures are globals.** A program that redefines
+  `append` or `cons` (as `tests/lisp/phase-7-macros.lisp` does) would change the
+  compiler once it compiles everything. Macros do not matter (the compiler is
+  compiled before they are defined); procedure calls through global cells do.
+  8.5 needs the compiler's own references bound to the primitives it was built
+  with.
+- Examples: `examples/compile-yourself.lisp` (compile, run, disassemble, compare
+  with the Smalltalk compiler, read the compiler's own source) and
+  `examples/extend-the-compiler.lisp` (a `repeat` special form, and one that
+  rejects bad syntax).
+- `tests\run-all.bat` takes about 2 m 30 s (this suite about 25 s).

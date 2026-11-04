@@ -36,7 +36,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 7.7 | Conditions & restarts | ✅ **done** — [spec](specs/phase-7.7-conditions-restarts.md), 54/54, [examples](examples/restarts.lisp) |
 | 7.8 | Strings, characters, vectors & hash tables | ✅ **done** — [spec](specs/phase-7.8-native-data.md), 58/58, [examples](examples/tiny-reader.lisp) |
 | 7.9 | Self-hosting groundwork | ✅ **done** — [spec](specs/phase-7.9-self-hosting-groundwork.md), 46/46, LISP unit tests ([`lib/test.lisp`](lib/test.lisp)); all suites 948/948 |
-| 8 | Self-hosting (meta-circular) | 🟨 in progress — [spec](specs/phase-8-self-hosting.md); 8.1 tests in LISP and 8.2 reader in LISP ([`lib/compiler/reader.lisp`](lib/compiler/reader.lisp), [example](examples/read-yourself.lisp)) done; all suites 1211/1211 |
+| 8 | Self-hosting (meta-circular) | 🟨 in progress — [spec](specs/phase-8-self-hosting.md); 8.1 tests in LISP, 8.2 reader and 8.3 compiler in LISP ([`lib/compiler/`](lib/compiler/), examples [read-yourself](examples/read-yourself.lisp), [compile-yourself](examples/compile-yourself.lisp), [extend-the-compiler](examples/extend-the-compiler.lisp)) done; all suites 2278/2278 |
 | — | CI/CD: tests on every push; image and VS Code extension built for tagged releases | ⬜ planned (see below) |
 | 9 | Pure Lisp image (with the numeric tower and hygienic macros) | ⬜ |
 
@@ -254,7 +254,9 @@ node, or raise and catch an error. These come first (decided 2026-11-03):
 language-behavior tests from Smalltalk to LISP (owner, 2026-11-04), so the
 self-hosted reader and compiler are checked against the same tests. Step 8.1
 (tests in LISP) and step 8.2 (the reader in LISP, matching the Smalltalk reader
-on every input and every `.lisp` file in the repository) are done.
+on every input and every `.lisp` file in the repository) are done, and so is step
+8.3: the compiler in LISP, which compiles every form in `lib/` and `examples/`
+to the same bytecode as the Smalltalk compiler.
 Reimplement cog-lisp **in cog-lisp**: rewrite the reader and the compiler — the
 latter emitting the same `CompiledMethod`s through a LISP-level interface to the
 Opal IR — in the language itself, bootstrapped by the Smalltalk-hosted
@@ -322,6 +324,15 @@ almost nothing to maintain:
   documentation to a JSON file the extension reads when no image is running, so
   even that list is never edited by hand.
 - To be specified with the language server.
+
+### Later: a reference of the built-ins (owner idea, 2026-11-04)
+Every primitive, special form and `lib/` macro listed with its parameters, a
+one-line description and the spec section that introduced it, so the growing
+set stays known to both of us. Built on the hover-help plan above: the
+documentation strings in the image are the source, and the reference
+(`docs/builtins.md`) is generated from them by the build, with a test that
+fails when a global has no documentation. Not yet scheduled; specify it with
+hover help, or sooner if keeping track gets hard.
 
 ### Later: a user manual (owner idea, 2026-11-04)
 The examples in `examples/` (each runnable, with its expected output checked by
