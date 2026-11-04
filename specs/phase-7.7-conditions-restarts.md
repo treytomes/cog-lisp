@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Phase** | 7.7 (the second step before Phase 8; README "Before Phase 8") |
-| **Status** | Accepted (2026-11-03) |
+| **Status** | Implemented (2026-11-03) — `tests/phase-7.7-conditions.st` 54/54; four examples; all suites 784/784 |
 | **Depends on** | Phases 1–7.6 |
 | **Feeds** | 7.8 native data (its primitives signal conditions), Phase 8 (the self-hosted reader and compiler raise and catch errors) |
 | **Model** | R7RS exceptions (`raise`, `guard`, `with-exception-handler`, `error`) plus Common Lisp–style restarts, both built on Pharo's exceptions |
@@ -266,3 +266,39 @@ Settled 2026-11-03 (owner sign-off); the spec is Accepted on these.
    report-and-continue.
 4. **Built-in restarts:** an unbound variable offers `use-value` and
    `store-value`; others may come with later phases.
+
+## 11. As implemented
+
+- **Tests:** `tests/phase-7.7-conditions.st` 54/54 (AC-1 to AC-16, and review
+  C-18); four examples and `tests/runner/abort.*` in the runner suite (63/63);
+  all suites 784/784; benchmarks 12/12 + AC-20, unchanged within noise.
+- **Restarts are invoked by non-local return, not by an exception** (revising
+  §5.3). Smalltalk looks for the handler of an exception signalled *inside a
+  handler block* only outside that handler's `on:do:`, so a transfer exception
+  raised from a `with-exception-handler` handler could never reach a
+  `restart-case` established between the error and the handler — exactly where
+  the low-level code establishes its restarts (an unbound variable's
+  `use-value` was "not active"). Instead `LispRestart class>>establish:during:`
+  gives each restart an escape block that returns from that method: invoking a
+  restart unwinds the stack (running `ensure:` and `dynamic-wind` afters), is
+  invisible to every `on: Error do:` in between (AC-10), and then runs the
+  restart's body. The `LispRestartTransfer` class of §5.3 was not needed.
+- **`guard` unwinds before its clauses run**, as R7RS says: a `dynamic-wind`
+  `after` has run by the time a clause sees the condition (AC-7). With no
+  matching clause the condition is signalled again from the `guard`, so outer
+  handlers and guards still catch it; restarts established inside the guarded
+  body are gone by then, which only matters to a handler *outside* a `guard`
+  that declined.
+- **Condition objects:** `error` signals a `LispError` with `irritants`; `raise`
+  of a non-exception signals a `LispRaise` (a `LispError` whose payload is the
+  value, resumable only for `raise-continuable`); handlers receive the payload.
+  `LispFileError` is signalled for a file that cannot be found (`load`), and
+  `file-error?` also accepts Pharo's `FileException`.
+- **The break loop** opens for runtime errors only (not compile or read errors),
+  lists every active restart (including the top level's `abort`), and is a
+  nested `LispRepl` reading the same input. End of input at any level ends the
+  session; `(abort)` returns to the top-level prompt.
+- **`abort` in a program** prints `error: aborted` and exits 1.
+- **`lib/cl.lisp`:** `handler-case` (types `error`, `condition`, `t`, or a
+  Smalltalk exception class name), `handler-bind` (a handler that returns
+  declines), `ignore-errors` (answers `nil`), `unwind-protect`.

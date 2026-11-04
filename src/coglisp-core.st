@@ -10,7 +10,7 @@
  Classes: LispCore (stateless facade), LispEnvironment, LispGlobal, LispMacro,
  LispUnboundError.
  ============================================================================"
-| failures cm core env cell macro err |
+| failures cm core env cell macro err raise rst rstvar |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -22,6 +22,11 @@ env  := (Object << #LispEnvironment) slots: { #bindings }; sharedVariables: { #D
 cell := (Object << #LispGlobal) slots: { #symbol. #value. #bound }; package: 'CogLisp-Core'; install.
 macro := (Object << #LispMacro) slots: { #expander }; package: 'CogLisp-Core'; install.
 err  := (LispError << #LispUnboundError) slots: { #symbol }; package: 'CogLisp-Core'; install.
+"Phase 7.7: a raised value that is not itself an exception; continuable for raise-continuable."
+raise := (LispError << #LispRaise) slots: { #payload. #continuable }; package: 'CogLisp-Core'; install.
+"A named way to recover, established by restart-case; the active ones live in LispRestarts."
+rst  := (Object << #LispRestart) slots: { #name. #action. #escape }; package: 'CogLisp-Core'; install.
+rstvar := (DynamicVariable << #LispRestarts) package: 'CogLisp-Core'; install.
 
 "=== LispCore : type predicates (class-side) ==============================="
 cm value: core class value: 'predicates' value: 'isPair: v
@@ -102,8 +107,16 @@ cm value: cell value: 'accessing' value: 'symbol
 cm value: cell value: 'testing' value: 'isBound
 	^ bound'.
 cm value: cell value: 'accessing' value: 'value
-	bound ifFalse: [^ self signalUnbound].
+	bound ifFalse: [^ self signalUnboundWithRestarts].
 	^ value'.
+cm value: cell value: 'private' value: 'signalUnboundWithRestarts
+	"An unbound variable offers use-value (this once) and store-value (define it,
+	 then use it): Phase 7.7 section 5.2."
+	^ LispRestart
+		withRestarts: {
+			LispRestart name: ''use-value'' action: [:v | v].
+			LispRestart name: ''store-value'' action: [:v | self define: v. v] }
+		do: [self signalUnbound]'.
 cm value: cell value: 'accessing' value: 'valueIfUnbound: aBlock
 	bound ifFalse: [^ aBlock value].
 	^ value'.
@@ -117,6 +130,69 @@ cm value: cell value: 'accessing' value: 'assign: aValue
 	^ aValue'.
 cm value: cell value: 'private' value: 'signalUnbound
 	^ (LispUnboundError new) symbol: symbol; signal: ''unbound variable: '' , symbol name'.
+"=== LispRaise (Phase 7.7 section 4.1) ====================================="
+cm value: raise value: 'accessing' value: 'payload
+	^ payload'.
+cm value: raise value: 'accessing' value: 'payload: anObject
+	payload := anObject'.
+cm value: raise value: 'accessing' value: 'continuable
+	^ continuable == true'.
+cm value: raise value: 'accessing' value: 'continuable: aBoolean
+	continuable := aBoolean'.
+cm value: raise value: 'testing' value: 'isResumable
+	^ self continuable'.
+cm value: raise value: 'accessing' value: 'messageText
+	^ ''uncaught raise: '' , (LispPrinter writeString: payload limitedTo: 60)'.
+
+"=== LispRestart and LispRestarts (section 5) ==============================="
+cm value: rst value: 'private' value: 'setName: aName action: aBlock
+	name := aName.
+	action := aBlock'.
+cm value: rst value: 'accessing' value: 'name
+	^ name'.
+cm value: rst value: 'accessing' value: 'action
+	^ action'.
+cm value: rst value: 'private' value: 'escape: aBlock
+	escape := aBlock'.
+cm value: rst value: 'printing' value: 'printOn: aStream
+	aStream nextPutAll: ''#<restart ''; nextPutAll: name name; nextPut: $>'.
+cm value: rst class value: 'instance creation' value: 'name: aName action: aBlock
+	"aName: a LISP symbol or a string. aBlock: anything answering valueWithArguments:."
+	^ self new setName: ((aName isKindOf: LispSymbol) ifTrue: [aName] ifFalse: [LispSymbol named: aName asString]) action: aBlock'.
+cm value: rst class value: 'restarts' value: 'active
+	"The restarts established in this process, innermost first."
+	^ LispRestarts value ifNil: [#()]'.
+cm value: rst class value: 'restarts' value: 'find: aName
+	| sym |
+	sym := (aName isKindOf: LispSymbol) ifTrue: [aName] ifFalse: [LispSymbol named: aName asString].
+	^ self active detect: [:r | r name == sym] ifNone: [nil]'.
+cm value: rst class value: 'restarts' value: 'withRestarts: restarts do: aBlock
+	"Evaluate aBlock with restarts established. Invoking one unwinds to here, then
+	 runs its action with the arguments; the action''s value is the answer."
+	| outcome |
+	outcome := self establish: restarts asArray during: aBlock.
+	outcome first == #normal ifTrue: [^ outcome second].
+	^ outcome second action valueWithArguments: outcome third'.
+cm value: rst class value: 'restarts' value: 'establish: restarts during: aBlock
+	"{#normal. value}, or {#restart. r. args} when restart r was invoked. Invoking is
+	 a non-local return from the escape block to this method: it unwinds the stack
+	 (running ensure: blocks) without an exception, because Smalltalk looks for the
+	 handler of an exception signalled in a handler only outside that handler, so it
+	 would never find a restart established between the error and the handler."
+	restarts do: [:r | r escape: [:args | ^ { #restart. r. args }]].
+	^ { #normal. LispRestarts value: restarts , self active during: aBlock }'.
+cm value: rst class value: 'restarts' value: 'invoke: aRestartOrName with: anArray
+	| r |
+	r := (aRestartOrName isKindOf: LispRestart) ifTrue: [aRestartOrName] ifFalse: [self find: aRestartOrName].
+	r isNil ifTrue: [^ (LispError new) signal: ''invoke-restart: no active restart named '' ,
+		((aRestartOrName isKindOf: LispSymbol) ifTrue: [aRestartOrName name] ifFalse: [aRestartOrName asString])].
+	(self active identityIncludes: r) ifFalse: [^ (LispError new) signal: ''invoke-restart: restart is not active: '' , r name name].
+	^ r invokeWith: anArray'.
+cm value: rst value: 'private' value: 'invokeWith: anArray
+	^ escape value: anArray asArray'.
+cm value: rstvar value: 'accessing' value: 'default
+	^ #()'.
+
 cm value: cell value: 'printing' value: 'printOn: aStream
 	aStream nextPutAll: ''#<global '' , symbol name , ''>'''.
 cm value: cell class value: 'instance creation' value: 'symbol: aSymbol

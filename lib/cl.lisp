@@ -133,3 +133,43 @@
     `(let ((,g (car ,place)))
        (set! ,place (cdr ,place))
        ,g)))
+
+;;; conditions (specs/phase-7.7-conditions-restarts.md section 2)
+;;; A condition type is error, condition or t, or the name of a Smalltalk
+;;; exception class such as ZeroDivide. restart-case and invoke-restart are core.
+
+(define (%cl-type-match? type c)
+  (cond ((memq type '(t condition)) #t)
+        ((eq? type 'error) (error-object? c))
+        (else (let ((cls (smalltalk-global type)))
+                (and cls (condition? c) [c isKindOf: cls])))))
+
+;; (handler-case form (type (var) body ...) ...) -- unwinds, then runs the clause
+(define-macro (handler-case form . clauses)
+  (let ((c (gensym)))
+    `(guard (,c ,@(map (lambda (cl)
+                         `((%cl-type-match? ',(car cl) ,c)
+                           (let ,(if (null? (car (cdr cl))) '() `((,(car (car (cdr cl))) ,c)))
+                             ,@(cdr (cdr cl)))))
+                       clauses))
+       ,form)))
+
+;; (handler-bind ((type handler) ...) body ...) -- handlers run before unwinding;
+;; one that returns declines, and the search goes on
+(define-macro (handler-bind bindings . body)
+  (if (null? bindings)
+      `(progn ,@body)
+      (let ((c (gensym)))
+        `(%handler-bind
+           (lambda (,c) (when (%cl-type-match? ',(car (car bindings)) ,c)
+                          (,(car (cdr (car bindings))) ,c)))
+           (lambda () (handler-bind ,(cdr bindings) ,@body))))))
+
+;; (ignore-errors form ...) -- nil when an error is signalled
+(define-macro (ignore-errors . body)
+  (let ((c (gensym)))
+    `(guard (,c ((error-object? ,c) nil)) ,@body)))
+
+;; (unwind-protect protected cleanup ...)
+(define-macro (unwind-protect protected . cleanup)
+  `(dynamic-wind (lambda () #f) (lambda () ,protected) (lambda () ,@cleanup)))

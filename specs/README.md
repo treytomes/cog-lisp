@@ -36,7 +36,7 @@ to successor).
 | 7 | [Macros & Derived Forms](phase-7-macros.md) | Implemented (115/115) |
 | 7.5 | [Review & Tooling](phase-7.5-review-and-tooling.md) | Implemented (114/114 review checks; all suites 627/627; extension checked in VS Code) |
 | 7.6 | [Smalltalk Interop](phase-7.6-smalltalk-interop.md) | Implemented (82/82; all suites 719/719) |
-| 7.7 | [Conditions & Restarts](phase-7.7-conditions-restarts.md) | Accepted |
+| 7.7 | [Conditions & Restarts](phase-7.7-conditions-restarts.md) | Implemented (54/54; all suites 784/784) |
 
 Later phases (2–7, see the [project plan](../README.md#project-plan)) get their
 specs here as we reach them.

@@ -32,8 +32,9 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 6 | Tail calls & optimization | ✅ **done** — [spec](specs/phase-6-optimization.md), 127/127, [benchmarks](bench/results.md) |
 | 7 | Macros & derived forms | ✅ **done** — [spec](specs/phase-7-macros.md), 115/115 |
 | 7.5 | Review & tooling | ✅ **done** — [spec](specs/phase-7.5-review-and-tooling.md), [review](specs/review-phases-1-7.md), [VS Code](vscode/README.md) |
-| 7.6 | Smalltalk interop | ✅ **done** — [spec](specs/phase-7.6-smalltalk-interop.md), 82/82, [examples](examples/interop-send.lisp); all suites 719/719 |
-| — | Before Phase 8: conditions & restarts (7.7) · native strings, characters, vectors & hash tables (7.8) · self-hosting groundwork (7.9) | ⬜ planned, in that order (see below) |
+| 7.6 | Smalltalk interop | ✅ **done** — [spec](specs/phase-7.6-smalltalk-interop.md), 82/82, [examples](examples/interop-send.lisp) |
+| 7.7 | Conditions & restarts | ✅ **done** — [spec](specs/phase-7.7-conditions-restarts.md), 54/54, [examples](examples/restarts.lisp); all suites 784/784 |
+| — | Before Phase 8: native strings, characters, vectors & hash tables (7.8) · self-hosting groundwork (7.9) | ⬜ planned, in that order (see below) |
 | 8 | Self-hosting (meta-circular) | ⬜ |
 | — | CI/CD: tests on every push; image and VS Code extension built for tagged releases | ⬜ planned (see below) |
 | 9 | Pure Lisp image (with the numeric tower and hygienic macros) | ⬜ |
@@ -78,6 +79,20 @@ Or start the REPL by running `cog-lisp.bat` with no arguments:
 
 `(save-image)` writes your definitions into `pharo\cog-lisp.image`, so they are
 there the next time you start it. End a session with `(exit)`.
+
+At a console, an error does not throw your work away: it opens a **break loop**
+inside the computation that failed, and lists the ways to recover (Phase 7.7):
+
+```
+> (+ undefined-var 1)
+error: unbound variable: undefined-var
+restarts: use-value store-value abort
+1> (use-value 41)
+42
+```
+
+`(store-value 5)` would define the variable and go on; `(abort)` returns to `>`.
+Programs and piped input report errors without stopping.
 Every procedure keeps the source it was compiled from: `(procedure-source f)`
 returns it, and `(disassemble f)` shows its bytecode.
 
@@ -217,7 +232,7 @@ node, or raise and catch an error. These come first (decided 2026-11-03):
   LISP procedure usable as a block, which must drive its own tail calls; review
   R-18). The way into the rest of the image, into the subsystems Phase 9 may keep
   or reimplement, and Phase 8's "LISP-level interface to the Opal IR".
-- **Conditions and restarts** ([spec accepted](specs/phase-7.7-conditions-restarts.md), Phase 7.7): a LISP-level error system: `error`, condition
+- **Conditions and restarts** — ✅ done as Phase 7.7 ([spec](specs/phase-7.7-conditions-restarts.md)): `guard`, `with-exception-handler`, `restart-case`, and a break loop at the console REPL. A LISP-level error system: `error`, condition
   objects, handlers, and restarts, with host errors mapped to conditions (review
   R-2, C-18). Before the primitives below, so they signal proper conditions.
 - **Native strings, characters, vectors and hash tables:** what a reader and a

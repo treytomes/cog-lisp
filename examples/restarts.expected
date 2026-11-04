@@ -1,0 +1,8 @@
+(10 30)
+(10 0 30 0)
+(10 6 30 5)
+(use-value skip abort)
+42
+200
+100
+invoke-restart: no active restart named skip

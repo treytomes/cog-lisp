@@ -58,3 +58,7 @@
 ;       ^^^^^^^ entity.name.function.selector.cog-lisp
 ;                     ^^^^^^^^^ keyword.control.special-form.cog-lisp
 ;                               ^^^ entity.name.type.class.cog-lisp
+
+(guard (e (#t 0)) (restart-case (f) (use-value (v) v)))
+;^^^^^ keyword.control.macro.cog-lisp
+;                  ^^^^^^^^^^^^ keyword.control.macro.cog-lisp

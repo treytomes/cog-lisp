@@ -11,7 +11,7 @@
  Classes: LispCons, LispSymbol, LispEmptyList, LispReadError, LispReader,
  LispPrinter.
  ============================================================================"
-| failures cm cons sym empty unspec lerr err loc rdr prn |
+| failures cm cons sym empty unspec lerr err loc ferr rdr prn |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -26,7 +26,9 @@ unspec := (Object << #LispUnspecified) sharedVariables: { #Default }; package: '
 "LispError is the root of every cog-lisp error, so a handler can tell a LISP error
  from a host bug (specs/review-phases-1-7.md R-16). It lives here, in the first
  package, so every later package can subclass it."
-lerr  := (Error  << #LispError) package: 'CogLisp-Reader'; install.
+lerr  := (Error  << #LispError) slots: { #irritants }; package: 'CogLisp-Reader'; install.
+"A file that cannot be found or opened (R7RS file-error?; Phase 7.7)."
+ferr  := (lerr   << #LispFileError) package: 'CogLisp-Reader'; install.
 err   := (lerr   << #LispReadError) slots: { #position. #incomplete }; package: 'CogLisp-Reader'; install.
 "An error raised while running a file, with where it happened (review R-1). The
  runner prints it as path:line:col: error: message, which editors can parse."
@@ -101,7 +103,7 @@ cm value: cons class value: 'quasiquote' value: 'qqAppend: aList to: tail
 	 unquote-splicing (Phase 7 section 4). Never uses the global append."
 	| result |
 	(aList == LispEmptyList default or: [(aList isKindOf: LispCons) and: [aList isProperList]])
-		ifFalse: [^ (Error new) signal: ''unquote-splicing: not a list''].
+		ifFalse: [^ (LispError new) signal: ''unquote-splicing: not a list''].	"review C-18"
 	result := tail.
 	aList lispElements reverseDo: [:e | result := self car: e cdr: result].
 	^ result'.
@@ -176,6 +178,11 @@ cm value: err value: 'testing' value: 'isIncomplete
 	^ incomplete == true'.
 
 "=== LispError: what a user is told about an error (review R-2) ============="
+cm value: lerr value: 'accessing' value: 'irritants
+	"The values given to (error message irritant ...), as a LISP list; nil otherwise."
+	^ irritants'.
+cm value: lerr value: 'accessing' value: 'irritants: aList
+	irritants := aList'.
 cm value: lerr class value: 'describing' value: 'show: aValue
 	^ LispPrinter writeString: aValue limitedTo: 60'.
 cm value: lerr class value: 'describing' value: 'describe: anError
@@ -198,6 +205,12 @@ cm value: lerr class value: 'describing' value: 'describe: anError
 	(anError isKindOf: ZeroDivide) ifTrue: [^ ''division by zero''].
 	text := anError messageText.
 	(text isNil or: [text isEmpty]) ifTrue: [text := anError class name].
+	"an error made by the error procedure reports its message, then its irritants as
+	 write shows them (Phase 7.7 section 4.1)"
+	((anError isKindOf: LispError) and: [anError irritants isKindOf: LispCons]) ifTrue: [
+		text := String streamContents: [:s |
+			s nextPutAll: text.
+			anError irritants do: [:each | s space; nextPutAll: (self show: each)]]].
 	^ text'.
 
 "=== LispLocatedError (review R-1) =========================================="

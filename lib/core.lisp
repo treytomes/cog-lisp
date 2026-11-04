@@ -83,3 +83,20 @@
                                  (car s)
                                  (car (cdr (cdr s)))))
                            specs)))))))
+
+;;; Conditions and restarts (specs/phase-7.7-conditions-restarts.md)
+
+;; (guard (var clause ...) body ...) -- cond-style clauses over what was raised;
+;; with no matching clause it is raised again where it was first raised
+(define-macro (guard spec . body)
+  `(%guard (lambda () ,@body)
+           (lambda (,(car spec))
+             (cond ,@(cdr spec) (else (%guard-no-match))))))
+
+;; (restart-case form (name (param ...) body ...) ...) -- form with named restarts
+(define-macro (restart-case form . clauses)
+  `(%restart-case
+     (lambda () ,form)
+     (list ,@(map (lambda (c)
+                    `(cons ',(car c) (lambda ,(car (cdr c)) ,@(cdr (cdr c)))))
+                  clauses))))

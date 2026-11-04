@@ -1,0 +1,9 @@
+(checked-sqrt: negative argument: (-4))
+checked-sqrt: negative argument: -9
+4
+((symbol out-of-paper) (list jammed) (string on fire) (other 42))
+car: not a pair: 5
+division by zero
+42 does not understand #frobnicate
+(outer-caught not-a-string)
+404

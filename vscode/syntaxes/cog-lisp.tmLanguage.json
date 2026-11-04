@@ -125,8 +125,8 @@
       }
     },
     "macro": {
-      "comment": "Derived forms from lib/core.lisp and lib/cl.lisp.",
-      "match": "(\\()\\s*(cond|case|and|or|when|unless|let\\*|letrec\\*?|do|else|setq|progn|prog1|labels|flet|dolist|dotimes|push|pop)(?=[\\s()\\[\\]]|$)",
+      "comment": "Derived forms from lib/core.lisp and lib/cl.lisp, including the condition forms (Phase 7.7).",
+      "match": "(\\()\\s*(cond|case|and|or|when|unless|let\\*|letrec\\*?|do|else|setq|progn|prog1|labels|flet|dolist|dotimes|push|pop|guard|restart-case|handler-case|handler-bind|ignore-errors|unwind-protect)(?=[\\s()\\[\\]]|$)",
       "captures": {
         "1": {
           "name": "punctuation.section.parens.begin.cog-lisp"

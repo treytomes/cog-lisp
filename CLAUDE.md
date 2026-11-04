@@ -217,6 +217,15 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   a non-block argument compiles inline, the argument taken as a plain value; the
   method is never sent. To send one for real (e.g. with a LISP procedure as the
   block), use `perform:withArguments:` (`LispCompiler inlinedSelectors`).
+- **An exception signalled inside a handler block is handled only *outside* that
+  handler's `on:do:`** (ANSI Smalltalk), not by `on:do:`s between the original
+  signal and the handler, even though they are still on the stack. So restarts
+  cannot be an exception: cog-lisp invokes them by non-local return from a block
+  created in the establishing method (`LispRestart class>>establish:during:`),
+  which unwinds, runs `ensure:` blocks, and passes no handler.
+- **A `DynamicVariable` subclass** (`LispRestarts value: x during: [...]`) gives a
+  per-process dynamic binding that handlers, which run on top of the signalling
+  stack, still see.
 - **`aSymbol , aString` answers a Symbol** (`#+ , ': x'` is `#'+: x'`); send
   `asString` first when building text from a selector.
 - **`anObject value` answers the object itself** (`Object>>value`), so any object

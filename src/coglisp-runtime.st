@@ -71,6 +71,16 @@ cm value: tout value: 'accessing' value: 'kind
 cm value: tout value: 'writing' value: 'nextPutAll: aString
 	aString isEmpty ifFalse: [midLine := aString last ~= Character lf].
 	buffer nextPutAll: aString'.
+cm value: tout value: 'writing' value: 'space
+	"The usual stream conveniences, so code written against a WriteStream works on
+	 the real stdout and stderr too (the break loop used space; Phase 7.7)."
+	self nextPut: Character space'.
+cm value: tout value: 'writing' value: 'tab
+	self nextPut: Character tab'.
+cm value: tout value: 'writing' value: 'lf
+	self nextPut: Character lf'.
+cm value: tout value: 'writing' value: 'print: anObject
+	self nextPutAll: anObject printString'.
 cm value: tout value: 'writing' value: 'nextPut: aCharacter
 	midLine := aCharacter ~= Character lf.
 	buffer nextPut: aCharacter'.
@@ -351,6 +361,7 @@ cm value: prims class value: 'installing' value: 'installInto: anEnv
 	self installMacroSupportInto: anEnv.
 	self installListSearchInto: anEnv.
 	self installInteropInto: anEnv.
+	self installConditionsInto: anEnv.
 	"every primitive knows its name, for printing and error messages (review R-7)"
 	anEnv cellsDo: [:c | | v |
 		v := c valueIfUnbound: [nil].
@@ -369,6 +380,75 @@ cm value: prims class value: 'installing' value: 'installMacroSupportInto: anEnv
 	anEnv define: (LispSymbol named: ''macroexpand-1'') value: (LispProcedure fixed: [:form | LispCompiler new macroexpand1: form] arity: 1).
 	anEnv define: (LispSymbol named: ''macroexpand'') value: (LispProcedure fixed: [:form | LispCompiler new macroexpand: form] arity: 1).
 	anEnv define: (LispSymbol named: ''eval'') value: (LispProcedure fixed: [:form | LispCompiler new eval: form] arity: 1)'.
+cm value: prims class value: 'installing' value: 'installConditionsInto: anEnv
+	"Phase 7.7: conditions are Pharo exceptions. Handlers catch Error (which includes
+	 LispRaise), never Notifications, Warnings or restart transfers. A handler gets
+	 the raised value for raise, and the exception itself otherwise."
+	| def payload noMatch fileException |
+	def := [:name :proc | anEnv define: (LispSymbol named: name) value: proc].
+	payload := [:ex | (ex isKindOf: LispRaise) ifTrue: [ex payload] ifFalse: [ex]].
+	noMatch := Object new.
+	fileException := Smalltalk at: #FileException ifAbsent: [nil].
+	"signalling (section 4.1)"
+	def value: ''error'' value: (LispProcedure variadic: [:msg :rest |
+		(LispError new)
+			irritants: rest;
+			signal: ((LispCore isString: msg) ifTrue: [msg] ifFalse: [LispPrinter displayString: msg])] required: 1).
+	def value: ''raise'' value: (LispProcedure fixed: [:obj |
+		(obj isKindOf: Exception)
+			ifTrue: [obj signal]
+			ifFalse: [(LispRaise new) payload: obj; continuable: false; signal]] arity: 1).
+	def value: ''raise-continuable'' value: (LispProcedure fixed: [:obj |
+		(LispRaise new) payload: obj; continuable: true; signal] arity: 1).
+	"handling (section 4.2)"
+	def value: ''with-exception-handler'' value: (LispProcedure fixed: [:handler :thunk |
+		[thunk value] on: Error do: [:ex | | v |
+			v := handler value: (payload value: ex).
+			((ex isKindOf: LispRaise) and: [ex continuable])
+				ifTrue: [ex resume: v]
+				ifFalse: [(LispError new) signal: ''handler returned from a non-continuable raise'']]] arity: 2).
+	def value: ''%handler-bind'' value: (LispProcedure fixed: [:handler :thunk |
+		"Common Lisp handler-bind: a handler that returns declines, and the search goes on"
+		[thunk value] on: Error do: [:ex | handler value: (payload value: ex). ex pass]] arity: 2).
+	def value: ''%guard'' value: (LispProcedure fixed: [:thunk :handler | | caught result |
+		"guard, as R7RS: unwind to the guard first (so dynamic-wind afters have run), then
+		 the clauses; with none matching, the condition is raised again from here"
+		caught := nil.
+		result := [thunk value] on: Error do: [:ex | caught := ex. ex return: nil].
+		caught isNil
+			ifTrue: [result]
+			ifFalse: [ | v |
+				v := handler value: (payload value: caught).
+				v == noMatch ifTrue: [caught signal] ifFalse: [v]]] arity: 2).
+	def value: ''%guard-no-match'' value: (LispProcedure fixed: [noMatch] arity: 0).
+	"cleanup (section 4.4)"
+	def value: ''dynamic-wind'' value: (LispProcedure fixed: [:before :thunk :after |
+		before value.
+		[thunk value] ensure: [after value]] arity: 3).
+	"inspecting (section 4.3)"
+	def value: ''condition?'' value: (LispProcedure fixed: [:x | x isKindOf: Exception] arity: 1).
+	def value: ''error-object?'' value: (LispProcedure fixed: [:x | (x isKindOf: Error) and: [(x isKindOf: LispRaise) not]] arity: 1).
+	def value: ''error-object-message'' value: (LispProcedure fixed: [:c |
+		(c isKindOf: LispError) ifTrue: [c messageText ifNil: ['''']] ifFalse: [LispError describe: c]] arity: 1).
+	def value: ''error-object-irritants'' value: (LispProcedure fixed: [:c |
+		((c isKindOf: LispError) and: [c irritants notNil]) ifTrue: [c irritants] ifFalse: [LispEmptyList default]] arity: 1).
+	def value: ''condition-report'' value: (LispProcedure fixed: [:c | LispError describe: c] arity: 1).
+	def value: ''read-error?'' value: (LispProcedure fixed: [:c |
+		(c isKindOf: LispReadError) or: [(c isKindOf: LispLocatedError) and: [c cause isKindOf: LispReadError]]] arity: 1).
+	def value: ''file-error?'' value: (LispProcedure fixed: [:c |
+		(c isKindOf: LispFileError) or: [fileException notNil and: [c isKindOf: fileException]]] arity: 1).
+	"restarts (section 5)"
+	def value: ''%restart-case'' value: (LispProcedure fixed: [:thunk :specs |
+		LispRestart
+			withRestarts: (specs lispElements collect: [:pair | LispRestart name: pair car action: pair cdr]) asArray
+			do: [thunk value]] arity: 2).
+	def value: ''invoke-restart'' value: (LispProcedure variadic: [:r :args | LispRestart invoke: r with: args lispElements asArray] required: 1).
+	def value: ''find-restart'' value: (LispProcedure fixed: [:n | (LispRestart find: n) ifNil: [false]] arity: 1).
+	def value: ''compute-restarts'' value: (LispProcedure fixed: [LispCons fromArray: LispRestart active] arity: 0).
+	def value: ''restart-name'' value: (LispProcedure fixed: [:r | r name] arity: 1).
+	def value: ''use-value'' value: (LispProcedure fixed: [:v | LispRestart invoke: ''use-value'' with: { v }] arity: 1).
+	def value: ''store-value'' value: (LispProcedure fixed: [:v | LispRestart invoke: ''store-value'' with: { v }] arity: 1).
+	def value: ''abort'' value: (LispProcedure fixed: [LispRestart invoke: ''abort'' with: #()] arity: 0)'.
 cm value: prims class value: 'installing' value: 'installInteropInto: anEnv
 	"Phase 7.6 sections 4.3 to 4.5: dynamic sends and lookups, and the values that
 	 differ between the languages. Names arrive as LISP symbols or strings."

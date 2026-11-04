@@ -935,7 +935,7 @@ cm value: comp value: 'evaluating' value: 'evalAll: aString named: aName
 cm value: comp value: 'evaluating' value: 'evalFile: aPath
 	| file |
 	file := aPath asFileReference.
-	file exists ifFalse: [^ self compileError: ''file not found: '' , aPath].
+	file exists ifFalse: [^ (LispFileError new) signal: ''file not found: '' , aPath].
 	^ self evalAll: file contents named: file fullName'.
 
 "=== load report ==========================================================="

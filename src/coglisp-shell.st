@@ -21,7 +21,7 @@ cm := [:cls :cat :src |
     do: [:e | failures add: cls name , ' >> ' , src lines first , '  --  ' , e messageText]].
 
 stdin := (Object << #LispStdin) slots: { #kind. #handle. #pending. #eof }; package: 'CogLisp-Shell'; install.
-repl  := (Object << #LispRepl) slots: { #in. #out. #err. #compiler }; package: 'CogLisp-Shell'; install.
+repl  := (Object << #LispRepl) slots: { #in. #out. #err. #compiler. #interactive. #level }; package: 'CogLisp-Shell'; install.
 shell := (ClapApplication << #LispShellCommand) sharedVariables: { #BuildTime }; package: 'CogLisp-Shell'; install.
 
 "=== LispStdin ============================================================
@@ -136,20 +136,44 @@ cm value: repl value: 'private' value: 'setIn: inStream out: outStream err: errS
 	in := inStream.
 	out := outStream.
 	err := errStream.
-	compiler := LispCompiler new'.
+	compiler := LispCompiler new.
+	interactive := false.
+	level := 0'.
+cm value: repl value: 'accessing' value: 'interactive: aBoolean
+	"True at a console: an unhandled error opens a break loop (Phase 7.7 section 7)."
+	interactive := aBoolean'.
+cm value: repl value: 'accessing' value: 'level: n
+	level := n'.
 cm value: repl value: 'reporting' value: 'errorText: anError
 	^ LispError describe: anError'.
 cm value: repl value: 'reporting' value: 'report: anError
 	err nextPutAll: ''error: '' , (self errorText: anError); nextPut: Character lf; flush'.
 cm value: repl value: 'running' value: 'prompt
+	level > 0 ifTrue: [out nextPutAll: level printString].
 	out nextPutAll: ''> ''; flush'.
 cm value: repl value: 'running' value: 'evalAndPrint: datum from: aReader
+	"At the top level each form runs with an abort restart, back to this prompt. An
+	 unhandled error is reported, or, at a console, opens a break loop on top of the
+	 failing computation, where its restarts can be invoked (Phase 7.7 section 7)."
 	| value |
-	[value := compiler eval: datum from: aReader.
-	 value == LispUnspecified default ifFalse: [
-		out nextPutAll: (LispPrinter writeString: value); nextPut: Character lf; flush]]
-		on: Error
-		do: [:e | self report: e]'.
+	LispRestart
+		withRestarts: (level = 0 ifTrue: [{ LispRestart name: ''abort'' action: [nil] }] ifFalse: [#()])
+		do: [
+			[value := compiler eval: datum from: aReader.
+			 value == LispUnspecified default ifFalse: [
+				out nextPutAll: (LispPrinter writeString: value); nextPut: Character lf; flush]]
+				on: Error
+				do: [:e | (interactive and: [(e isKindOf: LispCompileError) not])
+					ifTrue: [self breakLoop: e]
+					ifFalse: [self report: e]]]'.
+cm value: repl value: 'running' value: 'breakLoop: anError
+	"A nested REPL, still inside the computation that failed. Invoking a restart
+	 continues it; (abort) or end of input returns to the top-level prompt."
+	self report: anError.
+	err nextPutAll: ''restarts:''.
+	LispRestart active do: [:r | err nextPut: Character space; nextPutAll: r name name].
+	err nextPut: Character lf; flush.
+	(LispRepl in: in out: out err: err) interactive: true; level: level + 1; loop'.
 cm value: repl value: 'running' value: 'process: buffer
 	"Evaluate each complete datum in buffer as soon as it is read, and answer what is
 	 left to keep reading: the text after the last complete datum if the input ends in
@@ -169,15 +193,16 @@ cm value: repl value: 'running' value: 'process: buffer
 	^ '''''.
 cm value: repl value: 'running' value: 'run
 	"Loop until end of input. Output from display/write goes to the same stream as results."
+	LispPrimitives withOutput: out do: [self loop].
+	out nextPut: Character lf; flush'.
+cm value: repl value: 'running' value: 'loop
 	| buffer |
 	buffer := ''''.
-	LispPrimitives withOutput: out do: [
-		[buffer isEmpty ifTrue: [self prompt].
-		 in atEnd] whileFalse: [
-			buffer := self process: buffer , in nextLine , (String with: Character lf)]].
+	[buffer isEmpty ifTrue: [self prompt].
+	 in atEnd] whileFalse: [
+		buffer := self process: buffer , in nextLine , (String with: Character lf)].
 	(buffer allSatisfy: [:c | c isSeparator]) ifFalse: [
-		err nextPutAll: ''error: unexpected end of input''; nextPut: Character lf; flush].
-	out nextPut: Character lf; flush'.
+		err nextPutAll: ''error: unexpected end of input''; nextPut: Character lf; flush]'.
 cm value: repl class value: 'instance creation' value: 'in: inStream out: outStream err: errStream
 	^ self new setIn: inStream out: outStream err: errStream'.
 
@@ -249,15 +274,20 @@ cm value: shell value: 'memory' value: 'withMemoryLimit: limit do: aBlock
 	watchdog name: ''cog-lisp memory watchdog''.
 	^ aBlock ensure: [watchdog terminate]'.
 cm value: shell value: 'running' value: 'runRepl
-	self withMemoryLimitDo: [
+	self withMemoryLimitDo: [ | stdin |
+		stdin := LispStdin new.
+		"a break loop only at a console; piped and file input report and go on"
 		(LispRepl
-			in: LispStdin new
+			in: stdin
 			out: LispTextOutput stdout
-			err: LispTextOutput stderr) run].
+			err: LispTextOutput stderr) interactive: stdin kind = #console; run].
 	Smalltalk exit: 0'.
 cm value: shell value: 'running' value: 'runFile: aPath
 	aPath isNil ifTrue: [^ self fail: ''no program file given''].
-	self withMemoryLimitDo: [LispCompiler new evalFile: aPath].
+	"(abort) in a program ends it, as a failure (Phase 7.7 section 5.2)"
+	LispRestart
+		withRestarts: { LispRestart name: ''abort'' action: [self failReport: ''error: aborted''] }
+		do: [self withMemoryLimitDo: [LispCompiler new evalFile: aPath]].
 	LispTextOutput stdout flush.
 	Smalltalk exit: 0'.
 cm value: shell value: 'running' value: 'execute

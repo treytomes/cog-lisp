@@ -7,12 +7,12 @@ Times are the median of 5 warm runs, in milliseconds, excluding compile time. Lo
 
 | Benchmark | cog-lisp | tree-walker | Smalltalk | speedup over tree-walker | slowdown vs Smalltalk |
 |---|---:|---:|---:|---:|---:|
-| fib 22 | 2.34 | 251.0 | 0.22 | 107.1x | 10.7x |
-| tak 18 12 6 | 2.58 | 252.0 | 0.17 | 97.7x | 15.2x |
-| loop 100000 | 1.46 | 1117.0 | 0.11 | 764.6x | 13.0x |
-| even?/odd? 20000 | 1.83 | 203.0 | 1.48 | 111.0x | 1.2x |
-| list 20000 | 4.31 | 490.0 | 0.85 | 113.6x | 5.1x |
-| globals 50000 | 2.22 | 647.0 | 0.34 | 291.6x | 6.6x |
+| fib 22 | 2.83 | 273.0 | 0.27 | 96.5x | 10.6x |
+| tak 18 12 6 | 3.11 | 350.0 | 0.24 | 112.6x | 12.9x |
+| loop 100000 | 2.36 | 1482.0 | 0.13 | 628.1x | 17.6x |
+| even?/odd? 20000 | 1.91 | 275.0 | 1.44 | 144.3x | 1.3x |
+| list 20000 | 4.78 | 658.0 | 1.19 | 137.6x | 4.0x |
+| globals 50000 | 2.91 | 847.0 | 0.33 | 291.4x | 8.7x |
 
 ## Each optimization switched off
 
@@ -20,16 +20,16 @@ cog-lisp time with one optimization off, and how much slower that is than with a
 
 | Benchmark | all on | no tailCalls | no fastCalls | no globalCells | no literalQuote | no directLet | no inlinePrimitives |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| fib 22 | 2.34 | 2.27 (1.0x) | 6.13 (2.6x) | 42.0 (17.9x) | 2.09 (0.9x) | 2.08 (0.9x) | 5.00 (2.1x) |
-| tak 18 12 6 | 2.58 | 2.16 (0.8x) | 5.66 (2.2x) | 47.0 (18.2x) | 2.34 (0.9x) | 2.38 (0.9x) | 5.25 (2.0x) |
-| loop 100000 | 1.46 | 100.5 (68.8x) | 1.55 (1.1x) | 79.0 (54.1x) | 1.58 (1.1x) | 1.38 (0.9x) | 6.13 (4.2x) |
-| even?/odd? 20000 | 1.83 | 5.72 (3.1x) | 1.72 (0.9x) | 14.0 (7.7x) | 1.92 (1.1x) | 1.88 (1.0x) | 2.70 (1.5x) |
-| list 20000 | 4.31 | 20.9 (4.8x) | 5.25 (1.2x) | 50.8 (11.8x) | 4.72 (1.1x) | 4.13 (1.0x) | 6.94 (1.6x) |
-| globals 50000 | 2.22 | 32.0 (14.4x) | 26.8 (12.1x) | 94.5 (42.6x) | 2.33 (1.0x) | 2.27 (1.0x) | 3.97 (1.8x) |
+| fib 22 | 2.83 | 2.63 (0.9x) | 6.69 (2.4x) | 53.0 (18.7x) | 2.86 (1.0x) | 2.83 (1.0x) | 6.22 (2.2x) |
+| tak 18 12 6 | 3.11 | 3.34 (1.1x) | 8.63 (2.8x) | 92.0 (29.6x) | 3.84 (1.2x) | 4.78 (1.5x) | 8.56 (2.8x) |
+| loop 100000 | 2.36 | 153.0 (64.8x) | 2.36 (1.0x) | 107.0 (45.4x) | 2.14 (0.9x) | 2.16 (0.9x) | 9.44 (4.0x) |
+| even?/odd? 20000 | 1.91 | 7.56 (4.0x) | 2.13 (1.1x) | 22.8 (11.9x) | 2.17 (1.1x) | 2.14 (1.1x) | 3.38 (1.8x) |
+| list 20000 | 4.78 | 25.1 (5.3x) | 7.16 (1.5x) | 54.0 (11.3x) | 5.28 (1.1x) | 4.78 (1.0x) | 8.56 (1.8x) |
+| globals 50000 | 2.91 | 68.5 (23.6x) | 30.0 (10.3x) | 153.0 (52.6x) | 2.86 (1.0x) | 3.09 (1.1x) | 4.88 (1.7x) |
 
 ## Smalltalk interop
 
-A loop of 1,000,000 `(send acc + 1)`: 14.3 ms; the same loop with `(+ acc 1)`: 15.0 ms (0.9x).
+A loop of 1,000,000 `(send acc + 1)`: 15.5 ms; the same loop with `(+ acc 1)`: 17.5 ms (0.9x).
 
 ## Checks
 
@@ -39,10 +39,10 @@ A loop of 1,000,000 `(send acc + 1)`: 14.3 ms; the same loop with `(+ acc 1)`: 1
 - PASS  AC-15 compiled faster than the tree-walker: even?/odd? 20000
 - PASS  AC-15 compiled faster than the tree-walker: list 20000
 - PASS  AC-15 compiled faster than the tree-walker: globals 50000
-- PASS  AC-16/24 fastCalls makes fib 22 faster (2.6x)
-- PASS  AC-16/24 inlinePrimitives makes fib 22 faster (2.1x)
-- PASS  AC-16/24 fastCalls makes tak 18 12 6 faster (2.2x)
-- PASS  AC-16/24 inlinePrimitives makes tak 18 12 6 faster (2.0x)
-- PASS  AC-16/24 tailCalls makes loop 100000 faster (68.8x)
-- PASS  AC-16/24 globalCells makes globals 50000 faster (42.6x)
+- PASS  AC-16/24 fastCalls makes fib 22 faster (2.4x)
+- PASS  AC-16/24 inlinePrimitives makes fib 22 faster (2.2x)
+- PASS  AC-16/24 fastCalls makes tak 18 12 6 faster (2.8x)
+- PASS  AC-16/24 inlinePrimitives makes tak 18 12 6 faster (2.8x)
+- PASS  AC-16/24 tailCalls makes loop 100000 faster (64.8x)
+- PASS  AC-16/24 globalCells makes globals 50000 faster (52.6x)
 - PASS  Phase 7.6 AC-20 (send acc + 1) within 1.5x of (+ acc 1) (0.9x)
