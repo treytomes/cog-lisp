@@ -177,6 +177,12 @@ ame.bat`. The VS Code extension does this.
   commit with `git ls-remote <repo> refs/tags/<tag>^{}` (the peeled line; the
   plain one is the tag object for an annotated tag). Lint with
   `docker run --rm -v <repo>:/repo:ro --workdir /repo rhysd/actionlint:latest`.
+- **In a batch file, take `ERRORLEVEL` on the line right after the command**
+  (`set RC=!ERRORLEVEL!`). GitHub runs `shell: cmd` steps from a `.cmd` file, and
+  there `SET` resets `ERRORLEVEL` to 0 (in a `.bat` run by hand it does not), so a
+  check with a `set` in between passed locally and failed on the runner.
+- **Always pass `--headless` when a script starts the VM**, `eval` included:
+  without it the VM opens a window, and on a CI runner it never returns.
 - **Release bundles** come from `release/package.sh VERSION` (Linux, after the
   build) and are checked by `release/smoke-test.sh DIR` on each platform. Git on
   this machine has `core.fileMode false`: give a new `.sh` file its executable

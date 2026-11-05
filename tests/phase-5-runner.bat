@@ -66,8 +66,10 @@ set OK=0
 fc /b "tests\runner\persist\session2.expected" "%TMPD%\session2.out" >nul 2>&1 && set OK=1
 call :check "AC-13/AC-21 saved definition and its source survive a new process" !OK!
 call "%CL%" "tests\runner\persist\session2.lisp" >"%TMPD%\session2-orig.out" 2>&1
+rem  take the exit code at once: run from a .cmd file (as CI does), SET resets ERRORLEVEL
+set RC=!ERRORLEVEL!
 set OK=0
-if not "!ERRORLEVEL!"=="0" set OK=1
+if not "!RC!"=="0" set OK=1
 call :check "AC-13 the unsaved build image does not have the definition" !OK!
 del /q "pharo\cog-lisp-test.image" "pharo\cog-lisp-test.changes" >nul 2>&1
 
