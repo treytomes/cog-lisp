@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Status** | Proposed (2026-11-05), for the owner's acceptance |
+| **Status** | Accepted (2026-11-05), with the owner's decisions (§7); decision 4 is settled with 10.5's detailed spec |
 | **Depends on** | Phase 9 (the language it documents) |
 | **Feeds** | Phase 11 (the pure image; its LISP-visible tools join the reference) |
-| **Review items** | C-18 (compile errors carry no position), R-17 (re-reading an incomplete REPL form) |
+| **Review items** | C-18 (compile errors carry no position); R-17 considered and left with the REPL (§7) |
 
 ## 1. Goal
 
@@ -81,27 +81,39 @@ moved them ahead of the pure image (now Phase 11) on 2026-11-05.
 ## 4. Steps
 
 ### 10.1 Documentation in the image
+Two parts, around a release: the self-hosting rule (9.1) means `lib/core.lisp`
+can use a new `define-syntax` argument only once a seed has it. The owner chose
+the cleaner form and the release it needs over a stopgap call (2026-11-05).
+
+**10.1a: the machinery, and everything the seed's compiler does not compile.**
 - **Where documentation is kept.** A procedure, a macro and a special form each
-  carry a documentation string, and `(documentation 'name)` answers the
+  carry a documentation string. `(documentation 'name)` answers the
   documentation of what `name` is bound to: a global or a special form.
+  `(procedure-documentation f)` answers a procedure's.
 - **How it is written:**
   - *A primitive* gets its documentation where it is installed, beside its block
     (`src/coglisp-runtime.st`).
-  - *A `define`* whose body is a string followed by at least one more form keeps
-    that string as its documentation (as Common Lisp does). The string is still
-    evaluated, so R7RS meaning is unchanged.
-  - *A `define-syntax`, a special form, or anything else* is documented by a
-    call beside it: `(document! 'when "(when test body ...)" "...")`. A call is
-    something every seed compiles, so `lib/core.lisp` and `lib/compiler/` can use
-    it under the self-hosting rule.
+  - *A `define`* (and a `define-macro`) whose body is a string followed by at
+    least one more form keeps that string as its documentation, as Common Lisp
+    does. The string is still evaluated, so the R7RS meaning is unchanged.
+  - *A `define-syntax`* takes an optional string before its transformer:
+    `(define-syntax when "(when test body ...)\n..." (syntax-rules ...))`, at
+    top level and in a body. `let-syntax` bindings take none.
+  - *A special form* is documented where the compiler defines it:
+    `(define-special-form 'if "(if test then [else])\n..." translator)`. This is
+    a procedure call, which the seed compiles, so `lib/compiler/` can use it at
+    once.
 - **Its shape.** The first line is the call form, with parameter names:
   `(string-ref string k)`. The rest says what it does, in a sentence or two. A
   primitive's parameter names come from this first line; a LISP procedure's from
   its source.
-- **The category** (lists, strings, numbers, control, interop, ...) is the
-  section of the reference it appears in. For a primitive it is taken from the
-  installer that defines it (`installStringsInto:` gives Strings); `document!`
-  takes one.
+- **The category** is the section of the reference an entry appears in:
+  - for a primitive, the installer that defines it (`installStringsInto:` gives
+    Strings);
+  - for a special form, Special forms;
+  - for a definition in LISP, the file it was loaded from (`lib/core.lisp` gives
+    Derived forms, `lib/compiler/` gives The compiler and reader), which the
+    compiler records as it does the source text.
 - **Public, by rule.** The public names are:
   - the primitives;
   - the special forms;
@@ -109,9 +121,16 @@ moved them ahead of the pure image (now Phase 11) on 2026-11-05.
   - any LISP procedure that has documentation (the compiler's entry points, such
     as `compile-form` and `define-special-form`, get some).
 
-  A test fails if a primitive, special form or core form has none.
-- **Example** `examples/documentation.lisp`: documenting a procedure, and reading
-  any built-in's documentation back.
+  A test fails if a primitive or a special form has none.
+- **Example** `examples/documentation.lisp`: documenting a procedure and a macro,
+  and reading a built-in's documentation back.
+
+**Then the owner tags a minor release, v0.2.0, and the seed moves to it**, as it
+moved to v0.1.3.
+
+**10.1b: the derived forms.**
+- `lib/core.lisp`'s forms are documented with `define-syntax`'s string.
+- The completeness test covers them too.
 
 ### 10.2 The reference of the built-ins
 - **`docs/builtins.md`, generated** by a cog-lisp program (`tools/builtins.lisp`)
@@ -176,7 +195,9 @@ moved them ahead of the pure image (now Phase 11) on 2026-11-05.
 
 - AC-1 (10.1) Every primitive, special form and `lib/core.lisp` form has
   documentation, and a test fails when one does not. `(documentation 'name)`
-  answers it, and a documented `define` keeps its string. The example runs.
+  answers it, and a documented `define`, `define-macro` and `define-syntax` keep
+  their strings. `lib/core.lisp` uses `define-syntax`'s string, compiled by the
+  v0.2.0 seed. The example runs.
 - AC-2 (10.2) `docs/builtins.md` is generated from the image, matches it in a
   suite, and ships in the bundles.
 - AC-3 (10.3) The extension shows hover help and completion for every public
@@ -196,23 +217,20 @@ moved them ahead of the pure image (now Phase 11) on 2026-11-05.
 | `examples/documentation.lisp` | a documented procedure, and a built-in's documentation read back |
 | (the manual) | every example, as a chapter's worked and checked code |
 
-## 7. Decisions for the owner
+## 7. Decisions (owner, 2026-11-05)
 
-1. **The documentation form for macros and special forms**: a `document!` call
-   beside the definition (proposed, since every seed compiles it), or a new
-   `define-syntax` argument (cleaner, but usable in `lib/core.lisp` only after a
-   release, under the self-hosting rule).
-2. **Generated files are committed and checked** (proposed: reviewable in diffs,
-   and readable on GitHub), rather than generated only at release.
-3. **The manual's form**: Markdown in the repository (proposed: GitHub renders
-   it, and the bundles ship it), or a generated HTML site as well.
-4. **The language server evaluates a document's syntax definitions** in order to
-   expand later forms (proposed), accepting that a document's macros run inside
-   the server's image.
-5. **R-17** (re-reading an incomplete REPL form is quadratic) is a REPL problem
-   that the review filed under the language server. The proposal: the server
-   reads whole documents, so R-17 stays with the REPL, to be fixed when a large
-   form sent to it makes it matter.
+1. **Macros are documented by a string in `define-syntax`**, not a separate
+   call. A minor release (v0.2.0) gives the seed that compiles it (10.1). Special
+   forms use a string in `define-special-form`, which needs no release.
+2. **Every generated file is committed** and checked against the image by a
+   suite: the reference, the editor's data, the manual.
+3. **The manual is Markdown.**
+4. **Open**: whether the language server evaluates a document's syntax
+   definitions so later forms expand (proposed), accepting that a document's
+   macros run inside the server's image. Settled with 10.5's detailed spec,
+   after the spike.
+5. **R-17 stays with the REPL**: the server reads whole documents. It is fixed
+   when a large form sent to the REPL makes it matter.
 
 ## 8. Risks
 

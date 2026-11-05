@@ -327,10 +327,13 @@ were re-run and reproduced.
 - **Fix.** Define `LispError` in the reader package; reparent. Full condition
   system: **plan → conditions & restarts**.
 
-### R-17 Re-reading an incomplete REPL form is quadratic — plan → language server
+### R-17 Re-reading an incomplete REPL form is quadratic — plan → the REPL (owner, 2026-11-05)
 - **Evidence.** A 1000-line form piped to the REPL: 1.76 s; 4000 lines: 13.7 s
   (1.05 s as a file).
 - **Verdict.** Plan; promote if send-to-REPL sends large forms.
+- **2026-11-05.** It stays with the REPL (owner): the Phase 10 language server
+  reads whole documents, so it does not need the fix. Fixed when a large form
+  sent to the REPL makes it matter.
 
 ### R-18 Interop gaps — plan → Smalltalk interop
 - **Evidence.** A tail-calling procedure called from Smalltalk with `value:`
@@ -388,6 +391,6 @@ recovery after an error.
 | **Plan → conditions & restarts** | C-18 (`qqAppend`) · R-2 (host errors) |
 | **Plan → numeric tower** | R-11 (reading) · R-21: both closed in Phase 9 step 9.2 |
 | **Plan → hygienic macros** | C-14: closed in Phase 9 step 9.3 |
-| **Plan → language server** | C-18 (positions) · R-17: Phase 10 step 10.5 (specs/phase-10-documentation-and-editor.md) |
+| **Plan → language server** | C-18 (positions): Phase 10 step 10.5 (specs/phase-10-documentation-and-editor.md) · R-17: stays with the REPL (owner, 2026-11-05) |
 | **Plan → 7.5 tooling** | T-3 |
 | **Keep** | D-2 · C-15 · R-19 (printing) · R-25 |
