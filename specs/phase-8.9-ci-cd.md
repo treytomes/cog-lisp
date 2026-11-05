@@ -125,7 +125,7 @@ hand (`workflow_dispatch`) and upload `results.md` as an artifact.
 - AC-3 On Linux, stdin and output behave as on Windows: delayed pipe input, file
   input, end of input, UTF-8 text both ways (`λ` in and out), and the REPL at a
   pseudo-terminal reads lines and ends on Ctrl+D.
-- AC-4 A push runs `ci.yml`, and every job passes on `master`.
+- AC-4 A push runs `ci.yml`, and every job passes on `main` (`master` until 2026-11-05, when the owner renamed it).
 - AC-5 A failing check fails its job (shown once on a throwaway branch, then
   deleted).
 - AC-6 The image built on Linux runs the examples on Windows with matching
@@ -153,7 +153,7 @@ hand (`workflow_dispatch`) and upload `results.md` as an artifact.
 1. **How often does the Windows job run?** Leaning: every push, like the Linux
    jobs. It is free for a public repository, and the Windows-only code is where a
    change in shared code could break unnoticed. The alternative is pushes to
-   `master` and tags only, for faster pull-request feedback.
+   `main` and tags only, for faster pull-request feedback.
 2. **Both compilers on every push?** Leaning: yes. It is a second Linux job,
    about 2–3 minutes, running in parallel.
 3. **Release bundles include the Pharo VM?** Leaning: yes. Without it, trying
