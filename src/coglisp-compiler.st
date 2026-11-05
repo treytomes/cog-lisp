@@ -141,6 +141,7 @@ cm value: comp class value: 'implementation' value: 'lispEntries
 		at: #eval put: (at value: ''lisp-eval-from'');
 		at: #macroexpand1 put: (at value: ''lisp-macroexpand-1'');
 		at: #macroexpand put: (at value: ''lisp-macroexpand'');
+		at: #parseNumber put: (at value: ''reader-parse-number'');
 		at: #makeReader put: (at value: ''make-reader'');
 		at: #next put: (at value: ''reader-next'');
 		at: #datumStart put: (at value: ''reader-datum-start'');

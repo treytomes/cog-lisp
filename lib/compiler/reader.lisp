@@ -300,42 +300,117 @@
     (let ((s (substring (rd-source r) start (rd-pos r))))
       (cond ((= (string-length s) 0) (rd-error r "unexpected character"))
             ((string=? s ".") (rd-error-at "unexpected dot" (- (rd-pos r) 1) #f))
-            (else (rd-classify s))))))
+            (else (rd-classify r s))))))
 
-(define (rd-classify s)
-  (cond ((rd-integer-text? s) (rd-parse-integer s))
-        ((rd-float-text? s) (rd-parse-float s))
-        (else (string->symbol s))))
+;; a token is a number if one of the built-in syntaxes or a registered one reads
+;; it, else a symbol. Most tokens cannot start a number: one test decides.
+(define (rd-classify r s)
+  (let ((v (and (rd-number-start? (string-ref s 0)) (rd-parse-real s 0 10 #f))))
+    (cond ((eq? v rd-zero-denominator)
+           (rd-error-at (string-append "division by zero: " s) (- (rd-pos r) (string-length s)) #f))
+          (v v)
+          ((rd-other-number-syntax s))
+          (else (string->symbol s)))))
 
 (define (rd-sign? c) (or (eq? c #\+) (eq? c #\-)))
 
-(define (rd-integer-text? s)
-  (let* ((n (string-length s))
-         (i (if (and (> n 0) (rd-sign? (string-ref s 0))) 1 0)))
-    (and (< i n)
-         (let loop ((k i))
-           (or (= k n) (and (char-numeric? (string-ref s k)) (loop (+ k 1))))))))
+;;; Numbers: R7RS 7.1.1's real numbers (specs/phase-9-language.md step 9.2)
+;;;   integers and n/d in any radix, decimals in radix 10, +inf.0 -inf.0 +nan.0
+;;;   -nan.0, and the prefixes #e #i #x #o #b #d. A parser answers the number,
+;;;   #f when the text is not one, or rd-zero-denominator for n/0.
 
-(define (rd-parse-integer s)
-  (let* ((neg (eq? (string-ref s 0) #\-))
-         (i (if (rd-sign? (string-ref s 0)) 1 0)))
-    (let loop ((k i) (v 0))
-      (if (= k (string-length s))
-          (if neg (- v) v)
-          (loop (+ k 1) (+ (* v 10) (digit-value (string-ref s k))))))))
+(define (rd-number-start? c) (or (char-numeric? c) (eq? c #\+) (eq? c #\-) (eq? c #\.)))
+
+(define rd-zero-denominator (vector 'zero-denominator))
+
+;; what string->number and the # syntax read: prefixes, then a real
+(define (rd-parse-number s radix)
+  (rd-parse-prefixed s 0 radix #f #f))
+
+(define (rd-parse-prefixed s i radix radix-set exactness)
+  (if (and (< (+ i 1) (string-length s)) (eq? (string-ref s i) #\#))
+      (let ((c (char-downcase (string-ref s (+ i 1)))))
+        (cond ((and (not radix-set) (assv c '((#\x . 16) (#\o . 8) (#\b . 2) (#\d . 10))))
+               => (lambda (p) (rd-parse-prefixed s (+ i 2) (cdr p) #t exactness)))
+              ((and (not exactness) (or (eq? c #\e) (eq? c #\i)))
+               (rd-parse-prefixed s (+ i 2) radix radix-set c))
+              (else #f)))
+      (let ((v (rd-parse-real s i radix (eq? exactness #\e))))
+        (if (and (eq? exactness #\i) v (not (eq? v rd-zero-denominator)))
+            [v asFloat]
+            v))))
+
+;; a real from index i: exact answers an exact number for a decimal (#e), and #f
+;; for the infinities and NaN, which have no exact value
+(define (rd-parse-real s i radix exact)
+  (let ((n (string-length s)))
+    (cond ((= i n) #f)
+          ((and (= (- n i) 6) (rd-special-float [[(substring s i n) asLowercase] asString]))
+           => (lambda (v) (if exact #f v)))
+          (else
+           (let* ((c (string-ref s i))
+                  (j (if (rd-sign? c) (+ i 1) i))
+                  (v (and (< j n) (not (rd-sign? (string-ref s j))) (rd-parse-ureal s j radix exact))))
+             (if (and v (eq? c #\-) (not (eq? v rd-zero-denominator)))
+                 (rd-negate v)
+                 v))))))
+
+(define (rd-special-float s)
+  (cond ((string=? s "+inf.0") [(smalltalk Float) infinity])
+        ((string=? s "-inf.0") [[(smalltalk Float) infinity] negated])
+        ((or (string=? s "+nan.0") (string=? s "-nan.0")) [(smalltalk Float) nan])
+        (else #f)))
+
+;; -0.0 keeps its sign
+(define (rd-negate v)
+  (if (and [v isFloat] (= v 0)) [(smalltalk Float) negativeZero] [v negated]))
+
+;; an unsigned real from index j: an integer, n/d, or (radix 10) a decimal
+(define (rd-parse-ureal s j radix exact)
+  (let* ((n (string-length s))
+         (k (rd-skip-radix-digits s j radix)))
+    (cond ((and (> k j) (= k n)) (rd-digits->integer s j k radix))
+          ((and (> k j) (eq? (string-ref s k) #\/))
+           (let ((m (rd-skip-radix-digits s (+ k 1) radix)))
+             (and (> m (+ k 1)) (= m n)
+                  (let ((d (rd-digits->integer s (+ k 1) m radix)))
+                    (if (= d 0)
+                        rd-zero-denominator
+                        (/ (rd-digits->integer s j k radix) d))))))
+          ((= radix 10)
+           (let ((u (substring s j n)))
+             (and (rd-float-text? u)
+                  (let ((x (rd-decimal-value u)))
+                    (if exact x [x asFloat])))))
+          (else #f))))
+
+(define (rd-digit c radix)
+  (if (and (char-numeric? c) (<= radix 10))
+      (let ((d (digit-value c))) (and d (< d radix) d))
+      (let ((d (string-index "0123456789abcdef" (char-downcase c)))) (and d (< d radix) d))))
+
+;; the index after the digits of radix that start at i
+(define (rd-skip-radix-digits s i radix)
+  (if (and (< i (string-length s)) (rd-digit (string-ref s i) radix))
+      (rd-skip-radix-digits s (+ i 1) radix)
+      i))
+
+(define (rd-digits->integer s from to radix)
+  (let loop ((k from) (v 0))
+    (if (= k to) v (loop (+ k 1) (+ (* v radix) (rd-digit (string-ref s k) radix))))))
 
 ;; count the digits starting at i: answers the index after them
 (define (rd-skip-digits s i)
   (if (and (< i (string-length s)) (char-numeric? (string-ref s i))) (rd-skip-digits s (+ i 1)) i))
 
+;; an unsigned decimal: digits, a dot, digits, an exponent
 (define (rd-float-text? s)
   (let* ((n (string-length s))
-         (i0 (if (and (> n 0) (rd-sign? (string-ref s 0))) 1 0))
-         (i1 (rd-skip-digits s i0))
+         (i1 (rd-skip-digits s 0))
          (has-dot (and (< i1 n) (eq? (string-ref s i1) #\.)))
          (i2 (if has-dot (+ i1 1) i1))
          (i3 (rd-skip-digits s i2)))
-    (and (> (+ (- i1 i0) (- i3 i2)) 0)
+    (and (> (+ i1 (- i3 i2)) 0)
          (let ((has-exp (and (< i3 n) (memv (string-ref s i3) '(#\e #\E)) #t)))
            (if has-exp
                (let* ((j0 (+ i3 1))
@@ -350,12 +425,12 @@
   (let loop ((k from) (v 0))
     (if (= k to) v (loop (+ k 1) (+ (* v 10) (digit-value (string-ref s k)))))))
 
-(define (rd-parse-float s)
+;; the exact value of an unsigned decimal (rd-float-text? holds); asFloat of it is
+;; the nearest float
+(define (rd-decimal-value s)
   (let* ((n (string-length s))
-         (sign (if (eq? (string-ref s 0) #\-) -1 1))
-         (i0 (if (rd-sign? (string-ref s 0)) 1 0))
-         (i1 (rd-skip-digits s i0))
-         (int-part (rd-digits-value s i0 i1))
+         (i1 (rd-skip-digits s 0))
+         (int-part (rd-digits-value s 0 i1))
          (has-dot (and (< i1 n) (eq? (string-ref s i1) #\.)))
          (i2 (if has-dot (+ i1 1) i1))
          (i3 (rd-skip-digits s i2))
@@ -369,11 +444,32 @@
                      (e (rd-digits-value s j1 n)))
                 (if neg (- e) e))
               0))
-         (mantissa (+ (* int-part (rd-power-of-ten frac-len)) frac-part))
-         (value (* (/ (* sign mantissa) (rd-power-of-ten frac-len)) (rd-power-of-ten exponent))))
-    (if (and (= value 0) (= sign -1))
-        [(smalltalk Float) negativeZero]           ; -0.0 keeps its sign
-        [value asFloat])))
+         (mantissa (+ (* int-part (rd-power-of-ten frac-len)) frac-part)))
+    (* (/ mantissa (rd-power-of-ten frac-len)) (rd-power-of-ten exponent))))
+
+;;; Number syntaxes a library adds (step 9.2): (predicate . parser) pairs, tried
+;;; in order on a token no built-in syntax reads. The box is shared, so a syntax
+;;; defined later reaches the sealed reader.
+(define rd-number-syntaxes (vector '()))
+
+(define (define-number-syntax predicate parser)
+  (vector-set! rd-number-syntaxes 0
+               (append (vector-ref rd-number-syntaxes 0) (list (cons predicate parser))))
+  (if #f #f))
+
+(define (rd-other-number-syntax s)
+  (let loop ((syntaxes (vector-ref rd-number-syntaxes 0)))
+    (cond ((null? syntaxes) #f)
+          (((car (car syntaxes)) s) ((cdr (car syntaxes)) s))
+          (else (loop (cdr syntaxes))))))
+
+;; string->number (through the entry points): a number, or #f
+(define (reader-parse-number s radix)
+  (let ((v (rd-parse-number s radix)))
+    (cond ((eq? v rd-zero-denominator) #f)
+          (v v)
+          ((= radix 10) (rd-other-number-syntax s))
+          (else #f))))
 
 ;;; # syntax: characters, vectors, booleans, datum labels
 
@@ -385,8 +481,15 @@
           ((eq? c #\() (rd-vector r))
           ((char-numeric? c) (rd-label-start r))
           (else
-           (let ((word (rd-hash-word r)))
-             (cond ((or (string=? word "t") (string=? word "true")) #t)
+           (let* ((start (- (rd-pos r) 1))
+                  (word (rd-hash-word r))
+                  (v (and (> (string-length word) 1)
+                          (memv (char-downcase (string-ref word 0)) '(#\e #\i #\x #\o #\b #\d))
+                          (rd-parse-number (string-append "#" word) 10))))
+             (cond ((eq? v rd-zero-denominator)
+                    (rd-error-at (string-append "division by zero: #" word) start #f))
+                   (v v)
+                   ((or (string=? word "t") (string=? word "true")) #t)
                    ((or (string=? word "f") (string=? word "false")) #f)
                    (else (rd-error r (string-append "unknown # syntax: #" word)))))))))
 

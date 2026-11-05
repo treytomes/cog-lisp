@@ -253,21 +253,35 @@ cm value: prims class value: 'checks' value: 'compare: a with: b
 		x > y ifTrue: [^ 1]].
 	^ (a size - b size) sign'.
 cm value: prims class value: 'checks' value: 'numberFrom: s radix: radix
-	"string->number: what the reader reads as a number, or #f."
-	| r d neg digits v |
-	radix = 10 ifTrue: [
-		^ [r := LispReader on: s.
-		   d := r next.
-		   (d isNumber and: [r atEnd]) ifTrue: [d] ifFalse: [false]] on: LispReadError do: [:e | false]].
-	neg := s notEmpty and: [s first = $-].
-	digits := neg ifTrue: [s allButFirst] ifFalse: [s].
-	digits isEmpty ifTrue: [^ false].
-	v := 0.
-	digits do: [:c | | dv |
-		dv := c asUppercase digitValue.
-		(dv between: 0 and: radix - 1) ifFalse: [^ false].
-		v := v * radix + dv].
-	^ neg ifTrue: [v negated] ifFalse: [v]'.
+	"string->number: what the reader reads as a number, or #f (the reader''s own
+	 parser, Phase 9 step 9.2)."
+	^ (LispCompiler entries at: #parseNumber) value: s value: radix'.
+cm value: prims class value: 'checks' value: 'radix: rest for: who
+	"The optional radix of string->number and number->string: 2, 8, 10 or 16."
+	| radix |
+	radix := rest lispElements ifEmpty: [10] ifNotEmpty: [:r | r first].
+	(#(2 8 10 16) includes: radix) ifFalse: [self fail: who with: ''the radix must be 2, 8, 10 or 16: '' , (self show: radix)].
+	^ radix'.
+cm value: prims class value: 'checks' value: 'number: x for: who
+	"x, if it is a number; else an error naming who."
+	x isNumber ifFalse: [self fail: who with: ''not a number: '' , (self show: x)].
+	^ x'.
+cm value: prims class value: 'checks' value: 'real: x for: who
+	((x isNumber) and: [x lispIsReal]) ifFalse: [self fail: who with: ''not a real number: '' , (self show: x)].
+	^ x'.
+cm value: prims class value: 'checks' value: 'integer: x for: who
+	((x isNumber) and: [x lispIsInteger]) ifFalse: [self fail: who with: ''not an integer: '' , (self show: x)].
+	^ x'.
+cm value: prims class value: 'arithmetic' value: 'divide: a by: b
+	"a / b. An exact zero divisor of an exact dividend is an error; with a float
+	 either side the answer is IEEE''s: +inf.0, -inf.0 or +nan.0 (Phase 9 step 9.2)."
+	b = 0 ifFalse: [^ a / b].
+	((a isKindOf: Float) or: [b isKindOf: Float]) ifFalse: [^ a / b].
+	(a isNumber and: [a lispIsReal]) ifFalse: [^ a / b].
+	(a = 0 or: [a lispIsNaN]) ifTrue: [^ Float nan].
+	^ ((a > 0) = ((b isKindOf: Float) and: [b signBit = 1]))
+		ifTrue: [Float infinity negated]
+		ifFalse: [Float infinity]'.
 cm value: prims class value: 'checks' value: 'equalityTests
 	"The eq?, eqv? and equal? primitives ever installed, with the test each makes.
 	 A table knows its test by the procedure itself, not by what the names are
@@ -341,13 +355,11 @@ cm value: prims class value: 'installing' value: 'installStringsInto: anEnv
 	def value: ''symbol->string'' value: (LispProcedure fixed: [:y |
 		(y isKindOf: LispSymbol) ifTrue: [y name copy] ifFalse: [self fail: ''symbol->string'' with: ''not a symbol: '' , (self show: y)]] arity: 1).
 	def value: ''string->number'' value: (LispProcedure variadic: [:s :rest |
-		self numberFrom: (str value: s value: ''string->number'') radix: ((opt value: rest) ifEmpty: [10] ifNotEmpty: [:r | r first])] required: 1).
+		self numberFrom: (str value: s value: ''string->number'') radix: (self radix: rest for: ''string->number'')] required: 1).
 	def value: ''number->string'' value: (LispProcedure variadic: [:z :rest | | radix |
 		z isNumber ifFalse: [self fail: ''number->string'' with: ''not a number: '' , (self show: z)].
-		radix := (opt value: rest) ifEmpty: [10] ifNotEmpty: [:r | r first].
-		(radix = 10 or: [(z isKindOf: Integer) not])
-			ifTrue: [LispPrinter writeString: z]
-			ifFalse: [(z printStringBase: radix) asLowercase]] required: 1).
+		radix := self radix: rest for: ''number->string''.
+		String streamContents: [:o | z lispWriteOn: o base: radix]] required: 1).
 	cmp := [:name :key :test | def value: name value: (LispProcedure variadic: [:first :rest | | all |
 		all := ({ first } , rest lispElements asArray) collect: [:s | key value: (str value: s value: name)].
 		self chain: all with: [:a :b | test value: (self compare: a with: b)]] required: 1)].
@@ -1148,18 +1160,20 @@ cm value: prims class value: 'installing' value: 'installListsInto: anEnv
 	anEnv define: (LispSymbol named: ''map'') value: (LispProcedure fixed: [:prc :lst | LispCons fromArray: ((LispCons elementsOf: lst for: ''map'') collect: [:e | LispProcedure apply: prc to: { e }]) asArray] arity: 2).
 	anEnv define: (LispSymbol named: ''for-each'') value: (LispProcedure fixed: [:prc :lst | (LispCons elementsOf: lst for: ''for-each'') do: [:e | LispProcedure apply: prc to: { e }]. LispUnspecified default] arity: 2)'.
 cm value: prims class value: 'installing' value: 'installNumbersInto: anEnv
-	anEnv define: (LispSymbol named: ''+'') value: (LispProcedure variadic: [:nums | nums lispElements inject: 0 into: [:a :b | a + b]] required: 0).
-	anEnv define: (LispSymbol named: ''*'') value: (LispProcedure variadic: [:nums | nums lispElements inject: 1 into: [:a :b | a * b]] required: 0).
-	anEnv define: (LispSymbol named: ''-'') value: (LispProcedure variadic: [:first :rest | rest lispElements isEmpty ifTrue: [first negated] ifFalse: [rest lispElements inject: first into: [:a :b | a - b]]] required: 1).
-	anEnv define: (LispSymbol named: ''/'') value: (LispProcedure variadic: [:first :rest | rest lispElements isEmpty ifTrue: [1 / first] ifFalse: [rest lispElements inject: first into: [:a :b | a / b]]] required: 1).
+	"(+ x) and (* x) check x: they used to answer it whatever it was (review R-11)"
+	anEnv define: (LispSymbol named: ''+'') value: (LispProcedure variadic: [:nums | | xs | xs := nums lispElements. xs size = 1 ifTrue: [self number: xs first for: ''+''] ifFalse: [xs inject: 0 into: [:a :b | a + b]]] required: 0).
+	anEnv define: (LispSymbol named: ''*'') value: (LispProcedure variadic: [:nums | | xs | xs := nums lispElements. xs size = 1 ifTrue: [self number: xs first for: ''*''] ifFalse: [xs inject: 1 into: [:a :b | a * b]]] required: 0).
+	anEnv define: (LispSymbol named: ''-'') value: (LispProcedure variadic: [:first :rest | rest lispElements isEmpty ifTrue: [(self number: first for: ''-'') negated] ifFalse: [rest lispElements inject: first into: [:a :b | a - b]]] required: 1).
+	anEnv define: (LispSymbol named: ''/'') value: (LispProcedure variadic: [:first :rest | rest lispElements isEmpty ifTrue: [self divide: 1 by: (self number: first for: ''/'')] ifFalse: [rest lispElements inject: first into: [:a :b | self divide: a by: b]]] required: 1).
 	anEnv define: (LispSymbol named: ''modulo'') value: (LispProcedure fixed: [:a :b | a \\ b] arity: 2).
 	anEnv define: (LispSymbol named: ''quotient'') value: (LispProcedure fixed: [:a :b | a quo: b] arity: 2).
 	anEnv define: (LispSymbol named: ''abs'') value: (LispProcedure fixed: [:a | a abs] arity: 1).
-	anEnv define: (LispSymbol named: ''min'') value: (LispProcedure variadic: [:first :rest | rest lispElements inject: first into: [:a :b | a min: b]] required: 1).
-	anEnv define: (LispSymbol named: ''max'') value: (LispProcedure variadic: [:first :rest | rest lispElements inject: first into: [:a :b | a max: b]] required: 1).
-	anEnv define: (LispSymbol named: ''zero?'') value: (LispProcedure fixed: [:a | a = 0] arity: 1).
-	anEnv define: (LispSymbol named: ''positive?'') value: (LispProcedure fixed: [:a | a > 0] arity: 1).
-	anEnv define: (LispSymbol named: ''negative?'') value: (LispProcedure fixed: [:a | a < 0] arity: 1).
+	anEnv define: (LispSymbol named: ''min'') value: (LispProcedure variadic: [:first :rest | self extreme: #min: of: first and: rest for: ''min''] required: 1).
+	anEnv define: (LispSymbol named: ''max'') value: (LispProcedure variadic: [:first :rest | self extreme: #max: of: first and: rest for: ''max''] required: 1).
+	anEnv define: (LispSymbol named: ''zero?'') value: (LispProcedure fixed: [:a | (self number: a for: ''zero?'') = 0] arity: 1).
+	anEnv define: (LispSymbol named: ''positive?'') value: (LispProcedure fixed: [:a | (self real: a for: ''positive?'') > 0] arity: 1).
+	anEnv define: (LispSymbol named: ''negative?'') value: (LispProcedure fixed: [:a | (self real: a for: ''negative?'') < 0] arity: 1).
+	self installNumericTowerInto: anEnv.
 	self installNumberEntriesInto: anEnv'.
 cm value: prims class value: 'installing' value: 'installNumberEntriesInto: anEnv
 	"Phase 6 section 5.1: direct entries for the common fixed-arity uses of the
@@ -1168,12 +1182,49 @@ cm value: prims class value: 'installing' value: 'installNumberEntriesInto: anEn
 	e := [:name | anEnv lookup: (LispSymbol named: name)].
 	"0 to 4 arguments, as Phase 6 section 10 says: with four, (+ acc g1 g2 g3) used to take
 	 the variadic path, 14 times slower (review O-1)"
-	(e value: ''+'') entry: 0 is: [0]; entry: 1 is: [:a | a]; entry: 2 is: [:a :b | a + b]; entry: 3 is: [:a :b :c | a + b + c]; entry: 4 is: [:a :b :c :d | a + b + c + d].
-	(e value: ''*'') entry: 0 is: [1]; entry: 1 is: [:a | a]; entry: 2 is: [:a :b | a * b]; entry: 3 is: [:a :b :c | a * b * c]; entry: 4 is: [:a :b :c :d | a * b * c * d].
-	(e value: ''-'') entry: 1 is: [:a | a negated]; entry: 2 is: [:a :b | a - b]; entry: 3 is: [:a :b :c | a - b - c]; entry: 4 is: [:a :b :c :d | a - b - c - d].
-	(e value: ''/'') entry: 1 is: [:a | 1 / a]; entry: 2 is: [:a :b | a / b].
-	(e value: ''min'') entry: 2 is: [:a :b | a min: b].
-	(e value: ''max'') entry: 2 is: [:a :b | a max: b]'.
+	(e value: ''+'') entry: 0 is: [0]; entry: 1 is: [:a | self number: a for: ''+'']; entry: 2 is: [:a :b | a + b]; entry: 3 is: [:a :b :c | a + b + c]; entry: 4 is: [:a :b :c :d | a + b + c + d].
+	(e value: ''*'') entry: 0 is: [1]; entry: 1 is: [:a | self number: a for: ''*'']; entry: 2 is: [:a :b | a * b]; entry: 3 is: [:a :b :c | a * b * c]; entry: 4 is: [:a :b :c :d | a * b * c * d].
+	(e value: ''-'') entry: 1 is: [:a | (self number: a for: ''-'') negated]; entry: 2 is: [:a :b | a - b]; entry: 3 is: [:a :b :c | a - b - c]; entry: 4 is: [:a :b :c :d | a - b - c - d].
+	(e value: ''/'') entry: 1 is: [:a | self divide: 1 by: (self number: a for: ''/'')]; entry: 2 is: [:a :b | self divide: a by: b].
+	(e value: ''min'') entry: 2 is: [:a :b | self extreme: #min: of: a and: (LispCons car: b cdr: LispEmptyList default) for: ''min''].
+	(e value: ''max'') entry: 2 is: [:a :b | self extreme: #max: of: a and: (LispCons car: b cdr: LispEmptyList default) for: ''max'']'.
+cm value: prims class value: 'arithmetic' value: 'extreme: aSelector of: first and: rest for: who
+	"min or max: inexact if any argument is (R7RS 6.2.6)."
+	| result inexact |
+	result := self real: first for: who.
+	inexact := result lispIsExact not.
+	rest lispElements do: [:x |
+		(self real: x for: who) lispIsExact ifFalse: [inexact := true].
+		result := result perform: aSelector with: x].
+	^ inexact ifTrue: [result asFloat] ifFalse: [result]'.
+cm value: prims class value: 'installing' value: 'installNumericTowerInto: anEnv
+	"Phase 9 step 9.2a: the predicates, from the number protocol (Number>>lispIsExact
+	 and the rest, in CogLisp-Core), and exactness."
+	| def num |
+	def := [:name :proc | anEnv define: (LispSymbol named: name) value: proc].
+	num := [:x :who | self number: x for: who].
+	def value: ''complex?'' value: (LispProcedure fixed: [:x | x isNumber] arity: 1).
+	def value: ''real?'' value: (LispProcedure fixed: [:x | x isNumber and: [x lispIsReal]] arity: 1).
+	def value: ''rational?'' value: (LispProcedure fixed: [:x | x isNumber and: [x lispIsRational]] arity: 1).
+	def value: ''exact-integer?'' value: (LispProcedure fixed: [:x | x isNumber and: [x lispIsExact and: [x lispIsInteger]]] arity: 1).
+	def value: ''exact-rational?'' value: (LispProcedure fixed: [:x | x isNumber and: [x lispIsExact and: [x lispIsRational]]] arity: 1).
+	def value: ''exact?'' value: (LispProcedure fixed: [:x | (num value: x value: ''exact?'') lispIsExact] arity: 1).
+	def value: ''inexact?'' value: (LispProcedure fixed: [:x | (num value: x value: ''inexact?'') lispIsExact not] arity: 1).
+	def value: ''nan?'' value: (LispProcedure fixed: [:x | (num value: x value: ''nan?'') lispIsNaN] arity: 1).
+	def value: ''infinite?'' value: (LispProcedure fixed: [:x | (num value: x value: ''infinite?'') lispIsInfinite] arity: 1).
+	def value: ''finite?'' value: (LispProcedure fixed: [:x | (num value: x value: ''finite?'') lispIsInfinite not and: [x lispIsNaN not]] arity: 1).
+	def value: ''odd?'' value: (LispProcedure fixed: [:x | ((self integer: x for: ''odd?'') \\ 2) = 1] arity: 1).
+	def value: ''even?'' value: (LispProcedure fixed: [:x | ((self integer: x for: ''even?'') \\ 2) = 0] arity: 1).
+	def value: ''exact'' value: (LispProcedure fixed: [:x | self exact: x for: ''exact''] arity: 1).
+	def value: ''inexact->exact'' value: (LispProcedure fixed: [:x | self exact: x for: ''inexact->exact''] arity: 1).
+	def value: ''inexact'' value: (LispProcedure fixed: [:x | (num value: x value: ''inexact'') lispIsExact ifTrue: [x asFloat] ifFalse: [x]] arity: 1).
+	def value: ''exact->inexact'' value: (LispProcedure fixed: [:x | (num value: x value: ''exact->inexact'') lispIsExact ifTrue: [x asFloat] ifFalse: [x]] arity: 1)'.
+cm value: prims class value: 'arithmetic' value: 'exact: x for: who
+	"The exact number equal to x: a float''s exact value, not a nearby fraction."
+	(self number: x for: who) lispIsExact ifTrue: [^ x].
+	(x isKindOf: Float) ifFalse: [self fail: who with: ''no exact value for '' , (self show: x)].
+	(x isNaN or: [x isInfinite]) ifTrue: [self fail: who with: ''no exact value for '' , (self show: x)].
+	^ x asTrueFraction'.
 cm value: prims class value: 'installing' value: 'installComparisonsInto: anEnv
 	| e |
 	anEnv define: (LispSymbol named: ''='') value: (LispProcedure variadic: [:first :rest | | prev ok | prev := first. ok := true. rest lispElements do: [:x | (prev = x) ifFalse: [ok := false]. prev := x]. ok] required: 1).

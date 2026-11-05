@@ -40,7 +40,8 @@ check value: 'AC-2 isString sym' value: (LispCore isString: (sym value: 'hi')) v
 check value: 'AC-2 isChar' value: (LispCore isChar: $a) value: true.
 check value: 'AC-2 isNumber 3.14' value: (LispCore isNumber: 3.14) value: true.
 check value: 'AC-2 isInteger 3' value: (LispCore isInteger: 3) value: true.
-check value: 'AC-2 isInteger 3.0' value: (LispCore isInteger: 3.0) value: false.
+check value: 'AC-2 isInteger 3.0 (true since Phase 9 step 9.2: integer? asks the number; review R-11)' value: (LispCore isInteger: 3.0) value: true.
+check value: 'AC-2 isInteger 3.5' value: (LispCore isInteger: 3.5) value: false.
 
 "AC-3 isList (proper list, terminating)"
 check value: 'AC-3 isList ()' value: (LispCore isList: LispEmptyList default) value: true.

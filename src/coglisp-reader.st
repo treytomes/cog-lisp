@@ -205,8 +205,13 @@ cm value: lerr class value: 'describing' value: 'describe: anError
 		sel = #cdr ifTrue: [^ ''cdr: not a pair: '' , (self show: rcv)].
 		sel = #car: ifTrue: [^ ''set-car!!: not a pair: '' , (self show: rcv)].
 		sel = #cdr: ifTrue: [^ ''set-cdr!!: not a pair: '' , (self show: rcv)].
+		"arithmetic on a non-number: (+ 1 x) fails coercing x, (+ x 1) sends + to x"
 		(#(#adaptToNumber:andSend: #adaptToInteger:andSend: #adaptToFloat:andSend: #adaptToFraction:andSend:) includes: sel)
-			ifTrue: [^ anError message arguments last asString , '': not a number''].
+			ifTrue: [^ anError message arguments last asString , '': not a number: '' ,
+				"Pharo coerces a string a character at a time, so a character fails here"
+				((rcv isKindOf: Character) ifTrue: [''a string or a character''] ifFalse: [self show: rcv])].
+		((#(#+ #- #* #/ #< #> #<= #>= #negated #abs #// #\\ #rem: #quo: #min: #max:) includes: sel) and: [rcv isNumber not])
+			ifTrue: [^ sel asString , '': not a number: '' , (self show: rcv)].
 		"any other message: say so plainly, as Smalltalk would (Phase 7.6 section 7)"
 		^ (self show: rcv) , '' does not understand #'' , sel].
 	(anError isKindOf: ZeroDivide) ifTrue: [^ ''division by zero''].
@@ -361,15 +366,13 @@ cm value: prn class value: 'writing' value: 'print: v on: s display: displaying
 		v do: [:e | self print: e on: s display: displaying] separatedBy: [s nextPut: Character space].
 		^ s nextPut: $)].
 	(v isKindOf: LispCons) ifTrue: [^ self printList: v on: s display: displaying].
-	"3/2, which reads back as a symbol for now; Smalltalk prints (3/2) (review R-11)"
-	(v isKindOf: Fraction) ifTrue: [^ s print: v numerator; nextPut: $/; print: v denominator].
+	"a number writes itself (the number protocol, Phase 9 step 9.2): 3/2, +inf.0"
+	v isNumber ifTrue: [^ v lispWriteOn: s base: 10].
 	v == true ifTrue: [^ s nextPutAll: ''#t''].
 	v == false ifTrue: [^ s nextPutAll: ''#f''].
 	(v isKindOf: LispEmptyList) ifTrue: [^ s nextPutAll: ''()''].
 	(v isKindOf: LispSymbol) ifTrue: [^ s nextPutAll: v name].
 	(v isKindOf: LispCons) ifTrue: [^ self writeList: v on: s].
-	(v isKindOf: Integer) ifTrue: [^ s nextPutAll: v printString].
-	(v isKindOf: Float) ifTrue: [^ self writeFloat: v on: s].
 	(v isKindOf: Character) ifTrue: [^ self writeCharacter: v on: s].
 	(v isKindOf: Symbol) ifTrue: [^ s nextPutAll: ''#<''; nextPutAll: v printString; nextPut: $>].
 	(v isKindOf: String) ifTrue: [^ self writeStringLiteral: v on: s].
@@ -392,8 +395,6 @@ cm value: prn class value: 'writing' value: 'printList: aCons on: s display: dis
 		whileTrue: [s nextPut: Character space].
 	(cur isKindOf: LispEmptyList) ifFalse: [s nextPutAll: '' . ''. self print: cur on: s display: displaying].
 	s nextPut: $)'.
-cm value: prn class value: 'writing' value: 'writeFloat: aFloat on: s
-	s nextPutAll: aFloat printString'.
 cm value: prn class value: 'writing' value: 'writeCharacter: c on: s
 	c = Character space ifTrue: [^ s nextPutAll: ''#\space''].
 	c = Character lf ifTrue: [^ s nextPutAll: ''#\newline''].

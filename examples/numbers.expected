@@ -1,0 +1,21 @@
+1/3 + 1/6 = 1/2
+-6/4 reads as -3/2
+(* 1/3 3) = 1
+2 to the 100th = 1267650600228229401496703205376
+(exact? 1/2) = #t
+(inexact 1/3) = 0.3333333333333333
+(exact 0.5) = 1/2
+(exact 0.1) = 3602879701896397/36028797018963968
+(integer? 2.0) = #t
+#xff #b1010 #o777 = (255 10 511)
+#e1.25 = 5/4
+#i3/8 = 0.375
+(number->string 255 2) = "11111111"
+(string->number "1/a" 16) = 1/10
+(/ 1.0 0) = +inf.0
+(- (/ 1.0 0)) = -inf.0
+(/ 0.0 0) = +nan.0
+(nan? +nan.0) = #t
+(infinite? -inf.0) = #t
+(/ 1 0) is "division by zero"
+(+ 1 'apple) is "+: not a number: apple"

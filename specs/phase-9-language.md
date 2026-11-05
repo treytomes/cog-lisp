@@ -195,9 +195,10 @@ runs every suite.
 - **Open to new kinds** (owner, 2026-11-04: complex numbers should be a library
   that can be added at any time):
   - the arithmetic and comparison primitives dispatch on their operands through
-    Smalltalk's coercion protocol (`generality`, `adaptToNumber:andSend:`), not on
-    a closed list of classes, so a new number class joins the arithmetic by
-    implementing that protocol;
+    Smalltalk's coercion protocol (`adaptToInteger:andSend:`,
+    `adaptToFraction:andSend:`, `adaptToFloat:andSend:`; Pharo 14 has no
+    `generality`, measured 2026-11-05), not on a closed list of classes, so a new
+    number class joins the arithmetic by implementing that protocol;
   - the numeric predicates (`number?`, `complex?`, `real?`, …) and printing ask
     the object, so a new class answers for itself;
   - the reader offers a hook for number syntax it does not know
@@ -223,6 +224,98 @@ runs every suite.
   `number->string` with a radix, for rationals too.
 - **Type errors in arithmetic**: `(+ 'a)` is an error, not `a` (R-11).
 - **Speed**: the inlined fast paths for small integers stay as they are.
+
+#### 9.2 in detail (2026-11-05)
+
+Measured first: before 9.2, of the procedures above only `+ - * / quotient
+modulo abs min max zero? positive? negative? number? integer?` existed; `1/3`
+read as a symbol; `(/ 1.0 0.0)` was a division-by-zero error; infinity printed
+as `Float infinity`; and cog-lisp had **no multiple values**, which `floor/`,
+`truncate/` and `exact-integer-sqrt` return. Three commits:
+
+**9.2a: the tower itself** (read, print, ask, convert).
+- **The number protocol**: what cog-lisp asks of a number, as extension methods
+  on Pharo's `Number` (package `CogLisp-Core`), each with a default a new class
+  inherits and may override:
+
+  | Message | `Number` default | `Integer` | `Fraction` | `Float` |
+  |---|---|---|---|---|
+  | `lispIsExact` | false | true | true | false |
+  | `lispIsReal` | true | true | true | true |
+  | `lispIsRational` | false | true | true | finite |
+  | `lispIsInteger` | false | true | false | finite, no fraction part |
+  | `lispIsNaN`, `lispIsInfinite` | false | false | false | as the float is |
+  | `lispWriteOn:base:` | `printString`, base 10 only | digits | `n/d` | `+inf.0` etc., base 10 only |
+
+  A new number type subclasses `Number`, implements its arithmetic and the
+  `adaptTo…:andSend:` coercions, and overrides what differs (a complex type:
+  `lispIsReal` false). The predicates and the printer use nothing else.
+- **Reading** (`lib/compiler/reader.lisp`, one parser for the reader and
+  `string->number`, which takes a radix): R7RS 7.1.1's real numbers.
+  - Integers and `n/d` rationals in any radix; decimals (`1.5`, `.5`, `5.`,
+    `1e10`) in radix 10.
+  - The prefixes `#e #i #x #o #b #d`, at most one of each kind, in either order.
+  - `+inf.0 -inf.0 +nan.0 -nan.0`.
+  - `#e` on a decimal gives its exact value (`#e1.1` is `11/10`). `#i` gives
+    the nearest float.
+  - `n/0` is a read error ("division by zero"); `string->number` answers `#f`
+    for it.
+  - The common case stays cheap: a token that cannot start a number (its first
+    character not a digit, sign or dot) is a symbol after one test.
+- **Printing**: through `lispWriteOn:base:`. `+inf.0`, `-inf.0`, `+nan.0`;
+  other floats as Pharo prints them, which read back; `-6/4` prints `-3/2`.
+- **The predicates** of 9.2, from the protocol. `exact?`, `inexact?`, `nan?`,
+  `infinite?`, `finite?` and the sign tests need a number, and `odd?`/`even?` an
+  integer; anything else is an error naming the procedure.
+- **`exact`, `inexact`** and the old names. `(exact 0.1)` is
+  `3602879701896397/36028797018963968`, the float's exact value. `(exact +inf.0)`
+  is an error.
+- **Division by zero**: exact `(/ 1 0)` stays an error. With a float operand the
+  answer is IEEE's: `(/ 1.0 0)` is `+inf.0`, `(/ 0.0 0)` is `+nan.0`.
+- **Type errors**: the one-argument entries of `+ * - / min max` check their
+  argument. A host "does not understand" from arithmetic on a non-number is
+  reported as `+: not a number: a`.
+
+**9.2b: the procedures, and multiple values.**
+- **Multiple values** (R7RS 6.10), because `floor/` needs them:
+  - `values` answers its argument when given one, otherwise a values object;
+  - `call-with-values` calls its consumer with the values, as a tail call;
+  - `let-values` and `let*-values` are macros in `lib/core.lisp`;
+  - a values object prints as its values separated by spaces (what the REPL
+    shows).
+- **Rounding**: `floor ceiling round truncate` keep exactness: `(floor 2.5)` is
+  `2.0`, and `(round 5/2)` is `2` (to even).
+- **The division family** on integers, and on floats with integer values (the
+  answers are then inexact):
+  - `floor/` and `truncate/` answer two values;
+  - `floor-quotient`, `floor-remainder`, `truncate-quotient`, `truncate-remainder`;
+  - `quotient remainder modulo`.
+- **Rationals and integers**: `numerator`, `denominator` (of a float, inexact),
+  `gcd`, `lcm`, `abs`, `square`.
+- **Contagion**: `min` and `max` answer inexact if any argument is.
+- **Roots and powers**:
+  - `sqrt` is exact for an exact perfect square (`(sqrt 16)` is `4`,
+    `(sqrt 1/4)` is `1/2`), otherwise inexact. A negative argument is an error
+    naming complex numbers, which are a library;
+  - `exact-integer-sqrt` answers two values;
+  - `expt` is exact for an exact base and an exact integer power;
+  - `rationalize` answers the simplest rational within the tolerance (Stern-Brocot).
+- **Transcendental functions**: `exp log sin cos tan asin acos atan`, inexact,
+  with `log` and `atan` also taking two arguments. `(log 0)` is `-inf.0`.
+  Outside the real domain they answer `+nan.0`.
+- **`number->string`** with a radix, for rationals too (`(number->string 1/3 2)`
+  is `"1/11"`).
+
+**9.2c: open to new kinds.**
+- **`(define-number-syntax predicate parser)`**: the reader and `string->number`
+  try each registered syntax, in order, on a token that is not a built-in number,
+  before it becomes a symbol. The registry is a shared box, so it reaches the
+  sealed reader (step 8.5), as `define-special-form` reaches the compiler.
+- **The example `new-number-type.lisp`** defines dual numbers (`a+bε`, the basis
+  of automatic differentiation) as a `Number` subclass through interop, with
+  their read syntax. It then uses them in ordinary arithmetic, mixed with
+  integers and rationals, and in comparisons, predicates and printing. A test
+  checks the same.
 
 ### 9.3 Hygienic macros (R7RS 4.3)
 - **Forms**: `define-syntax`, `let-syntax`, `letrec-syntax`, `syntax-rules` with
@@ -299,5 +392,5 @@ runs every suite.
 | Step | Status |
 |---|---|
 | 9.1 Seeded builds | done (2026-11-05): built from the v0.1.2 seed (9.1a); the Smalltalk reader and compiler retired (9.1b); the seed rebuilt from its source in CI (9.1c) |
-| 9.2 Numeric tower | not started |
+| 9.2 Numeric tower | 9.2a done (2026-11-05): read, print, predicates, exactness, IEEE division, type errors (R-11, R-21); 9.2b, 9.2c to come |
 | 9.3 Hygienic macros | not started |

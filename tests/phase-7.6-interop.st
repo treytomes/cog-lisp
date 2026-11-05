@@ -133,7 +133,7 @@ h check: 'AC-18 read:' actual: (CogLisp read: '(a b)') expected: (lst value: '(a
 
 "AC-19 errors"
 
-h check: 'AC-19 R-2 translations unchanged' actual: { msg value: '(car 5)'. msg value: '(+ 1 "a")'. msg value: '(/ 1 0)' } expected: { 'car: not a pair: 5'. '+: not a number'. 'division by zero' }.
+h check: 'AC-19 R-2 translations unchanged' actual: { msg value: '(car 5)'. msg value: '(+ 1 "a")'. msg value: '(/ 1 0)' } expected: { 'car: not a pair: 5'. '+: not a number: a string or a character'. 'division by zero' }.
 h finish
 ] on: Error do: [:e | h harnessError: e].
 !

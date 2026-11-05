@@ -54,11 +54,60 @@ cm value: core class value: 'predicates' value: 'isString: v
 cm value: core class value: 'predicates' value: 'isChar: v
 	^ v isKindOf: Character'.
 cm value: core class value: 'predicates' value: 'isNumber: v
-	^ v isKindOf: Number'.
+	^ v isNumber'.
 cm value: core class value: 'predicates' value: 'isInteger: v
-	^ v isKindOf: Integer'.
+	"integer? is true of 2.0 too (R7RS; review R-11): the number answers"
+	^ v isNumber and: [v lispIsInteger]'.
 cm value: core class value: 'predicates' value: 'isReal: v
-	^ v isKindOf: Number'.
+	^ v isNumber and: [v lispIsReal]'.
+
+"=== the number protocol (Phase 9 step 9.2): what cog-lisp asks of a number,
+     with defaults a new Number subclass inherits and may override ==========="
+cm value: Number value: '*CogLisp-Core' value: 'lispIsExact
+	^ false'.
+cm value: Number value: '*CogLisp-Core' value: 'lispIsReal
+	^ true'.
+cm value: Number value: '*CogLisp-Core' value: 'lispIsRational
+	^ false'.
+cm value: Number value: '*CogLisp-Core' value: 'lispIsInteger
+	^ false'.
+cm value: Number value: '*CogLisp-Core' value: 'lispIsNaN
+	^ false'.
+cm value: Number value: '*CogLisp-Core' value: 'lispIsInfinite
+	^ false'.
+cm value: Number value: '*CogLisp-Core' value: 'lispWriteOn: aStream base: radix
+	"How write and number->string show this number."
+	radix = 10 ifFalse: [^ (LispError new) signal: ''number->string: radix '' , radix printString , '' is for exact numbers: '' , self printString].
+	aStream nextPutAll: self printString'.
+cm value: Integer value: '*CogLisp-Core' value: 'lispIsExact
+	^ true'.
+cm value: Integer value: '*CogLisp-Core' value: 'lispIsRational
+	^ true'.
+cm value: Integer value: '*CogLisp-Core' value: 'lispIsInteger
+	^ true'.
+cm value: Integer value: '*CogLisp-Core' value: 'lispWriteOn: aStream base: radix
+	aStream nextPutAll: (radix = 10 ifTrue: [self printString] ifFalse: [(self printStringBase: radix) asLowercase])'.
+cm value: Fraction value: '*CogLisp-Core' value: 'lispIsExact
+	^ true'.
+cm value: Fraction value: '*CogLisp-Core' value: 'lispIsRational
+	^ true'.
+cm value: Fraction value: '*CogLisp-Core' value: 'lispWriteOn: aStream base: radix
+	numerator lispWriteOn: aStream base: radix.
+	aStream nextPut: $/.
+	denominator lispWriteOn: aStream base: radix'.
+cm value: Float value: '*CogLisp-Core' value: 'lispIsRational
+	^ self isFinite'.
+cm value: Float value: '*CogLisp-Core' value: 'lispIsInteger
+	^ self isFinite and: [self fractionPart = 0.0]'.
+cm value: Float value: '*CogLisp-Core' value: 'lispIsNaN
+	^ self isNaN'.
+cm value: Float value: '*CogLisp-Core' value: 'lispIsInfinite
+	^ self isInfinite'.
+cm value: Float value: '*CogLisp-Core' value: 'lispWriteOn: aStream base: radix
+	radix = 10 ifFalse: [^ (LispError new) signal: ''number->string: radix '' , radix printString , '' is for exact numbers: '' , (LispPrinter writeString: self)].
+	self isNaN ifTrue: [^ aStream nextPutAll: ''+nan.0''].
+	self isInfinite ifTrue: [^ aStream nextPutAll: (self > 0 ifTrue: [''+inf.0''] ifFalse: [''-inf.0''])].
+	aStream nextPutAll: self printString'.
 cm value: core class value: 'predicates' value: 'isList: v
 	"False for a circular list, as R7RS requires (review R-4): a second pointer at
 	 half speed meets the first one if the spine loops."
