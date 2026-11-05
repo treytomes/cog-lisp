@@ -197,10 +197,27 @@ hand (`workflow_dispatch`) and upload `results.md` as an artifact.
   `release.yml` reuses `ci.yml`, builds once on Linux, tests each bundle on its
   own platform, then publishes with `gh release create` (pre-release for a tag
   with a suffix). The `.vsix` takes the tag's version.
-- **Licenses.** The Pharo zips carry no license files, so the bundles have
-  `THIRD-PARTY-NOTICES.md` pointing to the Pharo and pharo-vm repositories (MIT)
-  and to the libraries the VM folder ships. cog-lisp itself has no LICENSE file
-  yet: the owner's decision.
+- **Licenses.** The Pharo zips carry no license files, so the bundles first had
+  `THIRD-PARTY-NOTICES.md` pointing to the Pharo and pharo-vm repositories. That
+  is not enough: MIT asks for the notice itself in every copy, and the VM
+  archives hold many more third-party libraries. Since v0.1.2 (owner, 2026-11-04,
+  "correctly play along with the Pharo licenses"):
+  - Each bundle carries the full license texts in `licenses/`, from
+    `release/licenses/`: Pharo's `LICENSE` at the pinned commit (MIT, parts under
+    Apache 2.0, with its icon and font notices), the Apache 2.0 and OFL 1.1
+    texts, pharo-vm's `LICENSE` at the pinned commit, libffi 3.3 (the version
+    pharo-vm builds) and, on Windows, winpthreads 6.0.0.
+  - Each bundle ships **only the VM files `release/package.sh` lists**: the VM and
+    its plugins, libffi, and on Windows winpthreads (which the VM DLL imports, as
+    `objdump` showed). Left out: cairo, pixman, FreeType, fontconfig, HarfBuzz,
+    libpng, expat, bzip2, zlib, iconv, libgcc, SDL2/SDL3, libgit2, libssh2,
+    OpenSSL, the libjpeg-based JPEG plugin, a test library and the GUI
+    `Pharo.exe`. Every suite passes without them, on Windows (2506/2506) and on
+    Linux with each compiler (2509/2509). Packaging stops on any VM file in
+    neither list, so a new VM build cannot add a library unnoticed. Graphics
+    and HTTPS bring theirs back, with their licenses, in Phase 10.
+  - The smoke test checks that every license the notices name is present and
+    that the VM folder holds nothing else (Linux bundle 34/34, Windows 35/35).
 - **On GitHub, three bugs only a runner could show** (each fixed, and the first
   red runs were AC-5's failing jobs):
   - `bootstrap-pharo.bat` checked the image version without `--headless`; on the

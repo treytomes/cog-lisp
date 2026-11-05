@@ -205,6 +205,13 @@ ame.bat`. The VS Code extension does this.
   build) and are checked by `release/smoke-test.sh DIR` on each platform. Git on
   this machine has `core.fileMode false`: give a new `.sh` file its executable
   bit with `git update-index --chmod=+x`.
+- **Bundles ship only the VM files `release/package.sh` lists** (the VM, its
+  plugins, libffi, winpthreads), each license in `release/licenses/` and named in
+  `release/THIRD-PARTY-NOTICES.md`; packaging fails on any unlisted VM file. To
+  ship another library: check its license (LGPL needs source offered), add the
+  file to the keep list, its license text, and a notices entry. `objdump -p`
+  (DLL imports) and `objdump -p … | grep NEEDED` (Linux) in Docker show what
+  the VM really loads.
 
 ## Timing and benchmarking (Pharo 14) — Phase 6
 

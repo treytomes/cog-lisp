@@ -21,6 +21,24 @@ check() {
 }
 
 echo "== cog-lisp release bundle : $B =="
+
+# the licenses: every one THIRD-PARTY-NOTICES.md names is in licenses/, and no
+# library the notices do not cover (they cover the VM, libffi, winpthreads)
+ok=1
+for f in LICENSE THIRD-PARTY-NOTICES.md; do [ -s "$f" ] || { echo "    missing $f"; ok=0; }; done
+for f in $(grep -o 'licenses/[A-Za-z0-9._-]*\.txt' THIRD-PARTY-NOTICES.md | sort -u); do
+  case "$f" in
+    *winpthreads*) [ -f pharo/libwinpthread-1.dll ] || continue ;;
+  esac
+  [ -s "$f" ] || { echo "    missing $f"; ok=0; }
+done
+check "the bundle carries LICENSE, the notices and every license they name" $ok
+stray="$(cd pharo && find . -type f \( -iname '*.dll' -o -name '*.so' -o -name '*.so.*' \) | sed 's|.*/||' |
+  grep -Ev '^(lib)?(PharoVMCore|ffi|tty|winpthread-1|B2DPlugin|BitBltPlugin|DSAPrims|FileAttributesPlugin|FilePlugin|FloatArrayPlugin|JPEGReaderPlugin|LargeIntegers|LocalePlugin|MiscPrimitivePlugin|NewFilePlugin|SocketPlugin|SqueakSSL|SurfacePlugin|UUIDPlugin|UnixOSProcessPlugin)\.(dll|so)$' || true)"
+ok=0; [ -z "$stray" ] && ok=1
+check "the VM folder holds only the VM, its plugins, libffi and winpthreads" $ok
+[ "$ok" = 1 ] || echo "$stray" | sed 's/^/    /'
+
 for f in examples/*.lisp examples/*/main.lisp; do
   base="${f%.lisp}"
   [ -f "$base.expected" ] || continue

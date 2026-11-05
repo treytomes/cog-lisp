@@ -12,3 +12,7 @@ library and the examples; nothing else needs installing.
 The VS Code extension is `cog-lisp-VERSION.vsix` (*Install from VSIX...*); open
 the unpacked folder to run files and the REPL from the editor. `INSTALL.md` in
 each bundle has the details.
+
+cog-lisp is under the MIT license. Each bundle includes the Pharo image and VM
+and the libraries the VM needs, with their licenses in `licenses/` and a summary
+in `THIRD-PARTY-NOTICES.md`.

@@ -163,6 +163,13 @@ Specified when reached.
   the suites are the safety net, as they were for the compiler.
 - **Keeping graphics may keep a lot**: the audit measures what drawing alone needs
   before deciding on the windowing UI.
+- **Libraries come with licenses.** Since v0.1.2 the release bundles ship only
+  the VM, its plugins, libffi and winpthreads; the VM archives' other libraries
+  (cairo, FreeType, SDL, OpenSSL, …) are left out (`release/package.sh`,
+  `release/THIRD-PARTY-NOTICES.md`). When 10.6 or 10.7 needs one, it is added to
+  the list in `release/package.sh` with its license text in `release/licenses/`
+  and an entry in the notices. LGPL libraries (cairo, iconv) also need their
+  source offered.
 - **Building the VM (10.4)** pulls in a CMake and Slang toolchain this project has
   never needed; the spike decides whether it is worth it.
 

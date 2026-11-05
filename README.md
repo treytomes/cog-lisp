@@ -160,8 +160,13 @@ the bootstrap, and run every suite both ways.
 ## License
 
 cog-lisp is released under the [MIT license](LICENSE). Release bundles also
-carry the Pharo VM and image, under their own MIT licenses
-([third-party notices](release/THIRD-PARTY-NOTICES.md)).
+carry the Pharo image (MIT, with parts under Apache 2.0), the Pharo VM (MIT),
+libffi (MIT) and, on Windows, winpthreads (MIT and BSD), with each license's full
+text in the bundle's `licenses/` folder. They leave out the third-party libraries
+in the VM archives that cog-lisp does not use (graphics, Git, OpenSSL and
+others). See the [third-party notices](release/THIRD-PARTY-NOTICES.md); the
+license texts are in [`release/licenses/`](release/licenses/), and the list of
+VM files a bundle ships is in [`release/package.sh`](release/package.sh).
 
 ---
 
