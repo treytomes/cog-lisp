@@ -165,8 +165,10 @@ libffi (MIT) and, on Windows, winpthreads (MIT and BSD), with each license's ful
 text in the bundle's `licenses/` folder. They leave out the third-party libraries
 in the VM archives that cog-lisp does not use (graphics, Git, OpenSSL and
 others). See the [third-party notices](release/THIRD-PARTY-NOTICES.md); the
-license texts are in [`release/licenses/`](release/licenses/), and the list of
-VM files a bundle ships is in [`release/package.sh`](release/package.sh).
+license texts are in [`release/licenses/`](release/licenses/), with
+[how they were chosen](release/licenses/README.md) (what the VM loads, what was
+left out and what that costs), and the list of VM files a bundle ships is in
+[`release/package.sh`](release/package.sh).
 
 ---
 

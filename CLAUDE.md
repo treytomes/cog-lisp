@@ -211,7 +211,8 @@ ame.bat`. The VS Code extension does this.
   ship another library: check its license (LGPL needs source offered), add the
   file to the keep list, its license text, and a notices entry. `objdump -p`
   (DLL imports) and `objdump -p … | grep NEEDED` (Linux) in Docker show what
-  the VM really loads.
+  the VM really loads. The findings and the procedure for a pin change are in
+  `release/licenses/README.md`.
 
 ## Timing and benchmarking (Pharo 14) — Phase 6
 
