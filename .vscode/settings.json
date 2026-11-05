@@ -84,6 +84,7 @@
         "uncapture",
         "uninterned",
         "variadics",
+        "winpthreads",
         "zerop"
     ]
 }
