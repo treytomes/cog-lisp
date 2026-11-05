@@ -1,0 +1,5 @@
+((lambda (if) (if 1 2 3)) +) = 6
+(let ((list vector)) (list 1 2)) = #(1 2)
+case with a local memv: found
+cond with local if, let and begin: second
+do beside a variable named loop: ((2 1 0) mine)

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-11-04) |
+| **Status** | Implemented (2026-11-05); accepted 2026-11-04 |
 | **Depends on** | Phase 8 (complete), Phase 8.9 (CI, pinned Pharo) |
 | **Feeds** | Phase 10 (the pure LISP image) |
 | **Review items** | R-11 (reading rationals), R-21 (infinity and NaN), C-14 (shadowing and capture) |
@@ -420,6 +420,22 @@ Two commits.
   - When a seed has `syntax-rules`, the two files can become one.
 - **Measured**: compile time with `syntax-rules` `case`, `do` and `guard` stays
   within the Phase 8 check (below Phase 7.9's 36.3 ms).
+- **As built**:
+  - `core-syntax.lisp` redefines every derived form whose expansion uses names a
+    program could bind: `cond and or when unless let* letrec letrec* case do
+    guard restart-case`. Measured first: with only `case`, `do` and `guard`
+    converted, `cond`'s `define-macro` expansion still inserted plain `if` and
+    `let`, so a local `if` broke every `cond` inside a hygienic macro. `case` and
+    `cond` also take `=>` (R7RS).
+  - `let-values` and `let*-values` stay `define-macro`; their bindings are
+    gensyms already.
+  - Compiling the benchmark's forms took 21.4 ms (below the Phase 8 check). Every
+    suite took 104 s on Windows, about as before.
+  - `macroexpand` and `macroexpand-1` answer plain data: a `syntax-rules`
+    expansion's aliases become their symbols there, since they are for reading.
+  - A `define-macro` macro (`lib/test.lisp`'s `check`, `lib/cl.lisp`'s
+    `defmacro`) is still not hygienic: its expansion's names mean what they mean
+    where it is used.
 
 ## 5. Acceptance criteria
 
@@ -473,4 +489,4 @@ Two commits.
 |---|---|
 | 9.1 Seeded builds | done (2026-11-05): built from the v0.1.2 seed (9.1a); the Smalltalk reader and compiler retired (9.1b); the seed rebuilt from its source in CI (9.1c) |
 | 9.2 Numeric tower | done (2026-11-05): read, print, predicates, exactness, IEEE division, type errors (9.2a; R-11, R-21 closed); multiple values and the numeric procedures (9.2b); dual numbers added from outside the core, with their read syntax (9.2c) |
-| 9.3 Hygienic macros | 9.3a done (2026-11-05): aliases and resolution, shadowable special forms (C-14's first example), syntax-rules, define-syntax, let-syntax, letrec-syntax, syntax-error; 9.3b to come |
+| 9.3 Hygienic macros | done (2026-11-05): aliases and resolution, shadowable special forms, syntax-rules, define-syntax, let-syntax, letrec-syntax, syntax-error (9.3a); the derived forms hygienic, in lib/core-syntax.lisp (9.3b); C-14 closed |

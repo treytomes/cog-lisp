@@ -40,7 +40,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 7.9 | Self-hosting groundwork | ✅ **done** — [spec](specs/phase-7.9-self-hosting-groundwork.md), 46/46, LISP unit tests ([`lib/test.lisp`](lib/test.lisp)); all suites 948/948 |
 | 8 | Self-hosting (meta-circular) | ✅ **done** — [spec](specs/phase-8-self-hosting.md); 8.1 tests in LISP, 8.2 reader and 8.3 compiler in LISP, 8.4 the compiler compiles itself to a fixpoint, 8.5 the LISP reader and compiler are the ones in use, 8.6 it writes bytecode itself, compiling 2.1× faster than Phase 7.9 ([`lib/compiler/`](lib/compiler/), examples [read-yourself](examples/read-yourself.lisp), [compile-yourself](examples/compile-yourself.lisp), [extend-the-compiler](examples/extend-the-compiler.lisp), [bootstrap](examples/bootstrap.lisp), [sealed-compiler](examples/sealed-compiler.lisp)) done; all suites 2506/2506, with either compiler |
 | 8.9 | CI/CD, and running on Linux | ✅ **done** — [spec](specs/phase-8.9-ci-cd.md); every push tested on Linux (both compilers) and Windows; a `v*` tag publishes Linux and Windows bundles and the `.vsix` |
-| 9 | Finishing the language: seeded builds, the numeric tower, hygienic macros | 🔄 [spec](specs/phase-9-language.md): 9.1 seeded builds and 9.2 the numeric tower done (examples [seeded-build](examples/seeded-build.lisp), [numbers](examples/numbers.lisp), [new-number-type](examples/new-number-type.lisp)) |
+| 9 | Finishing the language: seeded builds, the numeric tower, hygienic macros | ✅ **done** — [spec](specs/phase-9-language.md); 9.1 seeded builds, 9.2 the numeric tower, 9.3 hygienic macros (examples [seeded-build](examples/seeded-build.lisp), [numbers](examples/numbers.lisp), [new-number-type](examples/new-number-type.lisp), [syntax-rules](examples/syntax-rules.lisp), [shadowing](examples/shadowing.lisp)) |
 | 10 | A world of its own: the pure LISP image, then networking and graphics from LISP | ⬜ [spec](specs/phase-10-pure-image.md) accepted in outline |
 
 Phase 0 is proven, not just planned: [`poc/answer.st`](poc/answer.st) builds
@@ -352,7 +352,7 @@ and examples:
   exactness, `#e #i #x #o #b`, `+inf.0`/`+nan.0`, and the numeric procedures
   (review R-11, R-21). Open to new kinds of number, so complex numbers can come
   as a library at any time (owner, 2026-11-04).
-- **9.3 Hygienic macros**: `syntax-rules`, `define-syntax`, `let-syntax`,
+- **9.3 Hygienic macros** (done): `syntax-rules`, `define-syntax`, `let-syntax`,
   `letrec-syntax`, by renaming; special-form names can be shadowed, and a macro's
   free names mean what they meant where it was defined (review C-14).
   `define-macro` stays.

@@ -1134,15 +1134,20 @@
 
 ;; What the primitives macroexpand-1 and macroexpand call (step 9.1; until then
 ;; they used the Smalltalk compiler's): expand a call of a global macro once, or
-;; until the form is no longer one.
+;; until the form is no longer one. They are for reading an expansion, so the
+;; answer is plain data: a syntax-rules expansion's aliases become their symbols
+;; (step 9.3), which drops what hygiene would have kept apart.
 (define (lisp-macroexpand-1 form)
+  (lc-strip (lc-macroexpand-1 form)))
+
+(define (lc-macroexpand-1 form)
   (let ((m (and (pair? form) (lc-macro-for (car form) (scope-new)))))
     (if m (lc-expand form m (scope-new)) form)))
 
 (define (lisp-macroexpand form)
   (let loop ((current form) (steps 1))
-    (let ((next (lisp-macroexpand-1 current)))
-      (cond ((eq? next current) current)
+    (let ((next (lc-macroexpand-1 current)))
+      (cond ((eq? next current) (lc-strip current))
             ((> steps lc-max-expansions) (lc-expansion-too-deep form))
             (else (loop next (+ steps 1)))))))
 

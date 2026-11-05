@@ -373,6 +373,28 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **cog-lisp has multiple values**: `values` (one value is just itself),
   `call-with-values`, `let-values`, `let*-values`.
 
+## Hygienic macros (Phase 9 step 9.3)
+
+- **An identifier is a symbol or a `LispAlias`** (a name and the compile-time
+  scope its macro was defined in); `syntax-rules` expansions make aliases. The
+  compiler resolves every identifier with `lc-binding` (scope, then the alias's
+  definition scope, then global) **before** it looks for a special form, so a
+  local `if` is a variable. Never compare a form's head with `eq?` against a
+  keyword in `lib/compiler/`: use `lc-special` (special forms) or `lc-id-is?`
+  (keywords like `unquote`); and test names with `lc-identifier?`, not `symbol?`.
+- **Aliases go back to symbols** in `quote` (`lc-strip`, only once a compile has
+  expanded a `syntax-rules` macro), in global names, `send` selectors,
+  `smalltalk` names and `macroexpand`'s answers.
+- **The derived forms are in two files.** `lib/core.lisp` (`define-macro`)
+  compiles the compiler, because the seed compiles it and v0.1.2 has no
+  `syntax-rules`. `lib/core-syntax.lisp` (`syntax-rules`) replaces them once
+  the new compiler is installed (`buildFromSeed:`). Change both together. When a
+  release with `syntax-rules` becomes the seed, they can become one.
+- **A `define-macro` expander may receive aliases** when it is used inside a
+  `syntax-rules` template. Compare keywords by name there (`%keyword?` in
+  `core.lisp`). A test that binds `lambda` or `if` around `check` breaks
+  `check` itself, which is a `define-macro`: bind inside the checked expression.
+
 ## Writing the compiler in LISP (Phase 8)
 
 - **The LISP reader and compiler are the only ones** (since Phase 9 step 9.1;

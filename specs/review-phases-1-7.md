@@ -188,11 +188,17 @@ re-run and reproduced before being recorded.
 - **Evidence.** A quoted gensym `eq?` itself: `#t` normally, `#f` with the option off.
 - **Fix.** Emit an uninterned symbol as a literal.
 
-### C-14 Special-form names cannot be shadowed; `case` captures a local `memv` — fixed (batch 4; stopgap and docs; hygiene planned → hygienic macros)
+### C-14 Special-form names cannot be shadowed; `case` captures a local `memv` — fixed (Phase 9 step 9.3)
 - **Evidence.** `((lambda (if) (if 1 2 3)) +)` → 2 (Scheme: 6; re-run);
   `(let ((memv (lambda (a b) #t))) (case 5 ((1) 'one) (else 'other)))` → `one`.
   The body scanner honours a local `begin`; `translateForm` does not.
 - **Verdict.** Plan. Now: document it, and make the scanner match `translateForm`.
+- **Closed in Phase 9 step 9.3** (2026-11-05). The compiler resolves an
+  identifier's binding before it looks for a special form, so the first example
+  is `6` (9.3a). `case` and the other derived forms are `syntax-rules` macros
+  (`lib/core-syntax.lisp`), so the second is `other`: `case` calls the global
+  `memv` (9.3b). Checked by `tests/lisp/phase-9.3-syntax-rules.lisp` and
+  `tests/lisp/phase-9.3-derived-forms.lisp`; example `examples/shadowing.lisp`.
 
 ### C-15 Inner-level `,@,@x` is a compile error — keep
 - **Evidence.** `` `(a `(b ,@,@x)) `` → "unquote-splicing outside a list".
@@ -381,7 +387,7 @@ recovery after an error.
 | **Plan → Smalltalk interop** | C-16 · R-18 |
 | **Plan → conditions & restarts** | C-18 (`qqAppend`) · R-2 (host errors) |
 | **Plan → numeric tower** | R-11 (reading) · R-21: both closed in Phase 9 step 9.2 |
-| **Plan → hygienic macros** | C-14 |
+| **Plan → hygienic macros** | C-14: closed in Phase 9 step 9.3 |
 | **Plan → language server** | C-18 (positions) · R-17 |
 | **Plan → 7.5 tooling** | T-3 |
 | **Keep** | D-2 · C-15 · R-19 (printing) · R-25 |
