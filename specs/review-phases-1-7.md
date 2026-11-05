@@ -289,10 +289,13 @@ were re-run and reproduced.
   `(exit 2.5)` → 0.
 - **Fix.** Integers 0–255; `#t` → 0, `#f` → 1 (R7RS); otherwise an error.
 
-### R-11 Fractions print as `(3/2)` — fixed (batch 4; printer; reading rationals planned → numeric tower)
+### R-11 Fractions print as `(3/2)` — fixed (batch 4: printer; Phase 9 step 9.2: the rest)
 - **Evidence.** `(display (/ 6 4))` → `(3/2)` (re-run), which reads back as a list.
 - **Fix.** Write `3/2`. Reading rationals, `integer?` on `2.0`, type checks in
   one-argument arithmetic (`(+ 'a)` → `a`): **plan → numeric tower**.
+- **Closed in Phase 9 step 9.2a** (2026-11-05): `1/3` and `-6/4` read (as `1/3`
+  and `-3/2`), `(integer? 2.0)` is `#t`, and `(+ 'a)` is the error
+  `+: not a number: a` (`tests/lisp/phase-9.2-numbers.lisp`).
 
 ### R-12 The reader loses the sign of `-0.0`; `eqv?` ignores it — fixed (batch 4)
 - **Evidence.** `-0.0` reads with sign bit 0; `(eqv? 0.0 -0.0)` → `#t` (R7RS: `#f`).
@@ -340,7 +343,10 @@ were re-run and reproduced.
 - **Fix.** Write `#\x1`. Strings need a `\x..;` reader escape: **plan →
   self-hosting**.
 
-### R-21 Infinity and NaN print as `Float infinity` / `Float nan` — plan → numeric tower
+### R-21 Infinity and NaN print as `Float infinity` / `Float nan` — fixed (Phase 9 step 9.2a)
+- **Fix.** They print and read as `+inf.0`, `-inf.0` and `+nan.0`; `nan?`,
+  `infinite?` and `finite?` ask about them; a float divided by zero gives
+  IEEE's answer (`tests/lisp/phase-9.2-numbers.lisp`).
 
 ### R-22 `load` resolves against the current directory; programs can't see arguments — fixed (7.9)
 - **Evidence.** `(load "b.lisp")` in `sub\a.lisp` loads `.\b.lisp`;
@@ -374,7 +380,7 @@ recovery after an error.
 | **Plan → self-hosting** | C-4 (`lambda`) · C-5 · C-18 (dispatch, templates) · R-4 (`equal?`, printer) · R-20 (strings) · R-22 |
 | **Plan → Smalltalk interop** | C-16 · R-18 |
 | **Plan → conditions & restarts** | C-18 (`qqAppend`) · R-2 (host errors) |
-| **Plan → numeric tower** | R-11 (reading) · R-21 |
+| **Plan → numeric tower** | R-11 (reading) · R-21: both closed in Phase 9 step 9.2 |
 | **Plan → hygienic macros** | C-14 |
 | **Plan → language server** | C-18 (positions) · R-17 |
 | **Plan → 7.5 tooling** | T-3 |

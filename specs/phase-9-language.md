@@ -320,6 +320,10 @@ as `Float infinity`; and cog-lisp had **no multiple values**, which `floor/`,
   their read syntax. It then uses them in ordinary arithmetic, mixed with
   integers and rationals, and in comparisons, predicates and printing. A test
   checks the same.
+- As built: the type lives in `examples/dual.lisp`, which the example and the
+  test load, so both use one definition. It is a few dozen lines of Smalltalk
+  method source, compiled through interop, and needed no change to cog-lisp:
+  the measure of "open".
 
 ### 9.3 Hygienic macros (R7RS 4.3)
 - **Forms**: `define-syntax`, `let-syntax`, `letrec-syntax`, `syntax-rules` with
@@ -396,5 +400,5 @@ as `Float infinity`; and cog-lisp had **no multiple values**, which `floor/`,
 | Step | Status |
 |---|---|
 | 9.1 Seeded builds | done (2026-11-05): built from the v0.1.2 seed (9.1a); the Smalltalk reader and compiler retired (9.1b); the seed rebuilt from its source in CI (9.1c) |
-| 9.2 Numeric tower | 9.2a, 9.2b done (2026-11-05): read, print, predicates, exactness, IEEE division, type errors (R-11, R-21); multiple values and the numeric procedures; 9.2c to come |
+| 9.2 Numeric tower | done (2026-11-05): read, print, predicates, exactness, IEEE division, type errors (9.2a; R-11, R-21 closed); multiple values and the numeric procedures (9.2b); dual numbers added from outside the core, with their read syntax (9.2c) |
 | 9.3 Hygienic macros | not started |

@@ -350,6 +350,29 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   name any of them. Since Phase 7.5 a package that fails to compile a method
   signals an error at the end of its file-in, so the build and the suites stop.
 
+## Numbers (Phase 9 step 9.2)
+
+- **A number answers for itself.** The predicates and the printer use only
+  `isNumber` and cog-lisp's number protocol, extension methods on `Number` in
+  `src/coglisp-core.st` (`lispIsExact`, `lispIsReal`, `lispIsRational`,
+  `lispIsInteger`, `lispIsNaN`, `lispIsInfinite`, `lispWriteOn:base:`). Mixed
+  arithmetic is Pharo's own double dispatch (`adaptToInteger:andSend:` and its
+  siblings; Pharo 14 has no `generality`). A new kind of number subclasses
+  `Number` and implements both (`examples/dual.lisp`). Don't test `isKindOf:
+  Float` where a protocol message would do.
+- **Number syntax is `lib/compiler/reader.lisp`'s** (`rd-parse-real`, used by
+  the reader and, through the `parseNumber` entry, by `string->number`).
+  `define-number-syntax` adds more, through a shared box that reaches the sealed
+  reader.
+- **Pharo floats raise `ZeroDivide`** where IEEE answers infinity: `/` goes
+  through `LispPrimitives divide:by:`. `0.5 = (1/2)` is true in Smalltalk, so
+  compare exactness too where it matters (`eqv?` does). The code generator keys
+  literals by identity, so `0.5`, `1/2` and `-0.0` stay distinct.
+- **Pharo coerces a string a character at a time** (`'3' + 4`), so arithmetic on
+  a string fails on a character: the message says "a string or a character".
+- **cog-lisp has multiple values**: `values` (one value is just itself),
+  `call-with-values`, `let-values`, `let*-values`.
+
 ## Writing the compiler in LISP (Phase 8)
 
 - **The LISP reader and compiler are the only ones** (since Phase 9 step 9.1;
