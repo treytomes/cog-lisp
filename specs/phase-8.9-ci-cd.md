@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Implemented (2026-11-04), except AC-4/5/7 on GitHub (they need a push and a tag) and AC-10 (the owner's install) |
+| **Status** | Implemented (2026-11-04); CI green on GitHub; the release workflow proven by a dry run; AC-10 (the owner's install) to come with the first tag |
 | **Depends on** | Phase 8 (complete) |
 | **Replaces** | README "After Phase 8: CI/CD", which assumed a Windows runner |
 
@@ -201,5 +201,29 @@ hand (`workflow_dispatch`) and upload `results.md` as an artifact.
   `THIRD-PARTY-NOTICES.md` pointing to the Pharo and pharo-vm repositories (MIT)
   and to the libraries the VM folder ships. cog-lisp itself has no LICENSE file
   yet: the owner's decision.
-- Not yet checked: AC-4 and AC-5 (a push to GitHub), AC-7 (a tag), AC-10 (the
-  owner's install on a Linux laptop).
+- **On GitHub, three bugs only a runner could show** (each fixed, and the first
+  red runs were AC-5's failing jobs):
+  - `bootstrap-pharo.bat` checked the image version without `--headless`; on the
+    Windows runner the VM opened a window and never returned (the job hung in
+    *Bootstrap Pharo* for 20 minutes before it was cancelled).
+  - The extension's grammar test counted only the Windows marks of
+    `vscode-tmgrammar-test` (`√`, `×`); on Linux they are `✓`, `✖`: 0 files.
+  - The runner suite read `ERRORLEVEL` after a `set`. GitHub runs `cmd` steps
+    from a `.cmd` file, where `SET` resets `ERRORLEVEL` to 0; by hand (`.bat`
+    rules) it does not. The cause was found from the run's uploaded outputs, once
+    the upload looked where the suites write (`%TEMP%` is not `runner.temp` there).
+- **AC-4: CI is green** on every job: Linux with each compiler (about a minute
+  each), Windows, and the extension.
+- **The release workflow, by a dry run.** Publishing a real release is the owner's
+  step, so `release.yml` also runs by hand (`workflow_dispatch`, a version input):
+  everything but `publish`. Its first run passed every job: the four test jobs,
+  packaging (both bundles and the `.vsix`), the Linux bundle's smoke test (32/32)
+  and the Windows bundle's, with the image built on Linux (33/33). AC-7's
+  publishing step runs on the first tag.
+- **The Pharo build is not pinned.** The "stable" Pharo 14 download is the latest
+  build: the runners got `e649a7f87c`, this machine has `58e29ca31d`, and every
+  suite passes on both. The CI cache keeps a runner's download until the bootstrap
+  script changes, but a release is built on whatever Pharo 14 build that is.
+  Pinning an exact build is a possible follow-up.
+- Still to come: AC-10, the owner's install on a Linux laptop from the first
+  release.
