@@ -1,7 +1,9 @@
 # Third-party software in this bundle
 
-This bundle redistributes, unchanged, software from the Pharo project, as
-published at <https://files.pharo.org>:
+cog-lisp itself is under the MIT license (`LICENSE`). This bundle also
+redistributes, unchanged, software from the Pharo project, as published at
+<https://files.pharo.org> (the exact builds are pinned in cog-lisp's
+`pharo.pins`):
 
 - **The Pharo virtual machine** (`pharo/` on Linux; `pharo\` on Windows): the
   OpenSmalltalk-derived Cog VM built by the Pharo project, released under the

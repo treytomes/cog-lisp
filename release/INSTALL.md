@@ -44,4 +44,5 @@ button) runs the file you are editing, errors show in *Problems*, and
 
 ## Licenses
 
-See `THIRD-PARTY-NOTICES.md` for the Pharo VM and image this bundle includes.
+cog-lisp is released under the MIT license (`LICENSE`). See
+`THIRD-PARTY-NOTICES.md` for the Pharo VM and image this bundle includes.

@@ -220,10 +220,18 @@ hand (`workflow_dispatch`) and upload `results.md` as an artifact.
   packaging (both bundles and the `.vsix`), the Linux bundle's smoke test (32/32)
   and the Windows bundle's, with the image built on Linux (33/33). AC-7's
   publishing step runs on the first tag.
-- **The Pharo build is not pinned.** The "stable" Pharo 14 download is the latest
-  build: the runners got `e649a7f87c`, this machine has `58e29ca31d`, and every
-  suite passes on both. The CI cache keeps a runner's download until the bootstrap
-  script changes, but a release is built on whatever Pharo 14 build that is.
-  Pinning an exact build is a possible follow-up.
+- **The Pharo build is pinned** (owner, 2026-11-04). The "stable" Pharo 14
+  download had been the latest build: the runners got `e649a7f87c` while this
+  machine had `58e29ca31d`. `pharo.pins` now names the exact archive files on
+  files.pharo.org with their SHA-256: the image build 788 (`58e29ca31d`, the build
+  all of Phase 8 was developed and benchmarked on; byte-identical to the zip used
+  here) and the VM v12.0.6-beta at commit `bebdbac` for Linux and Windows. Both
+  bootstraps and `release/package.sh` read it and check every download (a cached
+  zip that does not match is fetched again); the CI caches are keyed on it.
+  Pinning found two latent bootstrap bugs, invisible on fresh CI runners: the
+  Windows VM zip marks its files read-only, so re-running the bootstrap could not
+  extract over them; and from Git Bash, the batch file's `tar` was GNU tar.
+- **License** (owner, 2026-11-04): cog-lisp is under the MIT license (`LICENSE`),
+  which every bundle carries; the extension's `package.json` says MIT.
 - Still to come: AC-10, the owner's install on a Linux laptop from the first
   release.

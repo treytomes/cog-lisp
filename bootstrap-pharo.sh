@@ -1,28 +1,27 @@
 #!/usr/bin/env bash
 # ===========================================================================
 #  cog-lisp : Pharo bootstrap  (bash equivalent of bootstrap-pharo.bat)
-#  Downloads the stable 64-bit Pharo VM for this platform (Linux, or Windows
-#  under Git Bash) and the Pharo image, extracts them into ./pharo/, and
-#  confirms the VM build and the image/system version.
-#  Idempotent: cached zips are reused, so re-running is cheap.
+#  Downloads the pinned 64-bit Pharo VM for this platform (Linux, or Windows
+#  under Git Bash) and the pinned Pharo image (pharo.pins), checks each against
+#  its SHA-256, extracts them into ./pharo/, and confirms the VM build and the
+#  image/system version.
+#  Idempotent: a cached zip that matches its pin is reused; one that does not
+#  (an older pin) is downloaded again.
 # ===========================================================================
 set -u
-
-# --- Which Pharo release to stand up (140 = Pharo 14, current stable). ------
-PHARO_VERSION=140
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PHARO_DIR="$ROOT/pharo"
 DL_DIR="$PHARO_DIR/downloads"
 . "$ROOT/scripts/pharo-vm.sh"
+# the pins: IMAGE_URL, IMAGE_SHA256, VM_LINUX_URL, VM_LINUX_SHA256, VM_WINDOWS_...
+. "$ROOT/pharo.pins"
 case "$COGLISP_PLATFORM" in
-  linux)   VM_ZIP="$DL_DIR/pharo-vm-linux.zip"; VM_OS=Linux ;;
-  windows) VM_ZIP="$DL_DIR/pharo-vm.zip"; VM_OS=Windows ;;
+  linux)   VM_ZIP="$DL_DIR/pharo-vm-linux.zip"; VM_URL="$VM_LINUX_URL"; VM_SHA256="$VM_LINUX_SHA256" ;;
+  windows) VM_ZIP="$DL_DIR/pharo-vm-windows.zip"; VM_URL="$VM_WINDOWS_URL"; VM_SHA256="$VM_WINDOWS_SHA256" ;;
   *) echo "bootstrap-pharo: unsupported platform $(uname -s) (Linux and Windows are)" >&2; exit 1 ;;
 esac
 IMG_ZIP="$DL_DIR/pharo-image.zip"
-VM_URL="https://files.pharo.org/get-files/$PHARO_VERSION/pharo-vm-$VM_OS-x86_64-stable.zip"
-IMG_URL="https://files.pharo.org/get-files/$PHARO_VERSION/pharoImage-x86_64.zip"
 
 fail() {
   echo
@@ -47,29 +46,42 @@ extract() {
 }
 
 echo
-echo "=== cog-lisp : Pharo $PHARO_VERSION bootstrap ==="
+echo "=== cog-lisp : Pharo bootstrap (pinned in pharo.pins) ==="
 echo "    target dir : $PHARO_DIR"
 echo
 
 mkdir -p "$DL_DIR" || fail
 
-# --- Download the VM --------------------------------------------------------
-if [ -f "$VM_ZIP" ]; then
-  echo "[skip] VM zip already present"
-else
-  echo "[down] VM    $VM_URL"
-  curl -L --fail --progress-bar -o "$VM_ZIP" "$VM_URL" || { rm -f "$VM_ZIP"; fail; }
-fi
+# Reuse a file that matches its pin; otherwise download it and check it.
+fetch() {   # $1 URL, $2 SHA-256, $3 file
+  local url="$1" want="$2" file="$3" got
+  if [ -f "$file" ]; then
+    got="$(sha256sum "$file" | cut -d' ' -f1)"
+    if [ "$got" = "$want" ]; then
+      echo "[skip] $(basename "$file") matches its pin"
+      return 0
+    fi
+    echo "[redo] $(basename "$file") does not match its pin: downloading it again"
+    rm -f "$file"
+  fi
+  echo "[down] $url"
+  curl -L --fail --progress-bar -o "$file" "$url" || { rm -f "$file"; return 1; }
+  got="$(sha256sum "$file" | cut -d' ' -f1)"
+  if [ "$got" != "$want" ]; then
+    echo "[err ] $(basename "$file"): SHA-256 $got, pinned $want"
+    rm -f "$file"
+    return 1
+  fi
+  echo "[ok  ] $(basename "$file") matches its pin"
+}
 
-# --- Download the image -----------------------------------------------------
-if [ -f "$IMG_ZIP" ]; then
-  echo "[skip] image zip already present"
-else
-  echo "[down] image $IMG_URL"
-  curl -L --fail --progress-bar -o "$IMG_ZIP" "$IMG_URL" || { rm -f "$IMG_ZIP"; fail; }
-fi
+fetch "$VM_URL" "$VM_SHA256" "$VM_ZIP" || fail
+fetch "$IMAGE_URL" "$IMAGE_SHA256" "$IMG_ZIP" || fail
 
 # --- Extract ----------------------------------------------------------------
+# the Windows VM zip marks its files read-only, so a second extraction could not
+# replace them: make what is there writable first
+chmod -R u+w "$PHARO_DIR" 2>/dev/null
 echo "[xtr ] VM    -> pharo/"
 extract "$VM_ZIP" "$PHARO_DIR" || fail
 echo "[xtr ] image -> pharo/"
@@ -81,7 +93,7 @@ VM_EXE="$(pharo_vm "$PHARO_DIR")"
 [ -n "$VM_EXE" ] || { echo "[err ] no Pharo VM executable found under pharo/"; fail; }
 
 # --- Locate the stock image file (not a built cog-lisp image) ---------------
-IMAGE="$(find "$PHARO_DIR" -name 'Pharo*.image' -print -quit)"
+IMAGE="$(find "$PHARO_DIR" -maxdepth 1 -name 'Pharo*.image' -print -quit)"
 [ -n "$IMAGE" ] || { echo "[err ] no .image file found under pharo/"; fail; }
 
 echo
@@ -101,7 +113,7 @@ echo "=== Image / system version ===============================================
 
 echo
 echo "=== OK ====================================================================="
-echo "Pharo $PHARO_VERSION is ready."
+echo "Pharo is ready."
 if [ "$COGLISP_PLATFORM" = windows ]; then
   echo "Launch the GUI with:"
   echo "    \"${VM_EXE%PharoConsole.exe}Pharo.exe\" \"$IMAGE\""

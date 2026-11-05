@@ -2,61 +2,51 @@
 setlocal enabledelayedexpansion
 rem ===========================================================================
 rem  cog-lisp : Pharo bootstrap
-rem  Downloads the stable Pharo VM + image for 64-bit Windows, extracts them
-rem  into .\pharo\, and confirms the VM build and the image/system version.
-rem  Idempotent: cached zips are reused, so re-running is cheap.
+rem  Downloads the pinned Pharo VM + image for 64-bit Windows (pharo.pins),
+rem  checks each against its SHA-256, extracts them into .\pharo\, and confirms
+rem  the VM build and the image/system version.
+rem  Idempotent: a cached zip that matches its pin is reused; one that does not
+rem  (an older pin) is downloaded again.
 rem ===========================================================================
-
-rem --- Which Pharo release to stand up (140 = Pharo 14, current stable). ------
-set "PHARO_VERSION=140"
 
 set "ROOT=%~dp0"
 set "PHARO_DIR=%ROOT%pharo"
 set "DL_DIR=%PHARO_DIR%\downloads"
-set "VM_ZIP=%DL_DIR%\pharo-vm.zip"
-set "IMG_ZIP=%DL_DIR%\pharo-image.zip"
-set "VM_URL=https://files.pharo.org/get-files/%PHARO_VERSION%/pharo-vm-Windows-x86_64-stable.zip"
-set "IMG_URL=https://files.pharo.org/get-files/%PHARO_VERSION%/pharoImage-x86_64.zip"
+
+rem  the pins: IMAGE_URL, IMAGE_SHA256, VM_WINDOWS_URL, VM_WINDOWS_SHA256, ...
+for /f "usebackq eol=# tokens=1* delims==" %%A in ("%ROOT%pharo.pins") do set "%%A=%%B"
+if not defined VM_WINDOWS_URL ( echo [err ] no pins read from pharo.pins & goto :fail )
 
 echo(
-echo === cog-lisp : Pharo %PHARO_VERSION% bootstrap ===
+echo === cog-lisp : Pharo bootstrap (pinned in pharo.pins) ===
 echo     target dir : %PHARO_DIR%
 echo(
 
 if not exist "%DL_DIR%" mkdir "%DL_DIR%"
 
-rem --- Download the VM --------------------------------------------------------
-if exist "%VM_ZIP%" (
-  echo [skip] VM zip already present
-) else (
-  echo [down] VM    %VM_URL%
-  curl -L --fail --progress-bar -o "%VM_ZIP%" "%VM_URL%" || goto :fail
-)
+rem  variable NAMES, not values: a URL holds %2B, which CALL would expand again
+call :fetch VM_WINDOWS_URL VM_WINDOWS_SHA256 "%DL_DIR%\pharo-vm-windows.zip" || goto :fail
+call :fetch IMAGE_URL IMAGE_SHA256 "%DL_DIR%\pharo-image.zip" || goto :fail
 
-rem --- Download the image -----------------------------------------------------
-if exist "%IMG_ZIP%" (
-  echo [skip] image zip already present
-) else (
-  echo [down] image %IMG_URL%
-  curl -L --fail --progress-bar -o "%IMG_ZIP%" "%IMG_URL%" || goto :fail
-)
-
-rem --- Extract (tar ships with Windows 10/11 and reads zip) -------------------
+rem --- Extract (tar ships with Windows 10/11 and reads zip; named in full, since
+rem     a Git Bash PATH puts GNU tar first, which reads C:\ as a remote host) ---
+rem  the VM zip marks its files read-only, so a second extraction could not
+rem  replace them: clear that first
+attrib -r "%PHARO_DIR%\*" /s >nul 2>&1
 echo [xtr ] VM    -^> pharo\
-tar -xf "%VM_ZIP%" -C "%PHARO_DIR%" || goto :fail
+"%SystemRoot%\System32\tar.exe" -xf "%DL_DIR%\pharo-vm-windows.zip" -C "%PHARO_DIR%" || goto :fail
 echo [xtr ] image -^> pharo\
-tar -xf "%IMG_ZIP%" -C "%PHARO_DIR%" || goto :fail
+"%SystemRoot%\System32\tar.exe" -xf "%DL_DIR%\pharo-image.zip" -C "%PHARO_DIR%" || goto :fail
 
 rem --- Locate the console VM exe (prefer PharoConsole.exe: it writes stdout) --
 set "VM_EXE="
-for /r "%PHARO_DIR%" %%F in (PharoConsole.exe) do if not defined VM_EXE set "VM_EXE=%%F"
-if not defined VM_EXE for /r "%PHARO_DIR%" %%F in (Pharo.exe) do if not defined VM_EXE set "VM_EXE=%%F"
-if not defined VM_EXE ( echo [err ] no Pharo VM executable found under pharo\ & goto :fail )
+if exist "%PHARO_DIR%\PharoConsole.exe" set "VM_EXE=%PHARO_DIR%\PharoConsole.exe"
+if not defined VM_EXE ( echo [err ] no PharoConsole.exe under pharo\ & goto :fail )
 
-rem --- Locate the image file --------------------------------------------------
+rem --- Locate the stock image (not a built cog-lisp image) ---------------------
 set "IMAGE="
-for /r "%PHARO_DIR%" %%F in (*.image) do if not defined IMAGE set "IMAGE=%%F"
-if not defined IMAGE ( echo [err ] no .image file found under pharo\ & goto :fail )
+for %%F in ("%PHARO_DIR%\Pharo*.image") do if not defined IMAGE set "IMAGE=%%~fF"
+if not defined IMAGE ( echo [err ] no Pharo*.image found under pharo\ & goto :fail )
 
 echo(
 echo [ok  ] VM exe : %VM_EXE%
@@ -77,7 +67,7 @@ if errorlevel 1 ( echo [err ] image failed to evaluate SystemVersion & goto :fai
 
 echo(
 echo === OK =====================================================================
-echo Pharo %PHARO_VERSION% is ready.
+echo Pharo is ready.
 echo Launch the GUI with:
 echo     "%VM_EXE:PharoConsole.exe=Pharo.exe%" "%IMAGE%"
 echo(
@@ -87,3 +77,36 @@ exit /b 0
 echo(
 echo [FAILED] bootstrap did not complete - see messages above.
 exit /b 1
+
+rem ---------------------------------------------------------------------------
+:fetch
+rem  %1 = name of the URL variable, %2 = name of the SHA-256 variable, %3 = the file.
+rem  Reuse the file if it matches its pin; otherwise download it and check it.
+set "URL=!%~1!"
+set "WANT=!%~2!"
+set "FILE=%~3"
+if exist "!FILE!" (
+  call :sha256 "!FILE!"
+  if /i "!GOT!"=="!WANT!" (
+    echo [skip] %~nx3 matches its pin
+    exit /b 0
+  )
+  echo [redo] %~nx3 does not match its pin: downloading it again
+  del /q "!FILE!"
+)
+echo [down] !URL!
+curl -L --fail --progress-bar -o "!FILE!" "!URL!" || exit /b 1
+call :sha256 "!FILE!"
+if /i not "!GOT!"=="!WANT!" (
+  echo [err ] %~nx3: SHA-256 !GOT!, pinned !WANT!
+  del /q "!FILE!"
+  exit /b 1
+)
+echo [ok  ] %~nx3 matches its pin
+exit /b 0
+
+:sha256
+rem  %1 = a file; sets GOT to its SHA-256, lower case
+set "GOT="
+for /f "usebackq delims=" %%H in (`powershell -NoProfile -Command "(Get-FileHash -Algorithm SHA256 -LiteralPath '%~1').Hash.ToLower()"`) do set "GOT=%%H"
+exit /b 0

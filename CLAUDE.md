@@ -24,14 +24,24 @@ See `README.md` for the phased plan.
 
 ## Standing up the environment
 
-The VM + image are **not** committed (see `.gitignore`). Regenerate them with:
+The VM + image are **not** committed (see `.gitignore`). They are **pinned** in
+`pharo.pins` (Pharo 14 image build 788 `58e29ca31d`, VM v12.0.6-beta `bebdbac`):
+exact archive URLs on files.pharo.org with SHA-256 checksums, which every
+bootstrap and CI run checks. Regenerate them with:
 
 ```bat
 bootstrap-pharo.bat
 ```
 
-It downloads the stable 64-bit Windows VM + image into `pharo\`, extracts them,
-and prints the VM and image versions. It is idempotent (cached zips are reused).
+It downloads the pinned 64-bit VM + image into `pharo\`, checks them against
+their pins, extracts them, and prints the VM and image versions. It is
+idempotent: a cached zip that matches its pin is reused, one that does not is
+fetched again. To move to a newer Pharo, change a URL and its SHA-256 in
+`pharo.pins` together (the archive listings are under
+`https://files.pharo.org/image/140/` and `.../vm/pharo-spur64-headless/<OS>/`;
+`+` in a VM file name is `%2B` in its URL), bootstrap, and run every suite both
+ways. Never pin the "stable" or "latest" URLs: they change under you (CI got
+build 789 while this machine had 788).
 
 The root scripts each have a bash equivalent for Git Bash (`bootstrap-pharo.sh`,
 `build-image.sh`, `cog-lisp.sh`); keep each pair in step when changing either.
@@ -177,6 +187,14 @@ ame.bat`. The VS Code extension does this.
   commit with `git ls-remote <repo> refs/tags/<tag>^{}` (the peeled line; the
   plain one is the tag object for an annotated tag). Lint with
   `docker run --rm -v <repo>:/repo:ro --workdir /repo rhysd/actionlint:latest`.
+- **The Windows VM zip marks its files read-only.** A second extraction over
+  `pharo\` then fails ("Can't unlink already-existing object"); the bootstraps
+  clear the attribute first (`attrib -r`, `chmod -R u+w`). In a batch file name
+  Windows' tar in full (`%SystemRoot%\System32\tar.exe`): from Git Bash, `PATH`
+  finds GNU tar first, which reads `C:\...` as a remote host.
+- **A URL holding `%2B` must not be passed through `call :sub "%URL%"`:** CALL
+  expands `%` a second time (`%2` becomes an argument). Pass the variable's name
+  and read it with delayed expansion (`!%~1!`), as `bootstrap-pharo.bat` does.
 - **In a batch file, take `ERRORLEVEL` on the line right after the command**
   (`set RC=!ERRORLEVEL!`). GitHub runs `shell: cmd` steps from a `.cmd` file, and
   there `SET` resets `ERRORLEVEL` to 0 (in a `.bat` run by hand it does not), so a

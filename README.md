@@ -147,6 +147,21 @@ bench\run-benchmarks.bat
 Headless conventions and the verified Pharo mechanisms are documented in
 [`CLAUDE.md`](CLAUDE.md).
 
+### The Pharo build
+
+cog-lisp builds against one exact Pharo: the Pharo 14 image build 788
+(`58e29ca31d`) and the Pharo VM v12.0.6-beta (commit `bebdbac`), pinned with their
+SHA-256 checksums in [`pharo.pins`](pharo.pins). The bootstrap scripts, CI and
+the release bundles all use those files and check every download against its
+checksum. To move to a newer Pharo, change a URL and its checksum together, run
+the bootstrap, and run every suite both ways.
+
+## License
+
+cog-lisp is released under the [MIT license](LICENSE). Release bundles also
+carry the Pharo VM and image, under their own MIT licenses
+([third-party notices](release/THIRD-PARTY-NOTICES.md)).
+
 ---
 
 ## Project plan

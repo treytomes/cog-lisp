@@ -35,7 +35,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: pharo/downloads
-          key: pharo-linux-${{ hashFiles('bootstrap-pharo.sh') }}
+          key: pharo-linux-${{ hashFiles('pharo.pins') }}
       - name: Bootstrap Pharo
         run: ./bootstrap-pharo.sh
       - name: Run every suite
@@ -61,7 +61,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: pharo\downloads
-          key: pharo-windows-${{ hashFiles('bootstrap-pharo.bat') }}
+          key: pharo-windows-${{ hashFiles('pharo.pins') }}
       - name: Bootstrap Pharo
         shell: cmd
         run: bootstrap-pharo.bat
