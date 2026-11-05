@@ -9,4 +9,8 @@ Every feature lands with a runnable example in `examples/` (with a `.expected` f
 
 **Why:** they prove each feature works and double as documentation, one chapter per feature.
 
+The manual is now scheduled: Phase 10 step 10.4 (owner, 2026-11-05) generates
+`docs/manual/` from the examples' opening comments, code and `.expected` output,
+so an example's opening comment is chapter prose: write it for a reader.
+
 **How to apply:** in every spec, include an Examples section with one example per feature; write examples in a teaching order with plain comments, deterministic output, and building on earlier ones. Related: [[expert-system-goal]].

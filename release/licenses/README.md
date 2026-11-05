@@ -79,7 +79,7 @@ zlib, libgcc's GPL with the runtime exception, libjpeg's IJG credit).
 libraries do not work: drawing with Cairo, fonts, OS windows, Git, and on Linux
 HTTPS (`SqueakSSL` cannot load without OpenSSL 1.0, which modern distributions
 lack anyway). Plain sockets and everything cog-lisp does work. The image itself
-is unchanged; Phase 10.6 (networking) and 10.7 (graphics) bring libraries back
+is unchanged; Phase 11.6 (networking) and 11.7 (graphics) bring libraries back
 deliberately.
 
 ## How the bundles stay this way

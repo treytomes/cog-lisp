@@ -5,7 +5,7 @@
 | **Phase** | 8 |
 | **Status** | Implemented (2026-11-04): steps 8.1–8.6 done |
 | **Depends on** | Phases 1–7.9 |
-| **Feeds** | CI/CD, Phase 9 (seeded builds retire the Smalltalk compiler), Phase 10 (the pure LISP image) |
+| **Feeds** | CI/CD, Phase 9 (seeded builds retire the Smalltalk compiler), Phase 11 (the pure LISP image) |
 | **Shape** | Six steps, 8.1–8.6, each committed and green before the next (§4) |
 
 ## 1. Goal
@@ -38,7 +38,7 @@ and Pharo's code generation underneath (until §4.6).
 - Examples (§9).
 
 **Deferred**
-- Rewriting the runtime and primitives in LISP, and removing Opal: Phase 10.
+- Rewriting the runtime and primitives in LISP, and removing Opal: Phase 11.
   Removing the stock image from the build: Phase 9 (seeded builds).
 - Hygienic macros and the numeric tower: Phase 9.
 - A language server: later (README).

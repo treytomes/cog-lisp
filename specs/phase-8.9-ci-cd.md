@@ -215,7 +215,7 @@ hand (`workflow_dispatch`) and upload `results.md` as an artifact.
     `Pharo.exe`. Every suite passes without them, on Windows (2506/2506) and on
     Linux with each compiler (2509/2509). Packaging stops on any VM file in
     neither list, so a new VM build cannot add a library unnoticed. Graphics
-    and HTTPS bring theirs back, with their licenses, in Phase 10.
+    and HTTPS bring theirs back, with their licenses, in Phase 11.
   - The smoke test checks that every license the notices name is present and
     that the VM folder holds nothing else (Linux bundle 34/34, Windows 35/35).
 - **On GitHub, three bugs only a runner could show** (each fixed, and the first

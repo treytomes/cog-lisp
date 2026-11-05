@@ -52,7 +52,7 @@ time. This is the phase where the project's image-based premise becomes visible.
 - **The stock image is never modified.** The build saves to a new image name;
   tests that save use a throwaway copy.
 - **Nothing at run time depends on the stock image.** The stock image is needed
-  only to *build* `cog-lisp.image`. This keeps the path open to the Phase 10 goal
+  only to *build* `cog-lisp.image`. This keeps the path open to the Phase 11 goal
   of a pure Lisp image, where the stock image is not needed at all; the build
   script is where image shrinking will later happen.
 
@@ -146,7 +146,7 @@ its own definitions.
   their own and fall back to the printed form.
 - **Source lives in the image, not in side files.** It is an instance variable
   of `LispProcedure`, so it persists with `save-image` and does not depend on
-  Pharo's `.sources` / `.changes` files, which a pure Lisp image (Phase 10) will
+  Pharo's `.sources` / `.changes` files, which a pure Lisp image (Phase 11) will
   not have.
 - **`(procedure-source f)`** returns the text as a string. Primitives return
   `#f` (they have no LISP source).
@@ -305,6 +305,6 @@ a change:
   `.lisp` files, which is the natural way to work through *ANSI Common Lisp*.
 - A saved image with accumulated definitions is the first concrete form of the
   "body that persists" in the project's north star.
-- **Phase 10 (pure Lisp image)** builds on the image strategy chosen here: shrink
+- **Phase 11 (pure Lisp image)** builds on the image strategy chosen here: shrink
   the built image to the VM's kernel plus cog-lisp, and eventually build new
   images from an existing cog-lisp image rather than from the stock download.

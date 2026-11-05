@@ -5,7 +5,7 @@
 | **Phase** | 7.6 (the first of the steps before Phase 8; README "Before Phase 8") |
 | **Status** | Implemented (2026-11-03) — `tests/phase-7.6-interop.st` 82/82; five examples; all suites 719/719 |
 | **Depends on** | Phases 1–7.5 |
-| **Feeds** | 7.7 conditions & restarts, 7.8 native data, Phase 8 (the LISP-level interface to Opal), Phase 10 (the subsystem audit) |
+| **Feeds** | 7.7 conditions & restarts, 7.8 native data, Phase 8 (the LISP-level interface to Opal), Phase 11 (the subsystem audit) |
 | **Direction** | Both ways: LISP calls Smalltalk, and Smalltalk calls LISP |
 
 ## 1. Goal
@@ -19,7 +19,7 @@ passes through by identity.
 
 This is the way into everything the image already has (collections, streams,
 files, the compiler), the interface Phase 8's compiler will use to build Opal
-nodes, and what Phase 10's audit will reach the other subsystems through.
+nodes, and what Phase 11's audit will reach the other subsystems through.
 
 ## 2. Scope
 
@@ -38,7 +38,7 @@ nodes, and what Phase 10's audit will reach the other subsystems through.
 
 **Deferred**
 - Defining Smalltalk classes or methods from LISP (a method whose body is LISP).
-  A natural next step once conditions exist; planned for Phase 10 (`define-class`, `define-method`).
+  A natural next step once conditions exist; planned for Phase 11 (`define-class`, `define-method`).
 - Smalltalk cascades (`;`) and statement sequences inside brackets.
 - Mapping Smalltalk exceptions to LISP conditions: Phase 7.7. Until then a
   Smalltalk error raised in a send is reported like any other error (§7).

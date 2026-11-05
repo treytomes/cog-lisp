@@ -1,9 +1,9 @@
-# Phase 10 — A world of its own: the pure LISP image
+# Phase 11 — A world of its own: the pure LISP image
 
 | | |
 |---|---|
 | **Status** | Accepted in outline (2026-11-04). A long phase: each step gets its own detailed spec, accepted by the owner, before it starts. |
-| **Depends on** | Phase 9 (seeded builds, the numeric tower, hygienic macros) |
+| **Depends on** | Phase 9 (seeded builds, the numeric tower, hygienic macros); follows Phase 10 (documentation and the editor). Numbered Phase 10 until 2026-11-05, when the owner put documentation and the editor first. |
 
 ## 1. Goal
 
@@ -20,7 +20,7 @@ Pure does not mean that kernel goes. It means:
 
 1. **No stock image, at run time or at build time.** Phase 9 builds from a seed
    cog-lisp image; here the image also needs no Smalltalk compiler to build,
-   because cog-lisp's runtime is LISP (10.1).
+   because cog-lisp's runtime is LISP (11.1).
 2. **Only what the world needs.** Every Pharo subsystem is audited and kept,
    reimplemented in LISP, or removed. Nothing is removed blindly: networking and
    graphics stay, because the world will want them (owner, 2026-11-02 and
@@ -39,7 +39,7 @@ Pure does not mean that kernel goes. It means:
   `DateAndTime`. It also uses packages it never names, through messages alone:
   FileSystem (`asFileReference`), uFFI (`ffiCall:`), Regex (`matchesRegex:`),
   Zinc's UTF-8 encoders, exceptions, processes and `Delay`, `SessionManager`. A
-  static count undercounts; the audit also watches the system run (10.2).
+  static count undercounts; the audit also watches the system run (11.2).
 - After Phase 9, the Smalltalk in `src/` is the runtime: core data (cons cells,
   symbols, the printer, errors), the primitives, the shell and stdio, about 1,850
   lines today.
@@ -60,7 +60,7 @@ Pure does not mean that kernel goes. It means:
 
 ## 4. Steps (in outline; each is specified in detail before it starts)
 
-### 10.1 The runtime in LISP
+### 11.1 The runtime in LISP
 The step that lets an image be built without a Smalltalk compiler, and lets the
 world read and change its own runtime (owner, 2026-11-04).
 - **`define-class` and `define-method`**: LISP forms that define Smalltalk classes
@@ -74,24 +74,24 @@ world read and change its own runtime (owner, 2026-11-04).
 - The data classes stay Smalltalk classes (the VM and interop need that), defined
   from LISP; the kernel classes are untouched.
 
-### 10.2 The audit
+### 11.2 The audit
 - **A tool, `lib/audit.lisp`**, inventories what the world uses:
   - statically, the classes and selectors that cog-lisp's code and LISP library
     reach, and their packages, transitively;
   - dynamically, every method that runs while all the suites, examples and
     benchmarks run (method-level coverage).
-- **A table, `specs/phase-10-audit.md`**: every Pharo package, grouped into
+- **A table, `specs/phase-11-audit.md`**: every Pharo package, grouped into
   subsystems (kernel, collections, streams, files, networking, FFI, graphics, UI,
   the IDE, Monticello and Metacello, refactoring, tests, Opal, Clap, …), each with
   what uses it and a decision: **keep**, **reimplement in LISP**, or **remove**,
   with a reason.
-- **The owner signs off the table before 10.3.** Kept, as the owner has said:
+- **The owner signs off the table before 11.3.** Kept, as the owner has said:
   networking and graphics. Expected keeps besides: the kernel, collections,
   streams, files, stdio, processes, FFI. Expected removals: the IDE, Monticello,
   Metacello, refactoring, Pharo's own tests. Decided by measurement: Opal, Clap,
   Regex, the windowing UI (Morphic, Spec), which graphics may or may not need.
 
-### 10.3 The pure image
+### 11.3 The pure image
 - **Built from the seed**: the build loads cog-lisp, unloads every package the
   audit marked **remove** (dependents first), cleans up, and saves.
 - **Fixpoint**: an image built by that image is equivalent to it (every method's
@@ -100,7 +100,7 @@ world read and change its own runtime (owner, 2026-11-04).
   pure image, on Linux and Windows, and the release bundles ship it.
 - **Measured and recorded**: image size, start-up time, memory at the prompt.
 
-### 10.4 cog-lisp's own VM executables
+### 11.4 cog-lisp's own VM executables
 - **A spike first** (owner, 2026-11-04): build the VM from `pharo-vm` at the pinned
   commit, unchanged, in CI for Linux and Windows, and run every suite on it.
 - **If it builds reliably**: name it `cog-lisp` / `cog-lisp.exe`, make
@@ -109,7 +109,7 @@ world read and change its own runtime (owner, 2026-11-04).
 - **If not**: keep the stock binaries, renamed, with a launcher, and record the
   decision and its reason.
 
-### 10.5 The LISP-visible world
+### 11.5 The LISP-visible world
 What Pharo's IDE gave a Smalltalk programmer, for a LISP programmer at the REPL:
 - `(describe x)`, `(inspect x)` (a REPL-driven inspector), `(apropos "name")`,
   `(who-calls 'f)`, `(procedure-source f)` and `(disassemble f)` (as now), and
@@ -117,33 +117,33 @@ What Pharo's IDE gave a Smalltalk programmer, for a LISP programmer at the REPL:
 - **Errors never show Smalltalk stack traces**: a LISP backtrace of procedure
   names and source locations, at the break loop (`backtrace`).
 - `(save-image)`, `(save-image "name")`.
-- These are the first entries in the generated built-ins reference (README, "a
-  reference of the built-ins"), with the hover help planned for VS Code.
+- They are documented as every built-in is (Phase 10.1), so they join the
+  generated reference and the editor's hover help (Phase 10.2, 10.3).
 
-### 10.6 Networking from LISP
+### 11.6 Networking from LISP
 Sockets, HTTP client and server (Zinc, as the audit keeps it), and whatever the
 agent's way in and out of the world needs, as a LISP library. Specified when
 reached.
 
-### 10.7 Graphics from LISP
+### 11.7 Graphics from LISP
 Drawing and, if the audit keeps it, windows: a LISP library over what Pharo
-provides (Athens and Cairo, SDL2, Morphic or Spec, as measured in 10.2).
+provides (Athens and Cairo, SDL2, Morphic or Spec, as measured in 11.2).
 Specified when reached.
 
 ## 5. Acceptance criteria (in outline)
 
-- AC-1 (10.1) No Smalltalk source is filed in to build an image; the runtime's
+- AC-1 (11.1) No Smalltalk source is filed in to build an image; the runtime's
   methods come from `lib/runtime/`; every suite passes.
-- AC-2 (10.2) The audit table covers every package in the image, and the owner has
+- AC-2 (11.2) The audit table covers every package in the image, and the owner has
   signed it off.
-- AC-3 (10.3) The pure image passes every suite, example, LISP test and benchmark
+- AC-3 (11.3) The pure image passes every suite, example, LISP test and benchmark
   on both platforms; the image-builds-image fixpoint holds; the release ships it;
   its size and start-up time are recorded.
-- AC-4 (10.4) cog-lisp's own VM executables run every suite on both platforms, or
+- AC-4 (11.4) cog-lisp's own VM executables run every suite on both platforms, or
   the decision to keep the stock binaries is recorded with its reason.
-- AC-5 (10.5) Each tool of 10.5 works at the REPL and has a test and an example; an
+- AC-5 (11.5) Each tool of 11.5 works at the REPL and has a test and an example; an
   uncaught error shows a LISP backtrace, not a Smalltalk one.
-- AC-6 and AC-7 (10.6, 10.7): set by their detailed specs.
+- AC-6 and AC-7 (11.6, 11.7): set by their detailed specs.
 
 ## 6. Examples (in outline)
 
@@ -151,7 +151,7 @@ Specified when reached.
 |---|---|
 | `examples/define-class.lisp` | a Smalltalk class and its methods defined from LISP, and used through `send` |
 | `examples/world-tour.lisp` | describe, apropos, who-calls, a backtrace: the world examining itself |
-| (10.6, 10.7) | set by their detailed specs |
+| (11.6, 11.7) | set by their detailed specs |
 
 ## 7. Risks
 
@@ -159,28 +159,28 @@ Specified when reached.
   start-up and shut-down handlers, class-side registrations. The audit's dynamic
   half exists to find them, and stripping goes one subsystem at a time, with
   every suite run after each.
-- **The runtime rewrite (10.1) is the largest step.** It replaces working code;
+- **The runtime rewrite (11.1) is the largest step.** It replaces working code;
   the suites are the safety net, as they were for the compiler.
 - **Keeping graphics may keep a lot**: the audit measures what drawing alone needs
   before deciding on the windowing UI.
 - **Libraries come with licenses.** Since v0.1.2 the release bundles ship only
   the VM, its plugins, libffi and winpthreads; the VM archives' other libraries
   (cairo, FreeType, SDL, OpenSSL, …) are left out (`release/package.sh`,
-  `release/THIRD-PARTY-NOTICES.md`). When 10.6 or 10.7 needs one, it is added to
+  `release/THIRD-PARTY-NOTICES.md`). When 11.6 or 11.7 needs one, it is added to
   the list in `release/package.sh` with its license text in `release/licenses/`
   and an entry in the notices. LGPL libraries (cairo, iconv) also need their
   source offered.
-- **Building the VM (10.4)** pulls in a CMake and Slang toolchain this project has
+- **Building the VM (11.4)** pulls in a CMake and Slang toolchain this project has
   never needed; the spike decides whether it is worth it.
 
 ## 8. Step status
 
 | Step | Status |
 |---|---|
-| 10.1 Runtime in LISP | not started |
-| 10.2 Audit | not started |
-| 10.3 Pure image | not started |
-| 10.4 Own VM executables | not started |
-| 10.5 LISP-visible world | not started |
-| 10.6 Networking from LISP | not started |
-| 10.7 Graphics from LISP | not started |
+| 11.1 Runtime in LISP | not started |
+| 11.2 Audit | not started |
+| 11.3 Pure image | not started |
+| 11.4 Own VM executables | not started |
+| 11.5 LISP-visible world | not started |
+| 11.6 Networking from LISP | not started |
+| 11.7 Graphics from LISP | not started |

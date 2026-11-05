@@ -5,7 +5,7 @@
 - [North star vision](north-star-vision.md) — cog-lisp as a living Smalltalk-like world, eventually a body for an AI agent to grow in.
 - [Phase 2 env-model decision](phase-2-env-model-decision.md) — lexical+global (locals→temps, closures→BlockClosures); why, and the escape hatch.
 - [Lean on Pharo](lean-on-pharo.md) — design tenet: reuse Pharo's machinery (VM, blocks, Opal, image) rather than reinvent it.
-- [Pure Lisp image goal](pure-lisp-image-goal.md) — no stock Pharo image; Phase 9 = language, Phase 10 = pure image (long); runtime in LISP; networking/graphics kept; complex numbers as a library.
+- [Pure Lisp image goal](pure-lisp-image-goal.md) — no stock Pharo image; Phase 9 = language, Phase 11 = pure image (long); runtime in LISP; networking/graphics kept; complex numbers as a library.
 - [Retain source](retain-source.md) — every compiled procedure keeps its exact source text, stored in the image.
 - [Expert system goal](expert-system-goal.md) — later: forward (Rete) + backward (Prolog) chaining written in cog-lisp.
 - [Examples become the manual](examples-become-manual.md) — keep one checked example per feature; they will form the user manual.

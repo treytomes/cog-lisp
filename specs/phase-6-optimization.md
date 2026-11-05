@@ -5,7 +5,7 @@
 | **Phase** | 6 |
 | **Status** | Implemented (2026-11-02) — `tests/phase-6-tail-calls.st` 127/127; `bench\run-benchmarks.bat` 12/12 (including §11, guarded inlining, added 2026-11-03) |
 | **Depends on** | Phases 1–5 |
-| **Feeds** | Phase 7 (macros), Phase 8 (self-hosting), Phase 10 (pure image) |
+| **Feeds** | Phase 7 (macros), Phase 8 (self-hosting), Phase 11 (pure image) |
 | **Tail calls** | Proper tail calls: self tail calls become loops; other tail calls use a trampoline |
 | **Baselines** | Hand-written Smalltalk (the ceiling) and a tree-walking interpreter (the floor) |
 
@@ -252,7 +252,7 @@ Settled 2026-11-02 (owner sign-off); the spec is Accepted on these.
   all of which rely on proper tail calls to run in constant stack.
 - **Phase 8** (self-hosting): a compiler written in LISP is deeply recursive over
   its input; proper tail calls and fast calls keep it practical.
-- **Phase 10**: global cells and literal constants live in the image like any
+- **Phase 11**: global cells and literal constants live in the image like any
   object, so they need nothing from Pharo's `.sources`/`.changes` files.
 - `bench/results.md` becomes the baseline for any later performance work.
 

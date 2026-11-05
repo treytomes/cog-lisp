@@ -41,7 +41,8 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 8 | Self-hosting (meta-circular) | ✅ **done** — [spec](specs/phase-8-self-hosting.md); 8.1 tests in LISP, 8.2 reader and 8.3 compiler in LISP, 8.4 the compiler compiles itself to a fixpoint, 8.5 the LISP reader and compiler are the ones in use, 8.6 it writes bytecode itself, compiling 2.1× faster than Phase 7.9 ([`lib/compiler/`](lib/compiler/), examples [read-yourself](examples/read-yourself.lisp), [compile-yourself](examples/compile-yourself.lisp), [extend-the-compiler](examples/extend-the-compiler.lisp), [bootstrap](examples/bootstrap.lisp), [sealed-compiler](examples/sealed-compiler.lisp)) done; all suites 2506/2506, with either compiler |
 | 8.9 | CI/CD, and running on Linux | ✅ **done** — [spec](specs/phase-8.9-ci-cd.md); every push tested on Linux (both compilers) and Windows; a `v*` tag publishes Linux and Windows bundles and the `.vsix` |
 | 9 | Finishing the language: seeded builds, the numeric tower, hygienic macros | ✅ **done** — [spec](specs/phase-9-language.md); 9.1 seeded builds, 9.2 the numeric tower, 9.3 hygienic macros (examples [seeded-build](examples/seeded-build.lisp), [numbers](examples/numbers.lisp), [new-number-type](examples/new-number-type.lisp), [syntax-rules](examples/syntax-rules.lisp), [shadowing](examples/shadowing.lisp)) |
-| 10 | A world of its own: the pure LISP image, then networking and graphics from LISP | ⬜ [spec](specs/phase-10-pure-image.md) accepted in outline |
+| 10 | Knowing the language: documentation, the built-ins reference, hover help, the manual, a language server | ⬜ [spec](specs/phase-10-documentation-and-editor.md) proposed |
+| 11 | A world of its own: the pure LISP image, then networking and graphics from LISP | ⬜ [spec](specs/phase-11-pure-image.md) accepted in outline |
 
 Phase 0 is proven, not just planned: [`poc/answer.st`](poc/answer.st) builds
 three `CompiledMethod`s directly from Opal IR — a constant, a two-argument add,
@@ -282,7 +283,7 @@ node, or raise and catch an error. These come first (decided 2026-11-03):
 - **Smalltalk interop** — ✅ done as Phase 7.6 ([spec](specs/phase-7.6-smalltalk-interop.md)): `[coll add: x]`, `(send d at:put: k v)`, `(smalltalk Dictionary)`. Call Smalltalk from LISP (send messages
   to Smalltalk objects, reach classes and globals) and LISP from Smalltalk (a
   LISP procedure usable as a block, which must drive its own tail calls; review
-  R-18). The way into the rest of the image, into the subsystems Phase 10 may keep
+  R-18). The way into the rest of the image, into the subsystems Phase 11 may keep
   or reimplement, and Phase 8's "LISP-level interface to the Opal IR".
 - **Conditions and restarts** — ✅ done as Phase 7.7 ([spec](specs/phase-7.7-conditions-restarts.md)): `guard`, `with-exception-handler`, `restart-case`, and a break loop at the console REPL. A LISP-level error system: `error`, condition
   objects, handlers, and restarts, with host errors mapped to conditions (review
@@ -292,7 +293,7 @@ node, or raise and catch an error. These come first (decided 2026-11-03):
   `string->number`, `char->integer`, character predicates, string building,
   vectors, hash tables), as **native primitives** in cog-lisp's runtime rather
   than LISP names over Smalltalk objects: the world stays readable in LISP
-  (Phase 10), and the fixpoint check is simpler without host objects in the loop.
+  (Phase 11), and the fixpoint check is simpler without host objects in the loop.
 - **Self-hosting groundwork** — ✅ done as Phase 7.9 ([spec](specs/phase-7.9-self-hosting-groundwork.md)), with unit tests written in cog-lisp (`lib/test.lisp`, `tests/lisp/`): the review findings marked *plan → self-hosting*
   (`specs/review-phases-1-7.md`): calls nested ~20 deep (C-5), lambdas with
   more than 15 parameters (C-4), cycle-safe `equal?` and printing (R-4), string
@@ -357,57 +358,44 @@ and examples:
   free names mean what they meant where it was defined (review C-14).
   `define-macro` stays.
 
-### Phase 10 — A world of its own
-[Spec](specs/phase-10-pure-image.md), accepted in outline; a long phase, each
+### Phase 10 — Knowing the language
+[Spec](specs/phase-10-documentation-and-editor.md), proposed. Makes cog-lisp
+knowable, by a reader and by the editor, from documentation kept with each
+definition in the image (owner ideas of 2026-11-04, moved ahead of the pure
+image on 2026-11-05):
+- **10.1 Documentation in the image**: every primitive, special form and core
+  form documented where it is defined; `(documentation 'name)`; a test fails
+  when a built-in has none.
+- **10.2 The reference of the built-ins**: `docs/builtins.md`, generated from
+  the image and checked against it.
+- **10.3 Hover help, offline**: the VS Code extension shows each built-in's call
+  form and description, and completes its name, from generated data.
+- **10.4 The user manual**: `docs/manual/`, generated from the examples (their
+  comments, code and checked output) and a chapter list.
+- **10.5 A language server**, served by the image over stdio: a spike first, then
+  hover, completion, go to definition, diagnostics with positions, and macro
+  expansion.
+
+### Phase 11 — A world of its own
+[Spec](specs/phase-11-pure-image.md), accepted in outline; a long phase, each
 step specified in detail before it starts (owner, 2026-11-04). The VM always
 needs a small Smalltalk-shaped kernel; "pure" means no stock image at run or
 build time, only the Pharo subsystems the world needs, and a world a user meets
 in LISP.
-- **10.1 The runtime in LISP**: `define-class` and `define-method`, and cog-lisp's
+- **11.1 The runtime in LISP**: `define-class` and `define-method`, and cog-lisp's
   runtime moved from Smalltalk to `lib/runtime/`, so no Smalltalk compiler is
   needed to build an image, and the world can read and change its own runtime.
-- **10.2 The audit**: every Pharo package kept, reimplemented in LISP, or removed,
+- **11.2 The audit**: every Pharo package kept, reimplemented in LISP, or removed,
   measured statically and by running everything, and signed off by the owner
   before anything goes. Networking and graphics stay.
-- **10.3 The pure image**: built from the seed by unloading what the audit
+- **11.3 The pure image**: built from the seed by unloading what the audit
   removes; an image that builds its successor to a fixpoint.
-- **10.4 Our own VM executables**: a spike building `pharo-vm` at the pinned
+- **11.4 Our own VM executables**: a spike building `pharo-vm` at the pinned
   commit in CI, kept only if it builds reliably (`--headless` by default).
-- **10.5 The LISP-visible world**: describe, inspect, apropos, who-calls, edit, and
+- **11.5 The LISP-visible world**: describe, inspect, apropos, who-calls, edit, and
   LISP backtraces instead of Smalltalk ones.
-- **10.6 Networking from LISP** and **10.7 Graphics from LISP**, specified when
+- **11.6 Networking from LISP** and **11.7 Graphics from LISP**, specified when
   reached.
-
-### Later: hover help in VS Code (owner idea, 2026-11-04)
-Hover text for procedures, special forms and macros, designed so it costs
-almost nothing to maintain:
-- **One source of truth, in the image.** Each primitive gets a one-line
-  documentation string where it is installed; a `define` or `define-macro` whose
-  body starts with a string keeps it as its documentation (as Common Lisp does),
-  stored with the procedure like its source. `(procedure-documentation f)` reads
-  it, and a test fails if a primitive has none, so new primitives cannot be
-  added undocumented.
-- **The editor asks the image.** Hover comes from the planned image-served
-  language server (Phase 7.5 spec §5.4): documentation, the parameter list, and
-  `procedure-source` for user definitions. Nothing is copied into the extension.
-- **Offline fallback, generated:** the build can dump every global's
-  documentation to a JSON file the extension reads when no image is running, so
-  even that list is never edited by hand.
-- To be specified with the language server.
-
-### Later: a reference of the built-ins (owner idea, 2026-11-04)
-Every primitive, special form and `lib/` macro listed with its parameters, a
-one-line description and the spec section that introduced it, so the growing
-set stays known to both of us. Built on the hover-help plan above: the
-documentation strings in the image are the source, and the reference
-(`docs/builtins.md`) is generated from them by the build, with a test that
-fails when a global has no documentation. Not yet scheduled; specify it with
-hover help, or sooner if keeping track gets hard.
-
-### Later: a user manual (owner idea, 2026-11-04)
-The examples in `examples/` (each runnable, with its expected output checked by
-the test suites) are written to become the backbone of a cog-lisp user manual:
-one chapter per feature, with the example as its worked, verified code.
 
 ### Later: an expert system in cog-lisp (owner idea, 2026-11-03)
 A first large program written *in* cog-lisp, once the language phases are done:

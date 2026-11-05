@@ -41,7 +41,7 @@ from `send` are caught by the same forms (review R-2's host-error mapping).
 **Deferred**
 - Defining new condition *classes* from LISP (CL `define-condition`). Any value
   can be raised, so a tagged list or record serves for now; classes come with
-  defining Smalltalk classes from LISP (planned for Phase 10).
+  defining Smalltalk classes from LISP (planned for Phase 11).
 - `call/cc` and full re-entrant continuations; `dynamic-wind` here guards exits
   only (§5.3).
 - `warn`, `signal` of non-error conditions, and a condition hierarchy beyond what

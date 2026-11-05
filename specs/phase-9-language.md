@@ -4,12 +4,12 @@
 |---|---|
 | **Status** | Implemented (2026-11-05); accepted 2026-11-04 |
 | **Depends on** | Phase 8 (complete), Phase 8.9 (CI, pinned Pharo) |
-| **Feeds** | Phase 10 (the pure LISP image) |
+| **Feeds** | Phase 11 (the pure LISP image) |
 | **Review items** | R-11 (reading rationals), R-21 (infinity and NaN), C-14 (shadowing and capture) |
 
 ## 1. Goal
 
-Finish the language, so that Phase 10 can turn to the image:
+Finish the language, so that Phase 11 can turn to the image:
 
 - **Seeded builds**: an image is built from an earlier cog-lisp image instead of
   the stock Pharo image, and the Smalltalk reader and compiler retire.
@@ -20,8 +20,8 @@ Finish the language, so that Phase 10 can turn to the image:
   shadow and macros that cannot capture a program's variables.
 
 The pure image (the runtime in LISP, the audit of Pharo's subsystems, stripping,
-our own VM, the LISP-visible tools, then networking and graphics) is Phase 10
-(`specs/phase-10-pure-image.md`), split off by the owner on 2026-11-04 because it
+our own VM, the LISP-visible tools, then networking and graphics) is Phase 11
+(`specs/phase-11-pure-image.md`), split off by the owner on 2026-11-04 because it
 will take much longer.
 
 ## 2. Where we start (measured 2026-11-04)
@@ -67,7 +67,7 @@ will take much longer.
 - **Until this step every suite runs both ways**; after it, once, and CI's
   second Linux job goes.
 - The Smalltalk runtime in `src/` is still filed in by Opal, which the seed has
-  (Phase 10 moves the runtime to LISP).
+  (Phase 11 moves the runtime to LISP).
 - **Recovering from nothing**: the first seed is built the old way, from the
   pinned stock image, and that path stays in the repository (a script and a CI
   job that run it) as the documented way back if every seed is lost.
@@ -510,13 +510,13 @@ Two commits.
 
 ## 8. Decisions (owner, 2026-11-04)
 
-1. **Two phases**: this one is the language; the pure image is Phase 10, which
+1. **Two phases**: this one is the language; the pure image is Phase 11, which
    will take a long time and add graphics and networking.
-2. **The runtime is rewritten in LISP** (Phase 10, step 10.1).
+2. **The runtime is rewritten in LISP** (Phase 11, step 11.1).
 3. **Complex numbers are a library**, addable at any time: the tower is built open
    to new kinds of number (9.2).
 4. **Hygiene by renaming** (aliases), not syntactic closures or `syntax-case`.
-5. **Our own VM: a spike first** (Phase 10, step 10.4).
+5. **Our own VM: a spike first** (Phase 11, step 11.4).
 
 ## 9. Step status
 
