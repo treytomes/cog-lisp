@@ -49,8 +49,12 @@ release, pinned in `pharo.pins` as `SEED_TAG`, `SEED_URL` (its Linux bundle) and
 `build-image` runs `build/build.st` on it. The seed's sealed compiler compiles
 `lib/` into a **fresh** `LispEnvironment`: the environment is replaced, not
 cleared, so the seed's code keeps its old cells. The build then removes
-whatever the seed had that `src/` no longer defines. `(image-build-info)` reports
-the seed and the fixpoint.
+whatever the seed had that `src/` no longer defines: every method in its packages
+that the file-in did not compile (recorded from `MethodAdded`/`MethodModified`
+announcements; Pharo's recompiling a class for a new shape announces nothing,
+so object identity cannot tell), removed **before** any of it runs. It refuses
+to remove more than half the methods. `(image-build-info)` reports the seed and
+the fixpoint.
 - **The new `src/` must still run the seed's compiler for one build.** If it
   can't, keep the old method for one more release, or release and move the seed
   pin forward.
@@ -243,6 +247,9 @@ ame.bat`. The VS Code extension does this.
 
 ## Verified Opal AST API (Pharo 14) — for the Phase 3 compiler
 
+(The compiler that used this API retired in Phase 9 step 9.1; its source is in
+the history, up to release v0.1.2. These facts still hold for Pharo itself.)
+
 Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 
 - Parser is **`OCParser`**; AST nodes are **`OC*`** (`OCMethodNode`,
@@ -340,13 +347,15 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 
 ## Writing the compiler in LISP (Phase 8)
 
-- **Since 8.5 the LISP reader and compiler are the ones in use**, in the built
-  image and in a stock image (installed at the first compile, about 1 s, without
-  the fixpoint check the build does). `COGLISP_COMPILER=smalltalk` selects the
-  Smalltalk ones; run `tests\run-all.bat` both ways after compiler changes. The
-  Smalltalk ones are always reachable as `LispCompiler new smalltalkCompile:
-  datum context: nil` and `LispReader basicOn:`: a test that compares the two
-  must use those, or it compares the LISP versions with themselves.
+- **The LISP reader and compiler are the only ones** (since Phase 9 step 9.1;
+  the Smalltalk ones, `COGLISP_COMPILER` and the Opal generator retired). A stock
+  image with `src/` filed in has no reader or compiler at all: everything runs on
+  an image built from the seed. `src/coglisp-compiler.st` is now the Smalltalk
+  side only: `LispCompiler new compile:`/`eval:`/`evalFile:`, the options, the
+  entry points (`LispCompiler entries`), sealing, the seeded build. `LispReader
+  on:` answers the LISP reader (`LispReaderInLisp`) over a string or a
+  `ReadStream` on one; `LispReader readFrom:` also reads a `LispLineStream`
+  (stdin), a line at a time while the datum is incomplete.
 - **The installed compiler is sealed:** its code reads private copies of the
   global cells it uses, so redefining `append` (or `lc-translate-if`) in a
   program changes nothing for the compiler. To change the compiler, edit
@@ -358,17 +367,16 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   before optimizing: `MessageTally new spyEvery: 1 on: [...]`, then
   `leavesPrintExactOn:` (macros alone gave the reader 20%; these, 4x).
 - **`voidCogVMState` is on `Smalltalk vm`**, not `Smalltalk`, in Pharo 14.
-- **Since 8.6 the LISP compiler writes bytecode itself** (`lib/compiler/codegen.lisp`,
-  through Pharo's `EncoderForSistaV1`); `(set-code-generator! 'opal)` goes back to
-  Opal, whose output is byte-identical to the Smalltalk compiler's. Compare with
-  the Smalltalk compiler only through Opal. `EncoderForSistaV1` has `stream:`
-  but no getter; Pharo has no `isSmallInteger`.
+- **The LISP compiler writes bytecode itself** (`lib/compiler/codegen.lisp`,
+  through Pharo's `EncoderForSistaV1`; `opal-generate` keeps its old name).
+  `EncoderForSistaV1` has `stream:` but no getter; Pharo has no `isSmallInteger`.
 - **A bound global is read with `pushLiteralVariable`:** the VM reads a
   `LispGlobal`'s second slot (`value`) as a binding's value. Keep `value` the
   second slot, and keep cells from ever becoming unbound.
 - **Generator bugs show up compiling the compiler's own source.** Before
   rebuilding the image (whose bootstrap runs the generator), compile every form
-  of `lib/compiler/*.lisp` with it in a stock image and list the failures.
+  of `lib/compiler/*.lisp` with it in the built image and list the failures; the
+  build's bootstrap fails on them too.
 - **A Windows path inside generated LISP text is full of escapes** (`\U`, `\c`):
   build the datum (`LispCons fromArray: {...}`) instead of reading text.
 
@@ -428,10 +436,15 @@ This project follows spec-driven development: **write the spec before the code.*
   `PASS`/`FAIL` per check, and a final `RESULT: n/n` line.
 - Code changes reference the spec section they satisfy. If reality forces a
   deviation, update the spec first, then the code.
-- **Run everything with `tests\run-all.bat`** (about 2 m 10 s; `tests/run-all.sh` on Linux): each `tests\phase-*.st`
-  in a fresh stock image, then `tests\phase-5-runner.bat` (which rebuilds
-  `pharo\cog-lisp.image`), with a total; exit 0 only if all pass. Benchmarks are
-  separate (`bench\run-benchmarks.bat`) and noisy when the machine is busy.
+- **Run everything with `tests\run-all.bat`** (`tests/run-all.sh` on Linux): it
+  builds `pharo\cog-lisp.image` from the seed, runs each `tests\phase-*.st` on a
+  fresh copy of it (`pharo\suite.image`; a suite files in only its harness), then
+  `tests\phase-5-runner.bat` (which builds the image again) and the LISP tests,
+  with a total; exit 0 only if all pass. Every suite and test gets an empty file
+  as stdin: one that inherits an open pipe blocks forever in `(read)`. Never edit
+  a `.bat` file while cmd is running it: cmd re-reads the file as it goes.
+  Benchmarks are separate (`bench\run-benchmarks.bat`) and noisy when the machine
+  is busy.
 - **Language behavior is tested in LISP** (Phase 8 step 8.1): `tests/lisp/*.lisp`
   with `lib/test.lisp` (`define-test`, `check`, `check-error`, `check-written`,
   `check-error-class`, `eval-all`, `run-tests`). Smalltalk suites are for what

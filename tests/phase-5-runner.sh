@@ -35,8 +35,8 @@ same() { cmp -s "$1" "$2" && echo 1 || echo 0; }
 echo "== cog-lisp Phase 5 : runner =="
 
 # --- AC-1 / AC-2: build ------------------------------------------------------
-STOCK=""
-for f in pharo/Pharo*.image; do [ -f "$f" ] && { STOCK="$f"; break; }; done
+# the image is built from the seed (Phase 9 step 9.1), which the build never saves
+STOCK="pharo/seed.image"
 BEFORE="$(stat -c '%Y %s' "$STOCK" 2>/dev/null)"
 "$ROOT/build-image.sh" >"$TMPD/build.log" 2>&1
 RC=$?
@@ -44,7 +44,7 @@ AFTER="$(stat -c '%Y %s' "$STOCK" 2>/dev/null)"
 OK=0; [ "$RC" = 0 ] && [ -f pharo/cog-lisp.image ] && OK=1
 check "AC-1 build-image.sh creates pharo/cog-lisp.image" $OK
 OK=0; [ "$BEFORE" = "$AFTER" ] && OK=1
-check "AC-1 stock image unchanged" $OK
+check "AC-1 the seed image unchanged" $OK
 
 # --- one fixture: a program or REPL input ------------------------------------
 runcase() {   # $1 path of a .lisp or .stdin fixture, $2 prog or repl

@@ -1,10 +1,12 @@
 ;;; reader.lisp -- cog-lisp's reader, written in cog-lisp
 ;;; (specs/phase-8-self-hosting.md step 8.2)
 ;;;
-;;; A function-for-function counterpart of LispReader (src/coglisp-reader.st):
-;;; the same datums, the same source ranges for lists, the same read errors with
-;;; the same messages, positions and incomplete flags. It reads a string; offsets
-;;; are 0-based, as in the Smalltalk reader.
+;;; Written as a function-for-function counterpart of the reader written in
+;;; Smalltalk (LispReader in src/coglisp-reader.st up to release v0.1.2; it
+;;; retired in Phase 9 step 9.1, and this is now cog-lisp's only reader): the same
+;;; datums, the same source ranges for lists, the same read errors with the same
+;;; messages, positions and incomplete flags. It reads a string; offsets are
+;;; 0-based. LispReader on: is how Smalltalk code reaches it.
 ;;;
 ;;;   (define r (make-reader "(a b) 42"))
 ;;;   (reader-next r)            -> (a b), then 42, then the eof object

@@ -2,11 +2,8 @@
 ;;; specs/phase-8-self-hosting.md step 8.6, AC-8). Everything else runs on it too;
 ;;; these check what it had to get right that Opal did before: closures and
 ;;; their variables, inlined control flow, globals read as literal variables,
-;;; frame limits, literals. Passes with either compiler.
+;;; frame limits, literals. (Since step 9.1 it is the only generator.)
 (load "../../lib/test.lisp")
-
-(define-test "AC-8 the direct generator is in use"
-  (check (code-generator) 'direct))
 
 (define-test "AC-8 closures made in a loop keep their own iteration's values"
   (check (eval-all "(let loop ((i 0) (acc '())) (if (= i 3) (map (lambda (f) (f)) acc) (loop (+ i 1) (cons (lambda () i) acc))))")

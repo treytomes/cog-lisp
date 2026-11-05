@@ -1,16 +1,11 @@
 ;;; phase-8.5-switch-over.lisp -- the LISP reader and compiler are the ones in use
-;;; (specs/phase-8-self-hosting.md step 8.5, AC-5 and AC-6). Passes with either
-;;; implementation: tests\run-all.bat runs it once with the LISP compiler and once
-;;; with COGLISP_COMPILER=smalltalk.
+;;; (specs/phase-8-self-hosting.md step 8.5, AC-5 and AC-6). Since step 9.1 they
+;;; are the only ones: the Smalltalk ones, and COGLISP_COMPILER, retired.
 (load "../../lib/test.lisp")
 
-(define wanted
-  (let ((v [[(smalltalk OSEnvironment) current] at: "COGLISP_COMPILER" ifAbsent: (lambda () "")]))
-    (if (string=? [v asLowercase] "smalltalk") 'smalltalk 'lisp)))
-
-(define-test "AC-5 (compiler-implementation) is the one COGLISP_COMPILER selects"
-  (check (compiler-implementation) wanted)
-  (check-true [(smalltalk LispCompiler) hasLispCompiler]))
+(define-test "AC-5 the image has the LISP reader and compiler installed"
+  (check-true [(smalltalk LispCompiler) hasLispCompiler])
+  (check-true (procedure? [[(smalltalk LispCompiler) entries] at: (smalltalk-symbol "compile")])))
 
 (define-test "AC-5 eval, load and read use it"
   (check (eval '(let loop ((i 0)) (if (< i 5) (loop (+ i 1)) i))) 5)

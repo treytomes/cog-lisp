@@ -3,8 +3,10 @@
 #  cog-lisp : run every acceptance suite  (bash equivalent of tests\run-all.bat;
 #  specs/phase-7.5-review-and-tooling.md AC-5, Phase 8.9)
 #    tests/run-all.sh
-#  Runs each tests/phase-*.st in a fresh stock image, then the runner suite
-#  (which rebuilds pharo/cog-lisp.image), then the LISP unit tests
+#  Builds pharo/cog-lisp.image from the seed (build-image.sh), runs each
+#  tests/phase-*.st in a fresh copy of it (pharo/suite.image: suites file in
+#  their harness, which writes to the image's changes file), then the runner
+#  suite (which builds the image again), then the LISP unit tests
 #  tests/lisp/*.lisp, and prints each suite's RESULT and a total. Exit code 0
 #  only if every suite passed. Suite outputs stay in $COGLISP_TEST_OUTPUT
 #  (default: a temporary folder) for reading a failure. Benchmarks are separate.
@@ -15,10 +17,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 2
 . "$ROOT/scripts/pharo-vm.sh"
 VM="$(pharo_vm "$ROOT/pharo")"
-STOCK=""
-for f in pharo/Pharo*.image; do [ -f "$f" ] && { STOCK="$ROOT/$f"; break; }; done
-if [ -z "$STOCK" ] || [ -z "$VM" ]; then
-  echo "run-all: no stock image or VM in pharo/ -- run bootstrap-pharo.sh first" >&2
+if [ ! -f pharo/seed.image ] || [ -z "$VM" ]; then
+  echo "run-all: no seed image or VM in pharo/ -- run bootstrap-pharo.sh first" >&2
   exit 2
 fi
 TMPD="${COGLISP_TEST_OUTPUT:-${TMPDIR:-/tmp}/coglisp-run-all}"
@@ -28,12 +28,7 @@ mkdir -p "$TMPD"
 PASS=0
 TOTAL=0
 FAILED=0
-# the reader and compiler in use (Phase 8 step 8.5): LISP unless COGLISP_COMPILER=smalltalk
-if [ "$(echo "${COGLISP_COMPILER:-}" | tr '[:upper:]' '[:lower:]')" = smalltalk ]; then
-  echo "== cog-lisp : all suites, on the Smalltalk reader and compiler (COGLISP_COMPILER=smalltalk) =="
-else
-  echo "== cog-lisp : all suites, on the LISP reader and compiler =="
-fi
+echo "== cog-lisp : all suites =="
 
 # A suite passes when it exits 0 and prints "RESULT: n/n".
 tally() {   # $1 suite name, $2 its output, $3 its exit code
@@ -57,11 +52,22 @@ tally() {   # $1 suite name, $2 its output, $3 its exit code
   fi
 }
 
+if ! "$ROOT/build-image.sh" >"$TMPD/build-image.out" 2>&1; then
+  echo "  FAIL  build-image  -- see $TMPD/build-image.out"
+  tail -n 5 "$TMPD/build-image.out"
+  echo
+  echo "== THE IMAGE DID NOT BUILD: no suite was run =="
+  exit 1
+fi
+echo "  ok    build-image (from the seed)"
+
 for t in tests/phase-*.st; do
   name="$(basename "$t" .st)"
-  "$VM" --headless "$STOCK" st "$ROOT/$t" </dev/null >"$TMPD/$name.out" 2>&1
+  cp -f pharo/cog-lisp.image pharo/suite.image && cp -f pharo/cog-lisp.changes pharo/suite.changes
+  "$VM" --headless "$ROOT/pharo/suite.image" st "$ROOT/$t" </dev/null >"$TMPD/$name.out" 2>&1
   tally "$name" "$TMPD/$name.out" $?
 done
+rm -f pharo/suite.image pharo/suite.changes
 
 "$ROOT/tests/phase-5-runner.sh" >"$TMPD/phase-5-runner.out" 2>&1
 tally phase-5-runner "$TMPD/phase-5-runner.out" $?

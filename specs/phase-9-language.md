@@ -97,17 +97,27 @@ never saved) goes in this order:
 1. **Keep the seed's compiler.** Its entry points (`LispCompiler entries`) are
    kept for the build. Sealing (step 8.5) made them independent of the global
    environment: they read private copies of every cell they use.
-2. **Note what the seed has**: every method of the `CogLisp-*` packages,
-   extension methods included.
-3. **File in `src/`.** Classes are redefined in place, and every method in
-   `src/` is compiled anew.
-4. **A fresh global environment.** `LispEnvironment default` is replaced, not
+2. **Note the seed's packages** (`CogLisp-*`).
+3. **File in `src/`, noting every method it compiles.** Classes are redefined in
+   place, and every method in `src/` is compiled anew; each compile announces
+   itself (`MethodAdded`, `MethodModified`), and the build records them.
+4. **Remove what the seed had and the source no longer does, before any of it
+   can run.** In the packages `src/` defines and the seed's, a method the
+   file-in did not compile goes, and so does a class `src/` does not define.
+   (As built: the first plan kept the seed's method objects and removed those
+   still identical after the file-in, at the end of the build. Pharo recompiles
+   every method of a class whose shape changes, so stale methods became new
+   objects and stayed; and one ran first: the seed's `LispCompiler>>initialize`
+   wrote a slot that no longer existed. Hence the announcements, and the early
+   sweep.) A sweep that would remove more than half the methods is refused, as a
+   mistake in what was noted.
+5. **A fresh global environment.** `LispEnvironment default` is replaced, not
    cleared. The seed's code keeps its old cells, so the seed's compiler still
    works, and no definition of the seed's world reaches the new one. Then come
    the primitives (`installDefault`).
-5. **The seed compiles `lib/core.lisp` and `lib/compiler/`.** Defining the
+6. **The seed compiles `lib/core.lisp` and `lib/compiler/`.** Defining the
    compiler this way makes C1: the new source, compiled by the seed.
-6. **The bootstrap**, with the seed as stage 0:
+7. **The bootstrap**, with the seed as stage 0:
    - M0 is the seed compiling the compiler's source, read by the seed's reader.
    - M1 is C1 compiling it, read by the new reader. Installing M1 makes C2, which
      makes M2; installing M2 makes C3, which makes M3.
@@ -115,11 +125,7 @@ never saved) goes in this order:
      compiled it, so its output must already be final.
    - M0 = M1 holds only when the code generator has not changed since the seed.
      Its differences are reported (a count and labels), not required.
-7. **Seal and install** the new compiler, as step 8.5 does.
-8. **Remove what the seed had and the source no longer does.** A method noted in
-   step 2 that is still the same object was not compiled from the new source,
-   so it goes. The same applies to a `CogLisp-*` class that `src/` no longer
-   defines.
+8. **Seal and install** the new compiler, as step 8.5 does.
 9. **Smoke-test, record, save.** The image records how it was built:
    - the seed's tag and checksum;
    - the number of forms compiled;
@@ -143,21 +149,30 @@ ordinary commit: build, every suite, then the pin.
   `src/` into a stock image (a stock image has no compiler for `lib/compiler/`).
 - `run-all` builds the image first.
 - The Smalltalk side keeps its API, now over the LISP reader and compiler:
-  - `LispReader on:`, `LispReader eofObject`;
+  - `LispReader on:`, `read:`, `readAll:`, `eofObject`, and `readFrom:`, which
+    `read` uses: on standard input (a `LispLineStream`) it reads another line
+    while the datum is incomplete, as the Smalltalk reader's character-at-a-time
+    reading did;
   - `LispCompiler new compile:`, `eval:`, `evalString:`, `evalAll:`, `evalFile:`;
-  - the options (`withoutOptions:do:`, read by `lib/compiler/`), `inlinedSelectors`.
+  - the options (`withoutOptions:do:`, read by `lib/compiler/`).
+- `macroexpand` and `macroexpand-1` still called the Smalltalk compiler; they
+  now call `lisp-macroexpand` and `lisp-macroexpand-1` (`lib/compiler/compiler.lisp`)
+  through the entry points.
 - `bootstrap.lisp` keeps one stage 0, the seed. `definedNamesIn:` reads with the
   LISP reader.
 - **Removed:**
   - the `smalltalk*` entry points and `LispReader basicOn:`;
   - the translation methods;
-  - `COGLISP_COMPILER`, `implementation`/`usesLisp`;
+  - `COGLISP_COMPILER`, `implementation`/`usesLisp`, `(compiler-implementation)`;
   - the Opal converter in `lib/compiler/opal.lisp` and `set-code-generator!`
     (the light-node trees stay: `codegen.lisp` reads them);
   - the 8.2 and 8.3 Smalltalk suites;
   - CI's second Linux job;
   - the benchmark's comparison with the Smalltalk compiler. Its baseline figure
-    stays in `bench/results.md`.
+    stays in `bench/results.md`; the check now compares with Phase 7.9's figure;
+  - two Phase 7.9 checks of the Smalltalk compiler's internals (its special-form
+    table and template cache). The bytecode corpus now pins the LISP compiler's
+    code, by `method-listing` fingerprint (`COGLISP_REPIN=1` re-pins it).
 
   Tests that use any of these change to what remains, or go when only the
   retired code was their subject. The record of what they found stays in the
@@ -283,6 +298,6 @@ runs every suite.
 
 | Step | Status |
 |---|---|
-| 9.1 Seeded builds | 9.1a done (2026-11-05): the image is built from the v0.1.2 seed; 9.1b, 9.1c to come |
+| 9.1 Seeded builds | 9.1a, 9.1b done (2026-11-05): built from the v0.1.2 seed; the Smalltalk reader and compiler retired; 9.1c to come |
 | 9.2 Numeric tower | not started |
 | 9.3 Hygienic macros | not started |

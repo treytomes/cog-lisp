@@ -1,51 +1,324 @@
 === (define (fib n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))
-113 <4D> pushConstant: true114 <EF 0E> jumpFalse: 130116 <20> pushConstant: #<global fib>117 <11> pushLit: LispProcedure118 <22> pushConstant: [ ] in UndefinedObject>>#doIt119 <51> pushConstant: 1120 <23> pushConstant: '(define (fib n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))'121 <EA 23> send: fixed:arity:source:123 <25> pushConstant: 'fib'124 <96> send: named:125 <97> send: define:126 <D8> pop127 <18> pushLit: LispUnspecified128 <89> send: default129 <B0> jumpTo: 131130 <4F> pushConstant: nil131 <5C> returnTop
-145 <40> pushTemp: 0146 <D1> popIntoTemp: 1147 <41> pushTemp: 1148 <D2> popIntoTemp: 2149 <10> pushLit: LispCore150 <21> pushConstant: #<global <>151 <79> send: value152 <22> pushConstant: #<procedure <>153 <76> send: ==154 <C3> jumpFalse: 159155 <42> pushTemp: 2156 <23> pushConstant: 2157 <62> send: <158 <B6> jumpTo: 166159 <14> pushLit: LispProcedure160 <21> pushConstant: #<global <>161 <79> send: value162 <42> pushTemp: 2163 <23> pushConstant: 2164 <EA 2B> send: call:with:with:166 <96> send: isTruthy:167 <C2> jumpFalse: 171168 <42> pushTemp: 2169 <ED 3F> jumpTo: 234171 <4D> pushConstant: true172 <EF 3B> jumpFalse: 233174 <14> pushLit: LispProcedure175 <27> pushConstant: #<global fib>176 <79> send: value177 <28> pushConstant: #<global ->178 <79> send: value179 <29> pushConstant: #<procedure ->180 <76> send: ==181 <C3> jumpFalse: 186182 <42> pushTemp: 2183 <51> pushConstant: 1184 <61> send: -185 <B6> jumpTo: 193186 <14> pushLit: LispProcedure187 <28> pushConstant: #<global ->188 <79> send: value189 <42> pushTemp: 2190 <51> pushConstant: 1191 <EA 2B> send: call:with:with:193 <AA> send: call:with:194 <D3> popIntoTemp: 3195 <14> pushLit: LispProcedure196 <27> pushConstant: #<global fib>197 <79> send: value198 <28> pushConstant: #<global ->199 <79> send: value200 <29> pushConstant: #<procedure ->201 <76> send: ==202 <C3> jumpFalse: 207203 <42> pushTemp: 2204 <23> pushConstant: 2205 <61> send: -206 <B6> jumpTo: 214207 <14> pushLit: LispProcedure208 <28> pushConstant: #<global ->209 <79> send: value210 <42> pushTemp: 2211 <23> pushConstant: 2212 <EA 2B> send: call:with:with:214 <AA> send: call:with:215 <D4> popIntoTemp: 4216 <2B> pushConstant: #<global +>217 <79> send: value218 <2C> pushConstant: #<procedure +>219 <76> send: ==220 <C3> jumpFalse: 225221 <43> pushTemp: 3222 <44> pushTemp: 4223 <60> send: +224 <B6> jumpTo: 232225 <14> pushLit: LispProcedure226 <2B> pushConstant: #<global +>227 <79> send: value228 <43> pushTemp: 3229 <44> pushTemp: 4230 <EA 6B> send: tailCall:with:with:232 <B0> jumpTo: 234233 <4F> pushConstant: nil234 <5E> blockReturn
+code header -1152921504606846964 bytes 32 17 34 81 35 234 35 37 150 151 216 24 137 92
+lit LispGlobal #<global fib>
+lit GlobalVariable #LispProcedure->LispProcedure
+closure 1
+code header -1152921504588759028 bytes 64 209 65 210 16 33 118 196 66 232 2 98 182 18 16 66 232 2 234 27 78 118 186 66 237 54 18 36 121 21 38 118 195 66 81 97 181 18 21 66 81 234 27 167 211 18 36 121 21 38 118 196 66 232 2 97 182 18 21 66 232 2 234 27 167 212 24 41 118 195 67 68 96 181 18 24 67 68 234 83 94
+lit LispGlobal #<global <>
+lit LispProcedure #<procedure <>
+lit GlobalVariable #LispProcedure->LispProcedure
+lit ByteSymbol #call:with:with:
+lit LispGlobal #<global fib>
+lit LispGlobal #<global ->
+lit LispProcedure #<procedure ->
+lit ByteSymbol #call:with:
+lit LispGlobal #<global +>
+lit LispProcedure #<procedure +>
+lit ByteSymbol #tailCall:with:with:
+lit ByteString '(define (fib n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'fib'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
 === (define (tak x y z) (if (not (< y x)) z (tak (tak (- x 1) y z) (tak (- y 1) z x) (tak (- z 1) x y))))
-89 <4D> pushConstant: true90 <EF 0A> jumpFalse: 10292 <20> pushConstant: #<global tak>93 <21> pushConstant: [ ] in UndefinedObject>>#doIt94 <79> send: value95 <22> pushConstant: 'tak'96 <93> send: named:97 <94> send: define:98 <D8> pop99 <15> pushLit: LispUnspecified100 <86> send: default101 <B0> jumpTo: 103102 <4F> pushConstant: nil103 <5C> returnTop
-57 <E7 01> push: (Array new: 1)59 <D0> popIntoTemp: 060 <10> pushLit: LispProcedure61 <40> pushTemp: 062 <F9 01 01> fullClosure:a CompiledBlock: [ :arg1 :arg2 :arg3 |								           | tmp3 tmp4 tmp5 tmp6 tmp7 tmp8 tmp9 tmp10 tmp11 tmp12 tmp13 tmp14 |								           tmp3 := arg1.								           tmp4 := arg2.								           tmp5 := arg3.								           tmp6 := true.								           [ tmp6 ] whileTrue: [										           tmp11 := nil.										           tmp12 := nil.										           tmp13 := nil.										           tmp6 := false.										           tmp11 := tmp3.										           tmp12 := tmp4.										           tmp13 := tmp5.										           tmp7 := (LispCore isTruthy: (true ifTrue: [													                     tmp14 := '<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'														                              ifTrue: [ tmp12 < tmp11 ]														                              ifFalse: [														                              LispProcedure call: '<an unprintable nonliteral value>' value with: tmp12 with: tmp11 ].													                     '<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'														                     ifTrue: [ tmp14 == false ]														                     ifFalse: [ LispProcedure call: '<an unprintable nonliteral value>' value with: tmp14 ] ]))											                   ifTrue: [ tmp13 ]											                   ifFalse: [													                   true ifTrue: [															                   tmp8 := LispProcedure																                           call: '<an unprintable nonliteral value>' value																                           with:																	                           ('<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'																		                            ifTrue: [ tmp11 - 1 ]																		                            ifFalse: [																		                            LispProcedure call: '<an unprintable nonliteral value>' value with: tmp11 with: 1 ])																                           with: tmp12																                           with: tmp13.															                   tmp9 := LispProcedure																                           call: '<an unprintable nonliteral value>' value																                           with:																	                           ('<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'																		                            ifTrue: [ tmp12 - 1 ]																		                            ifFalse: [																		                            LispProcedure call: '<an unprintable nonliteral value>' value with: tmp12 with: 1 ])																                           with: tmp13																                           with: tmp11.															                   tmp10 := LispProcedure																                            call: '<an unprintable nonliteral value>' value																                            with:																	                            ('<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'																		                             ifTrue: [ tmp13 - 1 ]																		                             ifFalse: [																		                             LispProcedure call: '<an unprintable nonliteral value>' value with: tmp13 with: 1 ])																                            with: tmp11																                            with: tmp12.															                   '<an unprintable nonliteral value>' value == tmp2																                   ifTrue: [																		                   tmp3 := tmp8.																		                   tmp4 := tmp9.																		                   tmp5 := tmp10.																		                   tmp6 := true ]																                   ifFalse: [																		                   LispProcedure																			                   tailCall: '<an unprintable nonliteral value>' value																			                   with: tmp8																			                   with: tmp9																			                   with: tmp10 ] ] ] ].								           tmp7 ] NumCopied: 165 <22> pushConstant: 366 <23> pushConstant: '(define (tak x y z) (if (not (< y x)) z (tak (tak (- x 1) y z) (tak (- y 1) z x) (tak (- z 1) x y))))'67 <EA 23> send: fixed:arity:source:69 <FD 00 00> popIntoTemp: 0 inVectorAt: 072 <FB 00 00> pushTemp: 0 inVectorAt: 075 <5E> blockReturn
-153 <40> pushTemp: 0154 <D4> popIntoTemp: 4155 <41> pushTemp: 1156 <D5> popIntoTemp: 5157 <42> pushTemp: 2158 <D6> popIntoTemp: 6159 <4D> pushConstant: true160 <D7> popIntoTemp: 7161 <47> pushTemp: 7162 <EF C3> jumpFalse: 359164 <4F> pushConstant: nil165 <F2 0C> popIntoTemp: 12167 <4F> pushConstant: nil168 <F2 0D> popIntoTemp: 13170 <4F> pushConstant: nil171 <F2 0E> popIntoTemp: 14173 <4E> pushConstant: false174 <D7> popIntoTemp: 7175 <44> pushTemp: 4176 <F2 0C> popIntoTemp: 12178 <45> pushTemp: 5179 <F2 0D> popIntoTemp: 13181 <46> pushTemp: 6182 <F2 0E> popIntoTemp: 14184 <10> pushLit: LispCore185 <4D> pushConstant: true186 <EF 28> jumpFalse: 228188 <21> pushConstant: #<global <>189 <79> send: value190 <22> pushConstant: #<procedure <>191 <76> send: ==192 <C6> jumpFalse: 200193 <E5 0D> pushTemp: 13195 <E5 0C> pushTemp: 12197 <62> send: <198 <ED 09> jumpTo: 209200 <13> pushLit: LispProcedure201 <21> pushConstant: #<global <>202 <79> send: value203 <E5 0D> pushTemp: 13205 <E5 0C> pushTemp: 12207 <EA 23> send: call:with:with:209 <F2 0F> popIntoTemp: 15211 <25> pushConstant: #<global not>212 <79> send: value213 <26> pushConstant: #<procedure not>214 <76> send: ==215 <C4> jumpFalse: 221216 <E5 0F> pushTemp: 15218 <4E> pushConstant: false219 <76> send: ==220 <B5> jumpTo: 227221 <13> pushLit: LispProcedure222 <25> pushConstant: #<global not>223 <79> send: value224 <E5 0F> pushTemp: 15226 <A7> send: call:with:227 <B0> jumpTo: 229228 <4F> pushConstant: nil229 <98> send: isTruthy:230 <C3> jumpFalse: 235231 <E5 0E> pushTemp: 14233 <ED 76> jumpTo: 353235 <4D> pushConstant: true236 <EF 72> jumpFalse: 352238 <13> pushLit: LispProcedure239 <29> pushConstant: #<global tak>240 <79> send: value241 <2A> pushConstant: #<global ->242 <79> send: value243 <2B> pushConstant: #<procedure ->244 <76> send: ==245 <C4> jumpFalse: 251246 <E5 0C> pushTemp: 12248 <51> pushConstant: 1249 <61> send: -250 <B7> jumpTo: 259251 <13> pushLit: LispProcedure252 <2A> pushConstant: #<global ->253 <79> send: value254 <E5 0C> pushTemp: 12256 <51> pushConstant: 1257 <EA 23> send: call:with:with:259 <E5 0D> pushTemp: 13261 <E5 0E> pushTemp: 14263 <EA 64> send: call:with:with:with:265 <F2 09> popIntoTemp: 9267 <13> pushLit: LispProcedure268 <29> pushConstant: #<global tak>269 <79> send: value270 <2A> pushConstant: #<global ->271 <79> send: value272 <2B> pushConstant: #<procedure ->273 <76> send: ==274 <C4> jumpFalse: 280275 <E5 0D> pushTemp: 13277 <51> pushConstant: 1278 <61> send: -279 <B7> jumpTo: 288280 <13> pushLit: LispProcedure281 <2A> pushConstant: #<global ->282 <79> send: value283 <E5 0D> pushTemp: 13285 <51> pushConstant: 1286 <EA 23> send: call:with:with:288 <E5 0E> pushTemp: 14290 <E5 0C> pushTemp: 12292 <EA 64> send: call:with:with:with:294 <F2 0A> popIntoTemp: 10296 <13> pushLit: LispProcedure297 <29> pushConstant: #<global tak>298 <79> send: value299 <2A> pushConstant: #<global ->300 <79> send: value301 <2B> pushConstant: #<procedure ->302 <76> send: ==303 <C4> jumpFalse: 309304 <E5 0E> pushTemp: 14306 <51> pushConstant: 1307 <61> send: -308 <B7> jumpTo: 317309 <13> pushLit: LispProcedure310 <2A> pushConstant: #<global ->311 <79> send: value312 <E5 0E> pushTemp: 14314 <51> pushConstant: 1315 <EA 23> send: call:with:with:317 <E5 0C> pushTemp: 12319 <E5 0D> pushTemp: 13321 <EA 64> send: call:with:with:with:323 <F2 0B> popIntoTemp: 11325 <29> pushConstant: #<global tak>326 <79> send: value327 <FB 00 03> pushTemp: 0 inVectorAt: 3330 <76> send: ==331 <EF 0A> jumpFalse: 343333 <49> pushTemp: 9334 <D4> popIntoTemp: 4335 <4A> pushTemp: 10336 <D5> popIntoTemp: 5337 <4B> pushTemp: 11338 <D6> popIntoTemp: 6339 <4D> pushConstant: true340 <D7> popIntoTemp: 7341 <4F> pushConstant: nil342 <B7> jumpTo: 351343 <13> pushLit: LispProcedure344 <29> pushConstant: #<global tak>345 <79> send: value346 <49> pushTemp: 9347 <4A> pushTemp: 10348 <4B> pushTemp: 11349 <EA 6C> send: tailCall:with:with:with:351 <B0> jumpTo: 353352 <4F> pushConstant: nil353 <F2 08> popIntoTemp: 8355 <E1 FF ED 3A> jumpTo: 161359 <48> pushTemp: 8360 <5E> blockReturn
+code header -1152921504606846967 bytes 32 33 121 34 147 148 216 21 134 92
+lit LispGlobal #<global tak>
+closure 0
+code header -1152921504606584827 bytes 231 1 208 16 64 249 1 1 232 3 34 234 27 253 0 0 251 0 0 94
+lit GlobalVariable #LispProcedure->LispProcedure
+code header -1152921504552189939 bytes 64 212 65 213 66 214 77 215 71 239 165 78 215 68 242 12 69 242 13 70 242 14 16 33 118 197 229 13 229 12 98 183 18 16 229 13 229 12 234 27 242 15 20 37 118 196 229 15 78 118 180 18 20 229 15 166 78 118 187 229 14 237 107 18 39 121 24 41 118 196 229 12 81 97 182 18 24 229 12 81 234 27 229 13 229 14 234 84 242 9 18 39 121 24 41 118 196 229 13 81 97 182 18 24 229 13 81 234 27 229 14 229 12 234 84 242 10 18 39 121 24 41 118 196 229 14 81 97 182 18 24 229 14 81 234 27 229 12 229 13 234 84 242 11 39 121 251 0 3 118 239 10 73 212 74 213 75 214 77 215 79 183 18 39 121 73 74 75 234 92 242 8 225 255 237 88 72 94
+lit LispGlobal #<global <>
+lit LispProcedure #<procedure <>
+lit GlobalVariable #LispProcedure->LispProcedure
+lit ByteSymbol #call:with:with:
+lit LispGlobal #<global not>
+lit LispProcedure #<procedure not>
+lit ByteSymbol #call:with:
+lit LispGlobal #<global tak>
+lit LispGlobal #<global ->
+lit LispProcedure #<procedure ->
+lit ByteSymbol #call:with:with:with:
+lit ByteSymbol #tailCall:with:with:with:
+lit ByteString '(define (tak x y z) (if (not (< y x)) z (tak (tak (- x 1) y z) (tak (- y 1) z x) (tak (- z 1) x y))))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'tak'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
 === (define (count-loop n acc) (if (= n 0) acc (count-loop (- n 1) (+ acc 1))))
-89 <4D> pushConstant: true90 <EF 0A> jumpFalse: 10292 <20> pushConstant: #<global count-loop>93 <21> pushConstant: [ ] in UndefinedObject>>#doIt94 <79> send: value95 <22> pushConstant: 'count-loop'96 <93> send: named:97 <94> send: define:98 <D8> pop99 <15> pushLit: LispUnspecified100 <86> send: default101 <B0> jumpTo: 103102 <4F> pushConstant: nil103 <5C> returnTop
-57 <E7 01> push: (Array new: 1)59 <D0> popIntoTemp: 060 <10> pushLit: LispProcedure61 <40> pushTemp: 062 <F9 01 01> fullClosure:a CompiledBlock: [ :arg1 :arg2 |								           | tmp3 tmp4 tmp5 tmp6 tmp7 tmp8 tmp9 tmp10 |								           tmp3 := arg1.								           tmp4 := arg2.								           tmp5 := true.								           [ tmp5 ] whileTrue: [										           tmp9 := nil.										           tmp10 := nil.										           tmp5 := false.										           tmp9 := tmp3.										           tmp10 := tmp4.										           tmp6 := (LispCore isTruthy:											                    ('<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'												                     ifTrue: [ tmp9 = 0 ]												                     ifFalse: [ LispProcedure call: '<an unprintable nonliteral value>' value with: tmp9 with: 0 ]))											                   ifTrue: [ tmp10 ]											                   ifFalse: [													                   true ifTrue: [															                   tmp7 := '<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'																                           ifTrue: [ tmp9 - 1 ]																                           ifFalse: [																                           LispProcedure call: '<an unprintable nonliteral value>' value with: tmp9 with: 1 ].															                   tmp8 := '<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'																                           ifTrue: [ tmp10 + 1 ]																                           ifFalse: [																                           LispProcedure call: '<an unprintable nonliteral value>' value with: tmp10 with: 1 ].															                   '<an unprintable nonliteral value>' value == tmp2																                   ifTrue: [																		                   tmp3 := tmp7.																		                   tmp4 := tmp8.																		                   tmp5 := true ]																                   ifFalse: [																                   LispProcedure tailCall: '<an unprintable nonliteral value>' value with: tmp7 with: tmp8 ] ] ] ].								           tmp6 ] NumCopied: 165 <22> pushConstant: 266 <23> pushConstant: '(define (count-loop n acc) (if (= n 0) acc (count-loop (- n 1) (+ acc 1))))'67 <EA 23> send: fixed:arity:source:69 <FD 00 00> popIntoTemp: 0 inVectorAt: 072 <FB 00 00> pushTemp: 0 inVectorAt: 075 <5E> blockReturn
-137 <40> pushTemp: 0138 <D3> popIntoTemp: 3139 <41> pushTemp: 1140 <D4> popIntoTemp: 4141 <4D> pushConstant: true142 <D5> popIntoTemp: 5143 <45> pushTemp: 5144 <EF 67> jumpFalse: 249146 <4F> pushConstant: nil147 <F2 09> popIntoTemp: 9149 <4F> pushConstant: nil150 <F2 0A> popIntoTemp: 10152 <4E> pushConstant: false153 <D5> popIntoTemp: 5154 <43> pushTemp: 3155 <F2 09> popIntoTemp: 9157 <44> pushTemp: 4158 <F2 0A> popIntoTemp: 10160 <10> pushLit: LispCore161 <21> pushConstant: #<global =>162 <79> send: value163 <22> pushConstant: #<procedure =>164 <76> send: ==165 <C3> jumpFalse: 170166 <49> pushTemp: 9167 <50> pushConstant: 0168 <66> send: =169 <B6> jumpTo: 177170 <13> pushLit: LispProcedure171 <21> pushConstant: #<global =>172 <79> send: value173 <49> pushTemp: 9174 <50> pushConstant: 0175 <EA 23> send: call:with:with:177 <95> send: isTruthy:178 <C2> jumpFalse: 182179 <4A> pushTemp: 10180 <ED 3E> jumpTo: 244182 <4D> pushConstant: true183 <EF 3A> jumpFalse: 243185 <26> pushConstant: #<global ->186 <79> send: value187 <27> pushConstant: #<procedure ->188 <76> send: ==189 <C3> jumpFalse: 194190 <49> pushTemp: 9191 <51> pushConstant: 1192 <61> send: -193 <B6> jumpTo: 201194 <13> pushLit: LispProcedure195 <26> pushConstant: #<global ->196 <79> send: value197 <49> pushTemp: 9198 <51> pushConstant: 1199 <EA 23> send: call:with:with:201 <D7> popIntoTemp: 7202 <28> pushConstant: #<global +>203 <79> send: value204 <29> pushConstant: #<procedure +>205 <76> send: ==206 <C3> jumpFalse: 211207 <4A> pushTemp: 10208 <51> pushConstant: 1209 <60> send: +210 <B6> jumpTo: 218211 <13> pushLit: LispProcedure212 <28> pushConstant: #<global +>213 <79> send: value214 <4A> pushTemp: 10215 <51> pushConstant: 1216 <EA 23> send: call:with:with:218 <F2 08> popIntoTemp: 8220 <2A> pushConstant: #<global count-loop>221 <79> send: value222 <FB 00 02> pushTemp: 0 inVectorAt: 2225 <76> send: ==226 <C7> jumpFalse: 235227 <47> pushTemp: 7228 <D3> popIntoTemp: 3229 <48> pushTemp: 8230 <D4> popIntoTemp: 4231 <4D> pushConstant: true232 <D5> popIntoTemp: 5233 <4F> pushConstant: nil234 <B6> jumpTo: 242235 <13> pushLit: LispProcedure236 <2A> pushConstant: #<global count-loop>237 <79> send: value238 <47> pushTemp: 7239 <48> pushTemp: 8240 <EA 5B> send: tailCall:with:with:242 <B0> jumpTo: 244243 <4F> pushConstant: nil244 <D6> popIntoTemp: 6245 <E1 FF ED 96> jumpTo: 143249 <46> pushTemp: 6250 <5E> blockReturn
+code header -1152921504606846967 bytes 32 33 121 34 147 148 216 21 134 92
+lit LispGlobal #<global count-loop>
+closure 0
+code header -1152921504606584827 bytes 231 1 208 16 64 249 1 1 232 2 34 234 27 253 0 0 251 0 0 94
+lit GlobalVariable #LispProcedure->LispProcedure
+code header -1152921504570408949 bytes 64 211 65 212 77 213 69 239 86 78 213 67 242 9 68 242 10 16 33 118 195 73 80 102 181 18 16 73 80 234 27 78 118 186 74 237 53 20 37 118 195 73 81 97 181 18 20 73 81 234 27 215 22 39 118 195 74 81 96 181 18 22 74 81 234 27 242 8 40 121 251 0 2 118 199 71 211 72 212 77 213 79 182 18 40 121 71 72 234 75 214 225 255 237 167 70 94
+lit LispGlobal #<global =>
+lit LispProcedure #<procedure =>
+lit GlobalVariable #LispProcedure->LispProcedure
+lit ByteSymbol #call:with:with:
+lit LispGlobal #<global ->
+lit LispProcedure #<procedure ->
+lit LispGlobal #<global +>
+lit LispProcedure #<procedure +>
+lit LispGlobal #<global count-loop>
+lit ByteSymbol #tailCall:with:with:
+lit ByteString '(define (count-loop n acc) (if (= n 0) acc (count-loop (- n 1) (+ acc 1))))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'count-loop'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
 === (define (my-even? n) (if (= n 0) #t (my-odd? (- n 1))))
-113 <4D> pushConstant: true114 <EF 0E> jumpFalse: 130116 <20> pushConstant: #<global my-even?>117 <11> pushLit: LispProcedure118 <22> pushConstant: [ ] in UndefinedObject>>#doIt119 <51> pushConstant: 1120 <23> pushConstant: '(define (my-even? n) (if (= n 0) #t (my-odd? (- n 1))))'121 <EA 23> send: fixed:arity:source:123 <25> pushConstant: 'my-even?'124 <96> send: named:125 <97> send: define:126 <D8> pop127 <18> pushLit: LispUnspecified128 <89> send: default129 <B0> jumpTo: 131130 <4F> pushConstant: nil131 <5C> returnTop
-105 <40> pushTemp: 0106 <D1> popIntoTemp: 1107 <41> pushTemp: 1108 <D2> popIntoTemp: 2109 <10> pushLit: LispCore110 <21> pushConstant: #<global =>111 <79> send: value112 <22> pushConstant: #<procedure =>113 <76> send: ==114 <C3> jumpFalse: 119115 <42> pushTemp: 2116 <50> pushConstant: 0117 <66> send: =118 <B6> jumpTo: 126119 <13> pushLit: LispProcedure120 <21> pushConstant: #<global =>121 <79> send: value122 <42> pushTemp: 2123 <50> pushConstant: 0124 <EA 23> send: call:with:with:126 <95> send: isTruthy:127 <C2> jumpFalse: 131128 <4D> pushConstant: true129 <ED 14> jumpTo: 151131 <13> pushLit: LispProcedure132 <26> pushConstant: #<global my-odd?>133 <79> send: value134 <27> pushConstant: #<global ->135 <79> send: value136 <28> pushConstant: #<procedure ->137 <76> send: ==138 <C3> jumpFalse: 143139 <42> pushTemp: 2140 <51> pushConstant: 1141 <61> send: -142 <B6> jumpTo: 150143 <13> pushLit: LispProcedure144 <27> pushConstant: #<global ->145 <79> send: value146 <42> pushTemp: 2147 <51> pushConstant: 1148 <EA 23> send: call:with:with:150 <A9> send: tailCall:with:151 <5E> blockReturn
+code header -1152921504606846964 bytes 32 17 34 81 35 234 35 37 150 151 216 24 137 92
+lit LispGlobal #<global my-even?>
+lit GlobalVariable #LispProcedure->LispProcedure
+closure 1
+code header -1152921504589283319 bytes 64 209 65 210 16 33 118 195 66 80 102 181 18 16 66 80 234 27 78 118 186 77 237 18 18 36 121 21 38 118 195 66 81 97 181 18 21 66 81 234 27 167 94
+lit LispGlobal #<global =>
+lit LispProcedure #<procedure =>
+lit GlobalVariable #LispProcedure->LispProcedure
+lit ByteSymbol #call:with:with:
+lit LispGlobal #<global my-odd?>
+lit LispGlobal #<global ->
+lit LispProcedure #<procedure ->
+lit ByteSymbol #tailCall:with:
+lit ByteString '(define (my-even? n) (if (= n 0) #t (my-odd? (- n 1))))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'my-even?'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
 === (define (my-odd? n) (if (= n 0) #f (my-even? (- n 1))))
-113 <4D> pushConstant: true114 <EF 0E> jumpFalse: 130116 <20> pushConstant: #<global my-odd?>117 <11> pushLit: LispProcedure118 <22> pushConstant: [ ] in UndefinedObject>>#doIt119 <51> pushConstant: 1120 <23> pushConstant: '(define (my-odd? n) (if (= n 0) #f (my-even? (- n 1))))'121 <EA 23> send: fixed:arity:source:123 <25> pushConstant: 'my-odd?'124 <96> send: named:125 <97> send: define:126 <D8> pop127 <18> pushLit: LispUnspecified128 <89> send: default129 <B0> jumpTo: 131130 <4F> pushConstant: nil131 <5C> returnTop
-105 <40> pushTemp: 0106 <D1> popIntoTemp: 1107 <41> pushTemp: 1108 <D2> popIntoTemp: 2109 <10> pushLit: LispCore110 <21> pushConstant: #<global =>111 <79> send: value112 <22> pushConstant: #<procedure =>113 <76> send: ==114 <C3> jumpFalse: 119115 <42> pushTemp: 2116 <50> pushConstant: 0117 <66> send: =118 <B6> jumpTo: 126119 <13> pushLit: LispProcedure120 <21> pushConstant: #<global =>121 <79> send: value122 <42> pushTemp: 2123 <50> pushConstant: 0124 <EA 23> send: call:with:with:126 <95> send: isTruthy:127 <C2> jumpFalse: 131128 <4E> pushConstant: false129 <ED 14> jumpTo: 151131 <13> pushLit: LispProcedure132 <26> pushConstant: #<global my-even?>133 <79> send: value134 <27> pushConstant: #<global ->135 <79> send: value136 <28> pushConstant: #<procedure ->137 <76> send: ==138 <C3> jumpFalse: 143139 <42> pushTemp: 2140 <51> pushConstant: 1141 <61> send: -142 <B6> jumpTo: 150143 <13> pushLit: LispProcedure144 <27> pushConstant: #<global ->145 <79> send: value146 <42> pushTemp: 2147 <51> pushConstant: 1148 <EA 23> send: call:with:with:150 <A9> send: tailCall:with:151 <5E> blockReturn
+code header -1152921504606846964 bytes 32 17 34 81 35 234 35 37 150 151 216 24 137 92
+lit LispGlobal #<global my-odd?>
+lit GlobalVariable #LispProcedure->LispProcedure
+closure 1
+code header -1152921504589283319 bytes 64 209 65 210 16 33 118 195 66 80 102 181 18 16 66 80 234 27 78 118 186 78 237 18 18 36 121 21 38 118 195 66 81 97 181 18 21 66 81 234 27 167 94
+lit LispGlobal #<global =>
+lit LispProcedure #<procedure =>
+lit GlobalVariable #LispProcedure->LispProcedure
+lit ByteSymbol #call:with:with:
+lit LispGlobal #<global my-even?>
+lit LispGlobal #<global ->
+lit LispProcedure #<procedure ->
+lit ByteSymbol #tailCall:with:
+lit ByteString '(define (my-odd? n) (if (= n 0) #f (my-even? (- n 1))))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'my-odd?'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
 === (define (sum-list lst acc) (if (null? lst) acc (sum-list (cdr lst) (+ acc (car lst)))))
-89 <4D> pushConstant: true90 <EF 0A> jumpFalse: 10292 <20> pushConstant: #<global sum-list>93 <21> pushConstant: [ ] in UndefinedObject>>#doIt94 <79> send: value95 <22> pushConstant: 'sum-list'96 <93> send: named:97 <94> send: define:98 <D8> pop99 <15> pushLit: LispUnspecified100 <86> send: default101 <B0> jumpTo: 103102 <4F> pushConstant: nil103 <5C> returnTop
-57 <E7 01> push: (Array new: 1)59 <D0> popIntoTemp: 060 <10> pushLit: LispProcedure61 <40> pushTemp: 062 <F9 01 01> fullClosure:a CompiledBlock: [ :arg1 :arg2 |								           | tmp3 tmp4 tmp5 tmp6 tmp7 tmp8 tmp9 tmp10 tmp11 |								           tmp3 := arg1.								           tmp4 := arg2.								           tmp5 := true.								           [ tmp5 ] whileTrue: [										           tmp9 := nil.										           tmp10 := nil.										           tmp5 := false.										           tmp9 := tmp3.										           tmp10 := tmp4.										           tmp6 := (LispCore isTruthy:											                    ('<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'												                     ifTrue: [ tmp9 == '<an unprintable nonliteral value>' ]												                     ifFalse: [ LispProcedure call: '<an unprintable nonliteral value>' value with: tmp9 ]))											                   ifTrue: [ tmp10 ]											                   ifFalse: [													                   true ifTrue: [															                   tmp7 := '<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'																                           ifTrue: [ tmp9 cdr ]																                           ifFalse: [ LispProcedure call: '<an unprintable nonliteral value>' value with: tmp9 ].															                   tmp8 := true ifTrue: [																	                           tmp11 := '<an unprintable nonliteral value>' value																	                                    == '<an unprintable nonliteral value>'																		                                    ifTrue: [ tmp9 car ]																		                                    ifFalse: [																		                                    LispProcedure call: '<an unprintable nonliteral value>' value with: tmp9 ].																	                           '<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'																		                           ifTrue: [ tmp10 + tmp11 ]																		                           ifFalse: [																		                           LispProcedure call: '<an unprintable nonliteral value>' value with: tmp10 with: tmp11 ] ].															                   '<an unprintable nonliteral value>' value == tmp2																                   ifTrue: [																		                   tmp3 := tmp7.																		                   tmp4 := tmp8.																		                   tmp5 := true ]																                   ifFalse: [																                   LispProcedure tailCall: '<an unprintable nonliteral value>' value with: tmp7 with: tmp8 ] ] ] ].								           tmp6 ] NumCopied: 165 <22> pushConstant: 266 <23> pushConstant: '(define (sum-list lst acc) (if (null? lst) acc (sum-list (cdr lst) (+ acc (car lst)))))'67 <EA 23> send: fixed:arity:source:69 <FD 00 00> popIntoTemp: 0 inVectorAt: 072 <FB 00 00> pushTemp: 0 inVectorAt: 075 <5E> blockReturn
-185 <40> pushTemp: 0186 <D3> popIntoTemp: 3187 <41> pushTemp: 1188 <D4> popIntoTemp: 4189 <4D> pushConstant: true190 <D5> popIntoTemp: 5191 <45> pushTemp: 5192 <EF 76> jumpFalse: 312194 <4F> pushConstant: nil195 <F2 09> popIntoTemp: 9197 <4F> pushConstant: nil198 <F2 0A> popIntoTemp: 10200 <4E> pushConstant: false201 <D5> popIntoTemp: 5202 <43> pushTemp: 3203 <F2 09> popIntoTemp: 9205 <44> pushTemp: 4206 <F2 0A> popIntoTemp: 10208 <10> pushLit: LispCore209 <21> pushConstant: #<global null?>210 <79> send: value211 <22> pushConstant: #<procedure null?>212 <76> send: ==213 <C3> jumpFalse: 218214 <49> pushTemp: 9215 <23> pushConstant: a LispEmptyList216 <76> send: ==217 <B4> jumpTo: 223218 <14> pushLit: LispProcedure219 <21> pushConstant: #<global null?>220 <79> send: value221 <49> pushTemp: 9222 <A5> send: call:with:223 <96> send: isTruthy:224 <C2> jumpFalse: 228225 <4A> pushTemp: 10226 <ED 4F> jumpTo: 307228 <4D> pushConstant: true229 <EF 4B> jumpFalse: 306231 <27> pushConstant: #<global cdr>232 <79> send: value233 <28> pushConstant: #<procedure cdr>234 <76> send: ==235 <C2> jumpFalse: 239236 <49> pushTemp: 9237 <89> send: cdr238 <B4> jumpTo: 244239 <14> pushLit: LispProcedure240 <27> pushConstant: #<global cdr>241 <79> send: value242 <49> pushTemp: 9243 <A5> send: call:with:244 <D7> popIntoTemp: 7245 <4D> pushConstant: true246 <EF 20> jumpFalse: 280248 <2A> pushConstant: #<global car>249 <79> send: value250 <2B> pushConstant: #<procedure car>251 <76> send: ==252 <C2> jumpFalse: 256253 <49> pushTemp: 9254 <8C> send: car255 <B4> jumpTo: 261256 <14> pushLit: LispProcedure257 <2A> pushConstant: #<global car>258 <79> send: value259 <49> pushTemp: 9260 <A5> send: call:with:261 <F2 0B> popIntoTemp: 11263 <2D> pushConstant: #<global +>264 <79> send: value265 <2E> pushConstant: #<procedure +>266 <76> send: ==267 <C3> jumpFalse: 272268 <4A> pushTemp: 10269 <4B> pushTemp: 11270 <60> send: +271 <B6> jumpTo: 279272 <14> pushLit: LispProcedure273 <2D> pushConstant: #<global +>274 <79> send: value275 <4A> pushTemp: 10276 <4B> pushTemp: 11277 <EA 7B> send: call:with:with:279 <B0> jumpTo: 281280 <4F> pushConstant: nil281 <F2 08> popIntoTemp: 8283 <30> pushConstant: #<global sum-list>284 <79> send: value285 <FB 00 02> pushTemp: 0 inVectorAt: 2288 <76> send: ==289 <C7> jumpFalse: 298290 <47> pushTemp: 7291 <D3> popIntoTemp: 3292 <48> pushTemp: 8293 <D4> popIntoTemp: 4294 <4D> pushConstant: true295 <D5> popIntoTemp: 5296 <4F> pushConstant: nil297 <B6> jumpTo: 305298 <14> pushLit: LispProcedure299 <30> pushConstant: #<global sum-list>300 <79> send: value301 <47> pushTemp: 7302 <48> pushTemp: 8303 <EA 8B> send: tailCall:with:with:305 <B0> jumpTo: 307306 <4F> pushConstant: nil307 <D6> popIntoTemp: 6308 <E1 FF ED 87> jumpTo: 191312 <46> pushTemp: 6313 <5E> blockReturn
+code header -1152921504606846967 bytes 32 33 121 34 147 148 216 21 134 92
+lit LispGlobal #<global sum-list>
+closure 0
+code header -1152921504606584827 bytes 231 1 208 16 64 249 1 1 232 2 34 234 27 253 0 0 251 0 0 94
+lit GlobalVariable #LispProcedure->LispProcedure
+code header -1152921504570146799 bytes 64 211 65 212 77 213 69 239 94 78 213 67 242 9 68 242 10 16 33 118 195 73 34 118 179 19 16 73 164 78 118 186 74 237 63 21 38 118 194 73 135 179 19 21 73 164 215 24 41 118 194 73 138 179 19 24 73 164 242 11 27 44 118 195 74 75 96 181 19 27 74 75 234 107 242 8 46 121 251 0 2 118 199 71 211 72 212 77 213 79 182 19 46 121 71 72 234 123 214 225 255 237 159 70 94
+lit LispGlobal #<global null?>
+lit LispProcedure #<procedure null?>
+lit LispEmptyList a LispEmptyList
+lit GlobalVariable #LispProcedure->LispProcedure
+lit ByteSymbol #call:with:
+lit LispGlobal #<global cdr>
+lit LispProcedure #<procedure cdr>
+lit ByteSymbol #cdr
+lit LispGlobal #<global car>
+lit LispProcedure #<procedure car>
+lit ByteSymbol #car
+lit LispGlobal #<global +>
+lit LispProcedure #<procedure +>
+lit ByteSymbol #call:with:with:
+lit LispGlobal #<global sum-list>
+lit ByteSymbol #tailCall:with:with:
+lit ByteString '(define (sum-list lst acc) (if (null? lst) acc (sum-list (cdr lst) (+ acc (car lst)))))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'sum-list'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
 === (define (make-counter) (let ((n 0)) (lambda () (set! n (+ n 1)) n)))
-113 <4D> pushConstant: true114 <EF 0E> jumpFalse: 130116 <20> pushConstant: #<global make-counter>117 <11> pushLit: LispProcedure118 <22> pushConstant: [ ] in UndefinedObject>>#doIt119 <50> pushConstant: 0120 <23> pushConstant: '(define (make-counter) (let ((n 0)) (lambda () (set! n (+ n 1)) n)))'121 <EA 23> send: fixed:arity:source:123 <25> pushConstant: 'make-counter'124 <96> send: named:125 <97> send: define:126 <D8> pop127 <18> pushLit: LispUnspecified128 <89> send: default129 <B0> jumpTo: 131130 <4F> pushConstant: nil131 <5C> returnTop
-25 <20> pushConstant: [ ] in UndefinedObject>>#doIt26 <50> pushConstant: 027 <7A> send: value:28 <5E> blockReturn
-49 <E7 01> push: (Array new: 1)51 <D1> popIntoTemp: 152 <40> pushTemp: 053 <FD 00 01> popIntoTemp: 0 inVectorAt: 156 <10> pushLit: LispProcedure57 <41> pushTemp: 158 <F9 01 01> fullClosure:a CompiledBlock: [											    true ifTrue: [													    tmp2 := '<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'														            ifTrue: [ tmp2 + 1 ]														            ifFalse: [ LispProcedure call: '<an unprintable nonliteral value>' value with: tmp2 with: 1 ].													    LispUnspecified default ].											    tmp2 ] NumCopied: 161 <50> pushConstant: 062 <22> pushConstant: '(lambda () (set! n (+ n 1)) n)'63 <EA 1B> send: fixed:arity:source:65 <5E> blockReturn
-81 <4D> pushConstant: true82 <EF 1B> jumpFalse: 11184 <20> pushConstant: #<global +>85 <79> send: value86 <21> pushConstant: #<procedure +>87 <76> send: ==88 <C6> jumpFalse: 9689 <FB 00 00> pushTemp: 0 inVectorAt: 092 <51> pushConstant: 193 <60> send: +94 <ED 09> jumpTo: 10596 <12> pushLit: LispProcedure97 <20> pushConstant: #<global +>98 <79> send: value99 <FB 00 00> pushTemp: 0 inVectorAt: 0102 <51> pushConstant: 1103 <EA 1B> send: call:with:with:105 <FD 00 00> popIntoTemp: 0 inVectorAt: 0108 <14> pushLit: LispUnspecified109 <85> send: default110 <B0> jumpTo: 112111 <4F> pushConstant: nil112 <D8> pop113 <FB 00 00> pushTemp: 0 inVectorAt: 0116 <5E> blockReturn
+code header -1152921504606846964 bytes 32 17 34 80 35 234 35 37 150 151 216 24 137 92
+lit LispGlobal #<global make-counter>
+lit GlobalVariable #LispProcedure->LispProcedure
+closure 0
+code header -1152921504606846974 bytes 32 80 122 94
+closure 1
+code header -1152921504589545467 bytes 231 1 209 64 253 0 1 16 65 249 1 1 80 34 234 27 94
+lit GlobalVariable #LispProcedure->LispProcedure
+code header -1152921504606584825 bytes 16 33 118 197 251 0 0 81 96 183 18 16 251 0 0 81 234 27 253 0 0 20 133 216 251 0 0 94
+lit LispGlobal #<global +>
+lit LispProcedure #<procedure +>
+lit GlobalVariable #LispProcedure->LispProcedure
+lit ByteSymbol #call:with:with:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
+lit ByteString '(lambda () (set! n (+ n 1)) n)'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString '(define (make-counter) (let ((n 0)) (lambda () (set! n (+ n 1)) n)))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'make-counter'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
 === (define (classify x) (cond ((< x 0) (quote neg)) ((= x 0) (quote zero)) (else (case x ((1 2 3) (quote small)) (else (quote big))))))
-113 <4D> pushConstant: true114 <EF 0E> jumpFalse: 130116 <20> pushConstant: #<global classify>117 <11> pushLit: LispProcedure118 <22> pushConstant: [ ] in UndefinedObject>>#doIt119 <51> pushConstant: 1120 <23> pushConstant: '(define (classify x) (cond ((< x 0) (quote neg)) ((= x 0) (quote zero)) (else (case x ((1 2 3) (quote small)) (else (quote big))))))'121 <EA 23> send: fixed:arity:source:123 <25> pushConstant: 'classify'124 <96> send: named:125 <97> send: define:126 <D8> pop127 <18> pushLit: LispUnspecified128 <89> send: default129 <B0> jumpTo: 131130 <4F> pushConstant: nil131 <5C> returnTop
-113 <40> pushTemp: 0114 <D1> popIntoTemp: 1115 <41> pushTemp: 1116 <D2> popIntoTemp: 2117 <10> pushLit: LispCore118 <21> pushConstant: #<global <>119 <79> send: value120 <22> pushConstant: #<procedure <>121 <76> send: ==122 <C3> jumpFalse: 127123 <42> pushTemp: 2124 <50> pushConstant: 0125 <62> send: <126 <B6> jumpTo: 134127 <13> pushLit: LispProcedure128 <21> pushConstant: #<global <>129 <79> send: value130 <42> pushTemp: 2131 <50> pushConstant: 0132 <EA 23> send: call:with:with:134 <95> send: isTruthy:135 <C2> jumpFalse: 139136 <26> pushConstant: a LispSymbol137 <ED 18> jumpTo: 163139 <10> pushLit: LispCore140 <27> pushConstant: #<global =>141 <79> send: value142 <28> pushConstant: #<procedure =>143 <76> send: ==144 <C3> jumpFalse: 149145 <42> pushTemp: 2146 <50> pushConstant: 0147 <66> send: =148 <B6> jumpTo: 156149 <13> pushLit: LispProcedure150 <27> pushConstant: #<global =>151 <79> send: value152 <42> pushTemp: 2153 <50> pushConstant: 0154 <EA 23> send: call:with:with:156 <95> send: isTruthy:157 <C1> jumpFalse: 160158 <29> pushConstant: a LispSymbol159 <B2> jumpTo: 163160 <2A> pushConstant: [ ] in UndefinedObject>>#doIt161 <42> pushTemp: 2162 <7A> send: value:163 <5E> blockReturn
-89 <40> pushTemp: 090 <D1> popIntoTemp: 191 <10> pushLit: LispCore92 <11> pushLit: LispProcedure93 <22> pushConstant: #<global memv>94 <79> send: value95 <41> pushTemp: 196 <23> pushConstant: a LispCons97 <EA 23> send: call:with:with:99 <95> send: isTruthy:100 <C1> jumpFalse: 103101 <26> pushConstant: a LispSymbol102 <B0> jumpTo: 104103 <27> pushConstant: a LispSymbol104 <5E> blockReturn
+code header -1152921504606846964 bytes 32 17 34 81 35 234 35 37 150 151 216 24 137 92
+lit LispGlobal #<global classify>
+lit GlobalVariable #LispProcedure->LispProcedure
+closure 1
+code header -1152921504589283318 bytes 64 209 65 210 16 33 118 195 66 80 98 181 18 16 66 80 234 27 78 118 186 36 237 22 21 38 118 195 66 80 102 181 18 21 66 80 234 27 78 118 185 39 178 40 66 122 94
+lit LispGlobal #<global <>
+lit LispProcedure #<procedure <>
+lit GlobalVariable #LispProcedure->LispProcedure
+lit ByteSymbol #call:with:with:
+lit LispSymbol a LispSymbol
+lit LispGlobal #<global =>
+lit LispProcedure #<procedure =>
+lit LispSymbol a LispSymbol
+closure 1
+code header -1152921504589545465 bytes 64 209 16 17 65 34 234 27 78 118 185 36 176 37 94
+lit GlobalVariable #LispProcedure->LispProcedure
+lit LispGlobal #<global memv>
+lit LispCons a LispCons
+lit ByteSymbol #call:with:with:
+lit LispSymbol a LispSymbol
+lit LispSymbol a LispSymbol
+lit ByteString '(define (classify x) (cond ((< x 0) (quote neg)) ((= x 0) (quote zero)) (else (case x ((1 2 3) (quote small)) (else (quote big))))))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'classify'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
 === (define (qq a b) (quasiquote (a (unquote a) b (unquote-splicing b) end)))
-121 <4D> pushConstant: true122 <EF 0E> jumpFalse: 138124 <20> pushConstant: #<global qq>125 <11> pushLit: LispProcedure126 <22> pushConstant: [ ] in UndefinedObject>>#doIt127 <23> pushConstant: 2128 <24> pushConstant: '(define (qq a b) (quasiquote (a (unquote a) b (unquote-splicing b) end)))'129 <EA 2B> send: fixed:arity:source:131 <26> pushConstant: 'qq'132 <97> send: named:133 <98> send: define:134 <D8> pop135 <19> pushLit: LispUnspecified136 <8A> send: default137 <B0> jumpTo: 139138 <4F> pushConstant: nil139 <5C> returnTop
-65 <40> pushTemp: 066 <D2> popIntoTemp: 267 <41> pushTemp: 168 <D3> popIntoTemp: 369 <42> pushTemp: 270 <D4> popIntoTemp: 471 <43> pushTemp: 372 <D5> popIntoTemp: 573 <10> pushLit: LispCons74 <21> pushConstant: a LispSymbol75 <44> pushTemp: 476 <22> pushConstant: a LispSymbol77 <E7 83> pop 3 into (Array new: 3)79 <10> pushLit: LispCons80 <45> pushTemp: 581 <23> pushConstant: a LispCons82 <A4> send: qqAppend:to:83 <A5> send: fromArray:tail:84 <5E> blockReturn
+code header -1152921504606846964 bytes 32 17 34 232 2 35 234 35 37 150 151 216 24 137 92
+lit LispGlobal #<global qq>
+lit GlobalVariable #LispProcedure->LispProcedure
+closure 2
+code header -1152921504571719673 bytes 64 210 65 211 66 212 67 213 16 33 68 34 231 131 16 69 35 164 165 94
+lit GlobalVariable #LispCons->LispCons
+lit LispSymbol a LispSymbol
+lit LispSymbol a LispSymbol
+lit LispCons a LispCons
+lit ByteSymbol #qqAppend:to:
+lit ByteSymbol #fromArray:tail:
+lit ByteString '(define (qq a b) (quasiquote (a (unquote a) b (unquote-splicing b) end)))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'qq'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
 === (define (with-locals x) (define (sq y) (* y y)) (define z (sq x)) (list z (sq z)))
-113 <4D> pushConstant: true114 <EF 0E> jumpFalse: 130116 <20> pushConstant: #<global with-locals>117 <11> pushLit: LispProcedure118 <22> pushConstant: [ ] in UndefinedObject>>#doIt119 <51> pushConstant: 1120 <23> pushConstant: '(define (with-locals x) (define (sq y) (* y y)) (define z (sq x)) (list z (sq z)))'121 <EA 23> send: fixed:arity:source:123 <25> pushConstant: 'with-locals'124 <96> send: named:125 <97> send: define:126 <D8> pop127 <18> pushLit: LispUnspecified128 <89> send: default129 <B0> jumpTo: 131130 <4F> pushConstant: nil131 <5C> returnTop
-105 <40> pushTemp: 0106 <D1> popIntoTemp: 1107 <41> pushTemp: 1108 <D2> popIntoTemp: 2109 <10> pushLit: LispUnspecified110 <81> send: default111 <D3> popIntoTemp: 3112 <10> pushLit: LispUnspecified113 <81> send: default114 <D4> popIntoTemp: 4115 <12> pushLit: LispProcedure116 <23> pushConstant: [ ] in UndefinedObject>>#doIt117 <51> pushConstant: 1118 <24> pushConstant: '(define (sq y) (* y y))'119 <EA 2B> send: fixed:arity:source:121 <26> pushConstant: 'sq'122 <97> send: named:123 <D3> popIntoTemp: 3124 <12> pushLit: LispProcedure125 <43> pushTemp: 3126 <42> pushTemp: 2127 <A8> send: call:with:128 <D4> popIntoTemp: 4129 <12> pushLit: LispProcedure130 <29> pushConstant: #<global list>131 <79> send: value132 <44> pushTemp: 4133 <12> pushLit: LispProcedure134 <43> pushTemp: 3135 <44> pushTemp: 4136 <A8> send: call:with:137 <EA 53> send: tailCall:with:with:139 <5E> blockReturn
-57 <40> pushTemp: 058 <D1> popIntoTemp: 159 <41> pushTemp: 160 <D2> popIntoTemp: 261 <20> pushConstant: #<global *>62 <79> send: value63 <21> pushConstant: #<procedure *>64 <76> send: ==65 <C3> jumpFalse: 7066 <42> pushTemp: 267 <42> pushTemp: 268 <68> send: *69 <B6> jumpTo: 7770 <12> pushLit: LispProcedure71 <20> pushConstant: #<global *>72 <79> send: value73 <42> pushTemp: 274 <42> pushTemp: 275 <EA 1B> send: tailCall:with:with:77 <5E> blockReturn
+code header -1152921504606846964 bytes 32 17 34 81 35 234 35 37 150 151 216 24 137 92
+lit LispGlobal #<global with-locals>
+lit GlobalVariable #LispProcedure->LispProcedure
+closure 1
+code header -1152921504588759028 bytes 64 209 65 210 16 129 211 16 129 212 18 35 81 36 234 43 38 151 211 18 67 66 168 212 18 25 68 18 67 68 168 234 83 94
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
+lit GlobalVariable #LispProcedure->LispProcedure
+closure 1
+code header -1152921504589283323 bytes 64 209 65 210 16 33 118 195 66 66 104 181 18 16 66 66 234 27 94
+lit LispGlobal #<global *>
+lit LispProcedure #<procedure *>
+lit GlobalVariable #LispProcedure->LispProcedure
+lit ByteSymbol #tailCall:with:with:
+lit ByteString '(define (sq y) (* y y))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'sq'
+lit ByteSymbol #named:
+lit ByteSymbol #call:with:
+lit LispGlobal #<global list>
+lit ByteSymbol #tailCall:with:with:
+lit ByteString '(define (with-locals x) (define (sq y) (* y y)) (define z (sq x)) (list z (sq z)))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'with-locals'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
 === (define (loop-do n) (do ((i 0 (+ i 1)) (s 0 (+ s i))) ((= i n) s)))
-113 <4D> pushConstant: true114 <EF 0E> jumpFalse: 130116 <20> pushConstant: #<global loop-do>117 <11> pushLit: LispProcedure118 <22> pushConstant: [ ] in UndefinedObject>>#doIt119 <51> pushConstant: 1120 <23> pushConstant: '(define (loop-do n) (do ((i 0 (+ i 1)) (s 0 (+ s i))) ((= i n) s)))'121 <EA 23> send: fixed:arity:source:123 <25> pushConstant: 'loop-do'124 <96> send: named:125 <97> send: define:126 <D8> pop127 <18> pushLit: LispUnspecified128 <89> send: default129 <B0> jumpTo: 131130 <4F> pushConstant: nil131 <5C> returnTop
-41 <40> pushTemp: 042 <D1> popIntoTemp: 143 <41> pushTemp: 144 <D2> popIntoTemp: 245 <10> pushLit: LispProcedure46 <42> pushTemp: 247 <F9 01 01> fullClosure:a CompiledBlock: [										    | tmp4 |										    tmp4 := LispUnspecified default.										    tmp4 := [											            | tmp6 |											            tmp6 := LispProcedure												                    fixed: [ :arg2 :arg3 |														                    | tmp7 tmp8 tmp9 tmp10 tmp11 tmp12 tmp13 tmp14 |														                    tmp7 := arg2.														                    tmp8 := arg3.														                    tmp9 := true.														                    [ tmp9 ] whileTrue: [																                    tmp13 := nil.																                    tmp14 := nil.																                    tmp9 := false.																                    tmp13 := tmp7.																                    tmp14 := tmp8.																                    tmp10 := (LispCore isTruthy:																	                              ('<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'																		                               ifTrue: [ tmp13 = tmp2 ]																		                               ifFalse: [																		                               LispProcedure																			                               call: '<an unprintable nonliteral value>' value																			                               with: tmp13																			                               with: tmp2 ]))																	                             ifTrue: [																			                             true ifTrue: [																					                             (LispCore isTruthy: false)																						                             ifTrue: [ false ]																						                             ifFalse: [ LispUnspecified default ].																					                             tmp14 ] ]																	                             ifFalse: [																			                             true ifTrue: [																					                             tmp11 := '<an unprintable nonliteral value>' value																					                                      == '<an unprintable nonliteral value>'																						                                      ifTrue: [ tmp13 + 1 ]																						                                      ifFalse: [																						                                      LispProcedure																							                                      call: '<an unprintable nonliteral value>' value																							                                      with: tmp13																							                                      with: 1 ].																					                             tmp12 := '<an unprintable nonliteral value>' value																					                                      == '<an unprintable nonliteral value>'																						                                      ifTrue: [ tmp14 + tmp13 ]																						                                      ifFalse: [																						                                      LispProcedure																							                                      call: '<an unprintable nonliteral value>' value																							                                      with: tmp14																							                                      with: tmp13 ].																					                             tmp4 == tmp6																						                             ifTrue: [																								                             tmp7 := tmp11.																								                             tmp8 := tmp12.																								                             tmp9 := true ]																						                             ifFalse: [ LispProcedure tailCall: tmp4 with: tmp11 with: tmp12 ] ] ] ].														                    tmp10 ]												                    arity: 2												                    source: '(define (g2 i s) (if (= i n) (begin (if #f #f) s) (begin (g2 (+ i 1) (+ s i)))))'.											            tmp6 ] value named: 'g2'.										    tmp4 ] NumCopied: 150 <79> send: value51 <50> pushConstant: 052 <50> pushConstant: 053 <EA 13> send: tailCall:with:with:55 <5E> blockReturn
-57 <E7 01> push: (Array new: 1)59 <D1> popIntoTemp: 160 <10> pushLit: LispUnspecified61 <81> send: default62 <FD 00 01> popIntoTemp: 0 inVectorAt: 165 <41> pushTemp: 166 <40> pushTemp: 067 <F9 02 02> fullClosure:a CompiledBlock: [											            | tmp6 |											            tmp6 := LispProcedure												                    fixed: [ :arg2 :arg3 |														                    | tmp7 tmp8 tmp9 tmp10 tmp11 tmp12 tmp13 tmp14 |														                    tmp7 := arg2.														                    tmp8 := arg3.														                    tmp9 := true.														                    [ tmp9 ] whileTrue: [																                    tmp13 := nil.																                    tmp14 := nil.																                    tmp9 := false.																                    tmp13 := tmp7.																                    tmp14 := tmp8.																                    tmp10 := (LispCore isTruthy:																	                              ('<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'																		                               ifTrue: [ tmp13 = tmp2 ]																		                               ifFalse: [																		                               LispProcedure																			                               call: '<an unprintable nonliteral value>' value																			                               with: tmp13																			                               with: tmp2 ]))																	                             ifTrue: [																			                             true ifTrue: [																					                             (LispCore isTruthy: false)																						                             ifTrue: [ false ]																						                             ifFalse: [ LispUnspecified default ].																					                             tmp14 ] ]																	                             ifFalse: [																			                             true ifTrue: [																					                             tmp11 := '<an unprintable nonliteral value>' value																					                                      == '<an unprintable nonliteral value>'																						                                      ifTrue: [ tmp13 + 1 ]																						                                      ifFalse: [																						                                      LispProcedure																							                                      call: '<an unprintable nonliteral value>' value																							                                      with: tmp13																							                                      with: 1 ].																					                             tmp12 := '<an unprintable nonliteral value>' value																					                                      == '<an unprintable nonliteral value>'																						                                      ifTrue: [ tmp14 + tmp13 ]																						                                      ifFalse: [																						                                      LispProcedure																							                                      call: '<an unprintable nonliteral value>' value																							                                      with: tmp14																							                                      with: tmp13 ].																					                             tmp4 == tmp6																						                             ifTrue: [																								                             tmp7 := tmp11.																								                             tmp8 := tmp12.																								                             tmp9 := true ]																						                             ifFalse: [ LispProcedure tailCall: tmp4 with: tmp11 with: tmp12 ] ] ] ].														                    tmp10 ]												                    arity: 2												                    source: '(define (g2 i s) (if (= i n) (begin (if #f #f) s) (begin (g2 (+ i 1) (+ s i)))))'.											            tmp6 ] NumCopied: 270 <79> send: value71 <23> pushConstant: 'g2'72 <94> send: named:73 <FD 00 01> popIntoTemp: 0 inVectorAt: 176 <FB 00 01> pushTemp: 0 inVectorAt: 179 <5E> blockReturn
-57 <E7 01> push: (Array new: 1)59 <D2> popIntoTemp: 260 <10> pushLit: LispProcedure61 <42> pushTemp: 262 <41> pushTemp: 163 <40> pushTemp: 064 <F9 01 03> fullClosure:a CompiledBlock: [ :arg2 :arg3 |														                    | tmp7 tmp8 tmp9 tmp10 tmp11 tmp12 tmp13 tmp14 |														                    tmp7 := arg2.														                    tmp8 := arg3.														                    tmp9 := true.														                    [ tmp9 ] whileTrue: [																                    tmp13 := nil.																                    tmp14 := nil.																                    tmp9 := false.																                    tmp13 := tmp7.																                    tmp14 := tmp8.																                    tmp10 := (LispCore isTruthy:																	                              ('<an unprintable nonliteral value>' value == '<an unprintable nonliteral value>'																		                               ifTrue: [ tmp13 = tmp2 ]																		                               ifFalse: [																		                               LispProcedure																			                               call: '<an unprintable nonliteral value>' value																			                               with: tmp13																			                               with: tmp2 ]))																	                             ifTrue: [																			                             true ifTrue: [																					                             (LispCore isTruthy: false)																						                             ifTrue: [ false ]																						                             ifFalse: [ LispUnspecified default ].																					                             tmp14 ] ]																	                             ifFalse: [																			                             true ifTrue: [																					                             tmp11 := '<an unprintable nonliteral value>' value																					                                      == '<an unprintable nonliteral value>'																						                                      ifTrue: [ tmp13 + 1 ]																						                                      ifFalse: [																						                                      LispProcedure																							                                      call: '<an unprintable nonliteral value>' value																							                                      with: tmp13																							                                      with: 1 ].																					                             tmp12 := '<an unprintable nonliteral value>' value																					                                      == '<an unprintable nonliteral value>'																						                                      ifTrue: [ tmp14 + tmp13 ]																						                                      ifFalse: [																						                                      LispProcedure																							                                      call: '<an unprintable nonliteral value>' value																							                                      with: tmp14																							                                      with: tmp13 ].																					                             tmp4 == tmp6																						                             ifTrue: [																								                             tmp7 := tmp11.																								                             tmp8 := tmp12.																								                             tmp9 := true ]																						                             ifFalse: [ LispProcedure tailCall: tmp4 with: tmp11 with: tmp12 ] ] ] ].														                    tmp10 ] NumCopied: 367 <22> pushConstant: 268 <23> pushConstant: '(define (g2 i s) (if (= i n) (begin (if #f #f) s) (begin (g2 (+ i 1) (+ s i)))))'69 <EA 23> send: fixed:arity:source:71 <FD 00 02> popIntoTemp: 0 inVectorAt: 274 <FB 00 02> pushTemp: 0 inVectorAt: 277 <5E> blockReturn
-129 <40> pushTemp: 0130 <D5> popIntoTemp: 5131 <41> pushTemp: 1132 <D6> popIntoTemp: 6133 <4D> pushConstant: true134 <D7> popIntoTemp: 7135 <47> pushTemp: 7136 <EF 7D> jumpFalse: 263138 <4F> pushConstant: nil139 <F2 0B> popIntoTemp: 11141 <4F> pushConstant: nil142 <F2 0C> popIntoTemp: 12144 <4E> pushConstant: false145 <D7> popIntoTemp: 7146 <45> pushTemp: 5147 <F2 0B> popIntoTemp: 11149 <46> pushTemp: 6150 <F2 0C> popIntoTemp: 12152 <10> pushLit: LispCore153 <21> pushConstant: #<global =>154 <79> send: value155 <22> pushConstant: #<procedure =>156 <76> send: ==157 <C3> jumpFalse: 162158 <4B> pushTemp: 11159 <43> pushTemp: 3160 <66> send: =161 <B6> jumpTo: 169162 <13> pushLit: LispProcedure163 <21> pushConstant: #<global =>164 <79> send: value165 <4B> pushTemp: 11166 <43> pushTemp: 3167 <EA 23> send: call:with:with:169 <95> send: isTruthy:170 <EF 12> jumpFalse: 190172 <4D> pushConstant: true173 <EF 0C> jumpFalse: 187175 <10> pushLit: LispCore176 <4E> pushConstant: false177 <95> send: isTruthy:178 <C1> jumpFalse: 181179 <4E> pushConstant: false180 <B1> jumpTo: 183181 <16> pushLit: LispUnspecified182 <87> send: default183 <D8> pop184 <E5 0C> pushTemp: 12186 <B0> jumpTo: 188187 <4F> pushConstant: nil188 <ED 43> jumpTo: 257190 <4D> pushConstant: true191 <EF 3F> jumpFalse: 256193 <28> pushConstant: #<global +>194 <79> send: value195 <29> pushConstant: #<procedure +>196 <76> send: ==197 <C3> jumpFalse: 202198 <4B> pushTemp: 11199 <51> pushConstant: 1200 <60> send: +201 <B6> jumpTo: 209202 <13> pushLit: LispProcedure203 <28> pushConstant: #<global +>204 <79> send: value205 <4B> pushTemp: 11206 <51> pushConstant: 1207 <EA 23> send: call:with:with:209 <F2 09> popIntoTemp: 9211 <28> pushConstant: #<global +>212 <79> send: value213 <29> pushConstant: #<procedure +>214 <76> send: ==215 <C4> jumpFalse: 221216 <E5 0C> pushTemp: 12218 <4B> pushTemp: 11219 <60> send: +220 <B7> jumpTo: 229221 <13> pushLit: LispProcedure222 <28> pushConstant: #<global +>223 <79> send: value224 <E5 0C> pushTemp: 12226 <4B> pushTemp: 11227 <EA 23> send: call:with:with:229 <F2 0A> popIntoTemp: 10231 <FB 00 04> pushTemp: 0 inVectorAt: 4234 <FB 00 02> pushTemp: 0 inVectorAt: 2237 <76> send: ==238 <C7> jumpFalse: 247239 <49> pushTemp: 9240 <D5> popIntoTemp: 5241 <4A> pushTemp: 10242 <D6> popIntoTemp: 6243 <4D> pushConstant: true244 <D7> popIntoTemp: 7245 <4F> pushConstant: nil246 <B7> jumpTo: 255247 <13> pushLit: LispProcedure248 <FB 00 04> pushTemp: 0 inVectorAt: 4251 <49> pushTemp: 9252 <4A> pushTemp: 10253 <EA 53> send: tailCall:with:with:255 <B0> jumpTo: 257256 <4F> pushConstant: nil257 <F2 08> popIntoTemp: 8259 <E1 FF ED 80> jumpTo: 135263 <48> pushTemp: 8264 <5E> blockReturn
+code header -1152921504606846964 bytes 32 17 34 81 35 234 35 37 150 151 216 24 137 92
+lit LispGlobal #<global loop-do>
+lit GlobalVariable #LispProcedure->LispProcedure
+closure 1
+code header -1152921504589283324 bytes 64 209 65 210 16 66 249 1 1 121 80 80 234 19 94
+lit GlobalVariable #LispProcedure->LispProcedure
+code header -1152921504606322682 bytes 231 1 209 16 129 253 0 1 64 65 249 2 2 121 35 148 253 0 1 251 0 1 94
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
+code header -1152921504606060539 bytes 231 1 210 16 64 65 66 249 1 3 232 2 34 234 27 253 0 2 251 0 2 94
+lit GlobalVariable #LispProcedure->LispProcedure
+code header -1152921504569753590 bytes 64 213 65 214 77 215 71 239 102 78 215 69 242 11 70 242 12 16 33 118 195 75 66 102 181 18 16 75 66 234 27 78 118 238 12 78 78 118 184 178 20 133 216 229 12 237 58 22 39 118 195 75 81 96 181 18 22 75 81 234 27 242 9 22 39 118 196 229 12 75 96 182 18 22 229 12 75 234 27 242 10 251 0 3 251 0 4 118 199 73 213 74 214 77 215 79 183 18 251 0 3 73 74 234 67 242 8 225 255 237 151 72 94
+lit LispGlobal #<global =>
+lit LispProcedure #<procedure =>
+lit GlobalVariable #LispProcedure->LispProcedure
+lit ByteSymbol #call:with:with:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
+lit LispGlobal #<global +>
+lit LispProcedure #<procedure +>
+lit ByteSymbol #tailCall:with:with:
+lit ByteString '(define (g1 i s) (if (= i n) (begin (if #f #f) s) (begin (g1 (+ i 1) (+ s i)))))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'g1'
+lit ByteSymbol #named:
+lit ByteSymbol #tailCall:with:with:
+lit ByteString '(define (loop-do n) (do ((i 0 (+ i 1)) (s 0 (+ s i))) ((= i n) s)))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'loop-do'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
 === (define (send-it c) (send c add: 1) (send c size))
-113 <4D> pushConstant: true114 <EF 0E> jumpFalse: 130116 <20> pushConstant: #<global send-it>117 <11> pushLit: LispProcedure118 <22> pushConstant: [ ] in UndefinedObject>>#doIt119 <51> pushConstant: 1120 <23> pushConstant: '(define (send-it c) (send c add: 1) (send c size))'121 <EA 23> send: fixed:arity:source:123 <25> pushConstant: 'send-it'124 <96> send: named:125 <97> send: define:126 <D8> pop127 <18> pushLit: LispUnspecified128 <89> send: default129 <B0> jumpTo: 131130 <4F> pushConstant: nil131 <5C> returnTop
-25 <40> pushTemp: 026 <D1> popIntoTemp: 127 <41> pushTemp: 128 <D2> popIntoTemp: 229 <42> pushTemp: 230 <51> pushConstant: 131 <90> send: add:32 <D8> pop33 <42> pushTemp: 234 <72> send: size35 <5E> blockReturn
+code header -1152921504606846964 bytes 32 17 34 81 35 234 35 37 150 151 216 24 137 92
+lit LispGlobal #<global send-it>
+lit GlobalVariable #LispProcedure->LispProcedure
+closure 1
+code header -1152921504589283326 bytes 64 209 65 210 66 81 144 216 66 114 94
+lit ByteSymbol #add:
+lit ByteString '(define (send-it c) (send c add: 1) (send c size))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'send-it'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default
 === (define (guarded f) (guard (e (#t (quote caught))) (f)))
-113 <4D> pushConstant: true114 <EF 0E> jumpFalse: 130116 <20> pushConstant: #<global guarded>117 <11> pushLit: LispProcedure118 <22> pushConstant: [ ] in UndefinedObject>>#doIt119 <51> pushConstant: 1120 <23> pushConstant: '(define (guarded f) (guard (e (#t (quote caught))) (f)))'121 <EA 23> send: fixed:arity:source:123 <25> pushConstant: 'guarded'124 <96> send: named:125 <97> send: define:126 <D8> pop127 <18> pushLit: LispUnspecified128 <89> send: default129 <B0> jumpTo: 131130 <4F> pushConstant: nil131 <5C> returnTop
-81 <40> pushTemp: 082 <D1> popIntoTemp: 183 <41> pushTemp: 184 <D2> popIntoTemp: 285 <10> pushLit: LispProcedure86 <21> pushConstant: #<global %guard>87 <79> send: value88 <10> pushLit: LispProcedure89 <42> pushTemp: 290 <F9 02 01> fullClosure:a CompiledBlock: [ LispProcedure tailCall: tmp2 ] NumCopied: 193 <50> pushConstant: 094 <23> pushConstant: '(lambda () (f))'95 <EA 23> send: fixed:arity:source:97 <10> pushLit: LispProcedure98 <25> pushConstant: [ ] in UndefinedObject>>#doIt99 <51> pushConstant: 1100 <26> pushConstant: '(lambda (e) (cond (#t (quote caught)) (else (%guard-no-match))))'101 <EA 23> send: fixed:arity:source:103 <EA 3B> send: tailCall:with:with:105 <5E> blockReturn
-33 <10> pushLit: LispProcedure34 <40> pushTemp: 035 <91> send: tailCall:36 <5E> blockReturn
-73 <40> pushTemp: 074 <D1> popIntoTemp: 175 <10> pushLit: LispCore76 <4D> pushConstant: true77 <91> send: isTruthy:78 <C1> jumpFalse: 8179 <22> pushConstant: a LispSymbol80 <B3> jumpTo: 8581 <13> pushLit: LispProcedure82 <24> pushConstant: #<global %guard-no-match>83 <79> send: value84 <95> send: tailCall:85 <5E> blockReturn
+code header -1152921504606846964 bytes 32 17 34 81 35 234 35 37 150 151 216 24 137 92
+lit LispGlobal #<global guarded>
+lit GlobalVariable #LispProcedure->LispProcedure
+closure 1
+code header -1152921504589283319 bytes 64 209 65 210 16 17 16 66 249 2 1 80 35 234 35 16 37 81 38 234 35 234 59 94
+lit GlobalVariable #LispProcedure->LispProcedure
+lit LispGlobal #<global %guard>
+code header -1152921504606584829 bytes 16 64 145 94
+lit GlobalVariable #LispProcedure->LispProcedure
+lit ByteSymbol #tailCall:
+lit ByteString '(lambda () (f))'
+lit ByteSymbol #fixed:arity:source:
+closure 1
+code header -1152921504589545467 bytes 64 209 77 78 118 185 32 178 17 18 147 94
+lit LispSymbol a LispSymbol
+lit GlobalVariable #LispProcedure->LispProcedure
+lit LispGlobal #<global %guard-no-match>
+lit ByteSymbol #tailCall:
+lit ByteString '(lambda (e) (cond (#t (quote caught)) (else (%guard-no-match))))'
+lit ByteSymbol #tailCall:with:with:
+lit ByteString '(define (guarded f) (guard (e (#t (quote caught))) (f)))'
+lit ByteSymbol #fixed:arity:source:
+lit ByteString 'guarded'
+lit ByteSymbol #named:
+lit ByteSymbol #define:
+lit GlobalVariable #LispUnspecified->LispUnspecified
+lit ByteSymbol #default

@@ -5,11 +5,9 @@
    pharo\PharoConsole.exe pharo\<image>.image st tests\phase-2-core.st
  ============================================================================"
 
-"--- Chunk 1: load reader then core into this fresh image -------------------"
-| dir |
-dir := Smalltalk imageDirectory parent / 'src'.
-(dir / 'coglisp-reader.st') fileIn.
-(dir / 'coglisp-core.st') fileIn.
+"--- Chunk 1: the harness -------------------------------------------------"
+"The suite runs on a copy of the built image (pharo/suite.image, made by
+ tests/run-all), which holds every package: only the harness is filed in."
 (Smalltalk imageDirectory parent / 'tests' / 'harness.st') fileIn.
 !
 

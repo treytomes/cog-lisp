@@ -1,6 +1,7 @@
-# cog-lisp CI (specs/phase-8.9-ci-cd.md section 4.1): every suite on Linux with
-# both compilers, every suite on Windows, and the VS Code extension's tests, on
-# every push and pull request. release.yml calls this workflow before it builds a
+# cog-lisp CI (specs/phase-8.9-ci-cd.md section 4.1): every suite on Linux and on
+# Windows, and the VS Code extension's tests, on every push and pull request.
+# (Until Phase 9 step 9.1, Linux ran every suite twice: once with the Smalltalk
+# reader and compiler, which retired then.) release.yml calls this workflow before it builds a
 # release. Actions are pinned to commits; the version is in the comment.
 name: CI
 
@@ -20,15 +21,9 @@ concurrency:
 
 jobs:
   linux:
-    name: Linux (${{ matrix.compiler }} compiler)
+    name: Linux
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [lisp, smalltalk]
-    env:
-      COGLISP_COMPILER: ${{ matrix.compiler == 'smalltalk' && 'smalltalk' || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Cache the Pharo downloads
@@ -46,7 +41,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: test-output-linux-${{ matrix.compiler }}
+          name: test-output-linux
           path: |
             ${{ runner.temp }}/coglisp-run-all
             ${{ runner.temp }}/coglisp-runner

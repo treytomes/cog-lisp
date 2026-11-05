@@ -3,35 +3,45 @@ setlocal enabledelayedexpansion
 rem ===========================================================================
 rem  cog-lisp : run every acceptance suite  (specs/phase-7.5-review-and-tooling.md AC-5)
 rem    tests\run-all.bat
-rem  Runs each tests\phase-*.st in a fresh stock image, then the runner suite
-rem  (which rebuilds pharo\cog-lisp.image), then the LISP unit tests tests\lisp\*.lisp, and prints each suite's RESULT and a
-rem  total. Exit code 0 only if every suite passed. Benchmarks are separate:
-rem  bench\run-benchmarks.bat.
+rem  Builds pharo\cog-lisp.image from the seed (build-image.bat), runs each
+rem  tests\phase-*.st in a fresh copy of it (pharo\suite.image: suites file in
+rem  their harness, which writes to the image's changes file), then the runner
+rem  suite (which builds the image again), then the LISP unit tests
+rem  tests\lisp\*.lisp, and prints each suite's RESULT and a total. Exit code 0
+rem  only if every suite passed. Benchmarks are separate: bench\run-benchmarks.bat.
 rem ===========================================================================
 
 pushd "%~dp0.."
 set "VM=%CD%\pharo\PharoConsole.exe"
-set "STOCK="
-for %%F in ("pharo\Pharo*.image") do if not defined STOCK set "STOCK=%%~fF"
-if not defined STOCK (
-  echo run-all: no stock image in pharo\ -- run bootstrap-pharo.bat first 1>&2
+if not exist "pharo\seed.image" (
+  echo run-all: no seed image in pharo\ -- run bootstrap-pharo.bat first 1>&2
   popd & exit /b 2
 )
 set "TMPD=%TEMP%\coglisp-run-all"
 if exist "%TMPD%" rd /s /q "%TMPD%"
 mkdir "%TMPD%"
+rem  every suite and test reads stdin from an empty file, so (read) sees the end of
+rem  input whatever stdin run-all itself has (an open pipe would block it; NUL is
+rem  a character device, which LispStdin takes for a console)
+type nul >"%TMPD%\empty-input.txt"
 
 set PASS=0
 set TOTAL=0
 set FAILED=0
-rem  the reader and compiler in use (Phase 8 step 8.5): LISP unless COGLISP_COMPILER=smalltalk
-if /i "%COGLISP_COMPILER%"=="smalltalk" (
-  echo == cog-lisp : all suites, on the Smalltalk reader and compiler ^(COGLISP_COMPILER=smalltalk^) ==
-) else (
-  echo == cog-lisp : all suites, on the LISP reader and compiler ==
+echo == cog-lisp : all suites ==
+
+call "%CD%\build-image.bat" >"%TMPD%\build-image.out" 2>&1
+set RC=!ERRORLEVEL!
+if not "!RC!"=="0" (
+  echo   FAIL  build-image  -- see %TMPD%\build-image.out
+  echo.
+  echo == THE IMAGE DID NOT BUILD: no suite was run ==
+  popd & exit /b 1
 )
+echo   ok    build-image ^(from the seed^)
 
 for %%T in (tests\phase-*.st) do call :suite "%%~fT" "%%~nT"
+if exist "pharo\suite.image" del /q "pharo\suite.image" "pharo\suite.changes"
 call :runner
 rem  unit tests written in cog-lisp (lib/test.lisp; Phase 7.9), on the image the runner built
 for %%T in (tests\lisp\*.lisp) do call :lisptest "%%~fT" "%%~nT"
@@ -46,8 +56,10 @@ popd & exit /b 1
 
 rem ---------------------------------------------------------------------------
 :suite
-rem  %1 = full path of a suite, %2 = its name
-"%VM%" --headless "%STOCK%" st "%~1" >"%TMPD%\%~2.out" 2>&1
+rem  %1 = full path of a suite, %2 = its name; each runs on a fresh copy of the built image
+copy /y "pharo\cog-lisp.image" "pharo\suite.image" >nul
+copy /y "pharo\cog-lisp.changes" "pharo\suite.changes" >nul
+"%VM%" --headless "%CD%\pharo\suite.image" st "%~1" <"%TMPD%\empty-input.txt" >"%TMPD%\%~2.out" 2>&1
 set RC=!ERRORLEVEL!
 call :tally "%~2" "%TMPD%\%~2.out" !RC!
 exit /b 0
@@ -59,7 +71,7 @@ call :tally "phase-5-runner" "%TMPD%\phase-5-runner.out" !RC!
 exit /b 0
 
 :lisptest
-call "%CD%\cog-lisp.bat" "%~1" >"%TMPD%\lisp-%~2.out" 2>&1
+call "%CD%\cog-lisp.bat" "%~1" <"%TMPD%\empty-input.txt" >"%TMPD%\lisp-%~2.out" 2>&1
 set RC=!ERRORLEVEL!
 call :tally "lisp/%~2" "%TMPD%\lisp-%~2.out" !RC!
 exit /b 0

@@ -1,26 +1,28 @@
 ;;; bootstrap.lisp -- the compiler compiles itself, to a fixpoint
-;;; (specs/phase-8-self-hosting.md step 8.4)
+;;; (specs/phase-8-self-hosting.md step 8.4; specs/phase-9-language.md step 9.1)
 ;;;
-;;; Stage 0 is the compiler that builds this one: the seed's (an earlier cog-lisp
-;;; image's, step 9.1) or the Smalltalk compiler (LispCompiler, in a stock image).
-;;; Compiling the compiler's source (compiler-sources, in lib/compiler/) with it
-;;; gives the methods M0; the build runs the same compilation, which defines stage
-;;; 1, the LISP compiler running as compiled code. Stage 1 compiles the same source, read by the LISP reader, to M1;
-;;; installing M1 makes stage 2, which compiles it to M2; installing M2 makes stage
-;;; 3, which compiles it to M3. The fixpoint: M1 = M2 = M3, form by form, compared
-;;; by fingerprint (each method's header, bytecode bytes and literals, blocks
-;;; recursively), as tests/phase-8.3-compiler.st compares methods. M0 = M1 too
-;;; when stage 0 generates code as this source does (see bootstrap-fixpoint?).
+;;; Stage 0 is the compiler that builds this one: a seed's, an earlier cog-lisp
+;;; image's, reached through its entry points (LispCompiler entries). Compiling the
+;;; compiler's source (compiler-sources, in lib/compiler/) with it gives the
+;;; methods M0; the image build runs the same compilation, which defines stage 1,
+;;; this source running as compiled code. Stage 1 compiles the source, read by the
+;;; new reader, to M1; installing M1 makes stage 2, which compiles it to M2;
+;;; installing M2 makes stage 3, which compiles it to M3. The fixpoint: M1 = M2 =
+;;; M3, form by form, compared by fingerprint (each method's header, bytecode bytes
+;;; and literals, blocks recursively). Stage 1 already has this source's meaning,
+;;; whatever compiled it, so its output must be final. M0 = M1 holds only when the
+;;; seed generates code as this source does; that is reported, not required.
 ;;;
-;;;   (define b (bootstrap-compiler "lib/compiler"))   ; leaves stage 3 installed
+;;;   (define b (bootstrap-compiler "lib/compiler"))   ; the running compiler as the seed
 ;;;   (bootstrap-fixpoint? b)                          ; -> #t
 ;;;   (bootstrap-differences b 2 3)                    ; -> labels of forms that differ
 ;;;
-;;; The image build (step 9.1) passes the seed's entry points instead:
+;;; The image build passes the seed's entry points:
 ;;;   (bootstrap-compiler-from-seed "lib/compiler" entries)
 ;;;
-;;; This file is not among the sources it compiles, so installing a stage never
-;;; replaces the procedures running the bootstrap.
+;;; Either leaves stage 3 installed. This file is not among the sources it
+;;; compiles, so installing a stage never replaces the procedures running the
+;;; bootstrap. (Until step 9.1, stage 0 could also be the Smalltalk compiler.)
 
 (define compiler-sources '("reader.lisp" "opal.lisp" "codegen.lisp" "compiler.lisp"))
 
@@ -33,21 +35,12 @@
 ;; A source, over a file's text: (next-datum-thunk source-map source-for), where
 ;; (source-for datum) is the text the reader read datum from, or #f. Each reader
 ;; answers that for itself.
-(define (smalltalk-source text)
-  (let ((r [(smalltalk LispReader) basicOn: text]))     ; the Smalltalk reader itself
-    (list (lambda () [r next]) r
-          (lambda (datum) (let ((s [r sourceFor: datum])) (if (smalltalk-nil? s) #f s))))))
 
 (define (lisp-source text)
   (let ((r (make-reader text)))
     (list (lambda () (reader-next r)) r (lambda (datum) (reader-source-for r datum)))))
 
 ;;; Compilers: (datum source-map context) -> CompiledMethod
-
-(define (smalltalk-compile datum map context)
-  (let ((c [(smalltalk LispCompiler) new]))
-    [c instVarNamed: "sourceMap" put: map]
-    [c smalltalkCompile: datum context: (or context (smalltalk-nil))]))   ; not the one in use
 
 (define (lisp-compile datum map context)              ; whichever stage is installed
   (compile-form datum map context))
@@ -146,36 +139,28 @@
 
 ;;; The bootstrap
 
-;; answers a vector of the four stages' listings, each a list of (label . text);
-;; stage 3 is left installed
-;; Every stage generates code as the running compiler does when the bootstrap
-;; starts (code-generator: direct or opal, step 8.6). Installing a stage defines
-;; its own setting afresh, so the choice is put back after each install. The
-;; result records it in a fifth slot.
+;; the running compiler as the seed: stages 1 to 3 then rebuild it from its source
 (define (bootstrap-compiler dir)
-  (bootstrap-stages dir smalltalk-compile smalltalk-source 'smalltalk))
+  (bootstrap-compiler-from-seed dir [(smalltalk LispCompiler) entries]))
 
 ;; the image build: the seed is stage 0 (step 9.1)
 (define (bootstrap-compiler-from-seed dir entries)
-  (bootstrap-stages dir (seed-compiler entries) (seed-source entries) 'seed))
+  (bootstrap-stages dir (seed-compiler entries) (seed-source entries)))
 
-;; a sixth slot records what stage 0 was: smalltalk or seed
-(define (bootstrap-stages dir compile0 open0 stage0)
+;; answers a vector of the four stages' listings, each a list of (label . text),
+;; and what stage 0 was (the symbol seed); stage 3 is left installed
+(define (bootstrap-stages dir compile0 open0)
   (let* ((base (gensym-counter))
-         (generator (code-generator))
          (m0 (stage-compile compile0 open0 dir base))
          (m1 (stage-compile lisp-compile lisp-source dir base)))
     (stage-install m1)                                  ; stage 2
-    (set-code-generator! generator)
     (let ((m2 (stage-compile lisp-compile lisp-source dir base)))
       (stage-install m2)                                ; stage 3
-      (set-code-generator! generator)
       (let ((m3 (stage-compile lisp-compile lisp-source dir base)))
         (gensym-counter! (+ (gensym-counter) 1))
-        (vector (stage-listings m0) (stage-listings m1) (stage-listings m2) (stage-listings m3) generator stage0)))))
+        (vector (stage-listings m0) (stage-listings m1) (stage-listings m2) (stage-listings m3) 'seed)))))
 
-(define (bootstrap-generator b) (vector-ref b 4))
-(define (bootstrap-stage0 b) (vector-ref b 5))
+(define (bootstrap-stage0 b) (vector-ref b 4))
 
 ;; the labels of the forms whose methods differ between stages i and j
 (define (bootstrap-differences b i j)
@@ -185,12 +170,8 @@
           ((string=? (cdr (car a)) (cdr (car c))) (loop (cdr a) (cdr c) acc))
           (else (loop (cdr a) (cdr c) (cons (car (car a)) acc))))))
 
-;; Stages 1, 2 and 3 make the same methods. Through Opal, stage 1 also makes what
-;; stage 0, the Smalltalk compiler, makes (8.4); the direct generator makes
-;; different code from Opal's, so there stage 0 is not compared (8.6). A seed is
-;; not compared either: it generates code as its own, older source did (9.1).
+;; Stages 1, 2 and 3 make the same methods. Stage 0, the seed, is not compared: it
+;; generates code as its own, older source did.
 (define (bootstrap-fixpoint? b)
-  (and (or (eq? (bootstrap-generator b) 'direct) (eq? (bootstrap-stage0 b) 'seed)
-           (null? (bootstrap-differences b 0 1)))
-       (null? (bootstrap-differences b 1 2))
+  (and (null? (bootstrap-differences b 1 2))
        (null? (bootstrap-differences b 2 3))))

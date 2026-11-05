@@ -1,14 +1,11 @@
 ;;; phase-8.3-compiler.lisp -- unit tests of the compiler written in LISP
 ;;; (lib/compiler/compiler.lisp; specs/phase-8-self-hosting.md step 8.3, AC-3).
-;;; The byte-for-byte comparison with the Smalltalk compiler is
-;;; tests/phase-8.3-compiler.st; these test the compiler on its own terms. The
-;;; built image loads lib/compiler/.
+;;; Until step 9.1, tests/phase-8.3-compiler.st also compared it byte for byte with
+;;; the Smalltalk compiler, which retired then; these test the compiler on its own
+;;; terms. The built image loads lib/compiler/.
 (load "../../lib/test.lisp")
 
 (define (run-form d) (opal-run (compile-form d)))
-;; method-listing (lib/compiler/bootstrap.lisp): header, bytes and literals, blocks too
-(define (st-listing d) (method-listing [[(smalltalk LispCompiler) new] compile: d]))
-(define (lisp-listing d) (method-listing (compile-form d)))
 
 ;; the compile error a form gives, or no-error
 (define (compile-failure d)
@@ -24,16 +21,15 @@
   (check (run-form '(quasiquote (1 (unquote (+ 1 1)) (unquote-splicing (list 3 4))))) '(1 2 3 4))
   (check (run-form '[(smalltalk Array) with: 1 with: 2]) #(1 2)))
 
-;; through Opal: the direct generator (step 8.6) makes different code
-(define-test "AC-3 the same code as the Smalltalk compiler, through Opal"
-  (set-code-generator! 'opal)
-  (for-each (lambda (d) (check (lisp-listing d) (st-listing d)))
+;; method-listing (lib/compiler/bootstrap.lisp): header, bytes and literals, blocks too
+(define-test "AC-3 LispCompiler compile: is the LISP compiler"
+  (for-each (lambda (d) (check (method-listing [[(smalltalk LispCompiler) new] compile: d])
+                               (method-listing (compile-form d))))
             '((+ 1 2)
               (define (fact n) (if (= n 0) 1 (* n (fact (- n 1)))))
               (lambda (x) (let loop ((i 0)) (if (< i x) (loop (+ i 1)) i)))
               (cond ((assq 'a '((a . 1))) => cdr) (else #f))
-              (send (smalltalk OrderedCollection) new)))
-  (set-code-generator! 'direct))
+              (send (smalltalk OrderedCollection) new))))
 
 (define-test "AC-3 lisp-eval defines, and procedures keep their source"
   (lisp-eval-string "(define (lc-test-square x)   ; a comment\n  (* x x))")
@@ -48,7 +44,7 @@
   (lisp-eval-string "(define-macro (lc-test-twice e) `(begin ,e ,e)) (define lc-test-n 0) (lc-test-twice (set! lc-test-n (+ lc-test-n 1)))")
   (check lc-test-n 2))
 
-(define-test "AC-3 compile errors, with the Smalltalk compiler's messages"
+(define-test "AC-3 compile errors, with the messages the Smalltalk compiler gave"
   (check (compile-failure '(if)) "if: bad syntax: (if)")
   (check (compile-failure '(lambda (x x) x)) "lambda: duplicate parameter in (x x)")
   (check (compile-failure '(let ((x 1) (x 2)) x)) "let: duplicate name: x")

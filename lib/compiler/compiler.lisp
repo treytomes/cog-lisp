@@ -1,12 +1,14 @@
 ;;; compiler.lisp -- cog-lisp's compiler, written in cog-lisp
 ;;; (specs/phase-8-self-hosting.md step 8.3)
 ;;;
-;;; A procedure-for-procedure counterpart of LispCompiler (src/coglisp-compiler.st):
-;;; it builds the same Opal nodes, through lib/compiler/opal.lisp, so it compiles
-;;; every form to the same CompiledMethod, byte for byte. Each procedure names the
-;;; Smalltalk method it mirrors when the names differ. Every call that makes a
-;;; temporary name or translates a form happens in the Smalltalk method's order,
-;;; since the names l1, l2, ... are part of the generated code.
+;;; Written as a procedure-for-procedure counterpart of the compiler written in
+;;; Smalltalk (LispCompiler in src/coglisp-compiler.st up to release v0.1.2; it
+;;; retired in Phase 9 step 9.1, and this is now cog-lisp's only compiler). It
+;;; built the same nodes, so through Opal it compiled every form to the same
+;;; CompiledMethod, byte for byte. Each procedure names the Smalltalk method it
+;;; mirrored when the names differ; those names refer to that history. Every call
+;;; that makes a temporary name or translates a form happens in that method's
+;;; order, since the names l1, l2, ... are part of the generated code.
 ;;;
 ;;;   (compile-form '(+ 1 2))           -> a CompiledMethod
 ;;;   (lisp-eval '(define (f x) x))     -> evaluates as eval does
@@ -970,8 +972,8 @@
     (when (pair? source-map) (c-source-map! c (car source-map)))
     (lc-eval c datum #f 0)))
 
-;; What LispCompiler>>compile:context: and eval:context:steps: call when this
-;; compiler is the one in use (step 8.5): map is a reader or #f, text a string or #f.
+;; What LispCompiler>>compile:context: and eval:context:steps: call (step 8.5; the
+;; entry points in LispCompiler entries): map is a reader or #f, text a string or #f.
 (define (lisp-compile-from datum map text)
   (let ((c (make-lisp-compiler)))
     (c-source-map! c map)
@@ -981,6 +983,20 @@
   (let ((c (make-lisp-compiler)))
     (c-source-map! c map)
     (lc-eval c datum text steps)))
+
+;; What the primitives macroexpand-1 and macroexpand call (step 9.1; until then
+;; they used the Smalltalk compiler's): expand a call of a global macro once, or
+;; until the form is no longer one.
+(define (lisp-macroexpand-1 form)
+  (let ((m (and (pair? form) (lc-macro-for (car form) (scope-new)))))
+    (if m (lc-expand form m) form)))
+
+(define (lisp-macroexpand form)
+  (let loop ((current form) (steps 1))
+    (let ((next (lisp-macroexpand-1 current)))
+      (cond ((eq? next current) current)
+            ((> steps lc-max-expansions) (lc-expansion-too-deep form))
+            (else (loop next (+ steps 1)))))))
 
 ;; every datum of a string, read by the LISP reader so procedures keep their text
 (define (lisp-eval-string s)

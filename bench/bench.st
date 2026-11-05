@@ -41,7 +41,7 @@ benchDir := Smalltalk imageDirectory parent / 'bench'.
 !
 
 "--- Chunk 2: run, report, check -------------------------------------------"
-| out benches configs median compiledRun walkerRun stRun rows report checks pass total check fmt ratio file sizeNote sendTimes compileForms compileMs stCompileMs readText readMs stReadMs |
+| out benches configs median compiledRun walkerRun stRun rows report checks pass total check fmt ratio file sizeNote sendTimes compileForms compileMs readText readMs |
 out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
 LispPrimitives installDefault.
 
@@ -144,24 +144,16 @@ LispCompiler new evalFile: (Smalltalk imageDirectory parent / 'lib' / 'core.lisp
 3 timesRepeat: [compileForms do: [:f | LispCompiler new compile: f]].
 Smalltalk garbageCollect.
 compileMs := (([60 timesRepeat: [compileForms do: [:f | LispCompiler new compile: f]]] timeToRun asMilliSeconds) / 60.0).
-"Phase 8 step 8.5: compile: and LispReader on: use the compiler and reader in use
- (the ones written in LISP unless COGLISP_COMPILER=smalltalk); the Smalltalk ones
- are timed beside them (AC-7)."
-3 timesRepeat: [compileForms do: [:f | LispCompiler new smalltalkCompile: f context: nil]].
-Smalltalk garbageCollect.
-stCompileMs := (([60 timesRepeat: [compileForms do: [:f | LispCompiler new smalltalkCompile: f context: nil]]] timeToRun asMilliSeconds) / 60.0).
+"compile: and LispReader on: use the reader and compiler written in LISP. Until
+ Phase 9 step 9.1 the Smalltalk ones were timed beside them (Phase 8 AC-7, AC-8);
+ they retired then. The Phase 7.9 compiler took 36.3 ms on a quieter machine;
+ Phase 8.6 made it about 2x faster. The check guards that, with a margin for a
+ busy machine."
 3 timesRepeat: [LispReader readAll: readText].
 Smalltalk garbageCollect.
 readMs := (([20 timesRepeat: [LispReader readAll: readText]] timeToRun asMilliSeconds) / 20.0).
-Smalltalk garbageCollect.
-stReadMs := (([200 timesRepeat: [ | r | r := LispReader basicOn: readText. [r next == LispReader eofObject] whileFalse]] timeToRun asMilliSeconds) / 200.0).
-check value: 'Phase 8 AC-7 compile time with the compiler in use (' , LispCompiler implementation , ') within 1.5x of the Smalltalk compiler (' , (ratio value: compileMs value: stCompileMs) , ')'
-	value: compileMs <= (1.5 * stCompileMs).
-"Phase 8 step 8.6 (AC-8): the LISP compiler writes bytecode itself. The target
- was 2x faster than Phase 7.9 (36.3 ms on a quieter machine); measured against the
- Smalltalk compiler in the same run it is about 2x. The check guards a margin."
-check value: 'Phase 8 AC-8 the compiler in use compiles at least 1.5x faster than the Smalltalk compiler (' , (ratio value: stCompileMs value: compileMs) , ' faster; Phase 7.9 took 36.3 ms)'
-	value: (LispCompiler implementation = #smalltalk) | (compileMs * 1.5 <= stCompileMs).
+check value: 'Phase 8 AC-8 compiling is faster than Phase 7.9 did (36.3 ms): ' , (fmt value: compileMs) , ' ms'
+	value: compileMs < 36.3.
 
 report := String streamContents: [:s |
 	s nextPutAll: '# cog-lisp benchmark results'; lf; lf.
@@ -191,10 +183,9 @@ report := String streamContents: [:s |
 		s lf].
 	s lf; nextPutAll: '## Compilation'; lf; lf.
 	s nextPutAll: 'Compiling the ' , compileForms size printString , ' forms of `lib/core.lisp` and `examples/tiny-reader.lisp`: ' , (fmt value: compileMs)
-		, ' ms with the compiler in use (' , LispCompiler implementation , '); ' , (fmt value: stCompileMs) , ' ms with the Smalltalk compiler ('
-		, (ratio value: compileMs value: stCompileMs) , ').'; lf; lf.
-	s nextPutAll: 'Reading the same ' , readText size printString , ' characters: ' , (fmt value: readMs) , ' ms with the reader in use; '
-		, (fmt value: stReadMs) , ' ms with the Smalltalk reader (' , (ratio value: readMs value: stReadMs) , ').'; lf.
+		, ' ms (Phase 7.9: 36.3 ms).'; lf; lf.
+	s nextPutAll: 'Reading the same ' , readText size printString , ' characters: ' , (fmt value: readMs) , ' ms.'; lf; lf.
+	s nextPutAll: 'Until Phase 9 step 9.1 the Smalltalk compiler and reader were timed beside these; the last such run had them at 52.7 ms and 1.87 ms.'; lf.
 	s lf; nextPutAll: '## Smalltalk interop'; lf; lf.
 	s nextPutAll: 'A loop of 1,000,000 `(send acc + 1)`: ' , (fmt value: sendTimes first) , ' ms; the same loop with `(+ acc 1)`: '
 		, (fmt value: sendTimes last) , ' ms (' , (ratio value: sendTimes first value: sendTimes last) , ').'; lf.

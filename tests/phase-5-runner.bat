@@ -21,8 +21,8 @@ set TOTAL=0
 echo == cog-lisp Phase 5 : runner ==
 
 rem --- AC-1 / AC-2: build ------------------------------------------------------
-set "STOCK="
-for %%F in ("pharo\Pharo*.image") do if not defined STOCK set "STOCK=%%~fF"
+rem  the image is built from the seed (Phase 9 step 9.1), which the build never saves
+set "STOCK=%CD%\pharo\seed.image"
 for %%F in ("!STOCK!") do set "BEFORE=%%~tF %%~zF"
 rem  call by full path: the current directory may not be on the command search path
 call "%CD%\build-image.bat" >"%TMPD%\build.log" 2>&1
@@ -33,7 +33,7 @@ if "!RC!"=="0" if exist "pharo\cog-lisp.image" set OK=1
 call :check "AC-1 build-image.bat creates pharo\cog-lisp.image" !OK!
 set OK=0
 if "!BEFORE!"=="!AFTER!" set OK=1
-call :check "AC-1 stock image unchanged" !OK!
+call :check "AC-1 the seed image unchanged" !OK!
 
 rem --- runner and REPL fixtures, then the examples --------------------------------
 for %%F in (tests\runner\*.lisp) do call :runcase "%%~fF" prog

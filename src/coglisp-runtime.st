@@ -150,6 +150,30 @@ cm value: lines value: 'positioning' value: 'position
 	^ pos'.
 cm value: lines value: 'positioning' value: 'position: n
 	pos := n'.
+cm value: lines value: 'reading' value: 'readDatum
+	"The next datum, read by the LISP reader from the text read so far, which reads
+	 another line while the datum is incomplete; the eof object at the end of input
+	 (Phase 9 step 9.1: read on standard input, once the Smalltalk reader, which
+	 pulled characters one at a time, retired)."
+	| entries r d more |
+	entries := LispCompiler entries.
+	[true] whileTrue: [
+		self atEnd ifTrue: [^ LispReader eofObject].
+		r := (entries at: #makeReader) value: text.
+		(entries at: #setPosition) value: r value: pos.
+		more := false.
+		d := [(entries at: #next) value: r]
+			on: LispReadError
+			do: [:e |
+				(e isIncomplete and: [source atEnd not]) ifFalse: [e pass].
+				more := true.
+				nil].
+		more
+			ifTrue: [text := text , source nextLine , (String with: Character lf)]
+			ifFalse: [
+				d == LispReader eofObject
+					ifTrue: [pos := text size]
+					ifFalse: [pos := (entries at: #position) value: r. ^ d]]]'.
 cm value: lines value: 'reading' value: 'upTo: aCharacter
 	| out |
 	out := WriteStream on: String new.
@@ -496,7 +520,7 @@ cm value: prims class value: 'installing' value: 'installPortsInto: anEnv
 	def value: ''char-ready?'' value: (LispProcedure variadic: [:rest | true] required: 0).
 	def value: ''eof-object'' value: (LispProcedure fixed: [eof] arity: 0).
 	def value: ''eof-object?'' value: (LispProcedure fixed: [:x | x == eof] arity: 1).
-	def value: ''read'' value: (LispProcedure variadic: [:rest | (LispReader on: (inArg value: rest value: ''read'')) next] required: 0).
+	def value: ''read'' value: (LispProcedure variadic: [:rest | LispReader readFrom: (inArg value: rest value: ''read'')] required: 0).
 	def value: ''open-output-string'' value: (LispProcedure fixed: [LispOutputPort open] arity: 0).
 	def value: ''get-output-string'' value: (LispProcedure fixed: [:p | (self outPort: p for: ''get-output-string'') contents] arity: 1).
 	def value: ''write-char'' value: (LispProcedure variadic: [:c :rest |
@@ -881,12 +905,9 @@ cm value: prims class value: 'installing' value: 'installMacroSupportInto: anEnv
 		LispSymbol new setName: (prefix lispElements ifEmpty: [''g''] ifNotEmpty: [:p |
 			(p first isKindOf: LispSymbol) ifTrue: [p first name] ifFalse: [p first asString]]) , GensymCounter printString]
 		required: 0).
-	anEnv define: (LispSymbol named: ''macroexpand-1'') value: (LispProcedure fixed: [:form | LispCompiler new macroexpand1: form] arity: 1).
-	anEnv define: (LispSymbol named: ''macroexpand'') value: (LispProcedure fixed: [:form | LispCompiler new macroexpand: form] arity: 1).
+	anEnv define: (LispSymbol named: ''macroexpand-1'') value: (LispProcedure fixed: [:form | (LispCompiler entries at: #macroexpand1) value: form] arity: 1).
+	anEnv define: (LispSymbol named: ''macroexpand'') value: (LispProcedure fixed: [:form | (LispCompiler entries at: #macroexpand) value: form] arity: 1).
 	anEnv define: (LispSymbol named: ''eval'') value: (LispProcedure fixed: [:form | LispCompiler new eval: form] arity: 1).
-	"lisp or smalltalk: the reader and compiler in use (Phase 8 step 8.5)"
-	anEnv define: (LispSymbol named: ''compiler-implementation'') value: (LispProcedure fixed: [
-		LispSymbol named: (LispCompiler usesLisp ifTrue: [''lisp''] ifFalse: [''smalltalk''])] arity: 0).
 	"how this image was built: its seed, and the bootstrap (Phase 9 step 9.1)"
 	anEnv define: (LispSymbol named: ''image-build-info'') value: (LispProcedure fixed: [
 		LispCompiler buildInfoList] arity: 0)'.

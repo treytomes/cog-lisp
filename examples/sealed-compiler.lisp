@@ -2,13 +2,13 @@
 ;;; (Phase 8 step 8.5)
 ;;;
 ;;; eval, load, the REPL and the runner use the reader and compiler written in
-;;; cog-lisp (lib/compiler/), or the Smalltalk ones when COGLISP_COMPILER=smalltalk.
-;;; The LISP ones are sealed when the image is built: each global they use is
+;;; cog-lisp (lib/compiler/), the only ones since Phase 9 step 9.1. They are sealed
+;;; when the image is built: each global they use is
 ;;; bound for them to the value it had then. So a program may define any name --
 ;;; even one the compiler itself uses -- and only the program sees its definition.
 
-(display "compiler in use is lisp or smalltalk: ")
-(write (and (memq (compiler-implementation) '(lisp smalltalk)) #t))
+(display "the image has its LISP compiler: ")
+(write [(smalltalk LispCompiler) hasLispCompiler])
 (newline)
 
 ;; Redefine three things the compiler and reader use all the time.

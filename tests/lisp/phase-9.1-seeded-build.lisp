@@ -18,14 +18,12 @@
   (check-true (> (info-ref 'forms) 150))
   (check-true (integer? (info-ref 'seed-differences))))
 
-;; the sealed compiler's own switch and entry points, kept before the bootstrap
-;; below installs stages whose globals replace these names
-(define sealed-set-generator set-code-generator!)
+;; the sealed compiler's entry points, kept before the bootstrap below installs
+;; stages whose globals replace these names
 (define running-entries [(smalltalk LispCompiler) entries])
 (define stage-1-compile-form compile-form)
 
 (define b (bootstrap-compiler-from-seed "lib/compiler" running-entries))
-(sealed-set-generator 'direct)
 
 (define-test "AC-1 a seed is stage 0: the bootstrap records it"
   (check (bootstrap-stage0 b) 'seed)
@@ -44,8 +42,8 @@
   ;; a made-up result: stage 0 differs from stage 1; stages 1 to 3 agree
   (let ((m0 (list (cons "f 1" "old code")))
         (m1 (list (cons "f 1" "new code"))))
-    (check-true (bootstrap-fixpoint? (vector m0 m1 m1 m1 'opal 'seed)))
-    (check (bootstrap-differences (vector m0 m1 m1 m1 'opal 'seed) 0 1) '("f 1"))
-    (check-false (bootstrap-fixpoint? (vector m0 m1 m1 m0 'opal 'seed)))))
+    (check-true (bootstrap-fixpoint? (vector m0 m1 m1 m1 'seed)))
+    (check (bootstrap-differences (vector m0 m1 m1 m1 'seed) 0 1) '("f 1"))
+    (check-false (bootstrap-fixpoint? (vector m0 m1 m1 m0 'seed)))))
 
 (run-tests)

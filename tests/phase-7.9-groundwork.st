@@ -5,16 +5,14 @@
  Every bang in Lisp text is doubled for the chunk reader.
  ============================================================================"
 
-"--- Chunk 1: load the packages and the harness -----------------------------"
-| dir |
-dir := Smalltalk imageDirectory parent / 'src'.
-#('coglisp-reader.st' 'coglisp-core.st' 'coglisp-compiler.st' 'coglisp-runtime.st' 'coglisp-shell.st')
-	do: [:name | (dir / name) fileIn].
+"--- Chunk 1: the harness -------------------------------------------------"
+"The suite runs on a copy of the built image (pharo/suite.image, made by
+ tests/run-all), which holds every package: only the harness is filed in."
 (Smalltalk imageDirectory parent / 'tests' / 'harness.st') fileIn.
 !
 
 "--- Chunk 2: the checks -----------------------------------------------------"
-| h root ev w msg dump corpus nest captured |
+| h root ev w msg listing corpus nest captured |
 h := LispTestHarness new.
 root := Smalltalk imageDirectory parent.
 ev := [:s | LispCompiler new evalAll: s].
@@ -41,19 +39,22 @@ h check: 'AC-1 deep nesting inside a procedure, called repeatedly'
 	actual: (ev value: '(define (deep n) ' , (nest value: 60 value: 'n') , ') (list (deep 0) (deep 5))')
 	expected: (LispReader read: '(60 65)').
 
-"AC-2 code within the budget compiles exactly as before"
-dump := nil.
-dump := [:code :s | s nextPutAll: code symbolic; nextPut: Character lf.
-	code literals do: [:lit |
-		(lit isKindOf: CompiledBlock) ifTrue: [dump value: lit value: s].
-		(lit isKindOf: BlockClosure) ifTrue: [dump value: lit compiledBlock value: s]]].
+"AC-2 code within the budget compiles exactly as before. The corpus pins the
+ compiler's code by fingerprint (method-listing, lib/compiler/bootstrap.lisp:
+ header, bytecode bytes and literals, blocks too). Until Phase 9 step 9.1 it
+ pinned the Smalltalk compiler's symbolic listing. Each form starts from the
+ same gensym counter, so macro expansions agree. To re-pin after a deliberate
+ change to the generated code: COGLISP_REPIN=1 writes the actual listing over
+ tests/bytecode-corpus.expected."
+listing := LispCompiler new evalString: 'method-listing'.
 corpus := String streamContents: [:s | | r d |
 	r := LispReader on: (root / 'tests' / 'bytecode-corpus.lisp') contents.
 	[(d := r next) == LispReader eofObject] whileFalse: [
 		s nextPutAll: '=== '; nextPutAll: (LispPrinter writeString: d); nextPut: Character lf.
-		"the Smalltalk compiler's code (the corpus pins it; the LISP compiler's
-		 is compared with it byte for byte in tests/phase-8.3-compiler.st)"
-		dump value: (LispCompiler new smalltalkCompile: d context: nil) value: s]].
+		LispPrimitives classPool at: #GensymCounter put: 0.
+		s nextPutAll: (LispProcedure apply: listing to: { LispCompiler new compile: d })]].
+(OSEnvironment current at: 'COGLISP_REPIN' ifAbsent: ['']) = '1' ifTrue: [
+	(root / 'tests' / 'bytecode-corpus.expected') ensureDelete; writeStreamDo: [:w | w nextPutAll: corpus]].
 h check: 'AC-2 the bytecode corpus is unchanged (tests/bytecode-corpus.expected)'
 	actual: corpus = (root / 'tests' / 'bytecode-corpus.expected') contents
 	expected: true.
@@ -112,9 +113,9 @@ h check: 'AC-9 display of a cycle' actual: (LispPrinter displayString: (ev value
 
 h check: 'AC-10 a bad \x escape' actual: ([LispReader read: '"\xZZ;"'. #none] on: LispReadError do: [:e | e messageText]) expected: 'bad \x escape: expected hex digits and ;'.
 
-"AC-11 compiler structure"
-h check: 'AC-11 special forms dispatch through the table' actual: (LispCompiler specialForms size) expected: 11.
-h check: 'AC-11 message templates are cached' actual: ((LispCompiler classPool at: #TemplateCache) notNil and: [(LispCompiler classPool at: #TemplateCache) notEmpty]) expected: true.
+"AC-11 compiler structure: its two checks tested the Smalltalk compiler's
+ special-form table and template cache, which retired in Phase 9 step 9.1;
+ tests/lisp/phase-8.3-compiler.lisp tests the LISP compiler's table."
 
 "AC-12 the LISP test framework, run on tests with known failures"
 LispCompiler new evalFile: (root / 'lib' / 'test.lisp') fullName.

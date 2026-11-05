@@ -5,12 +5,9 @@
    pharo\PharoConsole.exe pharo\<image>.image st tests\phase-1-reader-printer.st
  ============================================================================"
 
-"--- Chunk 1: load the implementation into this fresh image -----------------"
-| srcFile |
-srcFile := Smalltalk imageDirectory parent / 'src' / 'coglisp-reader.st'.
-srcFile exists
-	ifTrue: [srcFile fileIn]
-	ifFalse: [Stdio stdout nextPutAll: 'SOURCE NOT FOUND: ' , srcFile pathString; nextPut: Character lf; flush].
+"--- Chunk 1: the harness -------------------------------------------------"
+"The suite runs on a copy of the built image (pharo/suite.image, made by
+ tests/run-all), which holds every package: only the harness is filed in."
 (Smalltalk imageDirectory parent / 'tests' / 'harness.st') fileIn.
 !
 

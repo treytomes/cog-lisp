@@ -7,8 +7,7 @@ bytecode of the method:
   60 <22> pushConstant: '(lambda (x) (* x x))'
   61 <EA 1B> send: fixed:arity:source:
   63 <5C> returnTop
-the same code as the Smalltalk compiler, writing bytecode itself: (#f #f #f)
-... and through Opal: (#t #t #t)
+LispCompiler compiles with it: (#t #t #t)
 (cube 3) = 27
 how the compiler translates if:
 (define (lc-translate-if c form scope tail)

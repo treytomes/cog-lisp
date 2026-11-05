@@ -59,8 +59,10 @@ LISP library and the examples: unpack it and run `./cog-lisp.sh` (Linux) or
 
 ## Getting started
 
-To build from a checkout instead, on Windows or Linux. One-time setup: download the Pharo VM and stock image, then build the cog-lisp
-image from `src\` (rerun the build after changing anything in `src\`,
+To build from a checkout instead, on Windows or Linux. One-time setup: download
+the Pharo VM and the seed (an earlier cog-lisp release, pinned in `pharo.pins`),
+then build the cog-lisp image from `src\` and `lib\`: the seed's compiler
+compiles the new one (rerun the build after changing anything in `src\`,
 `lib\core.lisp` or `lib\compiler\`). Each script has a bash equivalent, for Linux
 and for Git Bash on Windows (`bootstrap-pharo.sh`, `build-image.sh`,
 `cog-lisp.sh`, `tests/run-all.sh`); on Linux, use those:
@@ -122,14 +124,16 @@ tests\run-all.bat
 ```
 
 or `tests/run-all.sh` on Linux. GitHub Actions runs them on every push, on Linux
-with both compilers and on Windows ([`ci.yml`](.github/workflows/ci.yml)); pushing
+and on Windows ([`ci.yml`](.github/workflows/ci.yml)); pushing
 a tag `vMAJOR.MINOR.PATCH` builds and publishes a release
 ([`release.yml`](.github/workflows/release.yml)).
 
-The in-image suites run headless against the stock image, for example:
+The in-image suites run headless on a copy of the built image (`tests\run-all.bat`
+makes a fresh one for each), for example:
 
 ```bat
-pharo\PharoConsole.exe pharo\Pharo14.0-SNAPSHOT-64bit-58e29ca31d.image st tests\phase-4-runtime.st
+copy /y pharo\cog-lisp.image pharo\suite.image & copy /y pharo\cog-lisp.changes pharo\suite.changes
+pharo\PharoConsole.exe --headless pharo\suite.image st tests\phase-4-runtime.st
 ```
 
 The runner suite builds the image and drives `cog-lisp.bat` end to end:
@@ -155,7 +159,13 @@ cog-lisp builds against one exact Pharo: the Pharo 14 image build 788
 SHA-256 checksums in [`pharo.pins`](pharo.pins). The bootstrap scripts, CI and
 the release bundles all use those files and check every download against its
 checksum. To move to a newer Pharo, change a URL and its checksum together, run
-the bootstrap, and run every suite both ways.
+the bootstrap, and run every suite.
+
+The image is built from a **seed**, an earlier cog-lisp release pinned the same
+way (`SEED_TAG`, `SEED_URL`, `SEED_SHA256`; Phase 9 step 9.1). Its compiler
+compiles the new compiler, which then compiles itself to a fixpoint;
+`(image-build-info)` shows how the running image was built
+([example](examples/seeded-build.lisp)).
 
 ## License
 
@@ -298,7 +308,7 @@ on every input and every `.lisp` file in the repository) are done, and so is ste
 to the same bytecode as the Smalltalk compiler; and step 8.4: compiled by
 itself, twice, it still makes the same methods (a fixpoint); and step 8.5: eval,
 load, the REPL and the runner now use the reader and compiler written in
-cog-lisp (`COGLISP_COMPILER=smalltalk` switches back, for diagnosis); and step
+cog-lisp (the Smalltalk ones retired in Phase 9 step 9.1); and step
 8.6: it writes bytecode itself instead of going through Opal, and compiles
 2.1× faster than Phase 7.9.
 Reimplement cog-lisp **in cog-lisp**: rewrite the reader and the compiler — the
