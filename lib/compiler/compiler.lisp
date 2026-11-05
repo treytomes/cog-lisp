@@ -27,7 +27,7 @@
 (define (make-lisp-compiler)
   ;; counter source-map options self-loop inline-temps top-form source-context
   ;; in-body expansion-depth expr-depth
-  (vector 0 #f [[(smalltalk LispCompiler) defaultOptions] copy] #f 0 #f #f #f 0 0))
+  (vector 0 #f [[(smalltalk LispCompiler) defaultOptions] copy] #f 0 #f #f #f 0 0 #f))
 
 (define (c-counter c) (vector-ref c 0))
 (define (c-counter! c v) (vector-set! c 0 v))
@@ -48,6 +48,9 @@
 (define (c-expansion-depth! c v) (vector-set! c 8 v))
 (define (c-expr-depth c) (vector-ref c 9))
 (define (c-expr-depth! c v) (vector-set! c 9 v))
+;; true once this compilation expanded a syntax-rules macro, which makes aliases
+(define (c-hygienic c) (vector-ref c 10))
+(define (c-hygienic! c v) (vector-set! c 10 v))
 
 ;; A self loop (translateLambda:...): name local params proc again result temps used scratch
 (define (make-loop name local params proc again result)
@@ -71,6 +74,70 @@
 (define (scope-ref s k) [s at: k ifAbsent: (lambda () #f)])
 (define (scope-has? s k) [s includesKey: k])
 (define (scope-set! s k v) [s at: k put: v])
+
+;;; Identifiers (specs/phase-9-language.md step 9.3): a symbol, or an alias that a
+;;; syntax-rules expansion made. A scope maps an identifier to its binding: a temp
+;;; name (a string) or a local macro.
+
+(define (lc-identifier? x) (or (symbol? x) [x isLispAlias]))
+
+;; the symbol an identifier is spelled with
+(define (lc-id-symbol x) (if (symbol? x) x [x baseName]))
+
+;; is x the identifier spelled name? (for keywords that are not bindings)
+(define (lc-id-is? x name) (or (eq? x name) (and [x isLispAlias] (eq? [x baseName] name))))
+
+;; what id means in scope: a temp name (a string), a local macro, or the symbol of
+;; a global (a special form, a global macro or a variable). An alias not bound
+;; here means what its name means where its macro was defined.
+(define (lc-binding id scope)
+  (let ((b (scope-ref scope id)))
+    (cond (b b)
+          ((symbol? id) id)
+          (else (lc-binding [id name] [id env])))))
+
+;; the special form x names in scope, or #f
+(define (lc-special x scope)
+  (and (lc-identifier? x)
+       (let ((b (lc-binding x scope)))
+         (and (symbol? b) (hash-table-ref/default lc-special-forms b #f) b))))
+
+;; the global macro named sym, or #f
+(define (lc-global-macro sym)
+  (let ((value (lc-global-value sym)))
+    (and (not (eq? value lc-unbound)) [value isKindOf: (smalltalk LispMacro)] value)))
+
+;; identifiers the compiler itself puts into code it makes up: they mean the
+;; global special forms whatever the program binds locally
+(define lc-core-env (scope-new))
+(define (lc-core name) [(smalltalk LispAlias) name: name env: lc-core-env])
+(define lc-core-define (lc-core 'define))
+(define lc-core-lambda (lc-core 'lambda))
+(define lc-core-let (lc-core 'let))
+
+;; d with every alias turned back into its symbol (inside quote); cycles kept
+(define (lc-strip d) (lc-strip* d (make-hash-table eq?)))
+(define (lc-strip* d seen)
+  (cond ([d isLispAlias] [d baseName])
+        ((pair? d)
+         (if (hash-table-contains? seen d)
+             d
+             (begin
+               (hash-table-set! seen d #t)
+               (let ((a (lc-strip* (car d) seen)) (b (lc-strip* (cdr d) seen)))
+                 (if (and (eq? a (car d)) (eq? b (cdr d))) d (cons a b))))))
+        ((vector? d)
+         (if (hash-table-contains? seen d)
+             d
+             (begin
+               (hash-table-set! seen d #t)
+               (let* ((items (vector->list d))
+                      (stripped (lc-map (lambda (x) (lc-strip* x seen)) items)))
+                 (if (lc-all-eq? items stripped)
+                     d
+                     (let ((v (list->vector stripped))) [v beReadOnlyObject] v))))))
+        (else d)))
+(define (lc-all-eq? a b) (or (null? a) (and (eq? (car a) (car b)) (lc-all-eq? (cdr a) (cdr b)))))
 
 ;;; Smalltalk control, so unwinding behaves exactly as in the Smalltalk compiler
 (define (lc-ensure thunk after) [thunk ensure: after])
@@ -166,17 +233,17 @@
 (define (lc-check form min max)                     ; check:operands:to: (max #f: no limit)
   (let ((n (length (lc-items (cdr form)))))
     (when (or (< n min) (and max (> n max)))
-      (lc-syntax-error (symbol->string (car form)) form))))
+      (lc-syntax-error (symbol->string (lc-id-symbol (car form))) form))))
 
 (define (lc-check-define form)
   (let ((parts (lc-items (cdr form))))
     (when (null? parts) (lc-syntax-error "define" form))
     (let ((target (car parts)))
       (if (pair? target)
-          (unless (symbol? (car target))
+          (unless (lc-identifier? (car target))
             (lc-error (string-append "define: bad name: " (lc-show (car target)))))
           (begin
-            (unless (symbol? target) (lc-error (string-append "define: bad name: " (lc-show target))))
+            (unless (lc-identifier? target) (lc-error (string-append "define: bad name: " (lc-show target))))
             (unless (= (length parts) 2) (lc-syntax-error "define" form)))))))
 
 ;; ((name expr) ...), each name a symbol, none twice: the bindings as 2-lists
@@ -186,10 +253,10 @@
         (reverse acc)
         (let* ((b (car bs))
                (pair (if (pair? b) (lc-items b) '())))
-          (unless (and (= (length pair) 2) (symbol? (car pair)))
+          (unless (and (= (length pair) 2) (lc-identifier? (car pair)))
             (lc-error (string-append "let: bad binding: " (lc-show b))))
           (when (memq (car pair) seen)
-            (lc-error (string-append "let: duplicate name: " (symbol->string (car pair)))))
+            (lc-error (string-append "let: duplicate name: " (symbol->string (lc-id-symbol (car pair))))))
           (loop (cdr bs) (cons (car pair) seen) (cons pair acc))))))
 
 ;;; ---------------------------------------------------------------------------
@@ -198,17 +265,23 @@
 (define (lc-global-env-node) (opal-send (opal-var "LispEnvironment") "default" (vector)))
 (define (lc-cell sym) [[(smalltalk LispEnvironment) default] cellFor: sym])
 
-(define (lc-global-read c sym)
+(define (lc-global-read c id)
+  (lc-global-read-symbol c (lc-id-symbol id)))
+(define (lc-global-read-symbol c sym)
   (if (lc-uses? c "globalCells")
       (opal-send (opal-literal (lc-cell sym)) "value" (vector))
       (opal-send (lc-global-env-node) "lookup:" (vector (lc-symbol-node sym)))))
 
-(define (lc-global-define c sym node)
+(define (lc-global-define c id node)
+  (lc-global-define-symbol c (lc-id-symbol id) node))
+(define (lc-global-define-symbol c sym node)
   (if (lc-uses? c "globalCells")
       (opal-send (opal-literal (lc-cell sym)) "define:" (vector node))
       (opal-send (lc-global-env-node) "define:value:" (vector (lc-symbol-node sym) node))))
 
-(define (lc-global-assign c sym node)
+(define (lc-global-assign c id node)
+  (lc-global-assign-symbol c (lc-id-symbol id) node))
+(define (lc-global-assign-symbol c sym node)
   (if (lc-uses? c "globalCells")
       (opal-send (opal-literal (lc-cell sym)) "assign:" (vector node))
       (opal-send (lc-global-env-node) "set:value:" (vector (lc-symbol-node sym) node))))
@@ -296,9 +369,9 @@
 
 (define (lc-inlinable-primitive c op args scope)
   (and (lc-uses? c "inlinePrimitives")
-       (symbol? op)
-       (not (scope-has? scope op))
-       (let ((prim (lc-global-value op)))
+       (lc-identifier? op)
+       (symbol? (lc-binding op scope))
+       (let ((prim (lc-global-value (lc-binding op scope))))
          (and (not (eq? prim lc-unbound))
               [prim respondsTo: (smalltalk-symbol "inlineSpec")]
               (let ((spec [prim inlineSpec]))
@@ -354,6 +427,7 @@
   (cond ((pair? datum) (lc-translate-nested c datum scope tail))
         ((symbol? datum) (lc-translate-variable c datum scope))
         ((null? datum) (lc-empty-list-node))
+        ([datum isLispAlias] (lc-translate-variable c datum scope))
         (else (opal-literal datum))))
 
 ;; Past a depth budget, a form not in tail position is compiled in a block of its
@@ -371,18 +445,22 @@
          (lc-translate-form c form scope tail)))
    (lambda () (c-expr-depth! c (- (c-expr-depth c) 1)))))
 
-(define (lc-translate-variable c sym scope)
-  (let ((name (scope-ref scope sym)))
-    (cond (name (opal-var name))
-          ((lc-macro-for sym scope) (lc-error (string-append "macro used as a value: " (symbol->string sym))))
-          (else (lc-global-read c sym)))))
+(define (lc-translate-variable c id scope)
+  (let ((b (lc-binding id scope)))
+    (cond ((string? b) (opal-var b))
+          ((or (not (symbol? b)) (lc-global-macro b))
+           (lc-error (string-append "macro used as a value: " (symbol->string (lc-id-symbol id)))))
+          (else (lc-global-read-symbol c b)))))
 
+;; the operator decides, through its binding: a local variable is called even if
+;; its name is a special form's (review C-14)
 (define (lc-translate-form c form scope tail)
   (let* ((op (car form))
-         (special (and (symbol? op) (hash-table-ref/default lc-special-forms op #f))))
+         (b (and (lc-identifier? op) (lc-binding op scope)))
+         (special (and (symbol? b) (hash-table-ref/default lc-special-forms b #f))))
     (if special
         (special c form scope tail)
-        (let ((m (lc-macro-for op scope)))
+        (let ((m (and b (not (string? b)) (if (symbol? b) (lc-global-macro b) b))))
           (if m
               (lc-translate-macro-call c form m scope tail)
               (lc-translate-application c form scope tail))))))
@@ -408,7 +486,7 @@
 (define-special-form 'set!
   (lambda (c form scope tail)
     (lc-check form 2 2)
-    (unless (symbol? (car (cdr form)))
+    (unless (lc-identifier? (car (cdr form)))
       (lc-error (string-append "set!: bad name: " (lc-show (car (cdr form))))))
     (lc-translate-set c form scope)))
 (define-special-form 'quasiquote
@@ -419,35 +497,60 @@
   (lambda (c form scope tail) (lc-translate-send c form scope)))
 (define-special-form 'smalltalk
   (lambda (c form scope tail) (lc-translate-smalltalk-global form)))
+;; hygienic macros (step 9.3); internal define-syntax is a body's (lc-translate-scoped-body)
+(define-special-form 'define-syntax
+  (lambda (c form scope tail) (lc-check form 2 2) (lc-translate-define-syntax c form scope)))
+(define-special-form 'let-syntax
+  (lambda (c form scope tail) (lc-check form 1 #f) (lc-translate-let-syntax c form scope tail #f)))
+(define-special-form 'letrec-syntax
+  (lambda (c form scope tail) (lc-check form 1 #f) (lc-translate-let-syntax c form scope tail #t)))
+(define-special-form 'syntax-rules
+  (lambda (c form scope tail) (lc-error "syntax-rules is used only in define-syntax, let-syntax and letrec-syntax")))
+(define-special-form 'syntax-error
+  (lambda (c form scope tail)
+    (let ((parts (lc-items (cdr form))))
+      (lc-error (if (and (pair? parts) (string? (car parts)))
+                    (lc-join-shown (car parts) (cdr parts))
+                    (lc-join-shown "syntax-error" parts))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Macros
 
 (define (lc-macro-for op scope)
-  (and (symbol? op)
-       (not (scope-has? scope op))
-       (let ((value (lc-global-value op)))
-         (and (not (eq? value lc-unbound))
-              [value isKindOf: (smalltalk LispMacro)]
-              value))))
+  (and (lc-identifier? op)
+       (let ((b (lc-binding op scope)))
+         (cond ((string? b) #f)
+               ((symbol? b) (lc-global-macro b))
+               (else b)))))
 
-(define (lc-expand form macro)
-  (let ((name (if (symbol? (car form)) (symbol->string (car form)) "?")))
+;; (lc-expand form macro [scope [c]]): a syntax-rules macro is given the whole
+;; form and the scope of its use; a define-macro one, the operands
+(define (lc-expand form macro . opts)
+  (let ((name (if (lc-identifier? (car form)) (symbol->string (lc-id-symbol (car form))) "?"))
+        (scope (if (pair? opts) (car opts) (scope-new))))
+    (when (and (pair? opts) (pair? (cdr opts)) [macro isKindOf: (smalltalk LispSyntax)])
+      (c-hygienic! (car (cdr opts)) #t))
     (lc-on-error
-     (lambda () [(smalltalk LispProcedure) apply: [macro expander] to: (list->vector (lc-items (cdr form)))])
+     (lambda ()
+       (if [macro isKindOf: (smalltalk LispSyntax)]
+           [(smalltalk LispProcedure) apply: [macro expander] to: (vector form scope)]
+           [(smalltalk LispProcedure) apply: [macro expander] to: (list->vector (lc-items (cdr form)))]))
      (lambda (e)
        (let ((text [e messageText]))
-         (lc-error (string-append "error expanding " name ": "
-                                  (if (or (smalltalk-nil? text) [text isEmpty])
-                                      [[[e class] name] asString]
-                                      text))))))))
+         ;; a syntax-rules macro's own errors (no match, syntax-error) say so already
+         (if [e isKindOf: (smalltalk LispCompileError)]
+             [e pass]
+             (lc-error (string-append "error expanding " name ": "
+                                      (if (or (smalltalk-nil? text) [text isEmpty])
+                                          [[[e class] name] asString]
+                                          text)))))))))
 
 (define (lc-translate-macro-call c form macro scope tail)
   (c-expansion-depth! c (+ (c-expansion-depth c) 1))
   (when (> (c-expansion-depth c) lc-max-expansions)
     (c-expansion-depth! c 0)
     (lc-expansion-too-deep form))
-  (let* ((expansion (lc-if-curtailed (lambda () (lc-expand form macro))
+  (let* ((expansion (lc-if-curtailed (lambda () (lc-expand form macro scope c))
                                      (lambda () (c-expansion-depth! c (- (c-expansion-depth c) 1)))))
          (text (lc-recorded-source-of c form))
          (saved-context (c-source-context c))
@@ -462,14 +565,14 @@
 
 (define (lc-expansion-too-deep form)
   (lc-error (string-append "macro expansion too deep (more than " (number->string lc-max-expansions)
-                           " steps): " (if (symbol? (car form)) (symbol->string (car form)) (lc-show form)))))
+                           " steps): " (if (lc-identifier? (car form)) (symbol->string (lc-id-symbol (car form))) (lc-show form)))))
 
 (define (lc-translate-define-macro c form scope)
   (unless (eq? form (c-top-form c)) (lc-error "define-macro is allowed only at top level"))
   (let ((parts (lc-items (cdr form))))
     (when (null? parts) (lc-error "define-macro needs a name"))
     (let* ((target (car parts))
-           (name-sym (if (pair? target) (car target) target))
+           (name-sym (lc-id-symbol (if (pair? target) (car target) target)))
            (value-node
             (if (pair? target)
                 (lc-translate-lambda c (lc-make-lambda (cdr target) (cdr parts)) scope (lc-source-of c form) #f #f)
@@ -477,11 +580,45 @@
       (lc-and-unspecified
        (lc-global-define c name-sym (opal-send (opal-var "LispMacro") "expander:" (vector value-node)))))))
 
+;; (define-syntax name (syntax-rules ...)) at top level: a global macro, made now
+;; and defined when the form runs (in a body: lc-translate-scoped-body)
+(define (lc-translate-define-syntax c form scope)
+  (unless (eq? form (c-top-form c))
+    (lc-error "define-syntax is allowed only at top level or at the start of a body"))
+  (let ((name (car (cdr form))))
+    (unless (lc-identifier? name) (lc-error (string-append "define-syntax: bad name: " (lc-show name))))
+    (lc-and-unspecified
+     (lc-global-define c name (opal-literal (lc-make-syntax c (car (cdr (cdr form))) scope scope name))))))
+
+;; (let-syntax ((name (syntax-rules ...)) ...) body ...): the macros' scope is the
+;; enclosing one, or for letrec-syntax the new one, so they can use each other
+(define (lc-translate-let-syntax c form scope tail rec)
+  (let* ((parts (lc-items (cdr form)))
+         (bindings (lc-check-bindings (car parts)))
+         (child (scope-copy scope)))
+    (for-each (lambda (b)
+                (scope-set! child (car b) (lc-make-syntax c (car (cdr b)) scope (if rec child scope) (car b))))
+              bindings)
+    ;; the body is a body, as let's is
+    (lc-translate c (cons lc-core-let (cons '() (cdr parts))) child tail)))
+
+;; a transformer spec, (syntax-rules ...), in scope: the macro, defined in env
+(define (lc-make-syntax c spec scope env name)
+  (unless (and (pair? spec) (eq? (lc-special (car spec) scope) 'syntax-rules))
+    (lc-error (string-append "define-syntax: " (symbol->string (lc-id-symbol name))
+                             ": the transformer must be syntax-rules, not " (lc-show spec))))
+  (sr-make spec env (lc-id-symbol name)))
+
+;; message, then each argument as write shows it
+(define (lc-join-shown message args)
+  (let loop ((text message) (args args))
+    (if (null? args) text (loop (string-append text " " (lc-show (lc-strip (car args)))) (cdr args)))))
+
 ;;; ---------------------------------------------------------------------------
 ;;; Quasiquote
 
 (define (lc-tagged? datum name)                     ; isTagged:as:
-  (and (pair? datum) (eq? (car datum) name) (pair? (cdr datum)) (null? (cdr (cdr datum)))))
+  (and (pair? datum) (lc-id-is? (car datum) name) (pair? (cdr datum)) (null? (cdr (cdr datum)))))
 
 (define (lc-qq-constant? t n)
   (cond ((vector? t) (let loop ((i 0)) (or (= i (vector-length t)) (and (lc-qq-constant? (vector-ref t i) n) (loop (+ i 1))))))
@@ -535,7 +672,8 @@
 ;;; ---------------------------------------------------------------------------
 ;;; Bodies with internal define (letrec* semantics), as translateScopedBody:
 
-(define (lc-define-form? d) (and (pair? d) (eq? (car d) 'define)))
+(define (lc-define-form? d scope) (and (pair? d) (eq? (lc-special (car d) scope) 'define)))
+(define (lc-define-syntax-form? d scope) (and (pair? d) (eq? (lc-special (car d) scope) 'define-syntax)))
 
 ;; answers (temp-names . statement-nodes), both lists
 (define (lc-translate-scoped-body c data child-scope tail)
@@ -545,18 +683,26 @@
     (if (or (null? pending)
             (let* ((item (car pending)) (datum (car item)))
               (and (not (and (pair? datum) (lc-macro-for (car datum) child-scope)))
-                   (not (lc-define-form? datum))
-                   (not (and (pair? datum) (eq? (car datum) 'begin))))))
+                   (not (lc-define-form? datum child-scope))
+                   (not (lc-define-syntax-form? datum child-scope))
+                   (not (and (pair? datum) (eq? (lc-special (car datum) child-scope) 'begin))))))
         (lc-scoped-body-rest c (reverse defs) pending child-scope tail)
         (let* ((item (car pending))
                (datum (car item))
                (m (and (pair? datum) (lc-macro-for (car datum) child-scope))))
           (cond (m
                  (when (> (+ steps 1) lc-max-expansions) (lc-expansion-too-deep datum))
-                 (let* ((expansion (lc-expand datum m))
+                 (let* ((expansion (lc-expand datum m child-scope c))
                         (context (or (lc-recorded-source-of c datum) (cdr item))))
                    (scan (cons (cons expansion context) (cdr pending)) defs (+ steps 1))))
-                ((lc-define-form? datum)
+                ((lc-define-syntax-form? datum child-scope)
+                 ;; a local macro, for the whole body: its scope is the body's
+                 (lc-check datum 2 2)
+                 (let ((name (car (cdr datum))))
+                   (unless (lc-identifier? name) (lc-error (string-append "define-syntax: bad name: " (lc-show name))))
+                   (scope-set! child-scope name (lc-make-syntax c (car (cdr (cdr datum))) child-scope child-scope name))
+                   (scan (cdr pending) defs steps)))
+                ((lc-define-form? datum child-scope)
                  (lc-check-define datum)
                  (let* ((target (car (lc-items (cdr datum))))
                         (nm (lc-next-name c)))
@@ -567,7 +713,7 @@
                        defs steps)))))))
 
 (define (lc-scoped-body-rest c defs rest child-scope tail)
-  (when (lc-any? (lambda (it) (lc-define-form? (car it))) rest)
+  (when (lc-any? (lambda (it) (lc-define-form? (car it) child-scope)) rest)
     (lc-error "define after an expression in a body"))
   (let ((temps (lc-map (lambda (d) (lc-ref d 2)) defs))
         (inits (lc-map (lambda (d) (opal-assign (lc-ref d 2) (lc-unspecified-node))) defs))
@@ -589,7 +735,7 @@
                                                                 (lc-source-of c form) (car target) nm)
                                            (car target))
                                  (let ((value-data (car (cdr parts))))
-                                   (if (lc-lambda-form? value-data)
+                                   (if (lc-lambda-form? value-data child-scope)
                                        (lc-named (lc-translate-lambda c value-data child-scope (lc-source-of c value-data) target nm)
                                                  target)
                                        (lc-translate c value-data child-scope #f)))))))
@@ -621,8 +767,9 @@
 ;;; ---------------------------------------------------------------------------
 ;;; Quote, if, begin
 
-(define (lc-quote-node c datum)
-  (if (lc-uses? c "literalQuote") (opal-literal datum) (lc-reconstruct datum)))
+(define (lc-quote-node c datum0)
+  (let ((datum (if (c-hygienic c) (lc-strip datum0) datum0)))
+    (if (lc-uses? c "literalQuote") (opal-literal datum) (lc-reconstruct datum))))
 
 (define (lc-reconstruct datum)
   (cond ((pair? datum)
@@ -656,18 +803,18 @@
 ;; (a b . rest), (a b) or rest: answers (fixed-list . rest-symbol-or-#f)
 (define (lc-parse-params spec)
   (define (bad) (lc-error (string-append "lambda: bad parameter list: " (lc-show spec))))
-  (if (symbol? spec)
+  (if (lc-identifier? spec)
       (cons '() spec)
       (let loop ((cur spec) (fixed '()))
         (cond ((pair? cur)
-               (unless (symbol? (car cur)) (bad))
+               (unless (lc-identifier? (car cur)) (bad))
                (loop (cdr cur) (cons (car cur) fixed)))
-              ((or (symbol? cur) (null? cur))
+              ((or (lc-identifier? cur) (null? cur))
                (let* ((fixed (reverse fixed))
-                      (all (if (symbol? cur) (append fixed (list cur)) fixed)))
+                      (all (if (lc-identifier? cur) (append fixed (list cur)) fixed)))
                  (when (lc-duplicates? all)
                    (lc-error (string-append "lambda: duplicate parameter in " (lc-show spec))))
-                 (cons fixed (if (symbol? cur) cur #f))))
+                 (cons fixed (if (lc-identifier? cur) cur #f))))
               (else (bad))))))
 
 (define (lc-duplicates? l)
@@ -774,7 +921,7 @@
 
 (define (lc-translate-let c form scope tail)
   (let ((parts (lc-items (cdr form))))
-    (if (and (pair? parts) (symbol? (car parts)))
+    (if (and (pair? parts) (lc-identifier? (car parts)))
         (lc-with-source-of c form (lambda () (lc-translate-named-let c parts scope tail)))
         (let* ((bindings (lc-check-bindings (car parts)))
                (body-data (cdr parts))
@@ -821,12 +968,12 @@
 (define (lc-translate-named-let c parts scope tail)
   (let ((name (car parts)))
     (when (< (length parts) 2)
-      (lc-error (string-append "let: bad syntax: named let " (symbol->string name) " has no bindings")))
+      (lc-error (string-append "let: bad syntax: named let " (symbol->string (lc-id-symbol name)) " has no bindings")))
     (let* ((bindings (lc-check-bindings (car (cdr parts))))
            (vars (lc-map car bindings))
            (inits (lc-map (lambda (b) (car (cdr b))) bindings))
-           (define-form (cons 'define (cons (cons name vars) (cdr (cdr parts))))))
-      (lc-translate c (cons (list 'let '() define-form name) inits) scope tail))))
+           (define-form (cons lc-core-define (cons (cons name vars) (cdr (cdr parts))))))
+      (lc-translate c (cons (list lc-core-let '() define-form name) inits) scope tail))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Interop: send and smalltalk
@@ -853,8 +1000,8 @@
   (lc-check form 2 #f)
   (let* ((parts (lc-items (cdr form)))
          (sel (car (cdr parts))))
-    (unless (symbol? sel) (lc-error (string-append "send: bad selector: " (lc-show sel))))
-    (let* ((name (symbol->string sel))
+    (unless (lc-identifier? sel) (lc-error (string-append "send: bad selector: " (lc-show sel))))
+    (let* ((name (symbol->string (lc-id-symbol sel)))
            (arity (lc-selector-arity name))
            (args (cdr (cdr parts))))
       (unless arity (lc-error (string-append "send: not a Smalltalk selector: " name)))
@@ -873,7 +1020,7 @@
 
 (define (lc-translate-smalltalk-global form)
   (lc-check form 1 1)
-  (let ((name (car (cdr form))))
+  (let ((name (lc-id-symbol (car (cdr form)))))
     (unless (symbol? name) (lc-error (string-append "smalltalk: bad name: " (lc-show name))))
     (unless [[(smalltalk Smalltalk) globals] includesKey: (smalltalk-symbol (symbol->string name))]
       (lc-error (string-append "smalltalk: no Smalltalk global named " (symbol->string name))))
@@ -882,7 +1029,7 @@
 ;;; ---------------------------------------------------------------------------
 ;;; Define and set!
 
-(define (lc-lambda-form? d) (and (pair? d) (eq? (car d) 'lambda)))
+(define (lc-lambda-form? d scope) (and (pair? d) (eq? (lc-special (car d) scope) 'lambda)))
 
 (define (lc-translate-define c form scope)
   (when (eq? (c-in-body c) #t)
@@ -896,24 +1043,25 @@
                                      name-sym)))
           (lc-and-unspecified (lc-global-define c name-sym value-node)))
         (let* ((value-data (car (cdr parts)))
-               (value-node (if (lc-lambda-form? value-data)
+               (value-node (if (lc-lambda-form? value-data scope)
                                (lc-named (lc-translate-lambda c value-data scope (lc-source-of c value-data) target #f) target)
                                (lc-translate c value-data scope #f))))
           (lc-and-unspecified (lc-global-define c target value-node))))))
 
 ;; the procedure knows its name
 (define (lc-named proc-node sym)
-  (opal-send proc-node "named:" (vector (opal-literal (symbol->string sym)))))
+  (opal-send proc-node "named:" (vector (opal-literal (symbol->string (lc-id-symbol sym))))))
 
-(define (lc-make-lambda params body) (cons 'lambda (cons params body)))
+(define (lc-make-lambda params body) (cons lc-core-lambda (cons params body)))
 
 (define (lc-translate-set c form scope)
   (let* ((parts (lc-items (cdr form)))
          (sym (car parts))
          (value-node (lc-translate c (car (cdr parts)) scope #f))
-         (name (scope-ref scope sym)))
-    (lc-and-unspecified
-     (if name (opal-assign name value-node) (lc-global-assign c sym value-node)))))
+         (b (lc-binding sym scope)))
+    (cond ((string? b) (lc-and-unspecified (opal-assign b value-node)))
+          ((symbol? b) (lc-and-unspecified (lc-global-assign-symbol c b value-node)))
+          (else (lc-error (string-append "set!: not a variable: " (symbol->string (lc-id-symbol sym))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Entry points
@@ -950,12 +1098,12 @@
 ;; top-level macro call are themselves top-level forms
 (define (lc-eval c datum text n)
   (when (> n lc-max-expansions) (lc-expansion-too-deep datum))
-  (if (and (pair? datum) (eq? (car datum) 'begin))
+  (if (and (pair? datum) (eq? (lc-special (car datum) (scope-new)) 'begin))
       (let loop ((forms (lc-items (cdr datum))) (result (if #f #f)))
         (if (null? forms) result (loop (cdr forms) (lc-eval c (car forms) text n))))
       (let ((m (and (pair? datum) (lc-macro-for (car datum) (scope-new)))))
         (if m
-            (lc-eval c (lc-expand datum m) (or (lc-recorded-source-of c datum) text) (+ n 1))
+            (lc-eval c (lc-expand datum m (scope-new) c) (or (lc-recorded-source-of c datum) text) (+ n 1))
             (opal-run (lc-compile c datum text))))))
 
 ;;; The interface
@@ -989,7 +1137,7 @@
 ;; until the form is no longer one.
 (define (lisp-macroexpand-1 form)
   (let ((m (and (pair? form) (lc-macro-for (car form) (scope-new)))))
-    (if m (lc-expand form m) form)))
+    (if m (lc-expand form m (scope-new)) form)))
 
 (define (lisp-macroexpand form)
   (let loop ((current form) (steps 1))

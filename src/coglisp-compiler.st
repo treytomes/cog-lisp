@@ -130,7 +130,7 @@ cm value: comp class value: 'implementation' value: 'lispSourceDirectory
 cm value: comp class value: 'implementation' value: 'compilerSourceNames
 	"The compiler''s source, in lib/compiler/, in load order. bootstrap.lisp is the
 	 tool that compiles it to a fixpoint; it is not part of it, nor of the seal."
-	^ #(''reader.lisp'' ''opal.lisp'' ''codegen.lisp'' ''compiler.lisp'')'.
+	^ #(''reader.lisp'' ''opal.lisp'' ''codegen.lisp'' ''compiler.lisp'' ''syntax-rules.lisp'')'.
 cm value: comp class value: 'implementation' value: 'lispEntries
 	"The LISP procedures the Smalltalk side calls, taken now, after sealing: later
 	 definitions of these names do not change what eval and the reader use."

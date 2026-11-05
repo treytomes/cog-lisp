@@ -4,19 +4,24 @@
 ;;; cog-lisp itself, and keeps its source like any procedure. A macro defined
 ;;; here may use only the special forms and the macros defined above it.
 
+;; x is the keyword name: a symbol, or an alias of one, as a syntax-rules template
+;; passes it to a define-macro macro (specs/phase-9-language.md step 9.3)
+(define (%keyword? x name)
+  (if (eq? x name) #t (if [x isLispAlias] (eq? [x baseName] name) #f)))
+
 ;; (cond (test e ...) ... (test => f) ... (else e ...))
 (define-macro (cond . clauses)
   (if (null? clauses)
       '(if #f #f)
       (let ((clause (car clauses))
             (rest (cdr clauses)))
-        (if (eq? (car clause) 'else)
+        (if (%keyword? (car clause) 'else)
             `(begin ,@(cdr clause))
             (if (null? (cdr clause))
                 (let ((t (gensym)))
                   `(let ((,t ,(car clause)))
                      (if ,t ,t (cond ,@rest))))
-                (if (eq? (car (cdr clause)) '=>)
+                (if (%keyword? (car (cdr clause)) '=>)
                     (let ((t (gensym)))
                       `(let ((,t ,(car clause)))
                          (if ,t (,(car (cdr (cdr clause))) ,t) (cond ,@rest))))
@@ -65,7 +70,7 @@
   (let ((k (gensym)))
     `(let ((,k ,key))
        (cond ,@(map (lambda (c)
-                      (if (eq? (car c) 'else)
+                      (if (%keyword? (car c) 'else)
                           c
                           `((memv ,k ',(car c)) ,@(cdr c))))
                     clauses)))))

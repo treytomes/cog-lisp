@@ -349,6 +349,78 @@ as `Float infinity`; and cog-lisp had **no multiple values**, which `floor/`,
   looked up in the program's environment; the compiler's own references stay
   private.
 
+#### 9.3 in detail (2026-11-05)
+
+Measured first:
+- The compiler checks the special-form table *before* the scope. So no local
+  binding can shadow `if`, which is the cause of C-14's first example.
+- A scope is an `IdentityDictionary` from an identifier to its temp name, so
+  any object can be a key.
+- **The self-hosting rule (9.1) bites.** The seed compiles `lib/core.lisp`, and
+  the v0.1.2 seed has no `define-syntax`. So `core.lisp` itself cannot use
+  `syntax-rules` until a release that has it becomes the seed.
+
+Two commits.
+
+**9.3a: identifiers, resolution, `syntax-rules`.**
+- **An alias** (`LispAlias`, a data class beside `LispSymbol`) has a `name` (a
+  symbol, or an alias, for a macro written by a macro) and an `env`: the
+  compile-time scope where the macro was defined (an empty scope for a top-level
+  `define-syntax`). An *identifier* is a symbol or an alias.
+- **Resolution**, the one rule every part of the compiler now uses:
+  1. An identifier found in the scope means that binding: a local variable (its
+     temp name) or a local macro.
+  2. An alias not found there means what its name means in its `env`.
+  3. A symbol not found there is global: a special form if it names one, else a
+     global macro, else a global variable.
+
+  So a local `if` is an ordinary variable (C-14). Binding forms take identifiers
+  (`lambda`, `let`, named `let`, internal `define`, `set!`), so a variable a
+  template binds is a key that the program's own symbols never match.
+- **Where an alias goes back to a symbol**:
+  - inside `quote`, and the constant parts of `quasiquote`;
+  - the name a top-level `define` defines (a template's top-level definition
+    defines that name globally);
+  - `send` selectors, `smalltalk` names, `define-macro` names, procedure names
+    and error messages.
+
+  Keyword tests (`unquote`, `unquote-splicing`, `define` and `begin` in bodies,
+  `lambda` in `define`) resolve the identifier instead of comparing it with
+  `eq?`.
+- **Forms**:
+  - `define-syntax`: at top level it defines a global macro; in a body it is a
+    local one, visible to the whole body;
+  - `let-syntax` and `letrec-syntax`, whose bodies are bodies, as `let`'s are;
+  - `syntax-rules`, with literals, `_`, an ellipsis after any element (with more
+    patterns after it, and a dotted tail), nested ellipses, vectors, a custom
+    ellipsis (`(syntax-rules ::: (lit ...) rule ...)`) and `(... ...)` in
+    templates;
+  - `syntax-error`, which stops compilation with its message and arguments.
+
+  A literal matches an input identifier when both resolve to the same binding,
+  or both are free with the same name (R7RS 4.3.2). The transformer is built at
+  compile time; a top-level macro is a literal of the method that defines it.
+- **The expander** is `lib/compiler/syntax-rules.lisp`, a fifth compiler source:
+  matched in LISP, sealed with the rest. Each expansion makes one alias per
+  template symbol. Aliases arise only from `syntax-rules`, so a compile that
+  expands none never walks a quoted datum to strip them.
+- **`define-macro` stays non-hygienic.** Its expander sees aliases when it is
+  used inside a `syntax-rules` template. `lib/core.lisp`'s `cond` compares
+  `else` and `=>` by name through a helper, so it works there; a user's
+  `define-macro` that compares symbols with `eq?` may not (documented).
+
+**9.3b: hygienic derived forms.**
+- **`lib/core-syntax.lisp`**, loaded by the build once the new compiler is
+  installed (after the fixpoint, before saving), redefines `case`, `do` and
+  `guard` with `syntax-rules`. Then `case` calls the global `memv` inside
+  `(let ((memv ...)) ...)` (C-14's second example), and `do`'s loop name cannot
+  capture anything.
+  - Named `let` is the compiler's, and is hygienic through identifiers in 9.3a.
+  - `core.lisp` keeps the `define-macro` versions, which compile the compiler.
+  - When a seed has `syntax-rules`, the two files can become one.
+- **Measured**: compile time with `syntax-rules` `case`, `do` and `guard` stays
+  within the Phase 8 check (below Phase 7.9's 36.3 ms).
+
 ## 5. Acceptance criteria
 
 - AC-1 (9.1) The build starts from a pinned seed image, not the stock image, and
@@ -401,4 +473,4 @@ as `Float infinity`; and cog-lisp had **no multiple values**, which `floor/`,
 |---|---|
 | 9.1 Seeded builds | done (2026-11-05): built from the v0.1.2 seed (9.1a); the Smalltalk reader and compiler retired (9.1b); the seed rebuilt from its source in CI (9.1c) |
 | 9.2 Numeric tower | done (2026-11-05): read, print, predicates, exactness, IEEE division, type errors (9.2a; R-11, R-21 closed); multiple values and the numeric procedures (9.2b); dual numbers added from outside the core, with their read syntax (9.2c) |
-| 9.3 Hygienic macros | not started |
+| 9.3 Hygienic macros | 9.3a done (2026-11-05): aliases and resolution, shadowable special forms (C-14's first example), syntax-rules, define-syntax, let-syntax, letrec-syntax, syntax-error; 9.3b to come |

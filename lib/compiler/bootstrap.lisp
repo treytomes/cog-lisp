@@ -24,7 +24,7 @@
 ;;; compiles, so installing a stage never replaces the procedures running the
 ;;; bootstrap. (Until step 9.1, stage 0 could also be the Smalltalk compiler.)
 
-(define compiler-sources '("reader.lisp" "opal.lisp" "codegen.lisp" "compiler.lisp"))
+(define compiler-sources '("reader.lisp" "opal.lisp" "codegen.lisp" "compiler.lisp" "syntax-rules.lisp"))
 
 ;;; Source
 

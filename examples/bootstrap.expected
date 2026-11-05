@@ -1,4 +1,4 @@
-compiling ("reader.lisp" "opal.lisp" "codegen.lisp" "compiler.lisp")
+compiling ("reader.lisp" "opal.lisp" "codegen.lisp" "compiler.lisp" "syntax-rules.lisp")
   stage 1 vs stage 0: every method identical
   stage 2 vs stage 1: every method identical
   stage 3 vs stage 2: every method identical

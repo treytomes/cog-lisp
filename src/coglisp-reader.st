@@ -14,7 +14,7 @@
  Classes: LispCons, LispSymbol, LispEmptyList, LispReadError, LispReader,
  LispPrinter.
  ============================================================================"
-| failures cm cons sym empty unspec lerr err loc ferr eofc hole rdr prn |
+| failures cm cons sym empty unspec lerr err loc ferr eofc hole rdr prn alias |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -24,6 +24,9 @@ cm := [:cls :cat :src |
 "--- install all classes first, so method bodies may name their siblings ------"
 cons  := (Object << #LispCons) slots: { #car. #cdr }; package: 'CogLisp-Reader'; install.
 sym   := (Object << #LispSymbol) slots: { #name }; sharedVariables: { #Interned }; package: 'CogLisp-Reader'; install.
+"An identifier a syntax-rules expansion made: a name (a symbol, or an alias) and
+ the compile-time scope where its macro was defined (Phase 9 step 9.3)."
+alias := (Object << #LispAlias) slots: { #name. #env }; package: 'CogLisp-Reader'; install.
 empty := (Object << #LispEmptyList) sharedVariables: { #Default }; package: 'CogLisp-Reader'; install.
 unspec := (Object << #LispUnspecified) sharedVariables: { #Default }; package: 'CogLisp-Reader'; install.
 "LispError is the root of every cog-lisp error, so a handler can tell a LISP error
@@ -122,6 +125,22 @@ cm value: sym value: 'private' value: 'setName: aString
 	name := aString'.
 cm value: sym value: 'testing' value: 'isLispSymbol
 	^ true'.
+cm value: alias class value: 'instance creation' value: 'name: anIdentifier env: aScope
+	^ self new setName: anIdentifier env: aScope'.
+cm value: alias value: 'private' value: 'setName: anIdentifier env: aScope
+	name := anIdentifier.
+	env := aScope'.
+cm value: alias value: 'accessing' value: 'name
+	^ name'.
+cm value: alias value: 'accessing' value: 'env
+	^ env'.
+cm value: alias value: 'accessing' value: 'baseName
+	"the symbol this identifier is spelled with, through any aliases of aliases"
+	^ name baseName'.
+cm value: sym value: 'accessing' value: 'baseName
+	^ self'.
+cm value: alias value: 'printing' value: 'printOn: aStream
+	aStream nextPutAll: self baseName name'.
 cm value: sym class value: 'testing' value: 'isInterned: aSymbol
 	"False for a gensym: no symbol read from text is identical to it."
 	^ Interned notNil and: [(Interned at: aSymbol name ifAbsent: [nil]) == aSymbol]'.

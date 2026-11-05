@@ -1,0 +1,9 @@
+after (swap! tmp other): (second first)
+(my-cond (#f 1) ((= 1 1) 2) (else 3)) = 2
+my-let* = (1 2 20)
+table = ((fruit apple pear) (veg leek))
+with local list and if: (1 2)
+((lambda (if) (if 1 2 3)) +) = 6
+letrec-syntax: 4
+(unary 5) = -5
+(unary 1 2) is "unary takes one argument, not 1 2"

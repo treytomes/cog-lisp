@@ -10,7 +10,7 @@
  Classes: LispCore (stateless facade), LispEnvironment, LispGlobal, LispMacro,
  LispUnboundError.
  ============================================================================"
-| failures cm core env cell macro err raise rst rstvar |
+| failures cm core env cell macro err raise rst rstvar syntax |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -21,6 +21,9 @@ core := (Object << #LispCore) package: 'CogLisp-Core'; install.
 env  := (Object << #LispEnvironment) slots: { #bindings }; sharedVariables: { #Default }; package: 'CogLisp-Core'; install.
 cell := (Object << #LispGlobal) slots: { #symbol. #value. #bound }; package: 'CogLisp-Core'; install.
 macro := (Object << #LispMacro) slots: { #expander }; package: 'CogLisp-Core'; install.
+"A syntax-rules macro (Phase 9 step 9.3): its expander takes the whole form and
+ the scope of its use, and answers the expansion."
+syntax := (macro << #LispSyntax) slots: { #name }; package: 'CogLisp-Core'; install.
 err  := (LispError << #LispUnboundError) slots: { #symbol }; package: 'CogLisp-Core'; install.
 "Phase 7.7: a raised value that is not itself an exception; continuable for raise-continuable."
 raise := (LispError << #LispRaise) slots: { #payload. #continuable }; package: 'CogLisp-Core'; install.
@@ -36,6 +39,10 @@ cm value: Object value: '*CogLisp-Core' value: 'isLispPair
 	^ false'.
 cm value: Object value: '*CogLisp-Core' value: 'isLispSymbol
 	^ false'.
+cm value: Object value: '*CogLisp-Core' value: 'isLispAlias
+	^ false'.
+cm value: LispAlias value: 'testing' value: 'isLispAlias
+	^ true'.
 cm value: LispCons value: 'testing' value: 'isLispPair
 	^ true'.
 cm value: LispSymbol value: 'testing' value: 'isLispSymbol
@@ -169,6 +176,12 @@ cm value: macro value: 'accessing' value: 'expander
 	^ expander'.
 cm value: macro value: 'printing' value: 'printOn: aStream
 	aStream nextPutAll: ''#<macro>'''.
+cm value: syntax class value: 'instance creation' value: 'name: aSymbol expander: aProcedure
+	^ (self expander: aProcedure) setName: aSymbol'.
+cm value: syntax value: 'private' value: 'setName: aSymbol
+	name := aSymbol'.
+cm value: syntax value: 'printing' value: 'printOn: aStream
+	aStream nextPutAll: ''#<syntax '' , name name , ''>'''.
 cm value: macro class value: 'instance creation' value: 'expander: aProcedure
 	^ self new setExpander: aProcedure'.
 
