@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # ===========================================================================
 #  cog-lisp : build the cog-lisp image  (bash equivalent of build-image.bat;
-#  specs/phase-5-repl-runner.md 4.1)
-#  Loads src/, lib/core.lisp and lib/compiler/ into the stock Pharo image and
-#  saves the result as pharo/cog-lisp.image. The stock image is never modified.
+#  specs/phase-9-language.md 9.1; first specs/phase-5-repl-runner.md 4.1)
+#  Loads src/, lib/core.lisp and lib/compiler/ into the seed, an earlier cog-lisp
+#  image pinned in pharo.pins (pharo/seed.image), whose compiler compiles the new
+#  one, and saves the result as pharo/cog-lisp.image. The seed is never modified.
 #  Rerun after any change to src/, lib/core.lisp or lib/compiler/.
 # ===========================================================================
 set -u
@@ -13,20 +14,17 @@ PHARO="$ROOT/pharo"
 . "$ROOT/scripts/pharo-vm.sh"
 VM="$(pharo_vm "$PHARO")"
 
-STOCK=""
-for f in "$PHARO"/Pharo*.image; do
-  [ -f "$f" ] && { STOCK="$f"; break; }
-done
-if [ -z "$STOCK" ] || [ -z "$VM" ]; then
-  echo "build-image: no stock Pharo image or VM under pharo/ - run bootstrap-pharo.sh first" >&2
+SEED="$PHARO/seed.image"
+if [ ! -f "$SEED" ] || [ -z "$VM" ]; then
+  echo "build-image: no seed image or VM under pharo/ - run bootstrap-pharo.sh first" >&2
   exit 1
 fi
 
 rm -f "$PHARO/cog-lisp.image" "$PHARO/cog-lisp.changes"
 
 echo "=== cog-lisp : building image ==="
-echo "    from : $STOCK"
-if ! "$VM" --headless "$STOCK" st "$ROOT/build/build.st" || [ ! -f "$PHARO/cog-lisp.image" ]; then
+echo "    from : $SEED"
+if ! "$VM" --headless "$SEED" st "$ROOT/build/build.st" || [ ! -f "$PHARO/cog-lisp.image" ]; then
   echo "build-image: build failed - see messages above" >&2
   exit 1
 fi

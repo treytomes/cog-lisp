@@ -31,7 +31,7 @@ cm := [:cls :cat :src |
 
 comp := (Object << #LispCompiler)
 	slots: { #counter. #sourceMap. #options. #selfLoop. #inlineTemps. #topForm. #sourceContext. #inBody. #expansionDepth. #exprDepth };
-	sharedVariables: { #DefaultOptions. #SpecialForms. #TemplateCache. #Implementation. #ImplementationSession. #LispEntries. #Installing };
+	sharedVariables: { #DefaultOptions. #SpecialForms. #TemplateCache. #Implementation. #ImplementationSession. #LispEntries. #Installing. #BuildInfo };
 	package: 'CogLisp-Compiler';
 	install.
 err  := (LispError << #LispCompileError) package: 'CogLisp-Compiler'; install.
@@ -1181,6 +1181,108 @@ cm value: comp class value: 'implementation' value: 'sealLispCompiler: lib
 			(v isKindOf: (Smalltalk at: #LispHashTable)) ifTrue: [v values do: [:x | walkProc value: x]]]].
 	"machine code made before sealing may still read the old cells"
 	Smalltalk vm voidCogVMState'.
+
+"=== the image build, from a seed (Phase 9 step 9.1) ======================="
+cm value: comp class value: 'seeded build' value: 'buildFromSeed: build
+	"Steps 4 to 7 of the build (specs/phase-9-language.md, 9.1 in detail), run by
+	 build/build.st on the seed image after it has filed in src/. build holds what
+	 the build kept from the seed (#seedEntries, its sealed compiler). The seed
+	 compiles lib/core.lisp and lib/compiler/ into a fresh environment, the
+	 bootstrap runs with the seed as stage 0, and the compiler it reaches is sealed
+	 and put in use. Answers the bootstrap''s labels of the forms where the seed''s
+	 code and the new compiler''s differ."
+	| lib seed prims call result forms diffs |
+	lib := self lispSourceDirectory.
+	seed := build at: #seedEntries.
+	prims := Smalltalk at: #LispPrimitives.
+	call := [:name :args | (Smalltalk at: #LispProcedure)
+		apply: (LispEnvironment default lookup: (LispSymbol named: name)) to: args].
+	self implementation: #lisp.
+	LispEntries := seed.
+	LispEnvironment reset.
+	prims classPool at: #GensymCounter put: nil.
+	prims installDefault.
+	self new evalFile: (lib / ''core.lisp'') fullName.
+	self compilerSourceNames , #(''bootstrap.lisp'') do: [:name |
+		self new evalFile: (lib / ''compiler'' / name) fullName].
+	result := call value: ''bootstrap-compiler-from-seed'' value: { (lib / ''compiler'') fullName. seed }.
+	(call value: ''bootstrap-fixpoint?'' value: { result }) == true
+		ifFalse: [self error: ''the compiler did not reach a fixpoint: stages 1, 2 and 3 differ'' ].
+	forms := call value: ''length'' value: { result at: 2 }.
+	diffs := LispCons elementsOf: (call value: ''bootstrap-differences'' value: { result. 0. 1 }) for: ''build''.
+	self sealLispCompiler: lib.
+	LispEntries := self lispEntries.
+	prims classPool at: #GensymCounter put: nil.
+	BuildInfo := OrderedCollection new.
+	(self pinsAt: lib parent / ''pharo.pins'') in: [:pins |
+		BuildInfo
+			add: #seed -> (pins at: ''SEED_TAG'' ifAbsent: [''unknown'']);
+			add: #''seed-sha256'' -> (pins at: ''SEED_SHA256'' ifAbsent: [''unknown''])].
+	BuildInfo
+		add: #''stage-0'' -> (LispSymbol named: ''seed'');
+		add: #fixpoint -> true;
+		add: #forms -> forms;
+		add: #''seed-differences'' -> diffs size.
+	^ diffs'.
+cm value: comp class value: 'seeded build' value: 'pinsAt: aFile
+	"KEY=VALUE lines of pharo.pins, as a Dictionary; # starts a comment."
+	| pins |
+	pins := Dictionary new.
+	aFile exists ifFalse: [^ pins].
+	aFile contents lines do: [:line | | i |
+		i := line indexOf: $=.
+		(i > 1 and: [line first ~= $#]) ifTrue: [
+			pins at: (line copyFrom: 1 to: i - 1) trimBoth put: (line copyFrom: i + 1 to: line size) trimBoth]].
+	^ pins'.
+cm value: comp class value: 'seeded build' value: 'sourceDefinitions
+	"What src/ defines: (class names) -> (package names), read from its class
+	 definitions (the class name after the shift-hash, the package name after the
+	 package keyword). Keep those two patterns out of comments in src/."
+	| classes packages |
+	classes := Set new.
+	packages := Set new.
+	(self lispSourceDirectory parent / ''src'') files do: [:f |
+		f extension = ''st'' ifTrue: [ | text |
+			text := f contents.
+			(text allRegexMatches: ''<< #[A-Za-z0-9]+'') do: [:m | classes add: (m copyAfter: $#) asSymbol].
+			text lines do: [:line | | i |
+				i := line indexOfSubCollection: ''package: ''''''.
+				i > 0 ifTrue: [packages add: ((line copyFrom: i + 10 to: line size) copyUpTo: $'')]]]].
+	^ classes -> packages'.
+cm value: comp class value: 'seeded build' value: 'methodsOfPackages: names
+	"Every method of the named packages, extension methods included."
+	| methods |
+	methods := IdentitySet new.
+	(PackageOrganizer default packages select: [:p | names includes: p name asString]) do: [:p |
+		methods addAll: p methods; addAll: p extensionMethods].
+	^ methods'.
+cm value: comp class value: 'seeded build' value: 'cogLispMethods
+	"Every method of the packages src/ defines, extension methods included."
+	^ self methodsOfPackages: self sourceDefinitions value'.
+cm value: comp class value: 'seeded build' value: 'removeStaleFrom: build
+	"Step 8: what the seed had and src/ no longer defines, in the packages src/
+	 defines and the ones the seed had (build at: #seedPackages). A method the seed
+	 had that is still the same object was not compiled from src/; a class there
+	 that src/ does not define is not in the source. Answers the names removed."
+	| defs packages old removed |
+	defs := self sourceDefinitions.
+	packages := defs value copy addAll: (build at: #seedPackages ifAbsent: [#()]); yourself.
+	old := build at: #seedMethods.
+	removed := OrderedCollection new.
+	(PackageOrganizer default packages select: [:p | packages includes: p name asString]) do: [:p |
+		p definedClasses copy do: [:c |
+			(defs key includes: c name) ifFalse: [removed add: c name asString. c removeFromSystem]]].
+	(self methodsOfPackages: packages) do: [:m |
+		(old includes: m) ifTrue: [
+			removed add: m methodClass name asString , ''>>'' , m selector.
+			m methodClass removeSelector: m selector]].
+	Smalltalk vm voidCogVMState.
+	^ removed'.
+cm value: comp class value: 'seeded build' value: 'buildInfoList
+	"What (image-build-info) answers: an association list, or () in an image that
+	 was not built from a seed."
+	BuildInfo isNil ifTrue: [^ LispEmptyList default].
+	^ LispCons fromArray: (BuildInfo asArray collect: [:a | LispCons car: (LispSymbol named: a key) cdr: a value])'.
 cm value: comp class value: 'implementation' value: 'lispSourceMap: aSourceMap
 	"What the LISP compiler takes as a source map: the LISP reader inside an
 	 adapter, a Smalltalk reader as it is, or #f."

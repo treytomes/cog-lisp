@@ -2,8 +2,9 @@
 setlocal enabledelayedexpansion
 rem ===========================================================================
 rem  cog-lisp : Pharo bootstrap
-rem  Downloads the pinned Pharo VM + image for 64-bit Windows (pharo.pins),
-rem  checks each against its SHA-256, extracts them into .\pharo\, and confirms
+rem  Downloads the pinned Pharo VM + image for 64-bit Windows and the pinned seed,
+rem  a cog-lisp release (pharo.pins), checks each against its SHA-256, extracts
+rem  them into .\pharo\ (the seed as seed.image and seed.changes), and confirms
 rem  the VM build and the image/system version.
 rem  Idempotent: a cached zip that matches its pin is reused; one that does not
 rem  (an older pin) is downloaded again.
@@ -27,6 +28,7 @@ if not exist "%DL_DIR%" mkdir "%DL_DIR%"
 rem  variable NAMES, not values: a URL holds %2B, which CALL would expand again
 call :fetch VM_WINDOWS_URL VM_WINDOWS_SHA256 "%DL_DIR%\pharo-vm-windows.zip" || goto :fail
 call :fetch IMAGE_URL IMAGE_SHA256 "%DL_DIR%\pharo-image.zip" || goto :fail
+call :fetch SEED_URL SEED_SHA256 "%DL_DIR%\cog-lisp-seed.tar.gz" || goto :fail
 
 rem --- Extract (tar ships with Windows 10/11 and reads zip; named in full, since
 rem     a Git Bash PATH puts GNU tar first, which reads C:\ as a remote host) ---
@@ -37,6 +39,16 @@ echo [xtr ] VM    -^> pharo\
 "%SystemRoot%\System32\tar.exe" -xf "%DL_DIR%\pharo-vm-windows.zip" -C "%PHARO_DIR%" || goto :fail
 echo [xtr ] image -^> pharo\
 "%SystemRoot%\System32\tar.exe" -xf "%DL_DIR%\pharo-image.zip" -C "%PHARO_DIR%" || goto :fail
+rem  the seed bundle's image and changes, renamed seed.*; the build reads, never saves them
+echo [xtr ] seed  -^> pharo\seed.image (%SEED_TAG%)
+set "SEED_TMP=%DL_DIR%\seed-extract"
+if exist "%SEED_TMP%" rmdir /s /q "%SEED_TMP%"
+mkdir "%SEED_TMP%" || goto :fail
+set "SEED_DIR=cog-lisp-%SEED_TAG:~1%\pharo"
+"%SystemRoot%\System32\tar.exe" -xzf "%DL_DIR%\cog-lisp-seed.tar.gz" -C "%SEED_TMP%" "%SEED_DIR:\=/%/cog-lisp.image" "%SEED_DIR:\=/%/cog-lisp.changes" || goto :fail
+move /y "%SEED_TMP%\%SEED_DIR%\cog-lisp.image" "%PHARO_DIR%\seed.image" >nul || goto :fail
+move /y "%SEED_TMP%\%SEED_DIR%\cog-lisp.changes" "%PHARO_DIR%\seed.changes" >nul || goto :fail
+rmdir /s /q "%SEED_TMP%"
 
 rem --- Locate the console VM exe (prefer PharoConsole.exe: it writes stdout) --
 set "VM_EXE="

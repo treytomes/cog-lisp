@@ -43,6 +43,21 @@ fetched again. To move to a newer Pharo, change a URL and its SHA-256 in
 ways. Never pin the "stable" or "latest" URLs: they change under you (CI got
 build 789 while this machine had 788).
 
+**The image is built from a seed** (Phase 9 step 9.1): an earlier cog-lisp
+release, pinned in `pharo.pins` as `SEED_TAG`, `SEED_URL` (its Linux bundle) and
+`SEED_SHA256`. The bootstraps extract it as `pharo\seed.image`, and
+`build-image` runs `build/build.st` on it. The seed's sealed compiler compiles
+`lib/` into a **fresh** `LispEnvironment`: the environment is replaced, not
+cleared, so the seed's code keeps its old cells. The build then removes
+whatever the seed had that `src/` no longer defines. `(image-build-info)` reports
+the seed and the fixpoint.
+- **The new `src/` must still run the seed's compiler for one build.** If it
+  can't, keep the old method for one more release, or release and move the seed
+  pin forward.
+- **Never let a comment in `src/` contain the class-definition or package
+  patterns** (the shift-hash class name, or the package keyword followed by a
+  quote). The build reads them to learn what `src/` defines.
+
 The root scripts each have a bash equivalent for Git Bash (`bootstrap-pharo.sh`,
 `build-image.sh`, `cog-lisp.sh`); keep each pair in step when changing either.
 In mintty, stdin is a pipe, not a Windows console, so an interactive REPL needs

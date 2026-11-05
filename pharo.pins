@@ -3,7 +3,7 @@
 # release/package.sh; the CI caches are keyed on this file. Every download is
 # checked against its SHA-256, and a file that does not match is fetched again.
 # To move to another build: change a URL and its hash together, run the
-# bootstrap, and run every suite both ways.
+# bootstrap, and run every suite both ways (the seed: see its own note below).
 
 # Pharo 14 image, build 788 (sha 58e29ca31d)
 IMAGE_URL=https://files.pharo.org/image/140/Pharo14.0-SNAPSHOT.build.788.sha.58e29ca31d.arch.64bit.zip
@@ -14,3 +14,11 @@ VM_LINUX_URL=https://files.pharo.org/vm/pharo-spur64-headless/Linux-x86_64/Pharo
 VM_LINUX_SHA256=69c93bb7db7d955f3f96a867d0bd7b8edea69f55451856eb897c3823b7b854ac
 VM_WINDOWS_URL=https://files.pharo.org/vm/pharo-spur64-headless/Windows-x86_64/PharoVM-v12.0.6-beta%2B0.bebdbaca8-Windows-x86_64-bin.zip
 VM_WINDOWS_SHA256=b48e7e4e7e385811b40e5f0f0db9a85bcff9c669b8481ad909dd3fdd05926113
+
+# The seed: the cog-lisp release an image is built from (specs/phase-9-language.md,
+# step 9.1). Its Linux bundle holds the image (one image serves every platform).
+# To move the seed forward: release, then change all three together, rebuild, and
+# run every suite. scripts/rebuild-seed.sh rebuilds a lost seed from its tag.
+SEED_TAG=v0.1.2
+SEED_URL=https://github.com/treytomes/cog-lisp/releases/download/v0.1.2/cog-lisp-0.1.2-linux-x86_64.tar.gz
+SEED_SHA256=f8141f6526e81c46d056e60e044a113ebe39ca65d4c76c71fb5d3bb4f18c4764

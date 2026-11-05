@@ -886,7 +886,10 @@ cm value: prims class value: 'installing' value: 'installMacroSupportInto: anEnv
 	anEnv define: (LispSymbol named: ''eval'') value: (LispProcedure fixed: [:form | LispCompiler new eval: form] arity: 1).
 	"lisp or smalltalk: the reader and compiler in use (Phase 8 step 8.5)"
 	anEnv define: (LispSymbol named: ''compiler-implementation'') value: (LispProcedure fixed: [
-		LispSymbol named: (LispCompiler usesLisp ifTrue: [''lisp''] ifFalse: [''smalltalk''])] arity: 0)'.
+		LispSymbol named: (LispCompiler usesLisp ifTrue: [''lisp''] ifFalse: [''smalltalk''])] arity: 0).
+	"how this image was built: its seed, and the bootstrap (Phase 9 step 9.1)"
+	anEnv define: (LispSymbol named: ''image-build-info'') value: (LispProcedure fixed: [
+		LispCompiler buildInfoList] arity: 0)'.
 cm value: prims class value: 'installing' value: 'installConditionsInto: anEnv
 	"Phase 7.7: conditions are Pharo exceptions. Handlers catch Error (which includes
 	 LispRaise), never Notifications, Warnings or restart transfers. A handler gets

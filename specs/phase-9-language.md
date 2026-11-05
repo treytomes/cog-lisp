@@ -72,6 +72,108 @@ will take much longer.
   pinned stock image, and that path stays in the repository (a script and a CI
   job that run it) as the documented way back if every seed is lost.
 
+#### 9.1 in detail (2026-11-05)
+
+Three commits, each green on both platforms:
+
+- **9.1a Build from the seed** (the Smalltalk compiler still present).
+- **9.1b Retire** the Smalltalk reader and compiler, the Opal generator and
+  `COGLISP_COMPILER`; suites run on the built image.
+- **9.1c The recovery path**, as a script and a CI job.
+
+**The seed.** The first seed is the v0.1.2 release: the first built on the
+pinned Pharo build, and the first to carry the licenses. `pharo.pins` gains:
+- `SEED_TAG=v0.1.2`;
+- `SEED_URL`, the release's Linux bundle (one image serves every platform);
+- `SEED_SHA256`, the bundle's checksum.
+
+Both bootstraps fetch and check the seed bundle like the other pins, and extract
+its image and changes file as `pharo/seed.image` and `pharo/seed.changes`. They
+still fetch the VM. The stock image is fetched only by the recovery path (and,
+until 9.1b, for the suites).
+
+**The build** (`build/build.st`, run on `pharo/seed.image`; the seed file is
+never saved) goes in this order:
+1. **Keep the seed's compiler.** Its entry points (`LispCompiler entries`) are
+   kept for the build. Sealing (step 8.5) made them independent of the global
+   environment: they read private copies of every cell they use.
+2. **Note what the seed has**: every method of the `CogLisp-*` packages,
+   extension methods included.
+3. **File in `src/`.** Classes are redefined in place, and every method in
+   `src/` is compiled anew.
+4. **A fresh global environment.** `LispEnvironment default` is replaced, not
+   cleared. The seed's code keeps its old cells, so the seed's compiler still
+   works, and no definition of the seed's world reaches the new one. Then come
+   the primitives (`installDefault`).
+5. **The seed compiles `lib/core.lisp` and `lib/compiler/`.** Defining the
+   compiler this way makes C1: the new source, compiled by the seed.
+6. **The bootstrap**, with the seed as stage 0:
+   - M0 is the seed compiling the compiler's source, read by the seed's reader.
+   - M1 is C1 compiling it, read by the new reader. Installing M1 makes C2, which
+     makes M2; installing M2 makes C3, which makes M3.
+   - **The fixpoint is M1 = M2 = M3.** C1 has the new source's meaning whatever
+     compiled it, so its output must already be final.
+   - M0 = M1 holds only when the code generator has not changed since the seed.
+     Its differences are reported (a count and labels), not required.
+7. **Seal and install** the new compiler, as step 8.5 does.
+8. **Remove what the seed had and the source no longer does.** A method noted in
+   step 2 that is still the same object was not compiled from the new source,
+   so it goes. The same applies to a `CogLisp-*` class that `src/` no longer
+   defines.
+9. **Smoke-test, record, save.** The image records how it was built:
+   - the seed's tag and checksum;
+   - the number of forms compiled;
+   - the fixpoint;
+   - the M0/M1 differences.
+
+   `(image-build-info)` reads this back (`examples/seeded-build.lisp`). The image
+   is saved as `pharo/cog-lisp.image`.
+
+**Compatibility, the self-hosting rule.** The new `src/` must keep working with
+the seed's compiler, but only for the length of one build. A change the seed
+cannot compile has two ways forward:
+- keep the old method one more release;
+- release, then move the seed pin forward (`SEED_*` in `pharo.pins`).
+
+The suites and the fixpoint find such a break. Moving the seed pin forward is an
+ordinary commit: build, every suite, then the pin.
+
+**After 9.1b:**
+- A suite runs on a copy of the built `pharo/cog-lisp.image`, and no longer files
+  `src/` into a stock image (a stock image has no compiler for `lib/compiler/`).
+- `run-all` builds the image first.
+- The Smalltalk side keeps its API, now over the LISP reader and compiler:
+  - `LispReader on:`, `LispReader eofObject`;
+  - `LispCompiler new compile:`, `eval:`, `evalString:`, `evalAll:`, `evalFile:`;
+  - the options (`withoutOptions:do:`, read by `lib/compiler/`), `inlinedSelectors`.
+- `bootstrap.lisp` keeps one stage 0, the seed. `definedNamesIn:` reads with the
+  LISP reader.
+- **Removed:**
+  - the `smalltalk*` entry points and `LispReader basicOn:`;
+  - the translation methods;
+  - `COGLISP_COMPILER`, `implementation`/`usesLisp`;
+  - the Opal converter in `lib/compiler/opal.lisp` and `set-code-generator!`
+    (the light-node trees stay: `codegen.lisp` reads them);
+  - the 8.2 and 8.3 Smalltalk suites;
+  - CI's second Linux job;
+  - the benchmark's comparison with the Smalltalk compiler. Its baseline figure
+    stays in `bench/results.md`.
+
+  Tests that use any of these change to what remains, or go when only the
+  retired code was their subject. The record of what they found stays in the
+  Phase 8 spec.
+
+**The recovery path** (`scripts/rebuild-seed.sh`, bash, so it runs in Git Bash
+too):
+1. Export the seed's tag (`git archive SEED_TAG`) into a temporary folder.
+2. If that tree's own `pharo.pins` names a seed, rebuild that seed first, the
+   same way (recursively). Otherwise bootstrap it from its pinned stock image.
+3. Build it with its own scripts, and install the result as `pharo/seed.image`.
+
+So the way back is always "build the seed's own source the way it was built". A
+CI job runs it on Linux, then builds the current tree from the rebuilt seed and
+runs every suite.
+
 ### 9.2 The numeric tower (R7RS 6.2)
 - **Kinds**: exact integers (as now), exact rationals (Smalltalk's `Fraction`),
   inexact reals (`Float`).
@@ -181,6 +283,6 @@ will take much longer.
 
 | Step | Status |
 |---|---|
-| 9.1 Seeded builds | not started |
+| 9.1 Seeded builds | 9.1a done (2026-11-05): the image is built from the v0.1.2 seed; 9.1b, 9.1c to come |
 | 9.2 Numeric tower | not started |
 | 9.3 Hygienic macros | not started |

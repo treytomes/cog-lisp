@@ -261,6 +261,12 @@ cm value: env value: 'testing' value: 'isBound: aSymbol
 cm value: env class value: 'accessing' value: 'default
 	Default isNil ifTrue: [Default := self new].
 	^ Default'.
+cm value: env class value: 'accessing' value: 'reset
+	"A new, empty default environment (the image build, Phase 9 step 9.1). The old
+	 one is replaced, not cleared: code compiled against it keeps its cells and
+	 their values, so a sealed compiler built there still runs."
+	Default := self new.
+	^ Default'.
 
 "=== LispUnboundError ======================================================"
 cm value: err value: 'accessing' value: 'symbol

@@ -1,0 +1,5 @@
+built from the seed: v0.1.2
+the seed's checksum is pinned: #t
+stage 0 of the bootstrap was the seed
+the compiler compiled its own source, form by form: #t
+and reached a fixpoint: #t

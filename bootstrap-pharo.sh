@@ -2,9 +2,12 @@
 # ===========================================================================
 #  cog-lisp : Pharo bootstrap  (bash equivalent of bootstrap-pharo.bat)
 #  Downloads the pinned 64-bit Pharo VM for this platform (Linux, or Windows
-#  under Git Bash) and the pinned Pharo image (pharo.pins), checks each against
-#  its SHA-256, extracts them into ./pharo/, and confirms the VM build and the
-#  image/system version.
+#  under Git Bash), the pinned Pharo image and the pinned seed, a cog-lisp
+#  release (pharo.pins), checks each against its SHA-256, extracts them into
+#  ./pharo/ (the seed as seed.image and seed.changes), and confirms the VM build
+#  and the image/system version.
+#  COGLISP_SKIP_SEED=1 leaves the seed out: scripts/rebuild-seed.sh, rebuilding
+#  a seed from its source, puts one there itself.
 #  Idempotent: a cached zip that matches its pin is reused; one that does not
 #  (an older pin) is downloaded again.
 # ===========================================================================
@@ -14,7 +17,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PHARO_DIR="$ROOT/pharo"
 DL_DIR="$PHARO_DIR/downloads"
 . "$ROOT/scripts/pharo-vm.sh"
-# the pins: IMAGE_URL, IMAGE_SHA256, VM_LINUX_URL, VM_LINUX_SHA256, VM_WINDOWS_...
+# the pins: IMAGE_URL, IMAGE_SHA256, VM_LINUX_URL, VM_LINUX_SHA256, VM_WINDOWS_...,
+# SEED_TAG, SEED_URL, SEED_SHA256
 . "$ROOT/pharo.pins"
 case "$COGLISP_PLATFORM" in
   linux)   VM_ZIP="$DL_DIR/pharo-vm-linux.zip"; VM_URL="$VM_LINUX_URL"; VM_SHA256="$VM_LINUX_SHA256" ;;
@@ -22,6 +26,7 @@ case "$COGLISP_PLATFORM" in
   *) echo "bootstrap-pharo: unsupported platform $(uname -s) (Linux and Windows are)" >&2; exit 1 ;;
 esac
 IMG_ZIP="$DL_DIR/pharo-image.zip"
+SEED_TGZ="$DL_DIR/cog-lisp-seed.tar.gz"
 
 fail() {
   echo
@@ -77,6 +82,7 @@ fetch() {   # $1 URL, $2 SHA-256, $3 file
 
 fetch "$VM_URL" "$VM_SHA256" "$VM_ZIP" || fail
 fetch "$IMAGE_URL" "$IMAGE_SHA256" "$IMG_ZIP" || fail
+[ "${COGLISP_SKIP_SEED:-}" = 1 ] || fetch "$SEED_URL" "$SEED_SHA256" "$SEED_TGZ" || fail
 
 # --- Extract ----------------------------------------------------------------
 # the Windows VM zip marks its files read-only, so a second extraction could not
@@ -86,6 +92,17 @@ echo "[xtr ] VM    -> pharo/"
 extract "$VM_ZIP" "$PHARO_DIR" || fail
 echo "[xtr ] image -> pharo/"
 extract "$IMG_ZIP" "$PHARO_DIR" || fail
+# the seed bundle's image and changes, renamed seed.*; the build reads, never saves them
+if [ "${COGLISP_SKIP_SEED:-}" != 1 ]; then
+  echo "[xtr ] seed  -> pharo/seed.image ($SEED_TAG)"
+  SEED_TMP="$DL_DIR/seed-extract"
+  rm -rf "$SEED_TMP" && mkdir -p "$SEED_TMP" || fail
+  SEED_DIR="cog-lisp-${SEED_TAG#v}/pharo"
+  tar -xzf "$SEED_TGZ" -C "$SEED_TMP" "$SEED_DIR/cog-lisp.image" "$SEED_DIR/cog-lisp.changes" || fail
+  mv -f "$SEED_TMP/$SEED_DIR/cog-lisp.image" "$PHARO_DIR/seed.image" || fail
+  mv -f "$SEED_TMP/$SEED_DIR/cog-lisp.changes" "$PHARO_DIR/seed.changes" || fail
+  rm -rf "$SEED_TMP"
+fi
 
 # --- Locate the VM to run headless (Linux: the pharo launcher; Windows:
 #     PharoConsole.exe, which writes stdout) ---------------------------------
