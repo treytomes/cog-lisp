@@ -410,7 +410,7 @@ Two commits.
   `define-macro` that compares symbols with `eq?` may not (documented).
 
 **9.3b: hygienic derived forms.**
-- **`lib/core-syntax.lisp`**, loaded by the build once the new compiler is
+- **`lib/core-syntax.lisp`** (merged into `core.lisp` after Phase 9; see below), loaded by the build once the new compiler is
   installed (after the fixpoint, before saving), redefines `case`, `do` and
   `guard` with `syntax-rules`. Then `case` calls the global `memv` inside
   `(let ((memv ...)) ...)` (C-14's second example), and `do`'s loop name cannot
@@ -433,9 +433,36 @@ Two commits.
     suite took 104 s on Windows, about as before.
   - `macroexpand` and `macroexpand-1` answer plain data: a `syntax-rules`
     expansion's aliases become their symbols there, since they are for reading.
-  - A `define-macro` macro (`lib/test.lisp`'s `check`, `lib/cl.lisp`'s
-    `defmacro`) is still not hygienic: its expansion's names mean what they mean
-    where it is used.
+  - A `define-macro` macro (`lib/cl.lisp`'s `defmacro`) is still not hygienic:
+    its expansion's names mean what they mean where it is used.
+
+**After Phase 9: the seed moves to v0.1.3, and the two files become one**
+(owner, 2026-11-05: "get the `define-macro` references fixed").
+- **v0.1.3 became the seed**: it has `syntax-rules`, so the seed can compile
+  `syntax-rules` derived forms.
+- **`lib/core.lisp` is now the `syntax-rules` definitions**:
+  - `lib/core-syntax.lisp` and the build step that loaded it are gone;
+  - `let-values` and `let*-values` became `syntax-rules` too (R7RS's reference
+    definition);
+  - `%keyword?` and `%values-formals`, which existed only for the
+    `define-macro` versions, are gone.
+
+  `core.lisp` has no `define-macro` left, and the compiler is compiled through
+  the hygienic forms. The build's fixpoint holds, with no form where the seed's
+  code differs.
+- **`lib/test.lisp`'s forms** (`define-test`, `check`, …) are `syntax-rules`
+  macros, so a test may bind `lambda` or `if` around a `check`.
+- **A `define-syntax` macro keeps its source**, as a `define-macro`'s does (the
+  project's rule that compiled code keeps its text): its expander's
+  `procedure-source` is the defining form.
+- **The bytecode corpus was re-pinned for one form.** `do`'s loop procedure is
+  now named `loop` (the template's name) instead of a gensym, and its recorded
+  text changed with it. The bytecode bytes are unchanged.
+- **Where `define-macro` remains**, by design:
+  - `lib/cl.lisp`'s `defmacro`, which is Common Lisp's non-hygienic macro;
+  - the compiler's own record accessors in `lib/compiler/codegen.lisp`, which
+    capture nothing;
+  - the examples and tests of `define-macro` itself.
 
 ## 5. Acceptance criteria
 

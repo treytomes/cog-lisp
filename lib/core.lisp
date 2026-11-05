@@ -1,135 +1,125 @@
-;;; core.lisp -- cog-lisp's derived forms (specs/phase-7-macros.md section 7)
+;;; core.lisp -- cog-lisp's derived forms (specs/phase-7-macros.md section 7;
+;;; hygienic since specs/phase-9-language.md step 9.3)
 ;;;
-;;; Loaded into cog-lisp.image by the build. Each form is a macro written in
-;;; cog-lisp itself, and keeps its source like any procedure. A macro defined
-;;; here may use only the special forms and the macros defined above it.
+;;; Loaded into cog-lisp.image by the build, which compiles it with the seed's
+;;; compiler (a seed has syntax-rules from v0.1.3). Each form is a syntax-rules
+;;; macro: a name it binds cannot capture the program's, and a name it uses (if,
+;;; let, memv, ...) means the global one even where the program has bound it, so
+;;; (let ((memv ...)) (case x ...)) works (review C-14). They compile the compiler
+;;; too. A form may use the special forms and the forms defined in this file.
 
-;; x is the keyword name: a symbol, or an alias of one, as a syntax-rules template
-;; passes it to a define-macro macro (specs/phase-9-language.md step 9.3)
-(define (%keyword? x name)
-  (if (eq? x name) #t (if [x isLispAlias] (eq? [x baseName] name) #f)))
-
-;; (cond (test e ...) ... (test => f) ... (else e ...))
-(define-macro (cond . clauses)
-  (if (null? clauses)
-      '(if #f #f)
-      (let ((clause (car clauses))
-            (rest (cdr clauses)))
-        (if (%keyword? (car clause) 'else)
-            `(begin ,@(cdr clause))
-            (if (null? (cdr clause))
-                (let ((t (gensym)))
-                  `(let ((,t ,(car clause)))
-                     (if ,t ,t (cond ,@rest))))
-                (if (%keyword? (car (cdr clause)) '=>)
-                    (let ((t (gensym)))
-                      `(let ((,t ,(car clause)))
-                         (if ,t (,(car (cdr (cdr clause))) ,t) (cond ,@rest))))
-                    `(if ,(car clause)
-                         (begin ,@(cdr clause))
-                         (cond ,@rest))))))))
+;; (cond (test e ...) ... (test => f) ... (else e ...)); an else ends the clauses
+(define-syntax cond
+  (syntax-rules (else =>)
+    ((_) (if #f #f))
+    ((_ (else e ...) . ignored) (begin e ...))
+    ((_ (test => f) clause ...) (let ((t test)) (if t (f t) (cond clause ...))))
+    ((_ (test) clause ...) (let ((t test)) (if t t (cond clause ...))))
+    ((_ (test e ...) clause ...) (if test (begin e ...) (cond clause ...)))))
 
 ;; (and e ...) -- #t when empty; otherwise the first false value, or the last value
-(define-macro (and . xs)
-  (cond ((null? xs) #t)
-        ((null? (cdr xs)) (car xs))
-        (else `(if ,(car xs) (and ,@(cdr xs)) #f))))
+(define-syntax and
+  (syntax-rules ()
+    ((_) #t)
+    ((_ e) e)
+    ((_ e rest ...) (if e (and rest ...) #f))))
 
 ;; (or e ...) -- #f when empty; otherwise the first true value
-(define-macro (or . xs)
-  (cond ((null? xs) #f)
-        ((null? (cdr xs)) (car xs))
-        (else (let ((t (gensym)))
-                `(let ((,t ,(car xs)))
-                   (if ,t ,t (or ,@(cdr xs))))))))
+(define-syntax or
+  (syntax-rules ()
+    ((_) #f)
+    ((_ e) e)
+    ((_ e rest ...) (let ((t e)) (if t t (or rest ...))))))
 
-(define-macro (when test . body)
-  `(if ,test (begin ,@body)))
+(define-syntax when
+  (syntax-rules () ((_ test e ...) (if test (begin e ...)))))
 
-(define-macro (unless test . body)
-  `(if ,test (if #f #f) (begin ,@body)))
+(define-syntax unless
+  (syntax-rules () ((_ test e ...) (if test (if #f #f) (begin e ...)))))
 
 ;; (let* ((v e) ...) body ...) -- each binding sees the ones before it
-(define-macro (let* bindings . body)
-  (if (null? bindings)
-      `(let () ,@body)
-      `(let (,(car bindings))
-         (let* ,(cdr bindings) ,@body))))
+(define-syntax let*
+  (syntax-rules ()
+    ((_ () body ...) (let () body ...))
+    ((_ (binding) body ...) (let (binding) body ...))
+    ((_ (binding rest ...) body ...) (let (binding) (let* (rest ...) body ...)))))
 
 ;; (letrec* ((v e) ...) body ...) -- bindings in scope everywhere, assigned in order
-(define-macro (letrec* bindings . body)
-  `(let ()
-     ,@(map (lambda (b) `(define ,(car b) ,(car (cdr b)))) bindings)
-     (let () ,@body)))
+(define-syntax letrec*
+  (syntax-rules ()
+    ((_ ((v e) ...) body ...) (let () (define v e) ... (let () body ...)))))
 
-(define-macro (letrec bindings . body)
-  `(letrec* ,bindings ,@body))
+(define-syntax letrec
+  (syntax-rules ()
+    ((_ bindings body ...) (letrec* bindings body ...))))
 
-;; (case key ((datum ...) e ...) ... (else e ...)) -- compares with eqv?
-(define-macro (case key . clauses)
-  (let ((k (gensym)))
-    `(let ((,k ,key))
-       (cond ,@(map (lambda (c)
-                      (if (%keyword? (car c) 'else)
-                          c
-                          `((memv ,k ',(car c)) ,@(cdr c))))
-                    clauses)))))
+;; (case key ((datum ...) e ...) ... (else e ...)) -- compares with eqv?, through
+;; the global memv
+(define-syntax case
+  (syntax-rules (else =>)
+    ((_ "clauses" k) (if #f #f))
+    ((_ "clauses" k (else => f) . ignored) (f k))
+    ((_ "clauses" k (else e ...) . ignored) (begin e ...))
+    ((_ "clauses" k ((datum ...) => f) clause ...)
+     (if (memv k '(datum ...)) (f k) (case "clauses" k clause ...)))
+    ((_ "clauses" k ((datum ...) e ...) clause ...)
+     (if (memv k '(datum ...)) (begin e ...) (case "clauses" k clause ...)))
+    ((_ key clause ...) (let ((k key)) (case "clauses" k clause ...)))))
 
 ;; (do ((var init step) ...) (test result ...) body ...)
-(define-macro (do specs test-clause . body)
-  (let ((loop (gensym)))
-    `(let ,loop ,(map (lambda (s) (list (car s) (car (cdr s)))) specs)
-       (if ,(car test-clause)
-           (begin (if #f #f) ,@(cdr test-clause))
-           (begin
-             ,@body
-             (,loop ,@(map (lambda (s)
-                             (if (null? (cdr (cdr s)))
-                                 (car s)
-                                 (car (cdr (cdr s)))))
-                           specs)))))))
+(define-syntax do
+  (syntax-rules ()
+    ((_ "step" var) var)
+    ((_ "step" var step) step)
+    ((_ ((var init step ...) ...) (test result ...) body ...)
+     (let loop ((var init) ...)
+       (if test
+           (begin (if #f #f) result ...)
+           (begin body ... (loop (do "step" var step ...) ...)))))))
 
 ;;; Multiple values (specs/phase-9-language.md step 9.2; values and
 ;;; call-with-values are primitives)
 
-;; formals with every name replaced by a fresh one, in the same shape:
-;; (a b . c) -> (g1 g2 . g3), and the (name . fresh) pairs
-(define (%values-formals formals)
-  (cond ((null? formals) (cons '() '()))
-        ((symbol? formals) (let ((g (gensym))) (cons g (list (cons formals g)))))
-        (else (let ((g (gensym)) (rest (%values-formals (cdr formals))))
-                (cons (cons g (car rest)) (cons (cons (car formals) g) (cdr rest)))))))
-
 ;; (let-values (((a b) e) ((c . d) f) (g h)) body ...) -- each init is evaluated
-;; outside every binding, as let's are; let*-values sees the bindings before it
-(define-macro (let-values bindings . body)
-  (let loop ((bs bindings) (renames '()))
-    (if (null? bs)
-        `(let ,(map (lambda (r) (list (car r) (cdr r))) renames) ,@body)
-        (let ((fresh (%values-formals (car (car bs)))))
-          `(call-with-values (lambda () ,(car (cdr (car bs))))
-             (lambda ,(car fresh)
-               ,(loop (cdr bs) (append renames (cdr fresh)))))))))
+;; outside every binding, as let's are. Each formal is first bound to a fresh
+;; name (x, made anew by each expansion), and the formals to those at the end.
+;; (The R7RS reference definition.)
+(define-syntax let-values
+  (syntax-rules ()
+    ((_ (binding ...) body0 body ...)
+     (let-values "bind" (binding ...) () (begin body0 body ...)))
+    ((_ "bind" () tmps body)
+     (let tmps body))
+    ((_ "bind" ((formals init) binding ...) tmps body)
+     (let-values "mktmp" formals init () (binding ...) tmps body))
+    ((_ "mktmp" () init args bindings tmps body)
+     (call-with-values (lambda () init)
+       (lambda args (let-values "bind" bindings tmps body))))
+    ((_ "mktmp" (a . b) init (arg ...) bindings (tmp ...) body)
+     (let-values "mktmp" b init (arg ... x) bindings (tmp ... (a x)) body))
+    ((_ "mktmp" a init (arg ...) bindings (tmp ...) body)
+     (call-with-values (lambda () init)
+       (lambda (arg ... . x) (let-values "bind" bindings (tmp ... (a x)) body))))))
 
-(define-macro (let*-values bindings . body)
-  (if (null? bindings)
-      `(let () ,@body)
-      `(let-values (,(car bindings))
-         (let*-values ,(cdr bindings) ,@body))))
+;; (let*-values (((a b) e) ...) body ...) -- each init sees the bindings before it
+(define-syntax let*-values
+  (syntax-rules ()
+    ((_ () body ...) (let () body ...))
+    ((_ (binding rest ...) body ...) (let-values (binding) (let*-values (rest ...) body ...)))))
 
 ;;; Conditions and restarts (specs/phase-7.7-conditions-restarts.md)
 
 ;; (guard (var clause ...) body ...) -- cond-style clauses over what was raised;
 ;; with no matching clause it is raised again where it was first raised
-(define-macro (guard spec . body)
-  `(%guard (lambda () ,@body)
-           (lambda (,(car spec))
-             (cond ,@(cdr spec) (else (%guard-no-match))))))
+(define-syntax guard
+  (syntax-rules ()
+    ((_ (var clause ...) body ...)
+     (%guard (lambda () body ...)
+             (lambda (var) (cond clause ... (else (%guard-no-match))))))))
 
 ;; (restart-case form (name (param ...) body ...) ...) -- form with named restarts
-(define-macro (restart-case form . clauses)
-  `(%restart-case
-     (lambda () ,form)
-     (list ,@(map (lambda (c)
-                    `(cons ',(car c) (lambda ,(car (cdr c)) ,@(cdr (cdr c)))))
-                  clauses))))
+(define-syntax restart-case
+  (syntax-rules ()
+    ((_ form (name params body ...) ...)
+     (%restart-case (lambda () form)
+                    (list (cons 'name (lambda params body ...)) ...)))))

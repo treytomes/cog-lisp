@@ -1,5 +1,5 @@
 ;;; phase-9.3-derived-forms.lisp -- the derived forms are hygienic
-;;; (specs/phase-9-language.md step 9.3b, AC-3; review C-14): lib/core-syntax.lisp
+;;; (specs/phase-9-language.md step 9.3b, AC-3; review C-14): lib/core.lisp
 ;;; defines them with syntax-rules, so the names they use mean the global ones,
 ;;; and the names they bind capture nothing. Their behavior is the same as the
 ;;; define-macro versions' (every older suite checks that).
@@ -15,8 +15,6 @@
             '(cond case and or when unless let* letrec letrec* do guard restart-case)))
 
 (define-test "AC-3 cond, and, or, when, unless with if, let and begin bound locally"
-  ;; the bindings are inside each checked expression: check itself is a
-  ;; define-macro, whose expansion uses lambda and if as the program sees them
   (check (let ((if list) (let 1) (begin 2)) (cond (#f 'a) ((> 2 1) 'b) (else 'c))) 'b)
   (check (let ((if list) (let 1)) (cond ((assv 2 '((1 . one) (2 . two))) => cdr) (else 'none))) 'two)
   (check (let ((if list) (let 1)) (cond (#f) (5))) 5)
@@ -52,5 +50,11 @@
   (define-syntax my-max
     (syntax-rules () ((_ a b) (let ((x a) (y b)) (cond ((> x y) x) (else y))))))
   (check (let ((x 1) (y 2) (cond 'shadowed)) (my-max y x)) 2))
+
+(define-test "AC-3 the test framework's own forms are hygienic"
+  (let ((lambda 'l) (if 'i) (let 'x))
+    (check (+ 1 2) 3)
+    (check-true #t)
+    (check-error (car 5) "not a pair")))
 
 (run-tests)

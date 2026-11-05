@@ -196,7 +196,7 @@ re-run and reproduced before being recorded.
 - **Closed in Phase 9 step 9.3** (2026-11-05). The compiler resolves an
   identifier's binding before it looks for a special form, so the first example
   is `6` (9.3a). `case` and the other derived forms are `syntax-rules` macros
-  (`lib/core-syntax.lisp`), so the second is `other`: `case` calls the global
+  (`lib/core.lisp`), so the second is `other`: `case` calls the global
   `memv` (9.3b). Checked by `tests/lisp/phase-9.3-syntax-rules.lisp` and
   `tests/lisp/phase-9.3-derived-forms.lisp`; example `examples/shadowing.lisp`.
 

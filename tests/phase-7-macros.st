@@ -183,8 +183,8 @@ ev value: '(defn sq (x) (* x x))'.
 check value: 'AC-17 an expander keeps its define-macro text'
 	value: (LispEnvironment default lookup: (sym value: 'defn')) expander source
 	value: '(define-macro (defn name params . body) `(define (,name ,@params) ,@body))'.
-check value: 'AC-17 a core expander keeps its text'
-	value: ((LispEnvironment default lookup: (sym value: 'when')) expander source beginsWith: '(define-macro (when test . body)')
+check value: 'AC-17 a core expander keeps its text (a syntax-rules macro since Phase 9 step 9.3)'
+	value: ((LispEnvironment default lookup: (sym value: 'when')) expander source beginsWith: '(define-syntax when')
 	value: true.
 [ev value: '(define (outer) (define (inner y) (+ y 1)) inner) (procedure-source (outer))'] on: Error do: [:e | nil].
 "(the check itself moved to tests/lisp/phase-7-macros.lisp)"

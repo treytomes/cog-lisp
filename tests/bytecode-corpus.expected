@@ -268,9 +268,9 @@ lit ByteSymbol #default
 lit LispGlobal #<global +>
 lit LispProcedure #<procedure +>
 lit ByteSymbol #tailCall:with:with:
-lit ByteString '(define (g1 i s) (if (= i n) (begin (if #f #f) s) (begin (g1 (+ i 1) (+ s i)))))'
+lit ByteString '(define (loop i s) (if (= i n) (begin (if #f #f) s) (begin (loop (do "step" i (+ i 1)) (do "step" s (+ s i))))))'
 lit ByteSymbol #fixed:arity:source:
-lit ByteString 'g1'
+lit ByteString 'loop'
 lit ByteSymbol #named:
 lit ByteSymbol #tailCall:with:with:
 lit ByteString '(define (loop-do n) (do ((i 0 (+ i 1)) (s 0 (+ s i))) ((= i n) s)))'

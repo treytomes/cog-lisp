@@ -588,7 +588,7 @@
   (let ((name (car (cdr form))))
     (unless (lc-identifier? name) (lc-error (string-append "define-syntax: bad name: " (lc-show name))))
     (lc-and-unspecified
-     (lc-global-define c name (opal-literal (lc-make-syntax c (car (cdr (cdr form))) scope scope name))))))
+     (lc-global-define c name (opal-literal (lc-make-syntax c (car (cdr (cdr form))) scope scope name (lc-source-of c form)))))))
 
 ;; (let-syntax ((name (syntax-rules ...)) ...) body ...): the macros' scope is the
 ;; enclosing one, or for letrec-syntax the new one, so they can use each other
@@ -597,17 +597,20 @@
          (bindings (lc-check-bindings (car parts)))
          (child (scope-copy scope)))
     (for-each (lambda (b)
-                (scope-set! child (car b) (lc-make-syntax c (car (cdr b)) scope (if rec child scope) (car b))))
+                (scope-set! child (car b) (lc-make-syntax c (car (cdr b)) scope (if rec child scope) (car b) (lc-recorded-source-of c b))))
               bindings)
     ;; the body is a body, as let's is
     (lc-translate c (cons lc-core-let (cons '() (cdr parts))) child tail)))
 
-;; a transformer spec, (syntax-rules ...), in scope: the macro, defined in env
-(define (lc-make-syntax c spec scope env name)
+;; a transformer spec, (syntax-rules ...), in scope: the macro, defined in env.
+;; Its expander keeps the text that defined it, as a define-macro's does.
+(define (lc-make-syntax c spec scope env name text)
   (unless (and (pair? spec) (eq? (lc-special (car spec) scope) 'syntax-rules))
     (lc-error (string-append "define-syntax: " (symbol->string (lc-id-symbol name))
                              ": the transformer must be syntax-rules, not " (lc-show spec))))
-  (sr-make spec env (lc-id-symbol name)))
+  (let ((m (sr-make spec env (lc-id-symbol name))))
+    (when text [[m expander] source: text])
+    m))
 
 ;; message, then each argument as write shows it
 (define (lc-join-shown message args)
@@ -700,7 +703,7 @@
                  (lc-check datum 2 2)
                  (let ((name (car (cdr datum))))
                    (unless (lc-identifier? name) (lc-error (string-append "define-syntax: bad name: " (lc-show name))))
-                   (scope-set! child-scope name (lc-make-syntax c (car (cdr (cdr datum))) child-scope child-scope name))
+                   (scope-set! child-scope name (lc-make-syntax c (car (cdr (cdr datum))) child-scope child-scope name (lc-source-of c datum)))
                    (scan (cdr pending) defs steps)))
                 ((lc-define-form? datum child-scope)
                  (lc-check-define datum)

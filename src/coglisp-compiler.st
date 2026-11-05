@@ -232,9 +232,6 @@ cm value: comp class value: 'seeded build' value: 'buildFromSeed: build
 	diffs := LispCons elementsOf: (call value: ''bootstrap-differences'' value: { result. 0. 1 }) for: ''build''.
 	self sealLispCompiler: lib.
 	LispEntries := self lispEntries.
-	"the derived forms, hygienic: they need the new compiler, so they come after it
-	 (step 9.3b; lib/core-syntax.lisp says why core.lisp cannot have them)"
-	self new evalFile: (lib / ''core-syntax.lisp'') fullName.
 	prims classPool at: #GensymCounter put: nil.
 	BuildInfo := OrderedCollection new.
 	(self pinsAt: lib parent / ''pharo.pins'') in: [:pins |

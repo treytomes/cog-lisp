@@ -385,15 +385,17 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **Aliases go back to symbols** in `quote` (`lc-strip`, only once a compile has
   expanded a `syntax-rules` macro), in global names, `send` selectors,
   `smalltalk` names and `macroexpand`'s answers.
-- **The derived forms are in two files.** `lib/core.lisp` (`define-macro`)
-  compiles the compiler, because the seed compiles it and v0.1.2 has no
-  `syntax-rules`. `lib/core-syntax.lisp` (`syntax-rules`) replaces them once
-  the new compiler is installed (`buildFromSeed:`). Change both together. When a
-  release with `syntax-rules` becomes the seed, they can become one.
-- **A `define-macro` expander may receive aliases** when it is used inside a
-  `syntax-rules` template. Compare keywords by name there (`%keyword?` in
-  `core.lisp`). A test that binds `lambda` or `if` around `check` breaks
-  `check` itself, which is a `define-macro`: bind inside the checked expression.
+- **The derived forms are `syntax-rules` macros in `lib/core.lisp`**, which the
+  seed compiles (seeds have `syntax-rules` from v0.1.3), and they compile the
+  compiler too. So `lib/compiler/` may use only what the *pinned seed* supports;
+  a new feature reaches `core.lisp` or the compiler's source one release after
+  it lands (the self-hosting rule). `lib/test.lisp`'s forms are hygienic too.
+- **`define-macro` stays, for macros meant to capture** (`lib/cl.lisp`'s
+  `defmacro`, the compiler's own accessors in `codegen.lisp`). Its expander may
+  receive aliases when it is used inside a `syntax-rules` template: compare
+  keywords by name there, not with `eq?`.
+- **A `define-syntax` macro keeps its source**: its expander's
+  `procedure-source` is the `define-syntax` form's text.
 
 ## Writing the compiler in LISP (Phase 8)
 
