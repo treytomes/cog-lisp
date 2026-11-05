@@ -84,6 +84,34 @@
                                  (car (cdr (cdr s)))))
                            specs)))))))
 
+;;; Multiple values (specs/phase-9-language.md step 9.2; values and
+;;; call-with-values are primitives)
+
+;; formals with every name replaced by a fresh one, in the same shape:
+;; (a b . c) -> (g1 g2 . g3), and the (name . fresh) pairs
+(define (%values-formals formals)
+  (cond ((null? formals) (cons '() '()))
+        ((symbol? formals) (let ((g (gensym))) (cons g (list (cons formals g)))))
+        (else (let ((g (gensym)) (rest (%values-formals (cdr formals))))
+                (cons (cons g (car rest)) (cons (cons (car formals) g) (cdr rest)))))))
+
+;; (let-values (((a b) e) ((c . d) f) (g h)) body ...) -- each init is evaluated
+;; outside every binding, as let's are; let*-values sees the bindings before it
+(define-macro (let-values bindings . body)
+  (let loop ((bs bindings) (renames '()))
+    (if (null? bs)
+        `(let ,(map (lambda (r) (list (car r) (cdr r))) renames) ,@body)
+        (let ((fresh (%values-formals (car (car bs)))))
+          `(call-with-values (lambda () ,(car (cdr (car bs))))
+             (lambda ,(car fresh)
+               ,(loop (cdr bs) (append renames (cdr fresh)))))))))
+
+(define-macro (let*-values bindings . body)
+  (if (null? bindings)
+      `(let () ,@body)
+      `(let-values (,(car bindings))
+         (let*-values ,(cdr bindings) ,@body))))
+
 ;;; Conditions and restarts (specs/phase-7.7-conditions-restarts.md)
 
 ;; (guard (var clause ...) body ...) -- cond-style clauses over what was raised;

@@ -38,3 +38,25 @@
 
 ;; Arithmetic on something that is not a number is an error that says so.
 (show "(+ 1 'apple) is" (guard (e (#t (error-object-message e))) (+ 1 'apple)))
+
+;; The division family. floor/ and truncate/ answer two values: the quotient
+;; and the remainder, which let-values names. floor rounds toward minus infinity,
+;; truncate toward zero; they differ when the signs do.
+(let-values (((q r) (floor/ -7 2)))
+  (show "(floor/ -7 2) =" (list q r)))
+(let-values (((q r) (truncate/ -7 2)))
+  (show "(truncate/ -7 2) =" (list q r)))
+(show "(modulo -7 2), (remainder -7 2) =" (list (modulo -7 2) (remainder -7 2)))
+
+;; Rounding keeps exactness, and round goes to even on a half.
+(show "(round 5/2) (round 7/2) (round 2.5) =" (list (round 5/2) (round 7/2) (round 2.5)))
+(show "(floor -7/2) (truncate -7/2) =" (list (floor -7/2) (truncate -7/2)))
+
+;; Roots are exact when they can be.
+(show "(sqrt 16) (sqrt 1/4) =" (list (sqrt 16) (sqrt 1/4)))
+(show "(sqrt 2) =" (sqrt 2))
+(show "(exact-integer-sqrt 17) =" (call-with-values (lambda () (exact-integer-sqrt 17)) list))
+(show "(expt 2 -3) =" (expt 2 -3))
+(show "(rationalize 3/10 1/10) =" (rationalize 3/10 1/10))
+(show "(gcd 32 -36) (lcm 32 -36) =" (list (gcd 32 -36) (lcm 32 -36)))
+(show "(atan 1 1) =" (atan 1 1))

@@ -9,7 +9,7 @@
  Classes: LispError, LispArityError, LispProcedure, LispTailCall, LispPrimitives,
  LispTextOutput.
  ============================================================================"
-| failures cm lerr aerr proc tcall prims tout facade htab hkey iport oport lines |
+| failures cm lerr aerr proc tcall prims tout facade htab hkey iport oport lines vals |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -20,6 +20,8 @@ lerr  := LispError.  "defined by the reader package"
 aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp-Runtime'; install.
 proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries. #inline. #packed }; package: 'CogLisp-Runtime'; install.
 tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runtime'; install.
+"Zero or several values, as values answers them (R7RS 6.10; Phase 9 step 9.2)."
+vals := (Object << #LispValues) slots: { #values }; package: 'CogLisp-Runtime'; install.
 prims := (Object << #LispPrimitives) sharedVariables: { #Output. #Input. #CommandLine. #GensymCounter. #EqualityTests }; package: 'CogLisp-Runtime'; install.
 "CogLisp: the Smalltalk-side facade for evaluating and calling LISP (Phase 7.6 section 5.2)."
 facade := (Object << #CogLisp) package: 'CogLisp-Runtime'; install.
@@ -105,6 +107,17 @@ cm value: hkey value: 'comparing' value: '= other
 	^ other class == LispHashKey and: [LispHashTable same: key as: other key test: test]'.
 cm value: hkey value: 'comparing' value: 'hash
 	^ LispHashTable hashOf: key test: test'.
+
+"=== multiple values (Phase 9 step 9.2) ======================================"
+cm value: vals class value: 'instance creation' value: 'withAll: anArray
+	^ self new setValues: anArray'.
+cm value: vals value: 'private' value: 'setValues: anArray
+	values := anArray'.
+cm value: vals value: 'accessing' value: 'values
+	^ values'.
+cm value: vals value: 'printing' value: 'printOn: aStream
+	"what the REPL shows: each value as write shows it, separated by spaces"
+	values do: [:v | aStream nextPutAll: (LispPrinter writeString: v)] separatedBy: [aStream space]'.
 
 "=== string ports (section 8) ==============================================="
 cm value: iport class value: 'instance creation' value: 'on: aString
@@ -1165,15 +1178,13 @@ cm value: prims class value: 'installing' value: 'installNumbersInto: anEnv
 	anEnv define: (LispSymbol named: ''*'') value: (LispProcedure variadic: [:nums | | xs | xs := nums lispElements. xs size = 1 ifTrue: [self number: xs first for: ''*''] ifFalse: [xs inject: 1 into: [:a :b | a * b]]] required: 0).
 	anEnv define: (LispSymbol named: ''-'') value: (LispProcedure variadic: [:first :rest | rest lispElements isEmpty ifTrue: [(self number: first for: ''-'') negated] ifFalse: [rest lispElements inject: first into: [:a :b | a - b]]] required: 1).
 	anEnv define: (LispSymbol named: ''/'') value: (LispProcedure variadic: [:first :rest | rest lispElements isEmpty ifTrue: [self divide: 1 by: (self number: first for: ''/'')] ifFalse: [rest lispElements inject: first into: [:a :b | self divide: a by: b]]] required: 1).
-	anEnv define: (LispSymbol named: ''modulo'') value: (LispProcedure fixed: [:a :b | a \\ b] arity: 2).
-	anEnv define: (LispSymbol named: ''quotient'') value: (LispProcedure fixed: [:a :b | a quo: b] arity: 2).
-	anEnv define: (LispSymbol named: ''abs'') value: (LispProcedure fixed: [:a | a abs] arity: 1).
 	anEnv define: (LispSymbol named: ''min'') value: (LispProcedure variadic: [:first :rest | self extreme: #min: of: first and: rest for: ''min''] required: 1).
 	anEnv define: (LispSymbol named: ''max'') value: (LispProcedure variadic: [:first :rest | self extreme: #max: of: first and: rest for: ''max''] required: 1).
 	anEnv define: (LispSymbol named: ''zero?'') value: (LispProcedure fixed: [:a | (self number: a for: ''zero?'') = 0] arity: 1).
 	anEnv define: (LispSymbol named: ''positive?'') value: (LispProcedure fixed: [:a | (self real: a for: ''positive?'') > 0] arity: 1).
 	anEnv define: (LispSymbol named: ''negative?'') value: (LispProcedure fixed: [:a | (self real: a for: ''negative?'') < 0] arity: 1).
 	self installNumericTowerInto: anEnv.
+	self installNumericProceduresInto: anEnv.
 	self installNumberEntriesInto: anEnv'.
 cm value: prims class value: 'installing' value: 'installNumberEntriesInto: anEnv
 	"Phase 6 section 5.1: direct entries for the common fixed-arity uses of the
@@ -1219,6 +1230,169 @@ cm value: prims class value: 'installing' value: 'installNumericTowerInto: anEnv
 	def value: ''inexact->exact'' value: (LispProcedure fixed: [:x | self exact: x for: ''inexact->exact''] arity: 1).
 	def value: ''inexact'' value: (LispProcedure fixed: [:x | (num value: x value: ''inexact'') lispIsExact ifTrue: [x asFloat] ifFalse: [x]] arity: 1).
 	def value: ''exact->inexact'' value: (LispProcedure fixed: [:x | (num value: x value: ''exact->inexact'') lispIsExact ifTrue: [x asFloat] ifFalse: [x]] arity: 1)'.
+cm value: prims class value: 'installing' value: 'installNumericProceduresInto: anEnv
+	"Phase 9 step 9.2b: multiple values, rounding, the division family, roots and
+	 powers, the transcendental functions (R7RS 6.2.6, 6.10)."
+	| def real int inexactIf values float |
+	def := [:name :proc | anEnv define: (LispSymbol named: name) value: proc].
+	real := [:x :who | self real: x for: who].
+	int := [:x :who | self integer: x for: who].
+	values := [:a :b | LispValues withAll: { a. b }].
+	"x, inexact when any of the numbers is"
+	inexactIf := [:x :nums | (nums anySatisfy: [:n | n lispIsExact not]) ifTrue: [x asFloat] ifFalse: [x]].
+	float := [:x :who | (real value: x value: who) asFloat].
+
+	"multiple values"
+	def value: ''values'' value: (LispProcedure variadic: [:rest | | xs |
+		xs := rest lispElements asArray.
+		xs size = 1 ifTrue: [xs first] ifFalse: [LispValues withAll: xs]] required: 0).
+	def value: ''call-with-values'' value: (LispProcedure fixed: [:producer :consumer | | v |
+		v := LispProcedure call: producer.
+		LispProcedure tailCall: consumer to: ((v isKindOf: LispValues) ifTrue: [v values] ifFalse: [{ v }])] arity: 2).
+
+	"rounding: exact stays exact, a float stays a float"
+	def value: ''floor'' value: (LispProcedure fixed: [:x | self round: (real value: x value: ''floor'') with: [:y | y floor]] arity: 1).
+	def value: ''ceiling'' value: (LispProcedure fixed: [:x | self round: (real value: x value: ''ceiling'') with: [:y | y ceiling]] arity: 1).
+	def value: ''truncate'' value: (LispProcedure fixed: [:x | self round: (real value: x value: ''truncate'') with: [:y | y truncated]] arity: 1).
+	def value: ''round'' value: (LispProcedure fixed: [:x | self round: (real value: x value: ''round'') with: [:y | self roundToEven: y]] arity: 1).
+
+	"the division family, on integers (2.0 is one too)"
+	#( (''floor-quotient'' #//) (''floor-remainder'' #\\) (''modulo'' #\\)
+	   (''truncate-quotient'' #quo:) (''truncate-remainder'' #rem:) (''quotient'' #quo:) (''remainder'' #rem:) ) do: [:pair |
+		def value: pair first value: (LispProcedure fixed: [:a :b | self integerDivide: a by: b with: pair second for: pair first] arity: 2)].
+	def value: ''floor/'' value: (LispProcedure fixed: [:a :b |
+		values value: (self integerDivide: a by: b with: #// for: ''floor/'') value: (self integerDivide: a by: b with: #\\ for: ''floor/'')] arity: 2).
+	def value: ''truncate/'' value: (LispProcedure fixed: [:a :b |
+		values value: (self integerDivide: a by: b with: #quo: for: ''truncate/'') value: (self integerDivide: a by: b with: #rem: for: ''truncate/'')] arity: 2).
+
+	"rationals and integers"
+	def value: ''numerator'' value: (LispProcedure fixed: [:x | | e |
+		e := self exact: (self rational: x for: ''numerator'') for: ''numerator''.
+		inexactIf value: e numerator value: { x }] arity: 1).
+	def value: ''denominator'' value: (LispProcedure fixed: [:x | | e |
+		e := self exact: (self rational: x for: ''denominator'') for: ''denominator''.
+		inexactIf value: e denominator value: { x }] arity: 1).
+	def value: ''gcd'' value: (LispProcedure variadic: [:rest | | xs |
+		xs := rest lispElements collect: [:x | int value: x value: ''gcd''].
+		inexactIf value: (xs inject: 0 into: [:a :b | a asInteger gcd: b asInteger]) abs value: xs] required: 0).
+	def value: ''lcm'' value: (LispProcedure variadic: [:rest | | xs |
+		xs := rest lispElements collect: [:x | int value: x value: ''lcm''].
+		inexactIf value: (xs inject: 1 into: [:a :b | (a = 0 or: [b = 0]) ifTrue: [0] ifFalse: [a asInteger lcm: b asInteger]]) abs value: xs] required: 0).
+	def value: ''abs'' value: (LispProcedure fixed: [:x | (real value: x value: ''abs'') abs] arity: 1).
+	def value: ''magnitude'' value: (LispProcedure fixed: [:x | (real value: x value: ''magnitude'') abs] arity: 1).
+	def value: ''square'' value: (LispProcedure fixed: [:x | | n | n := self number: x for: ''square''. n * n] arity: 1).
+
+	"roots and powers"
+	def value: ''sqrt'' value: (LispProcedure fixed: [:x | self sqrt: (real value: x value: ''sqrt'')] arity: 1).
+	def value: ''exact-integer-sqrt'' value: (LispProcedure fixed: [:n | | s |
+		((n isNumber and: [n lispIsExact and: [n lispIsInteger]]) and: [n >= 0])
+			ifFalse: [self fail: ''exact-integer-sqrt'' with: ''not an exact non-negative integer: '' , (self show: n)].
+		s := n sqrtFloor.
+		values value: s value: n - (s * s)] arity: 1).
+	def value: ''expt'' value: (LispProcedure fixed: [:a :b | self expt: (self number: a for: ''expt'') to: (self number: b for: ''expt'')] arity: 2).
+	def value: ''rationalize'' value: (LispProcedure fixed: [:x :y | self rationalize: (real value: x value: ''rationalize'') within: (real value: y value: ''rationalize'')] arity: 2).
+
+	"the transcendental functions: inexact; +nan.0 outside the real domain"
+	def value: ''exp'' value: (LispProcedure fixed: [:x | (float value: x value: ''exp'') exp] arity: 1).
+	def value: ''log'' value: (LispProcedure variadic: [:x :rest | | ln |
+		ln := [:y :who | self naturalLog: (float value: y value: who)].
+		rest lispElements isEmpty
+			ifTrue: [ln value: x value: ''log'']
+			ifFalse: [(ln value: x value: ''log'') / (ln value: rest lispElements first value: ''log'')]] required: 1).
+	#( (''sin'' #sin) (''cos'' #cos) (''tan'' #tan) ) do: [:pair |
+		def value: pair first value: (LispProcedure fixed: [:x | | f |
+			f := float value: x value: pair first.
+			f isFinite ifTrue: [f perform: pair second] ifFalse: [Float nan]] arity: 1)].
+	#( (''asin'' #arcSin) (''acos'' #arcCos) ) do: [:pair |
+		def value: pair first value: (LispProcedure fixed: [:x | | f |
+			f := float value: x value: pair first.
+			(f between: -1.0 and: 1.0) ifTrue: [f perform: pair second] ifFalse: [Float nan]] arity: 1)].
+	def value: ''atan'' value: (LispProcedure variadic: [:y :rest |
+		rest lispElements isEmpty
+			ifTrue: [(float value: y value: ''atan'') arcTan]
+			ifFalse: [(float value: y value: ''atan'') arcTan: (float value: rest lispElements first value: ''atan'')]] required: 1)'.
+cm value: prims class value: 'checks' value: 'rational: x for: who
+	((x isNumber) and: [x lispIsRational]) ifFalse: [self fail: who with: ''not a rational number: '' , (self show: x)].
+	^ x'.
+cm value: prims class value: 'arithmetic' value: 'round: x with: aBlock
+	"floor, ceiling, round, truncate: exact gives exact; a float gives a float,
+	 keeping the sign of zero (ceiling -0.5 is -0.0) and leaving infinities and
+	 NaN as they are"
+	| r |
+	x lispIsExact ifTrue: [^ aBlock value: x].
+	(x isFinite) ifFalse: [^ x].
+	r := (aBlock value: x) asFloat.
+	^ (r = 0.0 and: [x signBit = 1]) ifTrue: [Float negativeZero] ifFalse: [r]'.
+cm value: prims class value: 'arithmetic' value: 'roundToEven: x
+	"to the nearest integer, a half to the even one (R7RS round)"
+	| f diff |
+	f := x floor.
+	diff := x - f.
+	diff < (1/2) ifTrue: [^ f].
+	diff > (1/2) ifTrue: [^ f + 1].
+	^ f even ifTrue: [f] ifFalse: [f + 1]'.
+cm value: prims class value: 'arithmetic' value: 'integerDivide: a by: b with: aSelector for: who
+	"The division family on integers; inexact if either is (a float with an
+	 integer value counts as an integer)."
+	| r |
+	self integer: a for: who.
+	self integer: b for: who.
+	b = 0 ifTrue: [self fail: who with: ''division by zero''].
+	r := a asInteger perform: aSelector with: b asInteger.
+	^ (a lispIsExact and: [b lispIsExact]) ifTrue: [r] ifFalse: [r asFloat]'.
+cm value: prims class value: 'arithmetic' value: 'sqrt: x
+	"Exact for an exact perfect square (of a rational), else inexact. No real square
+	 root for a negative number: complex numbers are a library."
+	| n d sn sd |
+	(x < 0) ifTrue: [self fail: ''sqrt'' with: ''no real square root of '' , (self show: x) , '' (complex numbers are not built in)''].
+	x lispIsExact ifFalse: [^ x sqrt].
+	n := x numerator. d := x denominator.
+	sn := n sqrtFloor. sd := d sqrtFloor.
+	((sn * sn) = n and: [(sd * sd) = d]) ifTrue: [^ sn / sd].
+	^ x asFloat sqrt'.
+cm value: prims class value: 'arithmetic' value: 'expt: a to: b
+	"Exact for an exact base and an exact integer power; a zero base by its own
+	 rules; a negative base to a non-integer power has no real answer."
+	(a lispIsReal and: [b lispIsReal]) ifFalse: [^ a raisedTo: b].
+	(b lispIsExact and: [b lispIsInteger]) ifTrue: [
+		b < 0 ifTrue: [^ self divide: 1 by: (a raisedTo: b negated)].
+		^ a raisedTo: b].
+	a = 0 ifTrue: [
+		b = 0 ifTrue: [^ (a lispIsExact and: [b lispIsExact]) ifTrue: [1] ifFalse: [1.0]].
+		b > 0 ifTrue: [^ (a lispIsExact and: [b lispIsExact]) ifTrue: [0] ifFalse: [0.0]].
+		^ Float infinity].
+	a < 0 ifTrue: [
+		b lispIsInteger ifTrue: [^ a asFloat raisedTo: b asInteger].
+		self fail: ''expt'' with: ''no real value for '' , (self show: a) , '' to the power '' , (self show: b) , '' (complex numbers are not built in)''].
+	(a lispIsExact and: [b lispIsExact]) ifTrue: [^ a raisedTo: b].
+	^ a asFloat raisedTo: b asFloat'.
+cm value: prims class value: 'arithmetic' value: 'naturalLog: f
+	"ln of a float: -inf.0 at zero, +nan.0 below it"
+	f isNaN ifTrue: [^ f].
+	f = 0.0 ifTrue: [^ Float infinity negated].
+	f < 0.0 ifTrue: [^ Float nan].
+	f isInfinite ifTrue: [^ f].
+	^ f ln'.
+cm value: prims class value: 'arithmetic' value: 'rationalize: x within: y
+	"The simplest rational within y of x (R7RS 6.2.6): inexact if either is."
+	| exact lo hi r |
+	(x lispIsNaN or: [y lispIsNaN]) ifTrue: [^ Float nan].
+	y lispIsInfinite ifTrue: [^ x lispIsInfinite ifTrue: [Float nan] ifFalse: [0.0]].
+	x lispIsInfinite ifTrue: [^ x].
+	exact := x lispIsExact and: [y lispIsExact].
+	lo := (self exact: x for: ''rationalize'') - (self exact: y for: ''rationalize'') abs.
+	hi := (self exact: x for: ''rationalize'') + (self exact: y for: ''rationalize'') abs.
+	r := self simplestBetween: lo and: hi.
+	^ exact ifTrue: [r] ifFalse: [r asFloat]'.
+cm value: prims class value: 'arithmetic' value: 'simplestBetween: lo and: hi
+	"the rational with the smallest denominator in [lo, hi], lo <= hi (Stern-Brocot)"
+	| fl |
+	(lo <= 0 and: [hi >= 0]) ifTrue: [^ 0].
+	hi < 0 ifTrue: [^ (self simplestBetween: hi negated and: lo negated) negated].
+	fl := lo floor.
+	fl = lo ifTrue: [^ fl].
+	fl < hi floor ifTrue: [^ fl + 1].
+	^ fl + (1 / (self simplestBetween: 1 / (hi - fl) and: 1 / (lo - fl)))'.
 cm value: prims class value: 'arithmetic' value: 'exact: x for: who
 	"The exact number equal to x: a float''s exact value, not a nearby fraction."
 	(self number: x for: who) lispIsExact ifTrue: [^ x].

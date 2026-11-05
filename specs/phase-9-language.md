@@ -305,6 +305,10 @@ as `Float infinity`; and cog-lisp had **no multiple values**, which `floor/`,
   Outside the real domain they answer `+nan.0`.
 - **`number->string`** with a radix, for rationals too (`(number->string 1/3 2)`
   is `"1/11"`).
+- As built: `expt` with a float power goes through Pharo's `raisedTo:` (`exp`
+  of `ln`), so `(expt 2 0.5)` is `1.414213562373095`, one unit in the last place
+  from `(sqrt 2)`. R7RS asks no more; a correctly rounded `pow` would need a
+  primitive Pharo does not have. `magnitude` came too, as `abs` of a real.
 
 **9.2c: open to new kinds.**
 - **`(define-number-syntax predicate parser)`**: the reader and `string->number`
@@ -392,5 +396,5 @@ as `Float infinity`; and cog-lisp had **no multiple values**, which `floor/`,
 | Step | Status |
 |---|---|
 | 9.1 Seeded builds | done (2026-11-05): built from the v0.1.2 seed (9.1a); the Smalltalk reader and compiler retired (9.1b); the seed rebuilt from its source in CI (9.1c) |
-| 9.2 Numeric tower | 9.2a done (2026-11-05): read, print, predicates, exactness, IEEE division, type errors (R-11, R-21); 9.2b, 9.2c to come |
+| 9.2 Numeric tower | 9.2a, 9.2b done (2026-11-05): read, print, predicates, exactness, IEEE division, type errors (R-11, R-21); multiple values and the numeric procedures; 9.2c to come |
 | 9.3 Hygienic macros | not started |
