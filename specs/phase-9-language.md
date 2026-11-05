@@ -479,6 +479,14 @@ Two commits.
   nested ellipses, literals, vectors, `let-syntax` and `letrec-syntax`); C-14's
   two examples give the Scheme answers; every existing suite passes.
 
+**Checked 2026-11-05.**
+- AC-1: every suite passes on Windows and Linux, and in CI; the recovery job
+  rebuilds the seed from source (recursively, v0.1.3 then v0.1.2).
+- The benchmarks pass 14/14 on Windows and, by the benchmarks workflow
+  (run 42091231387), on Linux, where compiling took 15.1 ms.
+- AC-2 and AC-3: the LISP tests named in 9.2 and 9.3; R-11, R-21 and C-14 are
+  closed in the review record.
+
 ## 6. Examples
 
 | Example | Proves |
