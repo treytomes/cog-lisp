@@ -55,6 +55,11 @@ announcements; Pharo's recompiling a class for a new shape announces nothing,
 so object identity cannot tell), removed **before** any of it runs. It refuses
 to remove more than half the methods. `(image-build-info)` reports the seed and
 the fixpoint.
+- **If a seed is lost**, `scripts/rebuild-seed.sh` rebuilds `pharo/seed.image`
+  from the seed's tagged source, the way it was built (recursing through older
+  seeds, down to a tag built from the stock image); bootstrap with
+  `COGLISP_SKIP_SEED=1` first. CI's recovery job runs it on every push. Running
+  it locally replaces the released seed; `bootstrap-pharo` puts it back.
 - **The new `src/` must still run the seed's compiler for one build.** If it
   can't, keep the old method for one more release, or release and move the seed
   pin forward.

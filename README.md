@@ -40,7 +40,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 7.9 | Self-hosting groundwork | ✅ **done** — [spec](specs/phase-7.9-self-hosting-groundwork.md), 46/46, LISP unit tests ([`lib/test.lisp`](lib/test.lisp)); all suites 948/948 |
 | 8 | Self-hosting (meta-circular) | ✅ **done** — [spec](specs/phase-8-self-hosting.md); 8.1 tests in LISP, 8.2 reader and 8.3 compiler in LISP, 8.4 the compiler compiles itself to a fixpoint, 8.5 the LISP reader and compiler are the ones in use, 8.6 it writes bytecode itself, compiling 2.1× faster than Phase 7.9 ([`lib/compiler/`](lib/compiler/), examples [read-yourself](examples/read-yourself.lisp), [compile-yourself](examples/compile-yourself.lisp), [extend-the-compiler](examples/extend-the-compiler.lisp), [bootstrap](examples/bootstrap.lisp), [sealed-compiler](examples/sealed-compiler.lisp)) done; all suites 2506/2506, with either compiler |
 | 8.9 | CI/CD, and running on Linux | ✅ **done** — [spec](specs/phase-8.9-ci-cd.md); every push tested on Linux (both compilers) and Windows; a `v*` tag publishes Linux and Windows bundles and the `.vsix` |
-| 9 | Finishing the language: seeded builds, the numeric tower, hygienic macros | ⬜ [spec](specs/phase-9-language.md) accepted |
+| 9 | Finishing the language: seeded builds, the numeric tower, hygienic macros | 🔄 [spec](specs/phase-9-language.md): 9.1 done |
 | 10 | A world of its own: the pure LISP image, then networking and graphics from LISP | ⬜ [spec](specs/phase-10-pure-image.md) accepted in outline |
 
 Phase 0 is proven, not just planned: [`poc/answer.st`](poc/answer.st) builds
@@ -165,7 +165,9 @@ The image is built from a **seed**, an earlier cog-lisp release pinned the same
 way (`SEED_TAG`, `SEED_URL`, `SEED_SHA256`; Phase 9 step 9.1). Its compiler
 compiles the new compiler, which then compiles itself to a fixpoint;
 `(image-build-info)` shows how the running image was built
-([example](examples/seeded-build.lisp)).
+([example](examples/seeded-build.lisp)). If a seed is ever lost,
+`scripts/rebuild-seed.sh` rebuilds it from its tagged source, the way it was
+built; CI does that on every push.
 
 ## License
 
@@ -342,10 +344,10 @@ spec, for the record, was a pipeline on a Windows runner:
 ### Phase 9 — Finishing the language
 [Spec](specs/phase-9-language.md), accepted. Three steps, each with LISP tests
 and examples:
-- **9.1 Seeded builds**: an image is built from an earlier cog-lisp image (a
-  pinned release, like `pharo.pins` pins Pharo), not the stock Pharo image. The
-  Smalltalk reader and compiler retire, with `COGLISP_COMPILER=smalltalk`; the
-  path that rebuilds a seed from the pinned stock image stays, for recovery.
+- **9.1 Seeded builds** (done): an image is built from an earlier cog-lisp image
+  (the v0.1.2 release, pinned like Pharo), not the stock Pharo image. The
+  Smalltalk reader and compiler retired, with `COGLISP_COMPILER`; a lost seed is
+  rebuilt from its tagged source (`scripts/rebuild-seed.sh`, run by CI).
 - **9.2 The numeric tower** (R7RS 6.2): exact rationals with read syntax (`1/3`),
   exactness, `#e #i #x #o #b`, `+inf.0`/`+nan.0`, and the numeric procedures
   (review R-11, R-21). Open to new kinds of number, so complex numbers can come

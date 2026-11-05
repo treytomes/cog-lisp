@@ -298,6 +298,6 @@ runs every suite.
 
 | Step | Status |
 |---|---|
-| 9.1 Seeded builds | 9.1a, 9.1b done (2026-11-05): built from the v0.1.2 seed; the Smalltalk reader and compiler retired; 9.1c to come |
+| 9.1 Seeded builds | done (2026-11-05): built from the v0.1.2 seed (9.1a); the Smalltalk reader and compiler retired (9.1b); the seed rebuilt from its source in CI (9.1c) |
 | 9.2 Numeric tower | not started |
 | 9.3 Hygienic macros | not started |
