@@ -9,6 +9,11 @@ A thin extension for working on cog-lisp in VS Code
   definitions introduce.
 - **Brackets and comments**: matching and auto-closing `()`, `""` and `#| |#`;
   *Toggle Line Comment* uses `;`.
+- **Hover help and completion** for every built-in (special forms, derived forms
+  and procedures): hover over a name to see its call form and what it does, and
+  completion offers the names as you type. The data is `builtins.json`,
+  generated from the documentation kept in the image (Phase 10 step 10.3), so it
+  works with no image running and never goes out of date: a suite checks it.
 - **cog-lisp: Run File** (the ▷ button in the editor title): runs the file with
   `cog-lisp.bat` (Windows) or `cog-lisp.sh` (Linux) in a task. An error (`path:line:col: error: message`) appears in
   *Problems* and is underlined in the file.

@@ -397,6 +397,26 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **A `define-syntax` macro keeps its source**: its expander's
   `procedure-source` is the `define-syntax` form's text.
 
+## Documentation and the generated files (Phase 10)
+
+- **Every built-in is documented in the image.** A primitive by the table at the
+  end of the installer that defines it (`self document: anEnv category: ...
+  with: #(name call description ...)`); a special form by
+  `define-special-form`'s string; a LISP definition by a string at the start of
+  its body (`define`, `define-macro`, `lambda`) or before its transformer
+  (`define-syntax`). A new primitive without documentation fails
+  `tests/lisp/phase-10.1-documentation.lisp`. No apostrophes in a primitive's
+  table: inside the method source they would need quadrupling.
+- **Three things are generated and committed**: `docs/builtins.md`,
+  `vscode/builtins.json` (hover help), and `docs/manual/` (from `examples/`,
+  `docs/manual/chapters.lisp` and `docs/manual/introduction.md`). After changing
+  documentation, an example or a chapter, rebuild the image and run
+  `./cog-lisp.sh tools/generate-docs.lisp`; the 10.2 and 10.4 suites fail while a
+  committed copy is out of date. A new example must be added to a chapter.
+- **An example's opening comment is manual prose**: its first line
+  (`name.lisp -- what it shows`) becomes the section title, and the rest of the
+  comment its explanation, so write it for a reader.
+
 ## Writing the compiler in LISP (Phase 8)
 
 - **The LISP reader and compiler are the only ones** (since Phase 9 step 9.1;

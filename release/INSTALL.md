@@ -42,6 +42,13 @@ Install the extension from `cog-lisp-VERSION.vsix` (Extensions view, `...` menu,
 button) runs the file you are editing, errors show in *Problems*, and
 *cog-lisp: Start REPL* opens the REPL in a terminal.
 
+## Documentation
+
+`docs/manual/README.md` is the manual: the language chapter by chapter, through
+the examples in `examples/`. `docs/builtins.md` lists every built-in with its
+call form and what it does; at the REPL, `(documentation 'name)` answers the
+same.
+
 ## Licenses
 
 cog-lisp is released under the MIT license (`LICENSE`). See

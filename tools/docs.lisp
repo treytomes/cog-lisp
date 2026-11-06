@@ -1,0 +1,342 @@
+;;; docs.lisp -- the documentation the image holds, as the files generated from it
+;;; (specs/phase-10-documentation-and-editor.md steps 10.2 and 10.3)
+;;;
+;;; (builtins-markdown) is docs/builtins.md and (builtins-json) is
+;;; vscode/builtins.json, each as a string. tools/generate-docs.lisp writes them;
+;;; the suites compare them with the committed files, so the files cannot drift
+;;; from the image. Only the built-in categories below are included, in this
+;;; order, so a program's own documented definitions never are.
+
+(define docs-categories
+  '("Special forms" "Derived forms" "Equality and types" "Numbers" "Lists"
+    "Characters" "Strings" "Vectors" "Hash tables" "Control"
+    "Conditions and restarts" "Evaluation and macros" "Output" "Ports" "Files"
+    "The system" "Smalltalk interop" "The compiler and reader"))
+
+;; an entry: #(name kind category call description)
+(define (docs-entry-name e) (vector-ref e 0))
+(define (docs-entry-kind e) (vector-ref e 1))
+(define (docs-entry-category e) (vector-ref e 2))
+(define (docs-entry-call e) (vector-ref e 3))
+(define (docs-entry-description e) (vector-ref e 4))
+
+;; the first line of a documentation string, and the rest as one line
+(define (docs-split doc)
+  (let ((i (string-index doc #\newline)))
+    (if i
+        (cons (substring doc 0 i) (docs-one-line (substring doc (+ i 1))))
+        (cons doc ""))))
+(define (docs-one-line s) (string-join (string-split s #\newline) " "))
+
+(define (docs-make-entry name kind)
+  (let ((doc (documentation name)) (category (documentation-category name)))
+    (and doc category (member category docs-categories)
+         (let ((parts (docs-split doc)))
+           (vector (symbol->string name) kind category (car parts) (cdr parts))))))
+
+(define (docs-kind value)
+  (cond ([value isKindOf: (smalltalk LispMacro)] "macro")
+        ((procedure? value) "procedure")
+        (else "value")))
+
+(define (docs-sort-strings strings)
+  (vector->list [[[(list->vector strings) asSortedCollection] asArray] copy]))
+
+;; every public, documented built-in, by category in docs-categories' order, then
+;; by name
+(define (builtin-entries)
+  (let ((entries '()))
+    (for-each (lambda (name)
+                (let ((e (docs-make-entry name "special form")))
+                  (when e (set! entries (cons e entries)))))
+              (special-form-names))
+    [[(smalltalk LispEnvironment) default]
+     cellsDo: (lambda (cell)
+                (when [cell isBound]
+                  (let* ((name [cell symbol])
+                         (s (symbol->string name)))
+                    (unless (or (char=? (string-ref s 0) #\%)
+                                (and (documentation-category name)
+                                     (string=? (documentation-category name) "Special forms")))
+                      (let ((e (docs-make-entry name (docs-kind [cell value]))))
+                        (when e (set! entries (cons e entries))))))))]
+    (let ((by-name (make-hash-table equal?)))
+      (for-each (lambda (e) (hash-table-set! by-name (docs-entry-name e) e)) entries)
+      (let loop ((cats docs-categories) (acc '()))
+        (if (null? cats)
+            (reverse acc)
+            (loop (cdr cats)
+                  (append (reverse (map (lambda (n) (hash-table-ref by-name n))
+                                        (docs-sort-strings
+                                         (map docs-entry-name
+                                              (docs-filter (lambda (e) (string=? (docs-entry-category e) (car cats)))
+                                                           entries)))))
+                          acc)))))))
+
+(define (docs-filter pred l)
+  (cond ((null? l) '())
+        ((pred (car l)) (cons (car l) (docs-filter pred (cdr l))))
+        (else (docs-filter pred (cdr l)))))
+
+(define (docs-in-category entries category)
+  (docs-filter (lambda (e) (string=? (docs-entry-category e) category)) entries))
+
+;;; docs/builtins.md
+
+;; GitHub's anchor for a heading
+(define (docs-anchor title)
+  (list->string (map (lambda (c) (if (char=? c #\space) #\- (char-downcase c))) (string->list title))))
+
+;; text for a Markdown table cell: a | would end the cell
+(define (docs-cell s)
+  (string-join (string-split s #\|) "\\|"))
+
+(define (builtins-markdown)
+  (let ((entries (builtin-entries)))
+    (with-output-to-string
+      (lambda ()
+        (display "# The built-ins of cog-lisp\n\n")
+        (display "Every special form, derived form and built-in procedure, with its call form\n")
+        (display "and what it does. Generated from the documentation kept in the image\n")
+        (display "(specs/phase-10-documentation-and-editor.md, step 10.2): do not edit by hand.\n")
+        (display "After changing documentation, rebuild the image and run\n")
+        (display "`./cog-lisp.sh tools/generate-docs.lisp` (or `cog-lisp.bat`).\n\n")
+        (display "In a call form, `[x]` is optional and `x ...` is any number of them.\n")
+        (display "`(documentation 'name)` answers the same text at the REPL.\n\n")
+        (for-each (lambda (cat)
+                    (let ((n (length (docs-in-category entries cat))))
+                      (when (> n 0)
+                        (display "- [") (display cat) (display "](#") (display (docs-anchor cat))
+                        (display ") (") (display n) (display ")\n"))))
+                  docs-categories)
+        (for-each (lambda (cat)
+                    (let ((es (docs-in-category entries cat)))
+                      (when (pair? es)
+                        (display "\n## ") (display cat) (display "\n\n")
+                        (display "| Name | Call | Kind | What it does |\n")
+                        (display "|---|---|---|---|\n")
+                        (for-each (lambda (e)
+                                    (display "| `") (display (docs-cell (docs-entry-name e)))
+                                    (display "` | `") (display (docs-cell (docs-entry-call e)))
+                                    (display "` | ") (display (docs-entry-kind e))
+                                    (display " | ") (display (docs-cell (docs-entry-description e)))
+                                    (display " |\n"))
+                                  es))))
+                  docs-categories)))))
+
+;;; vscode/builtins.json: what the editor shows on hover, and completes
+
+(define (docs-json-string s)
+  (with-output-to-string
+    (lambda ()
+      (display "\"")
+      (for-each (lambda (c)
+                  (cond ((char=? c #\") (display "\\\""))
+                        ((char=? c #\\) (display "\\\\"))
+                        ((char=? c #\newline) (display "\\n"))
+                        ((char=? c #\tab) (display "\\t"))
+                        ((< (char->integer c) 32) (display "\\u") (display (docs-hex4 (char->integer c))))
+                        (else (write-char c))))
+                (string->list s))
+      (display "\""))))
+
+(define (docs-hex4 n)
+  (let ((h (number->string n 16)))
+    (string-append (make-string (- 4 (string-length h)) #\0) h)))
+
+;; one entry per line, sorted by name, so the file diffs well
+(define (builtins-json)
+  (let* ((entries (builtin-entries))
+         (by-name (make-hash-table equal?)))
+    (for-each (lambda (e) (hash-table-set! by-name (docs-entry-name e) e)) entries)
+    (with-output-to-string
+      (lambda ()
+        (display "{\n")
+        (let loop ((names (docs-sort-strings (map docs-entry-name entries))))
+          (when (pair? names)
+            (let ((e (hash-table-ref by-name (car names))))
+              (display "  ") (display (docs-json-string (docs-entry-name e)))
+              (display ": {\"call\": ") (display (docs-json-string (docs-entry-call e)))
+              (display ", \"kind\": ") (display (docs-json-string (docs-entry-kind e)))
+              (display ", \"category\": ") (display (docs-json-string (docs-entry-category e)))
+              (display ", \"description\": ") (display (docs-json-string (docs-entry-description e)))
+              (display (if (pair? (cdr names)) "},\n" "}\n")))
+            (loop (cdr names))))
+        (display "}\n")))))
+
+;;; docs/manual/: the user manual, from the examples (step 10.4)
+
+;; the repository's root: this file is tools/docs.lisp
+(define docs-root [[[[(current-load-path) asFileReference] parent] parent] fullName])
+(define (docs-path relative) (string-append docs-root "/" relative))
+(define (docs-file-text relative) [[[(docs-path relative) asFileReference] contents] asString])
+(define (docs-file? relative) [[(docs-path relative) asFileReference] isFile])
+(define (docs-directory? relative) [[(docs-path relative) asFileReference] isDirectory])
+
+;; the chapters: #(slug title introduction (example ...)), from docs/manual/chapters.lisp
+(define (manual-chapters)
+  (map (lambda (form) (vector (car (cdr form)) (car (cdr (cdr form))) (car (cdr (cdr (cdr form))))
+                              (cdr (cdr (cdr (cdr form))))))
+       (read-all (docs-file-text "docs/manual/chapters.lisp"))))
+
+(define (docs-lines text) (string-split text #\newline))
+(define (docs-starts? s prefix)
+  (and (>= (string-length s) (string-length prefix)) (string=? (substring s 0 (string-length prefix)) prefix)))
+
+;; a comment line without its semicolons and the one space after them
+(define (docs-uncomment line)
+  (let loop ((i 0))
+    (if (and (< i (string-length line)) (char=? (string-ref line i) #\;))
+        (loop (+ i 1))
+        (substring line (if (and (< i (string-length line)) (char=? (string-ref line i) #\space)) (+ i 1) i)))))
+
+;; an example's text split into its opening comment (a list of lines) and its code
+(define (docs-split-example text)
+  (let loop ((lines (docs-lines text)) (comment '()))
+    (if (and (pair? lines) (docs-starts? (car lines) ";"))
+        (loop (cdr lines) (cons (docs-uncomment (car lines)) comment))
+        (cons (reverse comment)
+              (string-join (docs-drop-blank lines) "\n")))))
+
+(define (docs-drop-blank lines)
+  (if (and (pair? lines) (string=? (string-trim (car lines)) "")) (docs-drop-blank (cdr lines)) lines))
+
+;; "name.lisp -- what it shows (Phase 7.9 section 4)" -> "what it shows": the
+;; first line's title, without its reference to the spec
+(define (docs-example-title line)
+  (let* ((dash (string-search line " -- "))
+         (title (if dash (substring line (+ dash 4)) line))
+         (ref (string-search title " (Phase"))
+         (plain (if ref (substring title 0 ref) title)))
+    (if (string=? plain "")
+        plain
+        (string-append (string (char-upcase (string-ref plain 0))) (substring plain 1)))))
+
+;; the comment's prose: what follows the title line, less any line that only
+;; refers to the spec
+(define (docs-example-prose comment-lines)
+  (let ((rest (docs-filter (lambda (l) (not (or (docs-starts? (string-trim l) "(Phase")
+                                                  (docs-starts? (string-trim l) "(specs/"))))
+                           (if (pair? comment-lines) (cdr comment-lines) '()))))
+    (string-trim (string-join rest "\n"))))
+
+(define (docs-slashes path) [path copyReplaceAll: "\\" with: "/"])
+
+;; a path relative to the repository's root
+(define (docs-relative path)
+  (substring (docs-slashes path) (+ (string-length (docs-slashes docs-root)) 1)))
+
+;; the other .lisp files of a folder example, sorted (main.lisp is shown first)
+(define (docs-folder-others name)
+  (docs-sort-strings
+   (docs-filter (lambda (f) (and [f endsWith: ".lisp"] (not [f endsWith: "/main.lisp"])))
+                (map (lambda (f) (docs-relative [f fullName]))
+                     (vector->list [[[(docs-path (string-append "examples/" name)) asFileReference] allFiles] asArray])))))
+
+(define (docs-fence language text)
+  (string-append "```" language "\n" text (if [text endsWith: "\n"] "" "\n") "```\n"))
+
+(define (docs-listing path code)
+  (string-append "`" path "`:\n\n" (docs-fence "scheme" code) "\n"))
+
+;; one example, as a section of a chapter
+(define (docs-example-section name)
+  (let* ((folder (docs-directory? (string-append "examples/" name)))
+         (main (if folder (string-append "examples/" name "/main") (string-append "examples/" name)))
+         (parts (docs-split-example (docs-file-text (string-append main ".lisp"))))
+         (comment (car parts)))
+    (with-output-to-string
+      (lambda ()
+        (display "## ") (display (docs-example-title (if (pair? comment) (car comment) name))) (newline) (newline)
+        (let ((prose (docs-example-prose comment)))
+          (unless (string=? prose "") (display prose) (newline) (newline)))
+        (display (docs-listing (string-append main ".lisp") (cdr parts)))
+        (when folder
+          (for-each (lambda (f) (display (docs-listing f (cdr (docs-split-example (docs-file-text f))))))
+                    (docs-folder-others name)))
+        (when (docs-file? (string-append main ".args"))
+          (display "Run with the arguments `") (display (string-trim (docs-file-text (string-append main ".args"))))
+          (display "`.") (newline) (newline))
+        (when (docs-file? (string-append main ".input"))
+          (display "Its input:") (newline) (newline)
+          (display (docs-fence "text" (docs-file-text (string-append main ".input")))) (newline))
+        (if (docs-file? (string-append main ".expected"))
+            (begin
+              (display "Its output:") (newline) (newline)
+              (display (docs-fence "text" (docs-file-text (string-append main ".expected")))) (newline))
+            (begin (display "A library, which the next example loads.") (newline) (newline)))))))
+
+(define (docs-two-digits n) (if (< n 10) (string-append "0" (number->string n)) (number->string n)))
+(define (docs-nth l i) (if (= i 0) (car l) (docs-nth (cdr l) (- i 1))))
+
+;; the file name of chapter n (from 1)
+(define (docs-chapter-name n chapters)
+  (string-append (docs-two-digits n) "-" (vector-ref (docs-nth chapters (- n 1)) 0) ".md"))
+
+(define (docs-chapter-links n chapters)
+  (string-append
+   (if (> n 1)
+       (string-append "Previous: [" (vector-ref (docs-nth chapters (- n 2)) 1) "](" (docs-chapter-name (- n 1) chapters) ") · ")
+       "")
+   "[Contents](README.md)"
+   (if (< n (length chapters))
+       (string-append " · Next: [" (vector-ref (docs-nth chapters n) 1) "](" (docs-chapter-name (+ n 1) chapters) ")")
+       "")))
+
+(define docs-generated-note
+  "<!-- Generated by tools/generate-docs.lisp from docs/manual/chapters.lisp,\n     docs/manual/introduction.md and the examples: do not edit by hand. -->\n\n")
+
+(define (docs-chapter-text n chapter chapters)
+  (with-output-to-string
+    (lambda ()
+      (display "# ") (display n) (display ". ") (display (vector-ref chapter 1)) (newline) (newline)
+      (display docs-generated-note)
+      (display (vector-ref chapter 2)) (newline) (newline)
+      (for-each (lambda (name) (display (docs-example-section name))) (vector-ref chapter 3))
+      (display "---") (newline) (newline)
+      (display (docs-chapter-links n chapters)) (newline))))
+
+(define (docs-manual-index chapters)
+  (with-output-to-string
+    (lambda ()
+      (display "# The cog-lisp manual") (newline) (newline)
+      (display docs-generated-note)
+      (display (docs-file-text "docs/manual/introduction.md"))
+      (newline) (display "## Contents") (newline) (newline)
+      (let loop ((cs chapters) (n 1))
+        (when (pair? cs)
+          (display n) (display ". [") (display (vector-ref (car cs) 1)) (display "](")
+          (display (docs-chapter-name n chapters)) (display ")") (newline)
+          (loop (cdr cs) (+ n 1))))
+      (newline) (display "And the [reference of the built-ins](../builtins.md).") (newline))))
+
+;; every generated file of the manual: (relative-path . text)
+(define (manual-files)
+  (let ((chapters (manual-chapters)))
+    (cons (cons "docs/manual/README.md" (docs-manual-index chapters))
+          (let loop ((cs chapters) (n 1))
+            (if (null? cs)
+                '()
+                (cons (cons (string-append "docs/manual/" (docs-chapter-name n chapters))
+                            (docs-chapter-text n (car cs) chapters))
+                      (loop (cdr cs) (+ n 1))))))))
+
+;; every example: a .lisp file of examples/, or a folder with a main.lisp
+(define (docs-example-names)
+  (docs-sort-strings
+   (apply append
+          (map (lambda (e)
+                 (let ((base [e basename]))
+                   (cond ([e isDirectory] (if [[e / "main.lisp"] exists] (list base) '()))
+                         ([base endsWith: ".lisp"] (list (substring base 0 (- (string-length base) 5))))
+                         (else '()))))
+               (vector->list [[[(docs-path "examples") asFileReference] children] asArray])))))
+
+;; the examples no chapter names, and the names no example has
+(define (manual-unlisted-examples)
+  (let ((listed (apply append (map (lambda (c) (vector-ref c 3)) (manual-chapters)))))
+    (docs-filter (lambda (name) (not (member name listed))) (docs-example-names))))
+(define (manual-missing-examples)
+  (let ((names (docs-example-names)))
+    (docs-filter (lambda (name) (not (member name names)))
+                 (apply append (map (lambda (c) (vector-ref c 3)) (manual-chapters))))))

@@ -2,14 +2,17 @@
 // Deliberately thin: highlighting and brackets are declarative (package.json,
 // the grammar, language-configuration.json); this file only adds commands that
 // call the repo's own scripts, so the editor runs exactly what the terminal runs.
-// The language intelligence is planned for a language server served by the
-// image itself (section 5.4).
+// Hover help and completion for the built-ins come from builtins.json, generated
+// from the image's documentation (Phase 10 step 10.3; src/builtins.js); the rest
+// of the language intelligence is planned for a language server served by the
+// image itself (Phase 10 step 10.5).
 'use strict';
 
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
 const { topLevelFormAt } = require('./forms');
+const { loadBuiltins, symbolAt, hoverMarkdown, completions } = require('./builtins');
 
 const REPL_NAME = 'cog-lisp REPL';
 let replTerminal = null;
@@ -179,7 +182,42 @@ async function checkStale() {
   if (choice === 'Rebuild Image') rebuildImage();
 }
 
+// Hover and completion for the built-ins, from the generated builtins.json
+function registerBuiltins(context) {
+  let builtins = {};
+  try {
+    builtins = loadBuiltins(path.join(context.extensionPath, 'builtins.json'));
+  } catch (e) {
+    return;   // without the data, no help: nothing else depends on it
+  }
+  context.subscriptions.push(
+    vscode.languages.registerHoverProvider('cog-lisp', {
+      provideHover(document, position) {
+        const found = symbolAt(document.lineAt(position.line).text, position.character);
+        if (!found || !Object.prototype.hasOwnProperty.call(builtins, found.name)) return undefined;
+        const range = new vscode.Range(position.line, found.start, position.line, found.end);
+        return new vscode.Hover(new vscode.MarkdownString(hoverMarkdown(found.name, builtins[found.name])), range);
+      }
+    }),
+    vscode.languages.registerCompletionItemProvider('cog-lisp', {
+      provideCompletionItems(document, position) {
+        const found = symbolAt(document.lineAt(position.line).text, position.character);
+        const prefix = found ? document.lineAt(position.line).text.slice(found.start, position.character) : '';
+        return completions(builtins, prefix).map((name) => {
+          const entry = builtins[name];
+          const item = new vscode.CompletionItem(name,
+            entry.kind === 'procedure' ? vscode.CompletionItemKind.Function : vscode.CompletionItemKind.Keyword);
+          item.detail = entry.call;
+          item.documentation = new vscode.MarkdownString(entry.description);
+          return item;
+        });
+      }
+    })
+  );
+}
+
 function activate(context) {
+  registerBuiltins(context);
   context.subscriptions.push(
     vscode.commands.registerCommand('cog-lisp.runFile', runFile),
     vscode.commands.registerCommand('cog-lisp.startRepl', () => ensureRepl(true)),

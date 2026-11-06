@@ -14,6 +14,7 @@
   ],
   "main": "./src/extension.js",
   "activationEvents": [
+    "onLanguage:cog-lisp",
     "workspaceContains:cog-lisp.bat",
     "workspaceContains:cog-lisp.sh"
   ],
@@ -147,7 +148,7 @@
     }
   },
   "scripts": {
-    "test": "node test/forms.test.js && node test/matcher.test.js && node test/grammar.test.js",
+    "test": "node test/forms.test.js && node test/matcher.test.js && node test/builtins.test.js && node test/grammar.test.js",
     "package": "vsce package --skip-license --allow-missing-repository --out cog-lisp.vsix"
   },
   "devDependencies": {

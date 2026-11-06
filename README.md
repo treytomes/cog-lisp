@@ -153,6 +153,17 @@ bench\run-benchmarks.bat
 Headless conventions and the verified Pharo mechanisms are documented in
 [`CLAUDE.md`](CLAUDE.md).
 
+**[The cog-lisp manual](docs/manual/README.md)** teaches the language chapter by
+chapter, through the examples: each one's explanation, code and the output the
+suites check. It is generated from `examples/` and `docs/manual/chapters.lisp`.
+
+**[The reference of the built-ins](docs/builtins.md)** lists every special form,
+derived form and built-in procedure with its call form and what it does. It is
+generated from the documentation kept in the image (`(documentation 'name)` at
+the REPL). After changing documentation or an example, rebuild the image and run
+`./cog-lisp.sh tools/generate-docs.lisp`; a suite fails while a committed copy is
+out of date.
+
 ### The Pharo build
 
 cog-lisp builds against one exact Pharo: the Pharo 14 image build 788

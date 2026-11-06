@@ -181,6 +181,21 @@ moved to v0.1.3.
 - **What is written by hand** is only what joins the chapters: an introduction,
   installing and running, and a short prose file where a chapter needs one.
 
+As built (10.2 to 10.4):
+- `tools/docs.lisp` builds each generated file as a string, and
+  `tools/generate-docs.lisp` writes them. The suites load `tools/docs.lisp` and
+  compare its strings with the committed files.
+- The reference holds only the built-in categories, so neither the tool's nor a
+  program's documented definitions get into it.
+- The JSON is written by hand, sorted and one entry per line, so it diffs well.
+  `STONJSON` writes a dictionary in hash order.
+- The extension activates when a cog-lisp file opens, not only in a folder with
+  the launcher, so help works in any workspace.
+- A manual section's title is the example's first comment line, after `--` and
+  without its spec reference. A folder example shows each of its files, an
+  `.args` or `.input` file is shown with it, and an example without
+  `.expected` (`dual.lisp`) is shown as a library.
+
 ### 10.5 The language server (spike first)
 - **The spike, before the step's detailed spec:**
   - a `lisp lsp` command reads LSP messages from stdin and answers on stdout,
@@ -267,7 +282,7 @@ moved to v0.1.3.
 | Step | Status |
 |---|---|
 | 10.1 Documentation in the image | 10.1a done (2026-11-05): the machinery; 249 primitives, 16 special forms and the compiler's entry points documented; 10.1b (the derived forms) after the v0.2.0 seed |
-| 10.2 The reference of the built-ins | not started |
-| 10.3 Hover help, offline | not started |
-| 10.4 The user manual | not started |
+| 10.2 The reference of the built-ins | done (2026-11-05): docs/builtins.md, 283 entries in 17 sections, checked against the image |
+| 10.3 Hover help, offline | done (2026-11-05): hover and completion from vscode/builtins.json, checked against the image |
+| 10.4 The user manual | done (2026-11-05): docs/manual/, 14 chapters from all 36 examples |
 | 10.5 The language server | not started |

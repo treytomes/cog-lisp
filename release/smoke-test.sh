@@ -33,6 +33,10 @@ for f in $(grep -o 'licenses/[A-Za-z0-9._-]*\.txt' THIRD-PARTY-NOTICES.md | sort
   [ -s "$f" ] || { echo "    missing $f"; ok=0; }
 done
 check "the bundle carries LICENSE, the notices and every license they name" $ok
+ok=0; [ -s docs/builtins.md ] && grep -q "string-ref" docs/builtins.md && ok=1
+check "the bundle carries the reference of the built-ins (docs/builtins.md)" $ok
+ok=0; [ -s docs/manual/README.md ] && [ -s docs/manual/01-getting-started.md ] && ok=1
+check "the bundle carries the manual (docs/manual/)" $ok
 stray="$(cd pharo && find . -type f \( -iname '*.dll' -o -name '*.so' -o -name '*.so.*' \) | sed 's|.*/||' |
   grep -Ev '^(lib)?(PharoVMCore|ffi|tty|winpthread-1|B2DPlugin|BitBltPlugin|DSAPrims|FileAttributesPlugin|FilePlugin|FloatArrayPlugin|JPEGReaderPlugin|LargeIntegers|LocalePlugin|MiscPrimitivePlugin|NewFilePlugin|SocketPlugin|SqueakSSL|SurfacePlugin|UUIDPlugin|UnixOSProcessPlugin)\.(dll|so)$' || true)"
 ok=0; [ -z "$stray" ] && ok=1
