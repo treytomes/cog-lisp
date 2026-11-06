@@ -25,6 +25,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Files](#files) (17)
 - [The system](#the-system) (7)
 - [Smalltalk interop](#smalltalk-interop) (11)
+- [Language server](#language-server) (2)
 - [The compiler and reader](#the-compiler-and-reader) (17)
 
 ## Special forms
@@ -372,6 +373,13 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `smalltalk-selector` | `(smalltalk-selector name)` | procedure | The Smalltalk selector spelled name. |
 | `smalltalk-send` | `(smalltalk-send receiver selector arg ...)` | procedure | Sends the message selector to receiver with the arguments, chosen at run time. |
 | `smalltalk-symbol` | `(smalltalk-symbol name)` | procedure | The Smalltalk symbol spelled name. |
+
+## Language server
+
+| Name | Call | Kind | What it does |
+|---|---|---|---|
+| `read-framed-message` | `(read-framed-message)` | procedure | The next message on standard input, framed as the Language Server Protocol frames it (a Content-Length header, a blank line, the text), or the eof object. |
+| `write-framed-message` | `(write-framed-message text)` | procedure | Writes text to standard output, framed as the Language Server Protocol frames it. |
 
 ## The compiler and reader
 

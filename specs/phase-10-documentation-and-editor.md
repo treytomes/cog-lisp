@@ -222,6 +222,89 @@ As built (10.2 to 10.4):
 - **If the spike fails**, the step ends with the spike's record, and offline
   hover (10.3) is the editor's help until a later phase.
 
+#### The spike's record (2026-11-05): it works, on both platforms
+
+- **The worry was unfounded.** `LispStdin` already buffers raw bytes. Its
+  `nextLine` takes them only up to a line feed, and `atEnd` blocks until bytes
+  arrive or input ends. So a header line reads with `nextLine`, and only the
+  body needed something new: `nextBytes: n`, which waits for exactly n bytes.
+  No socket was needed.
+- **The server is LISP**: `lib/lsp.lisp`, run by the ordinary launcher
+  (`./cog-lisp.sh lib/lsp.lisp`), so no new shell command is needed.
+  - Two documented primitives frame the messages: `(read-framed-message)` and
+    `(write-framed-message text)`.
+  - JSON is Pharo's `STONJSON`, a message a Smalltalk `Dictionary`, reached
+    through interop.
+  - It answers `initialize`, keeps the open documents (full sync), answers
+    `hover` from `(documentation name)`, answers an unknown request with an
+    error, and ends on `shutdown` and `exit`.
+- **Checked from two clients.** Messages were written 7 bytes at a time, so a
+  body has no line break after it and the next message comes later:
+  - a Python probe, 8/8 on Windows (through `cog-lisp.bat`) and on Linux;
+  - VS Code's own message layer (`vscode-jsonrpc` 8.2.0, which
+    `vscode-languageclient` is built on; `vscode/test/lsp.test.js`), 6/6 on
+    both.
+
+  | | Windows | Linux (Docker) |
+  |---|---:|---:|
+  | start-up, to the `initialize` answer | 673 ms | 450 ms |
+  | a hover, median of 20 | 33 ms | 1 ms |
+
+- **Found on the way**: a Windows client must start the batch file as
+  `.\cog-lisp.bat` (as the extension's tasks do), and must stop the VM itself
+  if it stops the server: killing `cmd` leaves the VM running.
+
+#### 10.5 in detail (proposed 2026-11-05, for the owner's acceptance)
+
+**The extension starts the server and falls back.** It uses
+`vscode-languageclient` 9.0.1 (MIT; its license added to the extension's
+notices), packaged in the `.vsix`.
+- It starts `lib/lsp.lisp` with the workspace's launcher (`cogLisp.root`, as Run
+  File finds it).
+- With no launcher, or with `cogLisp.languageServer` set to `false`, the
+  offline hover and completion of 10.3 stay in use.
+- If the server stops, the extension says so once and falls back to the offline
+  help.
+
+**What the server serves**, each with checks in `vscode/test/lsp.test.js`:
+- **Hover**: a built-in's documentation, as in the spike. For a top-level
+  definition in an open document or a workspace file, hover also shows its
+  documentation string (if any) and its source.
+- **Completion**: the global environment's documented names and the special
+  forms, as 10.3 does, plus the names that workspace files define.
+- **Go to definition**: for a name a workspace file defines at top level.
+  - The server reads (never runs) each `.lisp` file of the workspace when
+    started, and each document as it changes.
+  - The reader's source ranges give each definition's place.
+- **Diagnostics**, as a document opens and changes:
+  - read errors, at the reader's position;
+  - compile errors, at the top-level form that failed. A compile error now
+    carries its form and the reader's range of it, which closes C-18; the
+    innermost form's place when the reader recorded it.
+  - Unbound names are not reported, since a program may define them at run time.
+- **Expand the form at the cursor**: a command, *cog-lisp: Expand Macro*, served
+  by a cog-lisp request (`cog-lisp/expand`). It shows `macroexpand`'s answer in a
+  new editor.
+- **Positions**: the protocol counts UTF-16 units, and cog-lisp strings count
+  characters. The server converts both ways, so a line with characters outside
+  the Basic Multilingual Plane is placed correctly; a check covers it.
+
+**Decision 4, the owner's: does the server run a document's syntax definitions?**
+- *Proposed: yes*, for `define-syntax` and `define-macro` at top level, so that
+  diagnostics see the program's own macros. This accepts that a document's
+  macro definitions (and, for `define-macro`, its expander's code) run inside
+  the server's image.
+- *Without it*, a use of the program's own macro compiles as a procedure call.
+  That gives no false errors, but misses the errors inside the use.
+
+**Checked in CI**:
+- the Linux and Windows jobs, which build the image, also run
+  `vscode/test/lsp.test.js`;
+- the VS Code job packages the `.vsix` with the client inside it.
+
+**Measured and recorded**: start-up, and the median hover, completion and
+diagnostics times on a file the size of `lib/compiler/compiler.lisp`.
+
 ## 5. Acceptance criteria
 
 - AC-1 (10.1) Every primitive, special form and `lib/core.lisp` form has
@@ -285,4 +368,4 @@ As built (10.2 to 10.4):
 | 10.2 The reference of the built-ins | done (2026-11-05): docs/builtins.md, 283 entries in 17 sections, checked against the image |
 | 10.3 Hover help, offline | done (2026-11-05): hover and completion from vscode/builtins.json, checked against the image |
 | 10.4 The user manual | done (2026-11-05): docs/manual/, 14 chapters from all 36 examples |
-| 10.5 The language server | not started |
+| 10.5 The language server | the spike done (2026-11-05): framing, hover, on Windows and Linux, from VS Code's message layer; the rest awaits its detailed spec |

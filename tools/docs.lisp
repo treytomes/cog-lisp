@@ -11,7 +11,7 @@
   '("Special forms" "Derived forms" "Equality and types" "Numbers" "Lists"
     "Characters" "Strings" "Vectors" "Hash tables" "Control"
     "Conditions and restarts" "Evaluation and macros" "Output" "Ports" "Files"
-    "The system" "Smalltalk interop" "The compiler and reader"))
+    "The system" "Smalltalk interop" "Language server" "The compiler and reader"))
 
 ;; an entry: #(name kind category call description)
 (define (docs-entry-name e) (vector-ref e 0))

@@ -22,7 +22,7 @@ proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name.
 tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runtime'; install.
 "Zero or several values, as values answers them (R7RS 6.10; Phase 9 step 9.2)."
 vals := (Object << #LispValues) slots: { #values }; package: 'CogLisp-Runtime'; install.
-prims := (Object << #LispPrimitives) sharedVariables: { #Output. #Input. #CommandLine. #GensymCounter. #EqualityTests }; package: 'CogLisp-Runtime'; install.
+prims := (Object << #LispPrimitives) sharedVariables: { #Output. #Input. #CommandLine. #GensymCounter. #EqualityTests. #MessageInput }; package: 'CogLisp-Runtime'; install.
 "CogLisp: the Smalltalk-side facade for evaluating and calling LISP (Phase 7.6 section 5.2)."
 facade := (Object << #CogLisp) package: 'CogLisp-Runtime'; install.
 "Phase 7.8: hash tables (keys wrapped so a Pharo OrderedDictionary compares them
@@ -1137,12 +1137,39 @@ cm value: prims class value: 'installing' value: 'installInto: anEnv
 	self installHashTablesInto: anEnv.
 	self installPortsInto: anEnv.
 	self installFilesInto: anEnv.
+	self installLanguageServerInto: anEnv.
 	"every primitive knows its name, for printing and error messages (review R-7)"
 	anEnv cellsDo: [:c | | v |
 		v := c valueIfUnbound: [nil].
 		(v isKindOf: LispProcedure) ifTrue: [v named: c symbol name]].
 	self installInlineFormsInto: anEnv.
 	^ anEnv'.
+cm value: prims class value: 'installing' value: 'installLanguageServerInto: anEnv
+	"Phase 10 step 10.5: messages framed as the Language Server Protocol frames them,
+	 a Content-Length header, a blank line, then that many bytes of UTF-8 text, on
+	 standard input and output. The server itself is LISP (lib/lsp.lisp)."
+	anEnv define: (LispSymbol named: ''read-framed-message'') value: (LispProcedure fixed: [ | in length line |
+		"LispStdin is in the shell package, which loads after this one"
+		in := MessageInput ifNil: [MessageInput := (Smalltalk at: #LispStdin) new].
+		length := nil.
+		[in atEnd ifTrue: [line := nil] ifFalse: [line := in nextLine].
+		 line notNil and: [line notEmpty]] whileTrue: [
+			((line asLowercase beginsWith: ''content-length:'')) ifTrue: [
+				length := (line copyAfter: $:) trimBoth asNumber]].
+		(line isNil or: [length isNil])
+			ifTrue: [LispReader eofObject]
+			ifFalse: [(in nextBytes: length) utf8Decoded]] arity: 0).
+	anEnv define: (LispSymbol named: ''write-framed-message'') value: (LispProcedure fixed: [:text | | out |
+		out := LispTextOutput stdout.
+		out nextPutAll: ''Content-Length: '' , (self string: text for: ''write-framed-message'') utf8Encoded size printString ,
+			(String with: Character cr with: Character lf with: Character cr with: Character lf).
+		out nextPutAll: text; flush.
+		LispUnspecified default] arity: 1).
+	self document: anEnv category: ''Language server'' with: #(
+		''read-framed-message'' ''(read-framed-message)''
+			''The next message on standard input, framed as the Language Server Protocol frames it (a Content-Length header, a blank line, the text), or the eof object.''
+		''write-framed-message'' ''(write-framed-message text)''
+			''Writes text to standard output, framed as the Language Server Protocol frames it.'')'.
 cm value: prims class value: 'installing' value: 'installMacroSupportInto: anEnv
 	"Phase 7 section 5.2. gensym makes uninterned symbols: not in the intern table,
 	 so no symbol the reader produces is ever identical to one."

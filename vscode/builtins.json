@@ -192,6 +192,7 @@
   "read-all": {"call": "(read-all string)", "kind": "procedure", "category": "The compiler and reader", "description": "A list of every datum of string."},
   "read-char": {"call": "(read-char [port])", "kind": "procedure", "category": "Ports", "description": "The next character from port, or the eof object."},
   "read-error?": {"call": "(read-error? x)", "kind": "procedure", "category": "Conditions and restarts", "description": "True if x is an error from reading."},
+  "read-framed-message": {"call": "(read-framed-message)", "kind": "procedure", "category": "Language server", "description": "The next message on standard input, framed as the Language Server Protocol frames it (a Content-Length header, a blank line, the text), or the eof object."},
   "read-from-string": {"call": "(read-from-string string)", "kind": "procedure", "category": "The compiler and reader", "description": "The one datum string holds; an error for none or more than one."},
   "read-line": {"call": "(read-line [port])", "kind": "procedure", "category": "Ports", "description": "The rest of the line from port, without its line break, or the eof object."},
   "read-string": {"call": "(read-string k [port])", "kind": "procedure", "category": "Ports", "description": "A string of the next k characters from port, fewer at its end, or the eof object."},
@@ -279,6 +280,7 @@
   "with-output-to-string": {"call": "(with-output-to-string thunk)", "kind": "procedure", "category": "Ports", "description": "Calls thunk with its output collected, and answers it as a string."},
   "write": {"call": "(write x [port])", "kind": "procedure", "category": "Output", "description": "Writes x so that read reads it back: strings in quotes, characters as #\\x."},
   "write-char": {"call": "(write-char char [port])", "kind": "procedure", "category": "Ports", "description": "Writes char to port."},
+  "write-framed-message": {"call": "(write-framed-message text)", "kind": "procedure", "category": "Language server", "description": "Writes text to standard output, framed as the Language Server Protocol frames it."},
   "write-shared": {"call": "(write-shared x [port])", "kind": "procedure", "category": "Files", "description": "Writes x with a datum label for every part it shares, so the sharing reads back."},
   "write-string": {"call": "(write-string string [port])", "kind": "procedure", "category": "Ports", "description": "Writes the characters of string to port."},
   "zero?": {"call": "(zero? z)", "kind": "procedure", "category": "Numbers", "description": "True if z is zero, exact or inexact."}

@@ -152,6 +152,14 @@ cm value: stdin value: 'private' value: 'waitForInput
 cm value: stdin value: 'testing' value: 'atEnd
 	self waitForInput.
 	^ pending isEmpty'.
+cm value: stdin value: 'reading' value: 'nextBytes: n
+	"The next n bytes, as a ByteArray; fewer only at the end of input. A language
+	 server reads a message body this way: its length is given, and no line break
+	 ends it (Phase 10 step 10.5)."
+	| bytes |
+	bytes := WriteStream on: (ByteArray new: n).
+	[bytes size < n and: [self atEnd not]] whileTrue: [bytes nextPut: pending removeFirst].
+	^ bytes contents'.
 cm value: stdin value: 'reading' value: 'nextLine
 	"The next line without its line ending; at end of input, whatever was left."
 	| bytes b line |
