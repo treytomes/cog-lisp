@@ -46,6 +46,9 @@ Definition*, errors as you type and *cog-lisp: Expand Macro*.
 
 ## Documentation
 
+The documentation of the latest release is also on the web, at
+<https://treytomes.github.io/cog-lisp/>.
+
 `docs/manual/README.md` is the manual: the language chapter by chapter, through
 the examples in `examples/`. `docs/builtins.md` lists every built-in with its
 call form and what it does; at the REPL, `(documentation 'name)` answers the

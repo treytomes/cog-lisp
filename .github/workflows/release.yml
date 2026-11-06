@@ -124,3 +124,16 @@ jobs:
             --title "cog-lisp $VERSION" \
             --notes-file release/NOTES.md \
             --generate-notes
+
+  # the documentation site, for the release just published (Phase 10 step 10.6);
+  # a pre-release leaves the site as it is
+  site:
+    needs: publish
+    if: github.event_name == 'push' && !contains(github.ref_name, '-')
+    uses: ./.github/workflows/pages.yml
+    with:
+      version: ${{ github.ref_name }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

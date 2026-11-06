@@ -1,5 +1,6 @@
 ;;; generate-docs.lisp -- write every file generated from the image's documentation
-;;; and the examples (specs/phase-10-documentation-and-editor.md, steps 10.2 to 10.4)
+;;; and the examples (specs/phase-10-documentation-and-editor.md, steps 10.2 to 10.4,
+;;; and the site's home page, 10.6)
 ;;;
 ;;;   ./cog-lisp.sh tools/generate-docs.lisp      (cog-lisp.bat on Windows)
 ;;;
@@ -24,3 +25,4 @@
 (docs-write! "docs/builtins.md" (builtins-markdown))
 (docs-write! "vscode/builtins.json" (builtins-json))
 (for-each (lambda (f) (docs-write! (car f) (cdr f))) (manual-files))
+(for-each (lambda (f) (docs-write! (car f) (cdr f))) (site-files))

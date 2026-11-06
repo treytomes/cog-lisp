@@ -41,9 +41,16 @@ async function main() {
     console.log('  no built image in pharo/: build it first');
     process.exit(2);
   }
+  // on a private copy of the image, as the extension runs it: a VM on the
+  // checkout's own image would collide with any other one running there
+  const imageCopy = fs.mkdtempSync(path.join(os.tmpdir(), 'cog-lisp-lsp-image-'));
+  for (const f of ['cog-lisp.image', 'cog-lisp.changes']) {
+    fs.copyFileSync(path.join(root, 'pharo', f), path.join(imageCopy, f));
+  }
+  const env = Object.assign({}, process.env, { COGLISP_IMAGE: path.join(imageCopy, 'cog-lisp.image') });
   const server = windows
-    ? cp.spawn('cmd.exe', ['/d', '/c', '.\\cog-lisp.bat', 'lib\\lsp.lisp'], { cwd: root })
-    : cp.spawn('./cog-lisp.sh', ['lib/lsp.lisp'], { cwd: root });
+    ? cp.spawn('cmd.exe', ['/d', '/c', '.\\cog-lisp.bat', 'lib\\lsp.lisp'], { cwd: root, env })
+    : cp.spawn('./cog-lisp.sh', ['lib/lsp.lisp'], { cwd: root, env });
   const connection = rpc.createMessageConnection(
     new rpc.StreamMessageReader(server.stdout), new rpc.StreamMessageWriter(server.stdin));
   const diagnostics = {};
@@ -151,6 +158,9 @@ async function main() {
   const code = await Promise.race([exited, new Promise((r) => setTimeout(() => r('hung'), 20000))]);
   check('exit ends the server (' + code + ')', code === 0);
   connection.dispose();
+  for (let i = 0; i < 10 && fs.existsSync(imageCopy); i++) {
+    try { fs.rmSync(imageCopy, { recursive: true, force: true }); } catch (e) { await new Promise((r) => setTimeout(r, 200)); }
+  }
 
   console.log('');
   console.log('== RESULT: ' + pass + '/' + total + ' checks passed ==');

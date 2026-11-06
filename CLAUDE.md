@@ -424,6 +424,21 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   runner unsets it. The `.vsix` in `vscode/` is git-ignored and goes stale:
   rebuild it (`npm run package`) before installing it. A new npm dependency
   shipped in the `.vsix` needs a row in `vscode/THIRD-PARTY-NOTICES.md`.
+  The extension runs the server on a copy of the image in the temporary folder
+  (`cog-lisp-server-*`). If the user's own VS Code holds this checkout's image
+  (an old extension), run `npm run test:vscode` with `COGLISP_TEST_ROOT` set to
+  a throwaway copy of the checkout, and run headless work with `COGLISP_IMAGE`
+  set to a copy of the image. Never kill the user's server.
+- **The site is GitHub Pages** (Phase 10 step 10.6): GitHub's own Jekyll build of
+  `docs/` (`.github/actions/build-site`), checked by `tools/check-site.js`,
+  built by CI on every push and published by each release (`pages.yml`). Every
+  page in `docs/` goes through Liquid, so a page must never hold `{{` or `{%`
+  (a suite checks). Build it locally with the action's own image:
+  `docker run --rm -v <dir>:/github/workspace -e PAGES_REPO_NWO=treytomes/cog-lisp
+  --entrypoint bash ghcr.io/actions/jekyll-build-pages:v1.0.13 -c 'cd
+  "$BUNDLE_APP_CONFIG" && bin/github-pages build --source
+  /github/workspace/docs --destination /github/workspace/_site'`, where `<dir>`
+  holds a copy of `docs/`. Its own entrypoint fails without a token.
 
 ## Writing the compiler in LISP (Phase 8)
 
@@ -538,9 +553,12 @@ This project follows spec-driven development: **write the spec before the code.*
   exits 0 or 1, so a new suite is picked up by `run-all.bat` with no other change.
 - **An unhandled error in a `st` chunk prints its stack and exits 1**; it does
   not hang (unlike an unhandled error inside a Clap command).
-- **Parallel headless runs on one image file can collide**: filing in writes to
-  the image's `.changes`, and a second VM may fail with "Cannot open non source
-  file". For concurrent runs (e.g. several reviewers), use a copy of the stock
+- **Two VMs running on one image file collide**, even when neither files
+  anything in: the first holds the image's `.changes` open for writing, and the
+  second fails at start-up with "Cannot open non source file" (checked
+  2026-11-06). A long-running VM (a REPL, the language server) therefore blocks
+  every other run of that image; give it a copy (`COGLISP_IMAGE`), as the
+  extension does for the language server. For concurrent runs (e.g. several reviewers), use a copy of the stock
   image per run. Kill a stray VM by PID, not by `taskkill /IM`, when other runs
   may be live.
 - **`--maxOldSpaceSize=<bytes>` caps the VM heap**, but at the cap the VM logs

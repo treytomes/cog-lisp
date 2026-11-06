@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<!-- The cog-lisp site's layout (specs/phase-10-documentation-and-editor.md step
+     10.6): the Primer theme's own (jekyll-theme-primer 0.6.0), with its "Improve
+     this page" footer replaced. The pages are generated, so an edit made to one
+     would be overwritten; the footer names the release the site documents, which
+     the build sets as cog_lisp_version. -->
+<html lang="{{ site.lang | default: "en-US" }}">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+{% seo %}
+    <link rel="stylesheet" href="{{ "/assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
+    {% include head-custom.html %}
+  </head>
+  <body>
+    <div class="container-lg px-3 my-5 markdown-body">
+      {% if site.title and site.title != page.title %}
+      <h1><a href="{{ "/" | relative_url }}">{{ site.title }}</a></h1>
+      {% endif %}
+
+      {{ content }}
+
+      <div class="footer border-top border-gray-light mt-5 pt-3 text-right text-gray">
+        {% if site.cog_lisp_version %}This site documents cog-lisp {{ site.cog_lisp_version }}. {% endif %}<a href="https://github.com/treytomes/cog-lisp/releases">Releases</a> · <a href="https://github.com/treytomes/cog-lisp">Source</a>
+      </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/anchor-js/4.1.0/anchor.min.js" integrity="sha256-lZaRhKri35AyJSypXXs4o6OPFTbTmUoltBbDCbdzegg=" crossorigin="anonymous"></script>
+    <script>anchors.add();</script>
+  </body>
+</html>

@@ -3,7 +3,8 @@
 # (the recovery path, Phase 9 step 9.1), and the VS Code extension's tests, on
 # every push and pull request. The language server (Phase 10 step 10.5) is
 # tested on Linux and on Windows, on the image each job's suites built; the VS
-# Code job has no image, so it checks the extension offline.
+# Code job has no image, so it checks the extension offline. The documentation
+# site (Phase 10 step 10.6) is built and checked, and published only by a release.
 # (Until Phase 9 step 9.1, Linux ran every suite twice: once with the Smalltalk
 # reader and compiler, which retired then.) release.yml calls this workflow before it builds a
 # release. Actions are pinned to commits; the version is in the comment.
@@ -173,3 +174,12 @@ jobs:
             echo "attempt $attempt failed"
           done
           exit 1
+
+  # the documentation site (Phase 10 step 10.6): built and checked, not published
+  site:
+    name: Documentation site
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/build-site

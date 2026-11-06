@@ -5,6 +5,8 @@
 'use strict';
 const vscode = require('vscode');
 const path = require('path');
+const fs = require('fs');
+const cp = require('child_process');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -73,6 +75,34 @@ async function run() {
     }, 10000);
     check('Expand Macro shows the expansion of the call at the cursor',
       expansion.includes('(twice (greet "b"))') && expansion.includes('(begin (greet "b") (greet "b"))'));
+
+    // the server must not hold the checkout's image: two VMs on one image collide
+    const ext = require(path.join(__dirname, '..', '..', 'src', 'extension.js'))._test;
+    const root = vscode.workspace.getConfiguration('cogLisp').get('root');
+    const firstCopy = ext.serverImageDir();
+    check('the server runs on a private copy of the image',
+      !!firstCopy && fs.existsSync(path.join(firstCopy, 'cog-lisp.image')) &&
+      !path.resolve(firstCopy).toLowerCase().startsWith(path.resolve(root).toLowerCase()));
+    const program = path.join(folder, 'hello-while-serving.lisp');
+    fs.writeFileSync(program, '(display "ran beside the server")\n(newline)\n');
+    const windows = process.platform === 'win32';
+    const ran = windows
+      ? cp.spawnSync('cmd.exe', ['/d', '/c', '.\\cog-lisp.bat', program], { cwd: root, encoding: 'utf8', input: '' })
+      : cp.spawnSync('./cog-lisp.sh', [program], { cwd: root, encoding: 'utf8', input: '' });
+    if (ran.status !== 0) console.log('    output: ' + ((ran.stdout || '') + (ran.stderr || '')).split('\n')[0]);
+    check('a program runs from the same checkout while the server runs (exit ' + ran.status + ')',
+      ran.status === 0 && (ran.stdout || '').includes('ran beside the server'));
+    const image = path.join(root, 'pharo', 'cog-lisp.image');
+    const now = new Date();
+    fs.utimesSync(image, now, now);
+    const restarted = await until(async () => {
+      const dir = ext.serverImageDir();
+      return !!dir && dir !== firstCopy && ext.serverActive() &&
+        (await hoverText(uses, 1, 2)).includes('(display name)');
+    }, 60000);
+    console.log('    restart: ' + JSON.stringify({ restarted, first: firstCopy, now: ext.serverImageDir(), active: ext.serverActive(), oldLeft: fs.existsSync(firstCopy) }));
+    check('a rebuilt image restarts the server on a new copy, and the old copy is removed',
+      restarted && !fs.existsSync(firstCopy));
   }
 
   console.log('');

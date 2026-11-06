@@ -1,0 +1,29 @@
+# Build the documentation site from docs/ with GitHub's own Jekyll, and check it
+# (specs/phase-10-documentation-and-editor.md step 10.6). CI runs it on every push;
+# pages.yml runs it before it publishes. Needs the repository checked out.
+name: Build the documentation site
+description: GitHub's Jekyll build of docs/ into _site/, then tools/check-site.js on it
+inputs:
+  version:
+    description: The release the site documents, named in every page's footer (none for CI)
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Name the release in the build's configuration
+      if: inputs.version != ''
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      # only in this job's copy of docs/_config.yml; nothing is committed
+      run: |
+        printf 'cog_lisp_version: "%s"\n' "${VERSION#v}" >> docs/_config.yml
+    - name: Build with Jekyll
+      uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697 # v1.0.13
+      with:
+        source: ./docs
+        destination: ./_site
+    - name: Check every page, link and anchor
+      shell: bash
+      run: node tools/check-site.js _site docs

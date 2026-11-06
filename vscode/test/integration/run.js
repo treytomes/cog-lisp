@@ -16,7 +16,9 @@ const { runTests } = require('@vscode/test-electron');
 // downloaded VS Code run as plain Node; the test VS Code must not inherit it.
 delete process.env.ELECTRON_RUN_AS_NODE;
 
-const repo = path.join(__dirname, '..', '..', '..');
+// the checkout the server pass uses as cogLisp.root: this one, or COGLISP_TEST_ROOT
+// (a checkout whose image nothing else holds, when this one's is in use)
+const repo = process.env.COGLISP_TEST_ROOT || path.join(__dirname, '..', '..', '..');
 
 function makeWorkspace(prefix, settings) {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), prefix));

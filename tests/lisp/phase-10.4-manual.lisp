@@ -36,4 +36,26 @@
   (check (docs-example-title "x.lisp -- what it shows (Phase 7.9 section 4)") "What it shows")
   (check (cdr (docs-split-example ";; a\n;; b\n\n(code)\n")) "(code)\n"))
 
+;; the site on GitHub Pages (step 10.6, AC-6)
+(define-test "AC-6 the site's home page is what the generator writes"
+  (for-each (lambda (f)
+              (check (list (car f) (and (docs-file? (car f)) (string=? (cdr f) (docs-file-text (car f)))))
+                     (list (car f) #t)))
+            (site-files))
+  (let ((home (site-index)))
+    (check-true (string-search home "](manual/README.md)"))
+    (check-true (string-search home "](builtins.md)"))
+    (check-true (string-search home "Scheme-like LISP"))))
+
+(define-test "AC-6 no page of the site holds Liquid syntax, which Jekyll would run"
+  (check-true (member "docs/index.md" (docs-site-pages)))
+  (check-true (member "docs/builtins.md" (docs-site-pages)))
+  (check (docs-liquid-pages) '()))
+
+(define-test "AC-6 the site's configuration leaves out the manual's sources"
+  (let ((config (docs-file-text "docs/_config.yml")))
+    (check-true (string-search config "baseurl: /cog-lisp"))
+    (check-true (string-search config "manual/chapters.lisp"))
+    (check-true (string-search config "manual/introduction.md"))))
+
 (run-tests)

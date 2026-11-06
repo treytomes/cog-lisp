@@ -16,6 +16,7 @@ const path = require('path');
 const { topLevelFormAt } = require('./forms');
 const { loadBuiltins, symbolAt, hoverMarkdown, completions } = require('./builtins');
 const cp = require('child_process');
+const os = require('os');
 const lc = require('vscode-languageclient/node');
 
 // the language server's client, while it serves; the offline help steps aside then
@@ -226,14 +227,86 @@ function registerBuiltins(context) {
   );
 }
 
+// The server runs on a private copy of the image. Two VMs on one image collide:
+// the first holds its .changes file open for writing, and the second then fails
+// at start-up ("Cannot open non source file"). A server that ran on
+// pharo/cog-lisp.image would make Run File, the REPL, the suites and every
+// terminal run fail for as long as the window is open.
+const SERVER_IMAGE_PREFIX = 'cog-lisp-server-';
+let serverImageDir = null;
+
+// copies whose VM still held them when they were removed (Windows): tried again later
+const retiredServerImages = new Set();
+
+function removeServerImage(dir) {
+  try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* still open */ }
+  if (fs.existsSync(dir)) retiredServerImages.add(dir); else retiredServerImages.delete(dir);
+}
+
+// remove a copy, waiting up to two seconds for its VM to let go of it
+async function removeServerImageSoon(dir) {
+  for (let i = 0; i < 10; i++) {
+    removeServerImage(dir);
+    if (!fs.existsSync(dir)) return;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
+// copies left by windows that closed without stopping their server
+function removeStaleServerImages() {
+  let names = [];
+  try { names = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith(SERVER_IMAGE_PREFIX)); } catch (e) { return; }
+  for (const name of names) {
+    const dir = path.join(os.tmpdir(), name);
+    let alive = false;
+    try {
+      process.kill(Number(fs.readFileSync(path.join(dir, 'owner.pid'), 'utf8')), 0);
+      alive = true;
+    } catch (e) { /* no owner file, or its window has gone */ }
+    if (!alive) removeServerImage(dir);
+  }
+}
+
+/** A fresh copy of the root's image and changes for the server; null if there is no image. */
+function copyServerImage(root) {
+  const image = path.join(root, 'pharo', 'cog-lisp.image');
+  if (!fs.existsSync(image)) return null;
+  removeStaleServerImages();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), SERVER_IMAGE_PREFIX));
+  fs.writeFileSync(path.join(dir, 'owner.pid'), String(process.pid));
+  fs.copyFileSync(image, path.join(dir, 'cog-lisp.image'));
+  const changes = path.join(root, 'pharo', 'cog-lisp.changes');
+  if (fs.existsSync(changes)) fs.copyFileSync(changes, path.join(dir, 'cog-lisp.changes'));
+  return dir;
+}
+
 // Start lib/lsp.lisp with the workspace's launcher, as Run File runs programs
 async function startLanguageServer(context) {
   if (!vscode.workspace.getConfiguration('cogLisp').get('languageServer', true)) return;
   const root = SUPPORTED ? cogLispRoot() : null;
   if (!root || !fs.existsSync(path.join(root, 'lib', 'lsp.lisp'))) return;
-  const serverOptions = () => Promise.resolve(WINDOWS
-    ? cp.spawn('cmd.exe', ['/d', '/c', '.\\' + script('cog-lisp'), 'lib\\lsp.lisp'], { cwd: root })
-    : cp.spawn('./' + script('cog-lisp'), ['lib/lsp.lisp'], { cwd: root }));
+  const serverOptions = async () => {
+    // each start (and restart) copies the image as it is now
+    for (const dir of [serverImageDir, ...retiredServerImages]) if (dir) await removeServerImageSoon(dir);
+    serverImageDir = copyServerImage(root);
+    const env = Object.assign({}, process.env);
+    if (serverImageDir) env.COGLISP_IMAGE = path.join(serverImageDir, 'cog-lisp.image');
+    return WINDOWS
+      ? cp.spawn('cmd.exe', ['/d', '/c', '.\\' + script('cog-lisp'), 'lib\\lsp.lisp'], { cwd: root, env })
+      : cp.spawn('./' + script('cog-lisp'), ['lib/lsp.lisp'], { cwd: root, env });
+  };
+  // a rebuilt image restarts the server on a new copy of it
+  const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(root, 'pharo/cog-lisp.image'));
+  let restartTimer = null;
+  const imageChanged = () => {
+    clearTimeout(restartTimer);
+    restartTimer = setTimeout(() => {
+      if (client) client.restart().then(() => { serverActive = true; }, () => { serverActive = false; });
+    }, 3000);
+  };
+  watcher.onDidChange(imageChanged);
+  watcher.onDidCreate(imageChanged);
+  context.subscriptions.push(watcher);
   let told = false;
   const clientOptions = {
     documentSelector: [{ language: 'cog-lisp' }],
@@ -313,6 +386,14 @@ function activate(context) {
   checkStale();
 }
 
-function deactivate() { return client ? client.stop() : undefined; }
+async function deactivate() {
+  if (client) {
+    try { await client.stop(); } catch (e) { /* already stopped */ }
+  }
+  // the VM may hold its files a moment after it exits
+  const dirs = [serverImageDir, ...retiredServerImages].filter(Boolean);
+  serverImageDir = null;
+  for (const dir of dirs) await removeServerImageSoon(dir);
+}
 
-module.exports = { activate, deactivate, _test: { staleSource, scriptArgs, serverActive: () => serverActive } };
+module.exports = { activate, deactivate, _test: { staleSource, scriptArgs, serverActive: () => serverActive, serverImageDir: () => serverImageDir } };

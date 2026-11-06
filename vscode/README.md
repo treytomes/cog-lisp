@@ -39,6 +39,10 @@ A thin extension for working on cog-lisp in VS Code
   - **cog-lisp: Expand Macro**, which opens the expansion of the macro call at
     the cursor (the innermost one) beside the file.
 
+  The server runs on its own copy of the image, in the system's temporary
+  folder, so *Run File*, the REPL and the terminal keep using the checkout's
+  image beside it. A rebuilt image restarts the server on a new copy.
+
   Without a launcher, or with `cogLisp.languageServer` set to `false`, the
   built-ins' hover help and completion above still work. If the server stops,
   the extension says so once and goes on with them.

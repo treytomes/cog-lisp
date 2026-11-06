@@ -397,9 +397,14 @@ our own. It is the `github-pages` gem that `actions/jekyll-build-pages` runs:
   - `baseurl: /cog-lisp`, set here so the links do not depend on what the
     Pages API answers at build time;
   - `exclude` for the manual's sources (`chapters.lisp`, `introduction.md`).
+- `docs/_layouts/default.html`: the theme's layout, with its *Improve this page*
+  footer replaced. That footer links to editing the page on GitHub, but the
+  pages are generated, so an edit would be overwritten. The new footer names
+  the release the site documents (`cog_lisp_version`) and links to the releases
+  and the source.
 - `.github/actions/build-site`, an action that CI and the release share. It:
-  - stamps the version, when given, onto the home page, in the build's copy
-    only;
+  - adds the version, when given, as `cog_lisp_version` in the build's copy of
+    `_config.yml` (never committed), so every page's footer names it;
   - runs `actions/jekyll-build-pages` on `docs/`;
   - runs `tools/check-site.js`.
 - `tools/check-site.js` (Node, no dependencies). It checks that:
@@ -442,6 +447,56 @@ The README and `release/INSTALL.md` link to the site.
 
 **No wiki (decision 7).** A wiki would be a second copy of generated pages that
 can be edited in the browser, and the next release would overwrite any edit.
+
+#### 10.6 as built (2026-11-06)
+
+- **The site was built locally** with the action's own image
+  (`ghcr.io/actions/jekyll-build-pages:v1.0.13`: Jekyll 3.10, github-pages 232).
+  Run without a token, it builds 17 pages in about 3 s.
+  - `tools/check-site.js` passes 4/4: 110 links within the site, and 19 section
+    anchors in the reference.
+  - A broken link, a missing anchor and a missing chapter each made it fail.
+  - Built locally, with no token, the build warns that GitHub's metadata is
+    missing; CI passes the workflow's token.
+- **What Jekyll does with the Markdown as committed:**
+  - links to `.md` files become `/cog-lisp/<page>.html`;
+  - `manual/README.md` becomes `/manual/`;
+  - each page's title comes from its first heading;
+  - the reference's section ids match its own links.
+  - The Markdown originals are copied beside the pages, which does no harm.
+- **The theme's favicon link is commented out** in its layout, so the missing
+  icon is not a broken link.
+
+#### A fix to 10.5 found on the way (2026-11-06): the server runs on a copy of the image
+
+- **The bug.** Any two VMs on one image collide: the first holds the
+  `.changes` file open for writing, and the second fails at start-up with
+  "Cannot open non source file". The extension started the server on
+  `pharo/cog-lisp.image`. So while VS Code was open on a checkout, every other
+  cog-lisp run there failed: *Run File*, the REPL, the terminal, the docs
+  generator, the suites. The owner's own window showed it on the day 10.5
+  shipped.
+- **The fix.** The extension copies the image and its changes to a fresh
+  `cog-lisp-server-*` folder in the system's temporary folder, and starts the
+  server there through `COGLISP_IMAGE`.
+  - A change to `pharo/cog-lisp.image` (a rebuild) restarts the server on a new
+    copy.
+  - Old copies are removed: on Windows the VM can hold its files for a moment
+    after it exits, so removal is retried. A copy left behind by a window that
+    has closed (`owner.pid`) is removed at the next start.
+  - `vscode/test/lsp.test.js` runs its server on a copy too.
+- **Checked inside VS Code** (the server pass is now 10/10):
+  - the server runs on a copy;
+  - a program runs from the same checkout while the server runs;
+  - touching the image restarts the server on a new copy and removes the old
+    one.
+
+  `COGLISP_TEST_ROOT` gives that pass another checkout. Here it ran on a
+  throwaway copy of this checkout, because the owner's window, still on the old
+  extension, held this one's image.
+- **Two VMs still collide** when both run on `pharo/cog-lisp.image`: for
+  example, a long-running REPL and *Run File*. That predates Phase 10 and is
+  left as it is.
 
 ## 5. Acceptance criteria
 
@@ -519,4 +574,4 @@ can be edited in the browser, and the next release would overwrite any edit.
 | 10.3 Hover help, offline | done (2026-11-05): hover and completion from vscode/builtins.json, checked against the image |
 | 10.4 The user manual | done (2026-11-05): docs/manual/, 14 chapters from all 36 examples |
 | 10.5 The language server | done (2026-11-06): hover, completion, go to definition, diagnostics (C-18 closed) and Expand Macro, served by the image to VS Code on Windows and Linux |
-| 10.6 The documentation on the web | accepted (2026-11-06; decisions 6 and 7) |
+| 10.6 The documentation on the web | done (2026-11-06): GitHub Pages from docs/, built and checked by CI, published by each release (first publish awaits the owner's Pages settings and the next release) |

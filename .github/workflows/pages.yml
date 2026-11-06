@@ -1,0 +1,75 @@
+# Publish the documentation site on GitHub Pages (specs/phase-10-documentation-
+# and-editor.md step 10.6): GitHub's Jekyll build of docs/, checked, deployed, and
+# fetched back from its URL. release.yml calls it once a release is published;
+# by hand, it publishes the documentation of the tag given.
+name: Pages
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: The release tag the site documents
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to publish the documentation of, e.g. v0.3.0
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.version || inputs.tag }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.version || inputs.tag }}
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: ./.github/actions/build-site
+        with:
+          version: ${{ env.TAG }}
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - name: Fetch the published site back
+        env:
+          SITE: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          VERSION="${TAG#v}"
+          # the CDN can take a moment to serve the new deployment
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsS "${SITE}" | grep -q "This site documents cog-lisp ${VERSION}\." &&
+               curl -fsS "${SITE}manual/01-getting-started.html" | grep -q "Getting started" &&
+               curl -fsS "${SITE}builtins.html" | grep -q 'id="special-forms"'; then
+              echo "published: ${SITE} documents cog-lisp ${VERSION}"
+              exit 0
+            fi
+            echo "attempt $attempt: not served yet"
+            sleep 20
+          done
+          exit 1

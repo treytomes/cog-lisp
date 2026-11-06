@@ -41,7 +41,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 8 | Self-hosting (meta-circular) | ✅ **done** — [spec](specs/phase-8-self-hosting.md); 8.1 tests in LISP, 8.2 reader and 8.3 compiler in LISP, 8.4 the compiler compiles itself to a fixpoint, 8.5 the LISP reader and compiler are the ones in use, 8.6 it writes bytecode itself, compiling 2.1× faster than Phase 7.9 ([`lib/compiler/`](lib/compiler/), examples [read-yourself](examples/read-yourself.lisp), [compile-yourself](examples/compile-yourself.lisp), [extend-the-compiler](examples/extend-the-compiler.lisp), [bootstrap](examples/bootstrap.lisp), [sealed-compiler](examples/sealed-compiler.lisp)) done; all suites 2506/2506, with either compiler |
 | 8.9 | CI/CD, and running on Linux | ✅ **done** — [spec](specs/phase-8.9-ci-cd.md); every push tested on Linux (both compilers) and Windows; a `v*` tag publishes Linux and Windows bundles and the `.vsix` |
 | 9 | Finishing the language: seeded builds, the numeric tower, hygienic macros | ✅ **done** — [spec](specs/phase-9-language.md); 9.1 seeded builds, 9.2 the numeric tower, 9.3 hygienic macros (examples [seeded-build](examples/seeded-build.lisp), [numbers](examples/numbers.lisp), [new-number-type](examples/new-number-type.lisp), [syntax-rules](examples/syntax-rules.lisp), [shadowing](examples/shadowing.lisp)) |
-| 10 | Knowing the language: documentation, the built-ins reference, hover help, the manual, a language server | ✅ **done** — [spec](specs/phase-10-documentation-and-editor.md); 10.1 documentation in the image, 10.2 [the reference](docs/builtins.md), 10.3 hover help offline, 10.4 [the manual](docs/manual/README.md), 10.5 a language server served by the image ([`lib/lsp.lisp`](lib/lsp.lisp)); all suites 1488/1488 (Windows), 1491/1491 (Linux) |
+| 10 | Knowing the language: documentation, the built-ins reference, hover help, the manual, a language server | ✅ **done** — [spec](specs/phase-10-documentation-and-editor.md); 10.1 documentation in the image, 10.2 [the reference](docs/builtins.md), 10.3 hover help offline, 10.4 [the manual](docs/manual/README.md), 10.5 a language server served by the image ([`lib/lsp.lisp`](lib/lsp.lisp)), 10.6 [the site](https://treytomes.github.io/cog-lisp/) on GitHub Pages; all suites 1498/1498 (Windows), 1501/1501 (Linux) |
 | 11 | A world of its own: the pure LISP image, then networking and graphics from LISP | ⬜ [spec](specs/phase-11-pure-image.md) accepted in outline |
 
 Phase 0 is proven, not just planned: [`poc/answer.st`](poc/answer.st) builds
@@ -152,6 +152,9 @@ bench\run-benchmarks.bat
 
 Headless conventions and the verified Pharo mechanisms are documented in
 [`CLAUDE.md`](CLAUDE.md).
+
+The manual and the reference are also published, for the latest release, at
+**<https://treytomes.github.io/cog-lisp/>** (Phase 10 step 10.6).
 
 **[The cog-lisp manual](docs/manual/README.md)** teaches the language chapter by
 chapter, through the examples: each one's explanation, code and the output the
@@ -387,6 +390,9 @@ image on 2026-11-05):
   and started by the extension: hover over the program's own definitions,
   completion, go to definition, diagnostics as you type (a compile error at its
   innermost form), and *cog-lisp: Expand Macro*.
+- **10.6 The documentation on the web**: GitHub Pages, GitHub's own Jekyll build
+  of `docs/`, built and link-checked by CI on every push and published by each
+  release, at <https://treytomes.github.io/cog-lisp/>.
 
 ### Phase 11 — A world of its own
 [Spec](specs/phase-11-pure-image.md), accepted in outline; a long phase, each
