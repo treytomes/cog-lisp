@@ -91,6 +91,15 @@
 (define (docs-cell s)
   (string-join (string-split s #\|) "\\|"))
 
+;; a table cell's text as code. Text holding a backtick (quasiquote's `template)
+;; would end a one-backtick code span early, and Jekyll's kramdown then gives up
+;; on the whole table; a two-backtick span with a space inside each end holds it,
+;; for kramdown and for GitHub's own Markdown alike.
+(define (docs-code-cell s)
+  (if (string-search s "`")
+      (string-append "`` " (docs-cell s) " ``")
+      (string-append "`" (docs-cell s) "`")))
+
 (define (builtins-markdown)
   (let ((entries (builtin-entries)))
     (with-output-to-string
@@ -116,9 +125,9 @@
                         (display "| Name | Call | Kind | What it does |\n")
                         (display "|---|---|---|---|\n")
                         (for-each (lambda (e)
-                                    (display "| `") (display (docs-cell (docs-entry-name e)))
-                                    (display "` | `") (display (docs-cell (docs-entry-call e)))
-                                    (display "` | ") (display (docs-entry-kind e))
+                                    (display "| ") (display (docs-code-cell (docs-entry-name e)))
+                                    (display " | ") (display (docs-code-cell (docs-entry-call e)))
+                                    (display " | ") (display (docs-entry-kind e))
                                     (display " | ") (display (docs-cell (docs-entry-description e)))
                                     (display " |\n"))
                                   es))))

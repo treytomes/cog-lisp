@@ -84,6 +84,14 @@ for (const page of pages) {
 check('every link within the site reaches a page, and every anchor is on it (' + links + ' links in ' + pages.length + ' pages)',
   links > 0 && broken.length === 0, broken.slice(0, 20).join('; '));
 
+// every Markdown table became a table: kramdown leaves one it cannot read as a
+// paragraph of | text (its |---| row turned into dashes)
+const rawTables = pages.filter((p) => /^\s*\|.*\|\s*$/m.test(text[p].replace(/<pre[\s\S]*?<\/pre>/g, '')));
+check('every table is rendered as a table, none left as | text', rawTables.length === 0, rawTables.join(', '));
+const refSections = [...(text['builtins.html'] || '').matchAll(/<h2 /g)].length;
+const refTables = [...(text['builtins.html'] || '').matchAll(/<table/g)].length;
+check('each of the reference\'s ' + refSections + ' sections has its table (' + refTables + ')', refSections > 0 && refTables === refSections);
+
 // the reference's contents link to each of its sections
 const sections = [...(text['builtins.html'] || '').matchAll(/href="#([^"]+)"/g)].length;
 check('the reference links to its sections (' + sections + ')', sections >= 10);

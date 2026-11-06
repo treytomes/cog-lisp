@@ -42,7 +42,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `let` | `(let ((name init) ...) body ...), (let loop ((name init) ...) body ...)` | special form | Binds each name to its init, evaluated outside the bindings; the named form also binds loop to the body as a procedure. |
 | `let-syntax` | `(let-syntax ((name (syntax-rules ...)) ...) body ...)` | special form | Local macros, defined in the enclosing scope, for the body. |
 | `letrec-syntax` | `(letrec-syntax ((name (syntax-rules ...)) ...) body ...)` | special form | Local macros that can use each other, for the body. |
-| `quasiquote` | `(quasiquote template), `template` | special form | The template as data, with (unquote x) and (unquote-splicing x), written ,x and ,@x, filled in. |
+| `quasiquote` | `` (quasiquote template), `template `` | special form | The template as data, with (unquote x) and (unquote-splicing x), written ,x and ,@x, filled in. |
 | `quote` | `(quote datum), 'datum` | special form | The datum itself, not evaluated. |
 | `send` | `(send receiver selector arg ...), [receiver selector arg ...]` | special form | Sends a Smalltalk message; the selector is spelled as in Smalltalk (at:put:). |
 | `set!` | `(set! name value)` | special form | Assigns value to the variable name, local or global. |
