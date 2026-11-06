@@ -1,0 +1,12 @@
+(string-ref string k)
+The character of string at index k, from 0.
+(if test then [else])
+Evaluates then if test is true (anything but #f), else else.
+"Strings"
+(average x ...)
+The mean of the numbers, exact when they all are.
+5/2
+(repeat n body ...)
+Runs the body n times.
+hi hi hi 
+("hello" #f)

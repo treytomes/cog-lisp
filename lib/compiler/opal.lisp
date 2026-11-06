@@ -45,4 +45,7 @@
 (define (opal-generate method-node) (codegen-method method-node))
 
 ;; Run a compiled doIt.
-(define (opal-run method) [method valueWithReceiver: (smalltalk-nil) arguments: (vector)])
+(define (opal-run method)
+  "(opal-run method)
+Runs a CompiledMethod that compile-form made, and answers its value."
+  [method valueWithReceiver: (smalltalk-nil) arguments: (vector)])

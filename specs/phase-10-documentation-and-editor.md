@@ -125,6 +125,22 @@ the cleaner form and the release it needs over a stopgap call (2026-11-05).
 - **Example** `examples/documentation.lisp`: documenting a procedure and a macro,
   and reading a built-in's documentation back.
 
+As built:
+- A primitive's documentation is a table at the end of the installer that
+  defines it: `self document: anEnv category: 'Strings' with: #(name call
+  description ...)`. A name in a table that is not bound is an error, so a table
+  cannot drift from what it documents.
+- `display`, `write` and `newline` are documented by the ports installer, which
+  gives them their final, port-taking definitions.
+- An old name (`hash-table-exists?`, `hash-table-size`) is a copy of the
+  procedure, so it has documentation of its own.
+- Names that start with `%` (`%guard` and the other machinery behind `guard`
+  and `restart-case`) are not public.
+- The compiler records a definition's category from the file being loaded; the
+  bootstrap's stages compile each source file as if loading it, so the
+  compiler's own procedures get theirs.
+- `(special-form-names)` lists the special forms.
+
 **Then the owner tags a minor release, v0.2.0, and the seed moves to it**, as it
 moved to v0.1.3.
 
@@ -250,7 +266,7 @@ moved to v0.1.3.
 
 | Step | Status |
 |---|---|
-| 10.1 Documentation in the image | not started |
+| 10.1 Documentation in the image | 10.1a done (2026-11-05): the machinery; 249 primitives, 16 special forms and the compiler's entry points documented; 10.1b (the derived forms) after the v0.2.0 seed |
 | 10.2 The reference of the built-ins | not started |
 | 10.3 Hover help, offline | not started |
 | 10.4 The user manual | not started |

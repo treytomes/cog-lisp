@@ -18,7 +18,7 @@ cm := [:cls :cat :src |
 
 lerr  := LispError.  "defined by the reader package"
 aerr  := (lerr   << #LispArityError) slots: { #proc. #given }; package: 'CogLisp-Runtime'; install.
-proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries. #inline. #packed }; package: 'CogLisp-Runtime'; install.
+proc  := (Object << #LispProcedure) slots: { #block. #required. #hasRest. #name. #source. #entries. #inline. #packed. #documentation. #category }; package: 'CogLisp-Runtime'; install.
 tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runtime'; install.
 "Zero or several values, as values answers them (R7RS 6.10; Phase 9 step 9.2)."
 vals := (Object << #LispValues) slots: { #values }; package: 'CogLisp-Runtime'; install.
@@ -209,6 +209,14 @@ cm value: oport value: 'printing' value: 'printOn: aStream
 	aStream nextPutAll: ''#<output-port>'''.
 
 "=== argument checks shared by the Phase 7.8 primitives (section 9) ========="
+cm value: prims class value: 'documentation' value: 'document: anEnv category: aCategory with: triples
+	"Each primitive in triples (name, call form, description) gets its documentation
+	 and category. A name that is not bound is an error, so a table cannot document a
+	 primitive that is not there (Phase 10 step 10.1)."
+	1 to: triples size by: 3 do: [:i | | v |
+		v := anEnv lookup: (LispSymbol named: (triples at: i)).
+		v documentation: (triples at: i + 1) , (String with: Character lf) , (triples at: i + 2).
+		v category: aCategory]'.
 cm value: prims class value: 'checks' value: 'fail: who with: aString
 	^ (LispError new) signal: who , '': '' , aString'.
 cm value: prims class value: 'checks' value: 'show: x
@@ -333,7 +341,41 @@ cm value: prims class value: 'installing' value: 'installCharactersInto: anEnv
 	def value: ''char-upcase'' value: (LispProcedure fixed: [:c | (ch value: c value: ''char-upcase'') asUppercase] arity: 1).
 	def value: ''char-downcase'' value: (LispProcedure fixed: [:c | (ch value: c value: ''char-downcase'') asLowercase] arity: 1).
 	def value: ''digit-value'' value: (LispProcedure fixed: [:c |
-		(ch value: c value: ''digit-value'') isDigit ifTrue: [c digitValue] ifFalse: [false]] arity: 1)'.
+		(ch value: c value: ''digit-value'') isDigit ifTrue: [c digitValue] ifFalse: [false]] arity: 1).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Characters'' with: #(
+		''char->integer'' ''(char->integer char)''
+			''The Unicode code point of char.''
+		''integer->char'' ''(integer->char n)''
+			''The character with the Unicode code point n.''
+		''char=?'' ''(char=? c1 c2 ...)''
+			''True if the characters are all the same.''
+		''char<?'' ''(char<? c1 c2 ...)''
+			''True if the code points are strictly increasing.''
+		''char>?'' ''(char>? c1 c2 ...)''
+			''True if the code points are strictly decreasing.''
+		''char<=?'' ''(char<=? c1 c2 ...)''
+			''True if the code points never decrease.''
+		''char>=?'' ''(char>=? c1 c2 ...)''
+			''True if the code points never increase.''
+		''char-ci=?'' ''(char-ci=? c1 c2 ...)''
+			''True if the characters are the same, ignoring case.''
+		''char-alphabetic?'' ''(char-alphabetic? char)''
+			''True if char is a letter.''
+		''char-numeric?'' ''(char-numeric? char)''
+			''True if char is a digit.''
+		''char-whitespace?'' ''(char-whitespace? char)''
+			''True if char is white space.''
+		''char-upper-case?'' ''(char-upper-case? char)''
+			''True if char is an upper-case letter.''
+		''char-lower-case?'' ''(char-lower-case? char)''
+			''True if char is a lower-case letter.''
+		''char-upcase'' ''(char-upcase char)''
+			''The upper-case form of char.''
+		''char-downcase'' ''(char-downcase char)''
+			''The lower-case form of char.''
+		''digit-value'' ''(digit-value char)''
+			''The value of the digit char, or #f if it is not a digit.'')'.
 
 "=== strings and symbols (section 5) ========================================"
 cm value: prims class value: 'installing' value: 'installStringsInto: anEnv
@@ -421,7 +463,67 @@ cm value: prims class value: 'installing' value: 'installStringsInto: anEnv
 			(LispCons elementsOf: l for: ''string-join'')
 				do: [:x | o nextPutAll: (str value: x value: ''string-join'')]
 				separatedBy: [o nextPutAll: sep]]] required: 1).
-	def value: ''string-trim'' value: (LispProcedure fixed: [:s | (str value: s value: ''string-trim'') trimBoth copy] arity: 1)'.
+	def value: ''string-trim'' value: (LispProcedure fixed: [:s | (str value: s value: ''string-trim'') trimBoth copy] arity: 1).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Strings'' with: #(
+		''string'' ''(string char ...)''
+			''A new string of the characters.''
+		''make-string'' ''(make-string k [char])''
+			''A new string of k characters, each char (a space by default).''
+		''string-length'' ''(string-length string)''
+			''The number of characters of string.''
+		''string-ref'' ''(string-ref string k)''
+			''The character of string at index k, from 0.''
+		''string-set!!'' ''(string-set!! string k char)''
+			''Replaces the character of string at index k with char.''
+		''substring'' ''(substring string start [end])''
+			''A new string of the characters of string from start to end.''
+		''string-copy'' ''(string-copy string [start [end]])''
+			''A new string of the characters of string from start to end.''
+		''string-copy!!'' ''(string-copy!! to at from [start [end]])''
+			''Copies the characters of from, start to end, into to at index at.''
+		''string-fill!!'' ''(string-fill!! string char)''
+			''Replaces every character of string with char.''
+		''string-append'' ''(string-append string ...)''
+			''A new string of the characters of each string in turn.''
+		''string->list'' ''(string->list string [start [end]])''
+			''A list of the characters of string.''
+		''list->string'' ''(list->string list)''
+			''A new string of the characters of list.''
+		''string->symbol'' ''(string->symbol string)''
+			''The symbol spelled string.''
+		''symbol->string'' ''(symbol->string symbol)''
+			''A new string of the name of symbol.''
+		''string->number'' ''(string->number string [radix])''
+			''The number string reads as, or #f; radix is 2, 8, 10 or 16.''
+		''number->string'' ''(number->string z [radix])''
+			''The text of the number z, as write writes it, in radix.''
+		''string=?'' ''(string=? s1 s2 ...)''
+			''True if the strings are all the same.''
+		''string<?'' ''(string<? s1 s2 ...)''
+			''True if the strings are strictly increasing, by code point.''
+		''string>?'' ''(string>? s1 s2 ...)''
+			''True if the strings are strictly decreasing, by code point.''
+		''string<=?'' ''(string<=? s1 s2 ...)''
+			''True if the strings never decrease, by code point.''
+		''string>=?'' ''(string>=? s1 s2 ...)''
+			''True if the strings never increase, by code point.''
+		''string-ci=?'' ''(string-ci=? s1 s2 ...)''
+			''True if the strings are the same, ignoring case.''
+		''string-upcase'' ''(string-upcase string)''
+			''A new string of string in upper case.''
+		''string-downcase'' ''(string-downcase string)''
+			''A new string of string in lower case.''
+		''string-index'' ''(string-index string char)''
+			''The index of the first char in string, or #f.''
+		''string-search'' ''(string-search string pattern)''
+			''The index where pattern first occurs in string, or #f.''
+		''string-split'' ''(string-split string char)''
+			''A list of the parts of string between the occurrences of char.''
+		''string-join'' ''(string-join list [separator])''
+			''A new string of the strings of list, with separator between them.''
+		''string-trim'' ''(string-trim string)''
+			''A new string of string without the white space at either end.'')'.
 
 "=== vectors (section 6) ===================================================="
 cm value: prims class value: 'installing' value: 'installVectorsInto: anEnv
@@ -462,7 +564,37 @@ cm value: prims class value: 'installing' value: 'installVectorsInto: anEnv
 		(vec value: v value: ''vector-map'') collect: [:x | LispProcedure apply: p to: { x }]] arity: 2).
 	def value: ''vector-for-each'' value: (LispProcedure fixed: [:p :v |
 		(vec value: v value: ''vector-for-each'') do: [:x | LispProcedure apply: p to: { x }].
-		unspec] arity: 2)'.
+		unspec] arity: 2).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Vectors'' with: #(
+		''vector'' ''(vector x ...)''
+			''A new vector of the arguments.''
+		''make-vector'' ''(make-vector k [fill])''
+			''A new vector of k elements, each fill.''
+		''vector?'' ''(vector? x)''
+			''True if x is a vector.''
+		''vector-length'' ''(vector-length vector)''
+			''The number of elements of vector.''
+		''vector-ref'' ''(vector-ref vector k)''
+			''The element of vector at index k, from 0.''
+		''vector-set!!'' ''(vector-set!! vector k x)''
+			''Replaces the element of vector at index k with x.''
+		''vector->list'' ''(vector->list vector [start [end]])''
+			''A list of the elements of vector.''
+		''list->vector'' ''(list->vector list)''
+			''A new vector of the elements of list.''
+		''vector-copy'' ''(vector-copy vector [start [end]])''
+			''A new vector of the elements of vector from start to end.''
+		''subvector'' ''(subvector vector start end)''
+			''A new vector of the elements of vector from start to end.''
+		''vector-append'' ''(vector-append vector ...)''
+			''A new vector of the elements of each vector in turn.''
+		''vector-fill!!'' ''(vector-fill!! vector x)''
+			''Replaces every element of vector with x.''
+		''vector-map'' ''(vector-map proc vector)''
+			''A new vector of the results of calling proc on each element of vector.''
+		''vector-for-each'' ''(vector-for-each proc vector)''
+			''Calls proc on each element of vector, in order.'')'.
 
 "=== hash tables (section 7) ================================================"
 cm value: prims class value: 'installing' value: 'installHashTablesInto: anEnv
@@ -484,9 +616,9 @@ cm value: prims class value: 'installing' value: 'installHashTablesInto: anEnv
 		(tbl value: t value: ''hash-table-ref/default'') at: k ifAbsent: [d]] arity: 3).
 	def value: ''hash-table-delete!!'' value: (LispProcedure fixed: [:t :k | (tbl value: t value: ''hash-table-delete!!'') removeKey: k. unspec] arity: 2).
 	def value: ''hash-table-contains?'' value: (LispProcedure fixed: [:t :k | (tbl value: t value: ''hash-table-contains?'') includesKey: k] arity: 2).
-	def value: ''hash-table-exists?'' value: (anEnv lookup: (LispSymbol named: ''hash-table-contains?'')).
+	def value: ''hash-table-exists?'' value: (anEnv lookup: (LispSymbol named: ''hash-table-contains?'')) copy.
 	def value: ''hash-table-count'' value: (LispProcedure fixed: [:t | (tbl value: t value: ''hash-table-count'') size] arity: 1).
-	def value: ''hash-table-size'' value: (anEnv lookup: (LispSymbol named: ''hash-table-count'')).
+	def value: ''hash-table-size'' value: (anEnv lookup: (LispSymbol named: ''hash-table-count'')) copy.
 	def value: ''hash-table-keys'' value: (LispProcedure fixed: [:t | LispCons fromArray: (tbl value: t value: ''hash-table-keys'') keys] arity: 1).
 	def value: ''hash-table-values'' value: (LispProcedure fixed: [:t | LispCons fromArray: (tbl value: t value: ''hash-table-values'') values] arity: 1).
 	def value: ''hash-table->alist'' value: (LispProcedure fixed: [:t |
@@ -508,7 +640,47 @@ cm value: prims class value: 'installing' value: 'installHashTablesInto: anEnv
 		(LispCons elementsOf: al for: ''alist->hash-table'') do: [:pair |
 			(pair isKindOf: LispCons) ifFalse: [self fail: ''alist->hash-table'' with: ''not a pair: '' , (self show: pair)].
 			(t includesKey: pair car) ifFalse: [t at: pair car put: pair cdr]].
-		t] required: 1)'.
+		t] required: 1).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Hash tables'' with: #(
+		''make-hash-table'' ''(make-hash-table [equality])''
+			''A new hash table comparing keys with equality: eq?, eqv? or equal? (the default).''
+		''hash-table?'' ''(hash-table? x)''
+			''True if x is a hash table.''
+		''hash-table-set!!'' ''(hash-table-set!! table key value)''
+			''Associates key with value in table.''
+		''hash-table-ref'' ''(hash-table-ref table key [missing])''
+			''The value of key in table; if there is none, the result of calling missing, or an error.''
+		''hash-table-ref/default'' ''(hash-table-ref/default table key default)''
+			''The value of key in table, or default.''
+		''hash-table-contains?'' ''(hash-table-contains? table key)''
+			''True if table has a value for key.''
+		''hash-table-exists?'' ''(hash-table-exists? table key)''
+			''The old name of hash-table-contains?.''
+		''hash-table-delete!!'' ''(hash-table-delete!! table key)''
+			''Removes key and its value from table.''
+		''hash-table-update!!'' ''(hash-table-update!! table key proc [missing])''
+			''Replaces the value of key with the result of calling proc on it.''
+		''hash-table-update!!/default'' ''(hash-table-update!!/default table key proc default)''
+			''As hash-table-update!!, with default as the value of a missing key.''
+		''hash-table-count'' ''(hash-table-count table)''
+			''The number of keys in table.''
+		''hash-table-size'' ''(hash-table-size table)''
+			''The old name of hash-table-count.''
+		''hash-table-keys'' ''(hash-table-keys table)''
+			''A list of the keys of table, in the order they were added.''
+		''hash-table-values'' ''(hash-table-values table)''
+			''A list of the values of table, in the order of their keys.''
+		''hash-table->alist'' ''(hash-table->alist table)''
+			''An association list of the keys and values of table.''
+		''alist->hash-table'' ''(alist->hash-table alist [equality])''
+			''A new hash table of the pairs of alist; the first of a repeated key wins.''
+		''hash-table-walk'' ''(hash-table-walk table proc)''
+			''Calls proc on each key and its value.''
+		''hash-table-copy'' ''(hash-table-copy table)''
+			''A new hash table with the keys and values of table.''
+		''hash-table-clear!!'' ''(hash-table-clear!! table)''
+			''Removes every key from table.'')'.
 
 "=== string ports, read, and output to a port (section 8) =================="
 cm value: prims class value: 'installing' value: 'installPortsInto: anEnv
@@ -562,7 +734,46 @@ cm value: prims class value: 'installing' value: 'installPortsInto: anEnv
 	def value: ''with-output-to-string'' value: (LispProcedure fixed: [:thunk | | o |
 		o := WriteStream on: String new.
 		self withOutput: o do: [LispProcedure apply: thunk to: #()].
-		o contents] arity: 1)'.
+		o contents] arity: 1).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Ports'' with: #(
+		''open-input-string'' ''(open-input-string string)''
+			''An input port that reads the characters of string.''
+		''open-output-string'' ''(open-output-string)''
+			''An output port that collects what is written to it.''
+		''get-output-string'' ''(get-output-string port)''
+			''The string of what has been written to the output string port.''
+		''with-output-to-string'' ''(with-output-to-string thunk)''
+			''Calls thunk with its output collected, and answers it as a string.''
+		''read'' ''(read [port])''
+			''The next datum from port (the current input by default), or the eof object.''
+		''read-char'' ''(read-char [port])''
+			''The next character from port, or the eof object.''
+		''peek-char'' ''(peek-char [port])''
+			''The next character from port, without reading it, or the eof object.''
+		''read-line'' ''(read-line [port])''
+			''The rest of the line from port, without its line break, or the eof object.''
+		''read-string'' ''(read-string k [port])''
+			''A string of the next k characters from port, fewer at its end, or the eof object.''
+		''char-ready?'' ''(char-ready? [port])''
+			''True: a character can always be read without waiting for it here.''
+		''write-char'' ''(write-char char [port])''
+			''Writes char to port.''
+		''write-string'' ''(write-string string [port])''
+			''Writes the characters of string to port.''
+		''eof-object'' ''(eof-object)''
+			''The eof object, which reading answers at the end of its input.''
+		''eof-object?'' ''(eof-object? x)''
+			''True if x is the eof object.'').
+	"display, write and newline were first installed without a port (installIOInto:);
+	 these are their final definitions"
+	self document: anEnv category: ''Output'' with: #(
+		''display'' ''(display x [port])''
+			''Writes x for a person: strings and characters as they are, to port or the current output.''
+		''write'' ''(write x [port])''
+			''Writes x so that read reads it back: strings in quotes, characters as #\x.''
+		''newline'' ''(newline [port])''
+			''Writes a line break.'')'.
 
 "=== LispTextOutput =========================================================
  Text output to stdout or stderr that encodes properly. Pharo's Stdio streams
@@ -670,6 +881,17 @@ cm value: proc value: 'accessing' value: 'name
 	^ name'.
 cm value: proc value: 'accessing' value: 'name: aString
 	name := aString'.
+cm value: proc value: 'documentation' value: 'documentation: aString
+	"Its documentation (Phase 10 step 10.1): the call form on the first line, then
+	 what it does."
+	documentation := aString'.
+cm value: proc value: 'documentation' value: 'category: aString
+	"The section of the reference of the built-ins it belongs in."
+	category := aString'.
+cm value: proc value: 'documentation' value: 'lispDocumentation
+	^ documentation'.
+cm value: proc value: 'documentation' value: 'lispCategory
+	^ category'.
 cm value: proc value: 'accessing' value: 'named: aString
 	"Name this procedure (once: an alias does not rename it) and answer it. The
 	 compiler sends this to the value of (define (f ...) ...) (review C-17)."
@@ -935,7 +1157,19 @@ cm value: prims class value: 'installing' value: 'installMacroSupportInto: anEnv
 	anEnv define: (LispSymbol named: ''eval'') value: (LispProcedure fixed: [:form | LispCompiler new eval: form] arity: 1).
 	"how this image was built: its seed, and the bootstrap (Phase 9 step 9.1)"
 	anEnv define: (LispSymbol named: ''image-build-info'') value: (LispProcedure fixed: [
-		LispCompiler buildInfoList] arity: 0)'.
+		LispCompiler buildInfoList] arity: 0).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Evaluation and macros'' with: #(
+		''eval'' ''(eval form)''
+			''Compiles and runs form at top level, and answers its value.''
+		''gensym'' ''(gensym [prefix])''
+			''A new uninterned symbol, unlike any other, for a name a macro makes up.''
+		''macroexpand-1'' ''(macroexpand-1 form)''
+			''form expanded once, if it is a macro call; else form itself.''
+		''macroexpand'' ''(macroexpand form)''
+			''form expanded until it is no longer a macro call.''
+		''image-build-info'' ''(image-build-info)''
+			''How this image was built: an association list of its seed, the bootstrap and its fixpoint.'')'.
 cm value: prims class value: 'installing' value: 'installConditionsInto: anEnv
 	"Phase 7.7: conditions are Pharo exceptions. Handlers catch Error (which includes
 	 LispRaise), never Notifications, Warnings or restart transfers. A handler gets
@@ -1004,7 +1238,47 @@ cm value: prims class value: 'installing' value: 'installConditionsInto: anEnv
 	def value: ''restart-name'' value: (LispProcedure fixed: [:r | r name] arity: 1).
 	def value: ''use-value'' value: (LispProcedure fixed: [:v | LispRestart invoke: ''use-value'' with: { v }] arity: 1).
 	def value: ''store-value'' value: (LispProcedure fixed: [:v | LispRestart invoke: ''store-value'' with: { v }] arity: 1).
-	def value: ''abort'' value: (LispProcedure fixed: [LispRestart invoke: ''abort'' with: #()] arity: 0)'.
+	def value: ''abort'' value: (LispProcedure fixed: [LispRestart invoke: ''abort'' with: #()] arity: 0).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Conditions and restarts'' with: #(
+		''error'' ''(error message irritant ...)''
+			''Signals an error with message, and the irritants for its report.''
+		''raise'' ''(raise obj)''
+			''Raises obj to the current handlers; a handler that returns is an error.''
+		''raise-continuable'' ''(raise-continuable obj)''
+			''Raises obj; the value the handler returns is the value of raise-continuable.''
+		''with-exception-handler'' ''(with-exception-handler handler thunk)''
+			''Calls thunk with handler handling what it raises.''
+		''dynamic-wind'' ''(dynamic-wind before thunk after)''
+			''Calls before, thunk and after, and calls after however thunk is left.''
+		''condition?'' ''(condition? x)''
+			''True if x is a condition: anything raised or signalled.''
+		''error-object?'' ''(error-object? x)''
+			''True if x is an error, as error and the system signal them.''
+		''error-object-message'' ''(error-object-message e)''
+			''The message of the error e.''
+		''error-object-irritants'' ''(error-object-irritants e)''
+			''The irritants of the error e, as a list.''
+		''condition-report'' ''(condition-report c)''
+			''The text that describes the condition c, as the runner shows it.''
+		''read-error?'' ''(read-error? x)''
+			''True if x is an error from reading.''
+		''file-error?'' ''(file-error? x)''
+			''True if x is an error from opening a file.''
+		''invoke-restart'' ''(invoke-restart restart arg ...)''
+			''Transfers to the active restart (or the one with that name), with the arguments.''
+		''find-restart'' ''(find-restart name)''
+			''The innermost active restart named name, or #f.''
+		''compute-restarts'' ''(compute-restarts)''
+			''A list of the active restarts, innermost first.''
+		''restart-name'' ''(restart-name restart)''
+			''The name of restart, a symbol.''
+		''use-value'' ''(use-value x)''
+			''Invokes the use-value restart with x.''
+		''store-value'' ''(store-value x)''
+			''Invokes the store-value restart with x.''
+		''abort'' ''(abort)''
+			''Invokes the abort restart.'')'.
 cm value: prims class value: 'installing' value: 'installInteropInto: anEnv
 	"Phase 7.6 sections 4.3 to 4.5: dynamic sends and lookups, and the values that
 	 differ between the languages. Names arrive as LISP symbols or strings."
@@ -1026,7 +1300,31 @@ cm value: prims class value: 'installing' value: 'installInteropInto: anEnv
 	def value: ''smalltalk-object?'' value: (LispProcedure fixed: [:x |
 		(x class package name beginsWith: ''CogLisp'') not
 			and: [(x isKindOf: Boolean) not and: [x isNumber not
-			and: [(x isKindOf: Character) not and: [(LispCore isString: x) not and: [(x isKindOf: Array) not]]]]]] arity: 1)'.
+			and: [(x isKindOf: Character) not and: [(LispCore isString: x) not and: [(x isKindOf: Array) not]]]]]] arity: 1).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Smalltalk interop'' with: #(
+		''smalltalk-global'' ''(smalltalk-global name)''
+			''The Smalltalk global named name (a symbol or a string), or #f.''
+		''smalltalk-selector'' ''(smalltalk-selector name)''
+			''The Smalltalk selector spelled name.''
+		''smalltalk-send'' ''(smalltalk-send receiver selector arg ...)''
+			''Sends the message selector to receiver with the arguments, chosen at run time.''
+		''smalltalk-symbol'' ''(smalltalk-symbol name)''
+			''The Smalltalk symbol spelled name.''
+		''lisp-symbol'' ''(lisp-symbol x)''
+			''The LISP symbol spelled as x, a Smalltalk symbol or string.''
+		''smalltalk-nil'' ''(smalltalk-nil)''
+			''Smalltalk nil, which is not a LISP value.''
+		''smalltalk-nil?'' ''(smalltalk-nil? x)''
+			''True if x is Smalltalk nil.''
+		''smalltalk-object?'' ''(smalltalk-object? x)''
+			''True if x is a Smalltalk object that is not also a LISP value.''
+		''list->array'' ''(list->array list)''
+			''A Smalltalk Array of the elements of list.''
+		''array->list'' ''(array->list array)''
+			''A list of the elements of a Smalltalk collection.''
+		''procedure->block'' ''(procedure->block proc)''
+			''A Smalltalk block that calls proc, for Smalltalk code that wants one.'')'.
 cm value: facade class value: 'evaluating' value: 'eval: aString
 	"Evaluate LISP source in the global environment; answer the last value."
 	^ LispCompiler new evalAll: aString'.
@@ -1062,7 +1360,21 @@ cm value: prims class value: 'installing' value: 'installListSearchInto: anEnv
 	anEnv define: (LispSymbol named: ''member'') value: (LispProcedure fixed: (mem value: [:a :b | LispCore equal: a with: b]) arity: 2).
 	anEnv define: (LispSymbol named: ''assq'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore eq: a with: b] value: ''assq'') arity: 2).
 	anEnv define: (LispSymbol named: ''assv'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore eqv: a with: b] value: ''assv'') arity: 2).
-	anEnv define: (LispSymbol named: ''assoc'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore equal: a with: b] value: ''assoc'') arity: 2)'.
+	anEnv define: (LispSymbol named: ''assoc'') value: (LispProcedure fixed: (ass value: [:a :b | LispCore equal: a with: b] value: ''assoc'') arity: 2).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Lists'' with: #(
+		''memq'' ''(memq x list)''
+			''The first tail of list whose car is eq? to x, or #f.''
+		''memv'' ''(memv x list)''
+			''The first tail of list whose car is eqv? to x, or #f.''
+		''member'' ''(member x list)''
+			''The first tail of list whose car is equal? to x, or #f.''
+		''assq'' ''(assq key alist)''
+			''The first pair of the association list whose car is eq? to key, or #f.''
+		''assv'' ''(assv key alist)''
+			''The first pair of the association list whose car is eqv? to key, or #f.''
+		''assoc'' ''(assoc key alist)''
+			''The first pair of the association list whose car is equal? to key, or #f.'')'.
 cm value: prims class value: 'installing' value: 'installInlineFormsInto: anEnv
 	"Inline forms for guarded inlining (Phase 6 section 11.2). Each matches what
 	 the primitive does for that many arguments."
@@ -1137,7 +1449,43 @@ cm value: prims class value: 'installing' value: 'installFilesInto: anEnv
 	def value: ''write-shared'' value: (LispProcedure variadic: [:x :rest |
 		((opt value: rest) ifEmpty: [self output] ifNotEmpty: [:r | self outPort: r first for: ''write-shared''])
 			nextPutAll: (LispPrinter writeSharedString: x); flush.
-		unspec] required: 1)'.
+		unspec] required: 1).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Files'' with: #(
+		''open-input-file'' ''(open-input-file path)''
+			''An input port reading the file at path.''
+		''open-output-file'' ''(open-output-file path)''
+			''An output port writing the file at path, which is replaced.''
+		''close-port'' ''(close-port port)''
+			''Closes port.''
+		''close-input-port'' ''(close-input-port port)''
+			''Closes the input port.''
+		''close-output-port'' ''(close-output-port port)''
+			''Closes the output port, so what was written is in its file.''
+		''call-with-input-file'' ''(call-with-input-file path proc)''
+			''Calls proc with an input port on the file, closed afterwards.''
+		''call-with-output-file'' ''(call-with-output-file path proc)''
+			''Calls proc with an output port on the file, closed afterwards.''
+		''with-input-from-file'' ''(with-input-from-file path thunk)''
+			''Calls thunk with the current input read from the file.''
+		''with-output-to-file'' ''(with-output-to-file path thunk)''
+			''Calls thunk with the current output written to the file.''
+		''file-exists?'' ''(file-exists? path)''
+			''True if there is a file at path.''
+		''delete-file'' ''(delete-file path)''
+			''Deletes the file at path.''
+		''current-input-port'' ''(current-input-port)''
+			''The port read reads from by default.''
+		''current-output-port'' ''(current-output-port)''
+			''The port display and write write to by default.''
+		''current-error-port'' ''(current-error-port)''
+			''The port for error messages.''
+		''current-load-path'' ''(current-load-path)''
+			''The full path of the file being loaded or run, or #f.''
+		''command-line'' ''(command-line)''
+			''A list of the program name and its arguments, as strings.''
+		''write-shared'' ''(write-shared x [port])''
+			''Writes x with a datum label for every part it shares, so the sharing reads back.'')'.
 cm value: prims class value: 'output' value: 'withOutput: aStream do: aBlock
 	| previous |
 	previous := Output.
@@ -1171,7 +1519,37 @@ cm value: prims class value: 'installing' value: 'installListsInto: anEnv
 	anEnv define: (LispSymbol named: ''set-car!!'') value: (LispProcedure fixed: [:p :v | p car: v. LispUnspecified default] arity: 2).
 	anEnv define: (LispSymbol named: ''set-cdr!!'') value: (LispProcedure fixed: [:p :v | p cdr: v. LispUnspecified default] arity: 2).
 	anEnv define: (LispSymbol named: ''map'') value: (LispProcedure fixed: [:prc :lst | LispCons fromArray: ((LispCons elementsOf: lst for: ''map'') collect: [:e | LispProcedure apply: prc to: { e }]) asArray] arity: 2).
-	anEnv define: (LispSymbol named: ''for-each'') value: (LispProcedure fixed: [:prc :lst | (LispCons elementsOf: lst for: ''for-each'') do: [:e | LispProcedure apply: prc to: { e }]. LispUnspecified default] arity: 2)'.
+	anEnv define: (LispSymbol named: ''for-each'') value: (LispProcedure fixed: [:prc :lst | (LispCons elementsOf: lst for: ''for-each'') do: [:e | LispProcedure apply: prc to: { e }]. LispUnspecified default] arity: 2).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Lists'' with: #(
+		''cons'' ''(cons a b)''
+			''A new pair whose car is a and whose cdr is b.''
+		''car'' ''(car pair)''
+			''The first element of pair.''
+		''cdr'' ''(cdr pair)''
+			''The second element of pair: for a list, the rest of it.''
+		''set-car!!'' ''(set-car!! pair x)''
+			''Replaces the car of pair with x.''
+		''set-cdr!!'' ''(set-cdr!! pair x)''
+			''Replaces the cdr of pair with x.''
+		''list'' ''(list x ...)''
+			''A new list of the arguments.''
+		''length'' ''(length list)''
+			''The number of elements of list; an error for an improper or circular list.''
+		''append'' ''(append list ... x)''
+			''A list of the elements of each list in turn, ending in x, which is shared, not copied.''
+		''reverse'' ''(reverse list)''
+			''A new list of the elements of list in reverse order.''
+		''map'' ''(map proc list)''
+			''A new list of the results of calling proc on each element of list.''
+		''for-each'' ''(for-each proc list)''
+			''Calls proc on each element of list, in order, for its effect.''
+		''null?'' ''(null? x)''
+			''True if x is the empty list.''
+		''pair?'' ''(pair? x)''
+			''True if x is a pair.''
+		''list?'' ''(list? x)''
+			''True if x is a proper list: finite, and ending in the empty list.'')'.
 cm value: prims class value: 'installing' value: 'installNumbersInto: anEnv
 	"(+ x) and (* x) check x: they used to answer it whatever it was (review R-11)"
 	anEnv define: (LispSymbol named: ''+'') value: (LispProcedure variadic: [:nums | | xs | xs := nums lispElements. xs size = 1 ifTrue: [self number: xs first for: ''+''] ifFalse: [xs inject: 0 into: [:a :b | a + b]]] required: 0).
@@ -1185,7 +1563,128 @@ cm value: prims class value: 'installing' value: 'installNumbersInto: anEnv
 	anEnv define: (LispSymbol named: ''negative?'') value: (LispProcedure fixed: [:a | (self real: a for: ''negative?'') < 0] arity: 1).
 	self installNumericTowerInto: anEnv.
 	self installNumericProceduresInto: anEnv.
-	self installNumberEntriesInto: anEnv'.
+	self installNumberEntriesInto: anEnv.
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Numbers'' with: #(
+		''+'' ''(+ z ...)''
+			''The sum of the numbers; 0 for none.''
+		''*'' ''(* z ...)''
+			''The product of the numbers; 1 for none.''
+		''-'' ''(- z w ...)''
+			''z minus each w in turn; with one argument, its negation.''
+		''/'' ''(/ z w ...)''
+			''z divided by each w in turn; with one argument, its reciprocal. Exact division stays exact (1/3); a float divided by zero gives an infinity or NaN.''
+		''abs'' ''(abs x)''
+			''The absolute value of the real number x.''
+		''magnitude'' ''(magnitude x)''
+			''The magnitude of x: for a real number, its absolute value.''
+		''square'' ''(square z)''
+			''z times z.''
+		''min'' ''(min x y ...)''
+			''The smallest of the real numbers; inexact if any of them is.''
+		''max'' ''(max x y ...)''
+			''The largest of the real numbers; inexact if any of them is.''
+		''zero?'' ''(zero? z)''
+			''True if z is zero, exact or inexact.''
+		''positive?'' ''(positive? x)''
+			''True if the real number x is greater than zero.''
+		''negative?'' ''(negative? x)''
+			''True if the real number x is less than zero.''
+		''odd?'' ''(odd? n)''
+			''True if the integer n is odd.''
+		''even?'' ''(even? n)''
+			''True if the integer n is even.''
+		''complex?'' ''(complex? x)''
+			''True if x is a number: there are no non-real numbers built in.''
+		''real?'' ''(real? x)''
+			''True if x is a real number.''
+		''rational?'' ''(rational? x)''
+			''True if x is a rational number: an exact rational, or a finite float.''
+		''exact?'' ''(exact? z)''
+			''True if the number z is exact.''
+		''inexact?'' ''(inexact? z)''
+			''True if the number z is inexact (a float).''
+		''exact-integer?'' ''(exact-integer? x)''
+			''True if x is an exact integer.''
+		''exact-rational?'' ''(exact-rational? x)''
+			''True if x is an exact integer or an exact fraction.''
+		''nan?'' ''(nan? z)''
+			''True if the number z is a NaN.''
+		''infinite?'' ''(infinite? z)''
+			''True if the number z is +inf.0 or -inf.0.''
+		''finite?'' ''(finite? z)''
+			''True if the number z is neither infinite nor NaN.''
+		''exact'' ''(exact z)''
+			''The exact number equal to z: a float gives the fraction it holds exactly. An error for an infinity or NaN.''
+		''inexact'' ''(inexact z)''
+			''The float nearest to z.''
+		''exact->inexact'' ''(exact->inexact z)''
+			''The old name of inexact.''
+		''inexact->exact'' ''(inexact->exact z)''
+			''The old name of exact.''
+		''floor'' ''(floor x)''
+			''The largest integer not greater than x; a float stays a float.''
+		''ceiling'' ''(ceiling x)''
+			''The smallest integer not less than x; a float stays a float.''
+		''truncate'' ''(truncate x)''
+			''x with its fraction dropped, toward zero; a float stays a float.''
+		''round'' ''(round x)''
+			''The nearest integer to x, a half going to the even one; a float stays a float.''
+		''floor/'' ''(floor/ n d)''
+			''Two values: the quotient of n by d rounded toward minus infinity, and the remainder, which has the sign of d.''
+		''floor-quotient'' ''(floor-quotient n d)''
+			''The quotient of n by d, rounded toward minus infinity.''
+		''floor-remainder'' ''(floor-remainder n d)''
+			''The remainder of n by d after floor-quotient; it has the sign of d.''
+		''truncate/'' ''(truncate/ n d)''
+			''Two values: the quotient of n by d rounded toward zero, and the remainder, which has the sign of n.''
+		''truncate-quotient'' ''(truncate-quotient n d)''
+			''The quotient of n by d, rounded toward zero.''
+		''truncate-remainder'' ''(truncate-remainder n d)''
+			''The remainder of n by d after truncate-quotient; it has the sign of n.''
+		''quotient'' ''(quotient n d)''
+			''The old name of truncate-quotient.''
+		''remainder'' ''(remainder n d)''
+			''The old name of truncate-remainder.''
+		''modulo'' ''(modulo n d)''
+			''The old name of floor-remainder.''
+		''numerator'' ''(numerator q)''
+			''The numerator of the rational q in lowest terms.''
+		''denominator'' ''(denominator q)''
+			''The denominator of the rational q in lowest terms, always positive.''
+		''gcd'' ''(gcd n ...)''
+			''The greatest common divisor of the integers, never negative; 0 for none.''
+		''lcm'' ''(lcm n ...)''
+			''The least common multiple of the integers, never negative; 1 for none.''
+		''sqrt'' ''(sqrt x)''
+			''The square root of x: exact for an exact perfect square, else inexact. An error for a negative number (complex numbers are not built in).''
+		''exact-integer-sqrt'' ''(exact-integer-sqrt n)''
+			''Two values: the largest integer s with s*s not above n, and n - s*s.''
+		''expt'' ''(expt z1 z2)''
+			''z1 raised to the power z2: exact for an exact base and an exact integer power.''
+		''rationalize'' ''(rationalize x y)''
+			''The simplest rational number within y of x; inexact if either is.''
+		''exp'' ''(exp z)''
+			''e raised to the power z.''
+		''log'' ''(log z [base])''
+			''The natural logarithm of z, or its logarithm in base; -inf.0 at zero, +nan.0 below it.''
+		''sin'' ''(sin z)''
+			''The sine of z, in radians.''
+		''cos'' ''(cos z)''
+			''The cosine of z, in radians.''
+		''tan'' ''(tan z)''
+			''The tangent of z, in radians.''
+		''asin'' ''(asin z)''
+			''The arcsine of z; +nan.0 outside -1 to 1.''
+		''acos'' ''(acos z)''
+			''The arccosine of z; +nan.0 outside -1 to 1.''
+		''atan'' ''(atan y [x])''
+			''The arctangent of y, or of y/x in the right quadrant.'').
+	self document: anEnv category: ''Control'' with: #(
+		''values'' ''(values x ...)''
+			''Answers its arguments as several values; one value is just itself.''
+		''call-with-values'' ''(call-with-values producer consumer)''
+			''Calls consumer with the values producer answers.'')'.
 cm value: prims class value: 'installing' value: 'installNumberEntriesInto: anEnv
 	"Phase 6 section 5.1: direct entries for the common fixed-arity uses of the
 	 variadic arithmetic primitives, so (+ a b) costs one block call."
@@ -1417,7 +1916,19 @@ cm value: prims class value: 'installing' value: 'installComparisonsInto: anEnv
 	(e value: ''<'') entry: 2 is: [:a :b | a < b].
 	(e value: ''>'') entry: 2 is: [:a :b | a > b].
 	(e value: ''<='') entry: 2 is: [:a :b | a <= b].
-	(e value: ''>='') entry: 2 is: [:a :b | a >= b]'.
+	(e value: ''>='') entry: 2 is: [:a :b | a >= b].
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Numbers'' with: #(
+		''='' ''(= z1 z2 ...)''
+			''True if the numbers are all equal.''
+		''<'' ''(< x1 x2 ...)''
+			''True if the numbers are strictly increasing.''
+		''>'' ''(> x1 x2 ...)''
+			''True if the numbers are strictly decreasing.''
+		''<='' ''(<= x1 x2 ...)''
+			''True if the numbers never decrease.''
+		''>='' ''(>= x1 x2 ...)''
+			''True if the numbers never increase.'')'.
 cm value: prims class value: 'installing' value: 'installPredicatesInto: anEnv
 	| equality |
 	"each registered, so make-hash-table knows it (equalityTests)"
@@ -1435,7 +1946,31 @@ cm value: prims class value: 'installing' value: 'installPredicatesInto: anEnv
 	anEnv define: (LispSymbol named: ''string?'') value: (LispProcedure fixed: [:x | LispCore isString: x] arity: 1).
 	anEnv define: (LispSymbol named: ''char?'') value: (LispProcedure fixed: [:x | LispCore isChar: x] arity: 1).
 	anEnv define: (LispSymbol named: ''boolean?'') value: (LispProcedure fixed: [:x | LispCore isBoolean: x] arity: 1).
-	anEnv define: (LispSymbol named: ''procedure?'') value: (LispProcedure fixed: [:x | x isKindOf: LispProcedure] arity: 1)'.
+	anEnv define: (LispSymbol named: ''procedure?'') value: (LispProcedure fixed: [:x | x isKindOf: LispProcedure] arity: 1).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Equality and types'' with: #(
+		''eq?'' ''(eq? a b)''
+			''True if a and b are the same object.''
+		''eqv?'' ''(eqv? a b)''
+			''True if a and b are the same object, or numbers of the same exactness and value, or the same character.''
+		''equal?'' ''(equal? a b)''
+			''True if a and b are eqv?, or pairs, vectors or strings with equal? contents.''
+		''not'' ''(not x)''
+			''True if x is #f, the only false value.''
+		''boolean?'' ''(boolean? x)''
+			''True if x is #t or #f.''
+		''symbol?'' ''(symbol? x)''
+			''True if x is a symbol.''
+		''number?'' ''(number? x)''
+			''True if x is a number.''
+		''integer?'' ''(integer? x)''
+			''True if x is an integer, exact or not: (integer? 2.0) is true.''
+		''string?'' ''(string? x)''
+			''True if x is a string.''
+		''char?'' ''(char? x)''
+			''True if x is a character.''
+		''procedure?'' ''(procedure? x)''
+			''True if x is a procedure.'')'.
 cm value: prims class value: 'installing' value: 'installIOInto: anEnv
 	anEnv define: (LispSymbol named: ''display'') value: (LispProcedure fixed: [:x | self output nextPutAll: (LispPrinter displayString: x); flush. LispUnspecified default] arity: 1).
 	anEnv define: (LispSymbol named: ''write'') value: (LispProcedure fixed: [:x | self output nextPutAll: (LispPrinter writeString: x); flush. LispUnspecified default] arity: 1).
@@ -1452,6 +1987,7 @@ cm value: prims class value: 'installing' value: 'installSystemInto: anEnv
 			ifFalse: [(LispError new) signal: ''exit: expected #t, #f or an integer from 0 to 255: '' , (LispPrinter writeString: c limitedTo: 60)]] required: 0).
 	anEnv define: (LispSymbol named: ''save-image'') value: (LispProcedure fixed: [self saveImage] arity: 0).
 	anEnv define: (LispSymbol named: ''procedure-source'') value: (LispProcedure fixed: [:p | p source ifNil: [false]] arity: 1).
+	anEnv define: (LispSymbol named: ''procedure-documentation'') value: (LispProcedure fixed: [:p | p lispDocumentation ifNil: [false]] arity: 1).
 	anEnv define: (LispSymbol named: ''stack-depth'') value: (LispProcedure fixed: [| c n |
 		c := thisContext.
 		n := 0.
@@ -1459,11 +1995,31 @@ cm value: prims class value: 'installing' value: 'installSystemInto: anEnv
 		n] arity: 0).
 	anEnv define: (LispSymbol named: ''disassemble'') value: (LispProcedure fixed: [:p |
 		self output nextPutAll: p block compiledBlock symbolic; nextPut: Character lf; flush.
-		LispUnspecified default] arity: 1)'.
+		LispUnspecified default] arity: 1).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''The system'' with: #(
+		''load'' ''(load path)''
+			''Reads and evaluates every form of the file at path, relative to the file being loaded.''
+		''exit'' ''(exit [code])''
+			''Ends the program: (exit) and (exit #t) succeed, (exit #f) fails, (exit n) exits with n.''
+		''save-image'' ''(save-image)''
+			''Saves the running image, so its definitions are there when it next starts.''
+		''procedure-documentation'' ''(procedure-documentation proc)''
+			''The documentation of proc, or #f: the call form on its first line, then what it does.''
+		''procedure-source'' ''(procedure-source proc)''
+			''The text proc was compiled from, or #f for a primitive.''
+		''stack-depth'' ''(stack-depth)''
+			''The number of frames on the stack, for testing that loops run in constant space.''
+		''disassemble'' ''(disassemble proc)''
+			''Writes the bytecode of the procedure proc.'')'.
 cm value: prims class value: 'installing' value: 'installControlInto: anEnv
 	"apply answers a bounce rather than calling, so that a tail call through apply
 	 runs in constant stack; every caller of a procedure drives bounces (Phase 6)."
-	anEnv define: (LispSymbol named: ''apply'') value: (LispProcedure fixed: [:prc :argList | LispProcedure tailCall: prc to: (LispCons elementsOf: argList for: ''apply'') asArray] arity: 2)'.
+	anEnv define: (LispSymbol named: ''apply'') value: (LispProcedure fixed: [:prc :argList | LispProcedure tailCall: prc to: (LispCons elementsOf: argList for: ''apply'') asArray] arity: 2).
+	"its documentation (Phase 10 step 10.1): name, call form, description"
+	self document: anEnv category: ''Control'' with: #(
+		''apply'' ''(apply proc list)''
+			''Calls proc with the elements of list as its arguments.'')'.
 
 "=== load report ==========================================================="
 Stdio stdout

@@ -469,44 +469,85 @@
 ;;; Special forms: a table from name to translator, as LispCompiler class>>specialForms
 
 (define lc-special-forms (make-hash-table eq?))
-(define (define-special-form name translator) (hash-table-set! lc-special-forms name translator))
+(define (define-special-form name . rest)
+  "(define-special-form name [documentation] translator)
+Makes name a special form of the running compiler: translator, called with the
+compiler's state, the form, the scope and whether the form is in tail position,
+answers its code. The documentation is what (documentation name) answers."
+  (let ((translator (if (pair? (cdr rest)) (car (cdr rest)) (car rest))))
+    (when (pair? (cdr rest))
+      [translator documentation: (car rest)]
+      [translator category: "Special forms"])
+    (hash-table-set! lc-special-forms name translator)))
 
 (define-special-form 'quote
+  "(quote datum), 'datum
+The datum itself, not evaluated."
   (lambda (c form scope tail) (lc-check form 1 1) (lc-quote-node c (car (cdr form)))))
 (define-special-form 'if
+  "(if test then [else])
+Evaluates then if test is true (anything but #f), else else."
   (lambda (c form scope tail) (lc-check form 2 3) (lc-translate-if c form scope tail)))
 (define-special-form 'begin
+  "(begin form ...)
+Evaluates the forms in order and answers the last; at top level each is a top-level form."
   (lambda (c form scope tail) (lc-translate-begin c (lc-items (cdr form)) scope tail)))
 (define-special-form 'lambda
+  "(lambda params body ...)
+A procedure. params is (a b), (a b . rest) or rest; a body may start with internal definitions, and with a documentation string."
   (lambda (c form scope tail) (lc-check form 1 #f) (lc-translate-lambda c form scope (lc-source-of c form) #f #f)))
 (define-special-form 'let
+  "(let ((name init) ...) body ...), (let loop ((name init) ...) body ...)
+Binds each name to its init, evaluated outside the bindings; the named form also binds loop to the body as a procedure."
   (lambda (c form scope tail) (lc-check form 1 #f) (lc-translate-let c form scope tail)))
 (define-special-form 'define
+  "(define name value), (define (name . params) body ...)
+Defines name, globally at top level or locally at the start of a body. A body that starts with a string keeps it as its documentation."
   (lambda (c form scope tail) (lc-check-define form) (lc-translate-define c form scope)))
 (define-special-form 'set!
+  "(set! name value)
+Assigns value to the variable name, local or global."
   (lambda (c form scope tail)
     (lc-check form 2 2)
     (unless (lc-identifier? (car (cdr form)))
       (lc-error (string-append "set!: bad name: " (lc-show (car (cdr form))))))
     (lc-translate-set c form scope)))
 (define-special-form 'quasiquote
+  "(quasiquote template), `template
+The template as data, with (unquote x) and (unquote-splicing x), written ,x and ,@x, filled in."
   (lambda (c form scope tail) (lc-check form 1 1) (lc-qq-node c (car (cdr form)) 0 scope)))
 (define-special-form 'define-macro
+  "(define-macro (name . params) body ...)
+A macro that is not hygienic: its expander gets the operands and answers code, whose names mean what they mean where it is used."
   (lambda (c form scope tail) (lc-check form 2 #f) (lc-translate-define-macro c form scope)))
 (define-special-form 'send
+  "(send receiver selector arg ...), [receiver selector arg ...]
+Sends a Smalltalk message; the selector is spelled as in Smalltalk (at:put:)."
   (lambda (c form scope tail) (lc-translate-send c form scope)))
 (define-special-form 'smalltalk
+  "(smalltalk Name)
+The Smalltalk global Name, such as a class."
   (lambda (c form scope tail) (lc-translate-smalltalk-global form)))
 ;; hygienic macros (step 9.3); internal define-syntax is a body's (lc-translate-scoped-body)
 (define-special-form 'define-syntax
-  (lambda (c form scope tail) (lc-check form 2 2) (lc-translate-define-syntax c form scope)))
+  "(define-syntax name [documentation] (syntax-rules ...))
+A hygienic macro, at top level or local to a body."
+  (lambda (c form scope tail) (lc-check form 2 3) (lc-translate-define-syntax c form scope)))
 (define-special-form 'let-syntax
+  "(let-syntax ((name (syntax-rules ...)) ...) body ...)
+Local macros, defined in the enclosing scope, for the body."
   (lambda (c form scope tail) (lc-check form 1 #f) (lc-translate-let-syntax c form scope tail #f)))
 (define-special-form 'letrec-syntax
+  "(letrec-syntax ((name (syntax-rules ...)) ...) body ...)
+Local macros that can use each other, for the body."
   (lambda (c form scope tail) (lc-check form 1 #f) (lc-translate-let-syntax c form scope tail #t)))
 (define-special-form 'syntax-rules
+  "(syntax-rules [ellipsis] (literal ...) (pattern template) ...)
+The transformer of a hygienic macro: the first pattern a use matches gives its template, filled in."
   (lambda (c form scope tail) (lc-error "syntax-rules is used only in define-syntax, let-syntax and letrec-syntax")))
 (define-special-form 'syntax-error
+  "(syntax-error message form ...)
+Stops compilation with message and the forms, for a macro to report a misuse."
   (lambda (c form scope tail)
     (let ((parts (lc-items (cdr form))))
       (lc-error (if (and (pair? parts) (string? (car parts)))
@@ -588,7 +629,20 @@
   (let ((name (car (cdr form))))
     (unless (lc-identifier? name) (lc-error (string-append "define-syntax: bad name: " (lc-show name))))
     (lc-and-unspecified
-     (lc-global-define c name (opal-literal (lc-make-syntax c (car (cdr (cdr form))) scope scope name (lc-source-of c form)))))))
+     (lc-global-define c name (opal-literal (lc-documented-syntax (lc-make-syntax c (lc-syntax-spec form) scope scope name (lc-source-of c form))
+                                                                   form))))))
+
+;; (define-syntax name [documentation] spec): the spec, and the documentation or #f
+(define (lc-syntax-spec form)
+  (let ((rest (cdr (cdr form))))
+    (if (and (string? (car rest)) (pair? (cdr rest))) (car (cdr rest)) (car rest))))
+(define (lc-syntax-documentation form)
+  (let ((rest (cdr (cdr form))))
+    (and (string? (car rest)) (pair? (cdr rest)) (car rest))))
+(define (lc-documented-syntax m form)
+  (let ((doc (lc-syntax-documentation form)))
+    (when doc [m documentation: doc] [m category: (lc-category)])
+    m))
 
 ;; (let-syntax ((name (syntax-rules ...)) ...) body ...): the macros' scope is the
 ;; enclosing one, or for letrec-syntax the new one, so they can use each other
@@ -700,10 +754,10 @@
                    (scan (cons (cons expansion context) (cdr pending)) defs (+ steps 1))))
                 ((lc-define-syntax-form? datum child-scope)
                  ;; a local macro, for the whole body: its scope is the body's
-                 (lc-check datum 2 2)
+                 (lc-check datum 2 3)
                  (let ((name (car (cdr datum))))
                    (unless (lc-identifier? name) (lc-error (string-append "define-syntax: bad name: " (lc-show name))))
-                   (scope-set! child-scope name (lc-make-syntax c (car (cdr (cdr datum))) child-scope child-scope name (lc-source-of c datum)))
+                   (scope-set! child-scope name (lc-documented-syntax (lc-make-syntax c (lc-syntax-spec datum) child-scope child-scope name (lc-source-of c datum)) datum))
                    (scan (cdr pending) defs steps)))
                 ((lc-define-form? datum child-scope)
                  (lc-check-define datum)
@@ -911,13 +965,33 @@
            (proc-node0 (opal-send (opal-var "LispProcedure")
                                   (if rest-sym "variadic:required:source:" "fixed:arity:source:")
                                   (vector block (opal-literal (length fixed)) (opal-literal source-text))))
-           (proc-node (if packed (opal-send proc-node0 "packed" (vector)) proc-node0)))
+           (proc-node1 (if packed (opal-send proc-node0 "packed" (vector)) proc-node0))
+           (proc-node (lc-documented-node c proc-node1 (cdr parts))))
       (if (not looping)
           proc-node
           (let ((proc-name (loop-proc loop)))
             (opal-send (opal-block (vector) (vector (opal-var proc-name))
                                    (vector (opal-assign proc-name proc-node) (opal-var proc-name)))
                        "value" (vector)))))))
+
+;; A body that starts with a string and has more after it keeps the string as the
+;; procedure's documentation (Phase 10 step 10.1), with the category of the file
+;; being loaded. The string is still evaluated, so the body means what it did.
+(define (lc-documented-node c proc-node body)
+  (if (and (pair? body) (string? (car body)) (pair? (cdr body)))
+      (opal-send (opal-send proc-node "documentation:" (vector (opal-literal (car body))))
+                 "category:" (vector (opal-literal (lc-category))))
+      proc-node))
+
+;; the section of the reference a definition belongs in: from the file being loaded
+(define (lc-category)
+  (let ((path [(smalltalk LispLoadPath) value]))
+    (if (smalltalk-nil? path)
+        "Definitions"
+        (let ((p [[path asString] copyReplaceAll: "\\" with: "/"]))
+          (cond ([p endsWith: "/lib/core.lisp"] "Derived forms")
+                ([p includesSubstring: "/lib/compiler/"] "The compiler and reader")
+                (else [[path asFileReference] basename]))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Let
@@ -1114,11 +1188,15 @@
 ;; (compile-form datum [source-map [context]]): a CompiledMethod, as compile:
 ;; source-map is a reader (LISP or Smalltalk) that read datum, or #f
 (define (compile-form datum . options)
+  "(compile-form datum [reader [context]])
+The Smalltalk CompiledMethod that runs datum, made by the compiler in use. reader is the LISP reader that read datum, so its procedures keep their text."
   (let ((c (make-lisp-compiler)))
     (when (pair? options) (c-source-map! c (car options)))
     (lc-compile c datum (if (and (pair? options) (pair? (cdr options))) (car (cdr options)) #f))))
 
 (define (lisp-eval datum . source-map)
+  "(lisp-eval datum [reader])
+Compiles and runs datum with the compiler in use, as eval does."
   (let ((c (make-lisp-compiler)))
     (when (pair? source-map) (c-source-map! c (car source-map)))
     (lc-eval c datum #f 0)))
@@ -1154,8 +1232,36 @@
             ((> steps lc-max-expansions) (lc-expansion-too-deep form))
             (else (loop next (+ steps 1)))))))
 
+;;; Documentation (Phase 10 step 10.1)
+
+;; what holds name's documentation: its special form, else its global value, or #f
+(define (lc-documented name)
+  (or (hash-table-ref/default lc-special-forms name #f)
+      (let ((v (lc-global-value name))) (if (eq? v lc-unbound) #f v))))
+
+(define (documentation name)
+  "(documentation name)
+The documentation of what the symbol name means: a special form, a macro or a
+procedure; #f if it has none. Its first line is the call form."
+  (let ((holder (lc-documented name)))
+    (and holder (let ((d [holder lispDocumentation])) (if (smalltalk-nil? d) #f d)))))
+
+(define (documentation-category name)
+  "(documentation-category name)
+The section of the reference of the built-ins that name belongs in, or #f."
+  (let ((holder (lc-documented name)))
+    (and holder (let ((d [holder lispCategory])) (if (smalltalk-nil? d) #f d)))))
+
+(define (special-form-names)
+  "(special-form-names)
+The names of the special forms, sorted."
+  (map string->symbol
+       (vector->list [[[(list->vector (map symbol->string (hash-table-keys lc-special-forms))) asSortedCollection] asArray] copy])))
+
 ;; every datum of a string, read by the LISP reader so procedures keep their text
 (define (lisp-eval-string s)
+  "(lisp-eval-string string)
+Reads and evaluates every datum of string in turn, so procedures keep their text; answers the last value."
   (let ((r (make-reader s)))
     (let loop ((result (if #f #f)))
       (let ((d (reader-next r)))

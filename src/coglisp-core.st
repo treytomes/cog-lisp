@@ -20,7 +20,7 @@ cm := [:cls :cat :src |
 core := (Object << #LispCore) package: 'CogLisp-Core'; install.
 env  := (Object << #LispEnvironment) slots: { #bindings }; sharedVariables: { #Default }; package: 'CogLisp-Core'; install.
 cell := (Object << #LispGlobal) slots: { #symbol. #value. #bound }; package: 'CogLisp-Core'; install.
-macro := (Object << #LispMacro) slots: { #expander }; package: 'CogLisp-Core'; install.
+macro := (Object << #LispMacro) slots: { #expander. #documentation. #category }; package: 'CogLisp-Core'; install.
 "A syntax-rules macro (Phase 9 step 9.3): its expander takes the whole form and
  the scope of its use, and answers the expansion."
 syntax := (macro << #LispSyntax) slots: { #name }; package: 'CogLisp-Core'; install.
@@ -41,6 +41,11 @@ cm value: Object value: '*CogLisp-Core' value: 'isLispSymbol
 	^ false'.
 cm value: Object value: '*CogLisp-Core' value: 'isLispAlias
 	^ false'.
+cm value: Object value: '*CogLisp-Core' value: 'lispDocumentation
+	"what (documentation name) answers for a value with none (Phase 10 step 10.1)"
+	^ nil'.
+cm value: Object value: '*CogLisp-Core' value: 'lispCategory
+	^ nil'.
 cm value: LispAlias value: 'testing' value: 'isLispAlias
 	^ true'.
 cm value: LispCons value: 'testing' value: 'isLispPair
@@ -172,6 +177,15 @@ cm value: core class value: 'truth' value: 'isTruthy: v
  them as calls. Defined here because the compiler loads before the runtime."
 cm value: macro value: 'private' value: 'setExpander: aProcedure
 	expander := aProcedure'.
+cm value: macro value: 'documentation' value: 'documentation: aString
+	documentation := aString'.
+cm value: macro value: 'documentation' value: 'category: aString
+	category := aString'.
+cm value: macro value: 'documentation' value: 'lispDocumentation
+	"its own, or a define-macro expander''s (a string at the start of its body)"
+	^ documentation ifNil: [expander lispDocumentation]'.
+cm value: macro value: 'documentation' value: 'lispCategory
+	^ category ifNil: [expander lispCategory]'.
 cm value: macro value: 'accessing' value: 'expander
 	^ expander'.
 cm value: macro value: 'printing' value: 'printOn: aStream

@@ -78,21 +78,29 @@
   (let files ((names compiler-sources) (acc '()))
     (if (null? names)
         (reverse acc)
-        (let* ((name (car names))
-               (source (open (bootstrap-file-text (bootstrap-path dir name))))
-               (next (car source))
-               (map (car (cdr source)))
-               (source-for (car (cdr (cdr source)))))
-          (let forms ((k 1) (acc acc))
-            (let ((d (next)))
-              (if (eof-object? d)
-                  (files (cdr names) acc)
-                  (begin
-                    (gensym-counter! gensym-base)
-                    (forms (+ k 1)
-                           (stage-visit compile d map source-for #f
-                                        (string-append name " form " (number->string k))
-                                        acc))))))))))
+        (files (cdr names)
+               (stage-compile-file compile open (bootstrap-path dir (car names)) (car names) gensym-base acc)))))
+
+;; one source file's forms, compiled as if the file were being loaded, so what a
+;; definition records about its file (its documentation's category) is the same
+;; in every stage as in a load (Phase 10 step 10.1)
+(define (stage-compile-file compile open path name gensym-base acc)
+  [(smalltalk LispLoadPath) value: [[path asFileReference] fullName]
+     during: (lambda ()
+               (let* ((source (open (bootstrap-file-text path)))
+                      (next (car source))
+                      (map (car (cdr source)))
+                      (source-for (car (cdr (cdr source)))))
+                 (let forms ((k 1) (acc acc))
+                   (let ((d (next)))
+                     (if (eof-object? d)
+                         acc
+                         (begin
+                           (gensym-counter! gensym-base)
+                           (forms (+ k 1)
+                                  (stage-visit compile d map source-for #f
+                                               (string-append name " form " (number->string k))
+                                               acc))))))))])
 
 (define (stage-visit compile datum map source-for context label acc)
   (cond ((and (pair? datum) (eq? (car datum) 'begin))
@@ -111,6 +119,8 @@
 ;;; Listings
 
 (define (method-listing m)
+  "(method-listing method)
+A fingerprint of a CompiledMethod: its header, its bytecode bytes and its literals, blocks included, to compare two compilations."
   (with-output-to-string (lambda () (listing-into m))))
 
 ;; A method's fingerprint: its header, its bytecode bytes, and every literal,
@@ -141,10 +151,14 @@
 
 ;; the running compiler as the seed: stages 1 to 3 then rebuild it from its source
 (define (bootstrap-compiler dir)
+  "(bootstrap-compiler directory)
+Compiles the compiler source in directory with the running compiler, then with each new stage in turn, three times; answers the stages, for bootstrap-fixpoint? and bootstrap-differences. The last stage is left installed."
   (bootstrap-compiler-from-seed dir [(smalltalk LispCompiler) entries]))
 
 ;; the image build: the seed is stage 0 (step 9.1)
 (define (bootstrap-compiler-from-seed dir entries)
+  "(bootstrap-compiler-from-seed directory entries)
+As bootstrap-compiler, with a seed compiler (its entry points) as stage 0, as the image build does."
   (bootstrap-stages dir (seed-compiler entries) (seed-source entries)))
 
 ;; answers a vector of the four stages' listings, each a list of (label . text),
@@ -160,10 +174,15 @@
         (gensym-counter! (+ (gensym-counter) 1))
         (vector (stage-listings m0) (stage-listings m1) (stage-listings m2) (stage-listings m3) 'seed)))))
 
-(define (bootstrap-stage0 b) (vector-ref b 4))
+(define (bootstrap-stage0 b)
+  "(bootstrap-stage0 stages)
+What stage 0 of a bootstrap was: the symbol seed."
+  (vector-ref b 4))
 
 ;; the labels of the forms whose methods differ between stages i and j
 (define (bootstrap-differences b i j)
+  "(bootstrap-differences stages i j)
+The labels of the forms whose methods differ between stages i and j."
   (let loop ((a (vector-ref b i)) (c (vector-ref b j)) (acc '()))
     (cond ((and (null? a) (null? c)) (reverse acc))
           ((or (null? a) (null? c)) (reverse (cons "different numbers of forms" acc)))
@@ -173,5 +192,7 @@
 ;; Stages 1, 2 and 3 make the same methods. Stage 0, the seed, is not compared: it
 ;; generates code as its own, older source did.
 (define (bootstrap-fixpoint? b)
+  "(bootstrap-fixpoint? stages)
+True if stages 1, 2 and 3 of a bootstrap made the same methods: the compiler compiles itself into itself."
   (and (null? (bootstrap-differences b 1 2))
        (null? (bootstrap-differences b 2 3))))

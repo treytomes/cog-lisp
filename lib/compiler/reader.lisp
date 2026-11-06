@@ -24,6 +24,8 @@
 ;;; procedures too: LispReaderInLisp calls them.
 
 (define (make-reader source)
+  "(make-reader string)
+A reader over string: reader-next reads its datums one at a time."
   (vector source 0 (string-length source) (make-hash-table eq?) #f 0))
 
 (define-macro (rd-source r) `[,r at: 1])
@@ -35,8 +37,14 @@
 (define (rd-labels r)                       ; made when first needed
   (or (vector-ref r 4)
       (begin (vector-set! r 4 (make-hash-table eqv?)) (vector-ref r 4))))
-(define (reader-datum-start r) (vector-ref r 5))
-(define (reader-position r) (rd-pos r))
+(define (reader-datum-start r)
+  "(reader-datum-start reader)
+The offset, from 0, at which the datum read last starts."
+  (vector-ref r 5))
+(define (reader-position r)
+  "(reader-position reader)
+The offset, from 0, just after what the reader has read."
+  (rd-pos r))
 
 (define-macro (rd-end? r) `(>= [,r at: 2] [,r at: 3]))
 (define (rd-at-end? r) (rd-end? r))
@@ -125,6 +133,8 @@
 ;;; Datums
 
 (define (reader-next r)
+  "(reader-next reader)
+The next datum, or the eof object at the end of the text."
   (rd-skip-intertoken! r)
   (if (rd-end? r)
       (eof-object)
@@ -453,6 +463,8 @@
 (define rd-number-syntaxes (vector '()))
 
 (define (define-number-syntax predicate parser)
+  "(define-number-syntax predicate parser)
+A new number syntax for the reader and string->number: a token that no built-in syntax reads and that satisfies predicate is read as (parser token)."
   (vector-set! rd-number-syntaxes 0
                (append (vector-ref rd-number-syntaxes 0) (list (cons predicate parser))))
   (if #f #f))
@@ -580,10 +592,15 @@
 ;;; Source text and conveniences
 
 (define (reader-source-for r lst)
+  "(reader-source-for reader list)
+The text the reader read the list from, or #f."
   (let ((range (hash-table-ref/default (rd-ranges r) lst #f)))
     (if range (substring (rd-source r) (- (car range) 1) (cdr range)) #f)))
 
-(define (reader-range-of r lst) (hash-table-ref/default (rd-ranges r) lst #f))
+(define (reader-range-of r lst)
+  "(reader-range-of reader list)
+The start and end offsets of the text the reader read the list from, or #f."
+  (hash-table-ref/default (rd-ranges r) lst #f))
 
 ;; One datum from an input port over text (a string or file port), leaving the
 ;; port just after it, as the read primitive does. Other ports (stdin) are read
@@ -598,7 +615,10 @@
             d))
         (read port))))
 
-(define (read-all s) (read-all-from-string s))
+(define (read-all s)
+  "(read-all string)
+A list of every datum of string."
+  (read-all-from-string s))
 
 (define (read-all-from-string s)
   (let ((r (make-reader s)))
@@ -607,6 +627,8 @@
         (if (eof-object? d) (reverse acc) (loop (cons d acc)))))))
 
 (define (read-from-string s)
+  "(read-from-string string)
+The one datum string holds; an error for none or more than one."
   (let* ((r (make-reader s))
          (d (reader-next r)))
     (when (eof-object? d)
