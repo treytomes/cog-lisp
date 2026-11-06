@@ -30,7 +30,7 @@
       "(for-each (lambda (a b) (display (+ a b))) (list 1 2) (list 3 4))" (error "for-each: expected 2 arguments, got 3")
       "(for-each (lambda (a) (display a)) (list 1 2))")
 
-(trap "There is no list-ref, filter, fold, reduce, iota or sort: define them (the helpers example)"
+(trap "There is no list-ref, first, second, last, filter, fold, reduce, iota or sort: define them (the helpers example)"
       "(display (list-ref (list 1 2 3) 1))" (error "unbound variable: list-ref")
       #f)
 
@@ -41,3 +41,15 @@
 (trap "A Smalltalk message is written in brackets, the selector bare (no quote)"
       "(display (send 3 '+ 4))" (error "send: bad selector: (quote +)")
       "(display [3 + 4])")
+
+(trap "A program must print its result with display: a value alone prints nothing"
+      "20" (answers "")
+      "(display 20)")
+
+(trap "A list written as code is a call: build it with list (or quote it)"
+      "(display (1 2 3))" (error "object is not applicable: 1")
+      "(display (list 1 2 3))")
+
+(trap "cons in a loop builds a list backwards: use map, or reverse at the end"
+      "(define r '()) (for-each (lambda (n) (set! r (cons (* n n) r))) (list 1 2 3)) (display r)" (answers "(9 4 1)")
+      "(display (map (lambda (n) (* n n)) (list 1 2 3)))")

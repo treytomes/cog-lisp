@@ -5,7 +5,7 @@
 // LM Studio's (which also serves models reached through Bionic's private link).
 //
 //   node tools/skill-eval.js --model <id> [--url http://localhost:1234/v1]
-//        [--attempts 2] [--repeat 1] [--out results.json]
+//        [--attempts 2] [--repeat 1] [--max-tokens 8192] [--out results.json]
 //   node tools/skill-eval.js --list      the models the server offers
 //   node tools/skill-eval.js --dry-run   each task's own solution as the answer:
 //                                        checks the tasks and the runner, no model
@@ -33,6 +33,8 @@ const flag = (name) => process.argv.includes('--' + name);
 const url = option('url', 'http://localhost:1234/v1').replace(/\/$/, '');
 const attempts = Number(option('attempts', '2'));
 const repeat = Number(option('repeat', '1'));
+// a cap on each answer, reasoning included, so a runaway answer cannot fill the context
+const maxTokens = Number(option('max-tokens', '8192'));
 const tasks = JSON.parse(fs.readFileSync(path.join(__dirname, 'skill-eval-tasks.json'), 'utf8'));
 const skill = fs.readFileSync(path.join(root, '.agents', 'skills', 'cog-lisp', 'SKILL.md'), 'utf8');
 
@@ -69,7 +71,7 @@ async function ask(model, messages) {
   const r = await fetch(url + '/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages, temperature: 0.2 }),
+    body: JSON.stringify({ model, messages, temperature: 0.2, max_tokens: maxTokens }),
     signal: AbortSignal.timeout(10 * 60 * 1000),
   });
   if (!r.ok) throw new Error('POST ' + url + '/chat/completions: ' + r.status + ' ' + (await r.text()).slice(0, 300));
@@ -97,7 +99,13 @@ function feedback(run, expected) {
 async function attemptTask(model, task, system) {
   const messages = [{ role: 'system', content: system }, { role: 'user', content: task.prompt }];
   for (let a = 1; a <= attempts; a++) {
-    const answer = model ? await ask(model, messages) : task.solution;
+    let answer;
+    try {
+      answer = model ? await ask(model, messages) : task.solution;
+    } catch (e) {
+      // the server refused (the context filled, say): this attempt failed, the run goes on
+      return { passed: 0, program: '', run: { status: -1, stdout: '', stderr: 'error: the server: ' + e.message.slice(0, 200) } };
+    }
     const program = model ? programIn(answer) : answer;
     const run = runProgram(program);
     if (run.status === 0 && same(run.stdout, task.expected)) return { passed: a, program };
@@ -137,6 +145,7 @@ async function main() {
       const first = rows.filter((x) => x.passed === 1).length;
       const any = rows.filter((x) => x.passed > 0).length;
       results.conditions[label] = { first, any, total: rows.length, rows };
+      if (option('out', null)) fs.writeFileSync(option('out', null), JSON.stringify(results, null, 2));
     }
     console.log('');
     for (const [label, c] of Object.entries(results.conditions)) {

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | 10.1–10.5 done (2026-11-06). Accepted 2026-11-05, with the owner's decisions (§7); decision 4 accepted with 10.5's detailed spec. 10.6 and 10.7 appended and accepted by the owner (2026-11-06) |
+| **Status** | 10.1–10.7 done (2026-11-06). Accepted 2026-11-05, with the owner's decisions (§7); decision 4 accepted with 10.5's detailed spec. 10.6 and 10.7 appended and accepted by the owner (2026-11-06) |
 | **Depends on** | Phase 9 (the language it documents) |
 | **Feeds** | Phase 11 (the pure image; its LISP-visible tools join the reference) |
 | **Review items** | C-18 (compile errors carry no position); R-17 considered and left with the REPL (§7) |
@@ -680,6 +680,52 @@ the bundles, plus the zip.
   `rojo` desktop (CUDA) through Bionic's private link, in place of the 3B model
   first tried. The results below come from that model.
 
+#### 10.7: the first results (2026-11-06)
+
+`ministral-3-8b-reasoning-2512` (Q4_K_M, loaded with a 16,384-token context),
+through the server at `http://localhost:1235/v1`. It ran 10 tasks, with up to
+2 attempts each; after a wrong answer, the model was shown what happened.
+
+| Run | Skill | Without the skill: first attempt / within 2 | With the skill: first attempt / within 2 |
+|---|---|---:|---:|
+| 1, 1 run per task | as committed | 0/10, 2/10 | 6/10, 6/10 |
+| 2, 3 runs per task | + 3 traps, `iota` with a start | 1/30, 7/30 | 14/30, 16/30 |
+| 3, 3 runs per task | + the rule first, `first`/`second`/`last` named | 0/30, 4/30 | **17/30, 20/30** |
+
+- **Without the skill** the model writes some other Lisp:
+  - names that do not exist: `print`, `second`, `split`, `defun`, `format`;
+  - Smalltalk syntax it cannot know.
+  It almost never passes on the first attempt.
+- **What each revision fixed**, from the failures of the run before it:
+  - run 2:
+    - a value alone prints nothing in a program;
+    - a list written as code is a call ("object is not applicable: 1");
+    - `cons` in a loop builds the list backwards;
+    - `iota` takes an optional start, as most Schemes' does;
+  - run 3:
+    - the rule that the answer is a program that prints its result, moved to
+      the top of the skill with an example;
+    - `first`, `second` and `last` named among the missing names.
+- **What still fails, with the skill:**
+  - **The model writes the result instead of a program** (`(1 4 9 16 25)`,
+    `red,green,blue`, `20`) in 5 of the 10 failures of run 3. `second-element`
+    never passed.
+    - Part of this may come from the harness: it asks for one code block, and
+      the task shows the expected output.
+    - An agent in Bionic writes a file and runs it, so this is the first thing
+      to watch there.
+  - Two answers used `iota` without defining it, though the skill says to copy
+    the helpers.
+  - The remaining failures are the model's own bugs.
+- **The context fills up.** One request in a third attempt at run 3 was
+  refused: "Context size has been exceeded". The skill costs 3,362 prompt
+  tokens of the 16,384 loaded, and a reasoning model's answers are long.
+  - `tools/skill-eval.js` now caps each answer (`--max-tokens`, 8192), records
+    a refused request as a failed attempt, and saves its results as it goes.
+  - For agent work, load the model with a larger context: it supports 262,144.
+- Sampling makes these numbers noisy (3 runs per task, temperature 0.2), so a
+  difference of two or three tasks is not a finding.
+
 ## 5. Acceptance criteria
 
 - AC-1 (10.1) Every primitive, special form and `lib/core.lisp` form has
@@ -769,4 +815,4 @@ the bundles, plus the zip.
 | 10.4 The user manual | done (2026-11-05): docs/manual/, 14 chapters from all 36 examples |
 | 10.5 The language server | done (2026-11-06): hover, completion, go to definition, diagnostics (C-18 closed) and Expand Macro, served by the image to VS Code on Windows and Linux |
 | 10.6 The documentation on the web | done (2026-11-06): GitHub Pages from docs/, built and checked by CI, published by each release (first publish awaits the owner's Pages settings and the next release) |
-| 10.7 A skill for agents | accepted (2026-11-06; decisions 8 and 9) |
+| 10.7 A skill for agents | done (2026-11-06): .agents/skills/cog-lisp/, generated and checked, rebuilt by each release; Ministral 3 8B passes 17/30 tasks on the first attempt with it, 0/30 without |

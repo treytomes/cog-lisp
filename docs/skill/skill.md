@@ -10,6 +10,10 @@ cog-lisp is **Scheme** (R7RS), not Common Lisp. It runs inside a Pharo
 Smalltalk image and can send Smalltalk messages. Only the names in
 `reference.md` (beside this file) exist; anything else is unbound.
 
+**Always answer with a program that prints the result.** Asked to print the
+squares of 1 to 3, write `(display (map (lambda (n) (* n n)) (list 1 2 3)))`,
+never `(1 4 9)`: data written as code is a call, and fails.
+
 ## Run a program
 
 Work in the cog-lisp folder: the one that holds `cog-lisp.sh` and
@@ -37,13 +41,11 @@ typing.
 
 ## Traps
 
-Each one shows the wrong code, what it does, and the right code.
-
 <!-- traps -->
 
 ## Examples
 
-Every example below runs, and prints exactly the output shown.
+Each runs, and prints exactly what is shown.
 
 <!-- example: hello -->
 <!-- example: lists -->
@@ -58,6 +60,5 @@ Every example below runs, and prints exactly the output shown.
 
 ## More
 
-- `reference.md`, beside this file: every built-in, with its call form.
-- In the cog-lisp folder: `docs/manual/` (the manual) and `examples/` (more
-  programs, each with its output in a `.expected` file).
+`reference.md` (beside this file) lists every built-in. The cog-lisp folder
+also has the manual (`docs/manual/`) and more programs (`examples/`).

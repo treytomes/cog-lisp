@@ -11,6 +11,10 @@ cog-lisp is **Scheme** (R7RS), not Common Lisp. It runs inside a Pharo
 Smalltalk image and can send Smalltalk messages. Only the names in
 `reference.md` (beside this file) exist; anything else is unbound.
 
+**Always answer with a program that prints the result.** Asked to print the
+squares of 1 to 3, write `(display (map (lambda (n) (* n n)) (list 1 2 3)))`,
+never `(1 4 9)`: data written as code is a call, and fails.
+
 ## Run a program
 
 Work in the cog-lisp folder: the one that holds `cog-lisp.sh` and
@@ -38,8 +42,6 @@ typing.
 
 ## Traps
 
-Each one shows the wrong code, what it does, and the right code.
-
 - **Common Lisp's defun does not exist: define makes procedures**
   - Wrong: `(defun square (x) (* x x))` stops with `error: unbound variable: defun`
   - Right: `(define (square x) (* x x))`
@@ -58,7 +60,7 @@ Each one shows the wrong code, what it does, and the right code.
 - **for-each takes one list (not several)**
   - Wrong: `(for-each (lambda (a b) (display (+ a b))) (list 1 2) (list 3 4))` stops with `error: for-each: expected 2 arguments, got 3`
   - Right: `(for-each (lambda (a) (display a)) (list 1 2))`
-- **There is no list-ref, filter, fold, reduce, iota or sort: define them (the helpers example)**
+- **There is no list-ref, first, second, last, filter, fold, reduce, iota or sort: define them (the helpers example)**
   - Wrong: `(display (list-ref (list 1 2 3) 1))` stops with `error: unbound variable: list-ref`
 - **A string literal cannot be changed: change a copy**
   - Wrong: `(define s "cat") (string-set! s 0 #\b)` stops with `error: string-set!: string is immutable (a literal); copy it first`
@@ -66,10 +68,19 @@ Each one shows the wrong code, what it does, and the right code.
 - **A Smalltalk message is written in brackets, the selector bare (no quote)**
   - Wrong: `(display (send 3 '+ 4))` stops with `error: send: bad selector: (quote +)`
   - Right: `(display [3 + 4])`
+- **A program must print its result with display: a value alone prints nothing**
+  - Wrong: `20` prints ``
+  - Right: `(display 20)`
+- **A list written as code is a call: build it with list (or quote it)**
+  - Wrong: `(display (1 2 3))` stops with `error: object is not applicable: 1`
+  - Right: `(display (list 1 2 3))`
+- **cons in a loop builds a list backwards: use map, or reverse at the end**
+  - Wrong: `(define r '()) (for-each (lambda (n) (set! r (cons (* n n) r))) (list 1 2 3)) (display r)` prints `(9 4 1)`
+  - Right: `(display (map (lambda (n) (* n n)) (list 1 2 3)))`
 
 ## Examples
 
-Every example below runs, and prints exactly the output shown.
+Each runs, and prints exactly what is shown.
 
 ### Define a procedure, build text, print it
 
@@ -145,9 +156,10 @@ It prints:
 (define (fold f acc lst)            ; (f acc element), left to right
   (if (null? lst) acc (fold f (f acc (car lst)) (cdr lst))))
 
-(define (iota n)                    ; (0 1 ... n-1)
-  (let loop ((i (- n 1)) (acc '()))
-    (if (< i 0) acc (loop (- i 1) (cons i acc)))))
+(define (iota count . start)        ; (iota 5) is (0 1 2 3 4); (iota 5 1) is (1 2 3 4 5)
+  (let ((from (if (null? start) 0 (car start))))
+    (let loop ((i (- count 1)) (acc '()))
+      (if (< i 0) acc (loop (- i 1) (cons (+ from i) acc))))))
 
 (define (list-ref lst k)
   (if (= k 0) (car lst) (list-ref (cdr lst) (- k 1))))
@@ -160,6 +172,7 @@ It prints:
   (fold (lambda (acc x) (insert x acc less?)) '() lst))
 
 (display (filter even? (iota 10))) (newline)
+(display (iota 5 1)) (newline)
 (display (fold + 0 (list 1 2 3 4))) (newline)
 (display (list-ref (list "a" "b" "c") 1)) (newline)
 (display (sort (list 3 1 4 1 5) <)) (newline)
@@ -169,6 +182,7 @@ It prints:
 
 ```text
 (0 2 4 6 8)
+(1 2 3 4 5)
 10
 b
 (1 1 3 4 5)
@@ -363,6 +377,5 @@ It prints:
 
 ## More
 
-- `reference.md`, beside this file: every built-in, with its call form.
-- In the cog-lisp folder: `docs/manual/` (the manual) and `examples/` (more
-  programs, each with its output in a `.expected` file).
+`reference.md` (beside this file) lists every built-in. The cog-lisp folder
+also has the manual (`docs/manual/`) and more programs (`examples/`).
