@@ -9,3 +9,4 @@
 - [Retain source](retain-source.md) — every compiled procedure keeps its exact source text, stored in the image.
 - [Expert system goal](expert-system-goal.md) — later: forward (Rete) + backward (Prolog) chaining written in cog-lisp.
 - [Examples become the manual](examples-become-manual.md) — keep one checked example per feature; they will form the user manual.
+- [Skill eval model](skill-eval-model.md) — measure the agent skill with Ministral 3 8B reasoning on rojo, via Bionic private link.

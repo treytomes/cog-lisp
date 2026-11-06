@@ -439,6 +439,15 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   "$BUNDLE_APP_CONFIG" && bin/github-pages build --source
   /github/workspace/docs --destination /github/workspace/_site'`, where `<dir>`
   holds a copy of `docs/`. Its own entrypoint fails without a token.
+- **The agent skill** (`.agents/skills/cog-lisp/`, Phase 10 step 10.7) is
+  generated too, from `docs/skill/` (`skill.md`, `traps.lisp`, `examples/`)
+  and the image. Every trap's wrong and right code is run by
+  `tests/lisp/phase-10.7-skill.lisp`, and every example by the runner suite;
+  keep `SKILL.md` under 10 KB. Before claiming a name is missing or a form
+  fails, check it on the image: `(documentation 'name)` answers #f for a name
+  that does not exist. `node tools/skill-eval.js --dry-run` checks the
+  evaluation's tasks; a real run needs a model behind an OpenAI-compatible
+  server, such as LM Studio's (`--url`, `--model`; `--list` shows the ids).
 
 ## Writing the compiler in LISP (Phase 8)
 

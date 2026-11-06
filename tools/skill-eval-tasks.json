@@ -1,0 +1,62 @@
+[
+  {
+    "name": "squares",
+    "prompt": "Print the squares of the numbers 1 to 5 as a list, exactly like this: (1 4 9 16 25)",
+    "expected": "(1 4 9 16 25)",
+    "solution": "(display (map (lambda (n) (* n n)) (list 1 2 3 4 5)))\n"
+  },
+  {
+    "name": "sum-of-evens",
+    "prompt": "Print the sum of the even numbers from 1 to 100.",
+    "expected": "2550",
+    "solution": "(display (let loop ((i 1) (sum 0)) (if (> i 100) sum (loop (+ i 1) (if (even? i) (+ sum i) sum)))))\n"
+  },
+  {
+    "name": "factorial",
+    "prompt": "Define a factorial procedure and print the factorial of 20.",
+    "expected": "2432902008176640000",
+    "solution": "(define (fact n) (if (= n 0) 1 (* n (fact (- n 1)))))\n(display (fact 20))\n"
+  },
+  {
+    "name": "second-element",
+    "prompt": "Print the second element of the list (10 20 30).",
+    "expected": "20",
+    "solution": "(display (car (cdr (list 10 20 30))))\n"
+  },
+  {
+    "name": "keep-odd",
+    "prompt": "Keep only the odd numbers of the list (1 2 3 4 5 6 7) and print the result as a list: (1 3 5 7)",
+    "expected": "(1 3 5 7)",
+    "solution": "(define (keep-odd l) (cond ((null? l) '()) ((odd? (car l)) (cons (car l) (keep-odd (cdr l)))) (else (keep-odd (cdr l)))))\n(display (keep-odd (list 1 2 3 4 5 6 7)))\n"
+  },
+  {
+    "name": "sort-numbers",
+    "prompt": "Sort the numbers 3 1 2 5 4 into ascending order and print them as a list: (1 2 3 4 5)",
+    "expected": "(1 2 3 4 5)",
+    "solution": "(define (insert x l) (cond ((null? l) (list x)) ((< x (car l)) (cons x l)) (else (cons (car l) (insert x (cdr l))))))\n(define (sort l) (if (null? l) '() (insert (car l) (sort (cdr l)))))\n(display (sort (list 3 1 2 5 4)))\n"
+  },
+  {
+    "name": "word-count",
+    "prompt": "Count how many times each word appears in the string \"a b a c b a\", then print one line per word, for a, b and c in that order, like this:\na: 3\nb: 2\nc: 1",
+    "expected": "a: 3\nb: 2\nc: 1",
+    "solution": "(define words (string-split \"a b a c b a\" #\\space))\n(define (count w l) (cond ((null? l) 0) ((string=? w (car l)) (+ 1 (count w (cdr l)))) (else (count w (cdr l)))))\n(for-each (lambda (w) (display w) (display \": \") (display (count w words)) (newline)) (list \"a\" \"b\" \"c\"))\n"
+  },
+  {
+    "name": "join-with-commas",
+    "prompt": "Join the strings \"red\", \"green\" and \"blue\" with commas and print the result: red,green,blue",
+    "expected": "red,green,blue",
+    "solution": "(display (string-join (list \"red\" \"green\" \"blue\") \",\"))\n"
+  },
+  {
+    "name": "smalltalk-uppercase",
+    "prompt": "Using a Smalltalk message (cog-lisp can send messages to Smalltalk objects), print the string \"hello\" in upper case.",
+    "expected": "HELLO",
+    "solution": "(display [\"hello\" asUppercase])\n"
+  },
+  {
+    "name": "fix-a-program",
+    "prompt": "This program fails. Fix it so that it prints 5:\n(defun add (a b) (+ a b))\n(display (add 2 3))",
+    "expected": "5",
+    "solution": "(define (add a b) (+ a b))\n(display (add 2 3))\n"
+  }
+]

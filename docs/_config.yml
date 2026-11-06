@@ -9,3 +9,5 @@ url: https://treytomes.github.io
 exclude:
   - manual/chapters.lisp
   - manual/introduction.md
+  # the agent skill's sources (step 10.7): the skill is .agents/skills/cog-lisp
+  - skill

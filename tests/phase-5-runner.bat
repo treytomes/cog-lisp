@@ -41,6 +41,8 @@ for %%F in (tests\runner\*.stdin) do call :runcase "%%~fF" repl
 for %%F in (examples\*.lisp) do call :runcase "%%~fF" prog
 rem  multi-file example programs: examples\NAME\main.lisp
 for %%F in (examples\*\main.lisp) do call :runcase "%%~fF" prog
+rem  the agent skill's examples (Phase 10 step 10.7), shown in SKILL.md with their output
+for %%F in (docs\skill\examples\*.lisp) do call :runcase "%%~fF" prog
 
 rem --- REPL input that arrives late, as at an interactive prompt ---------------------
 rem  Pharo's stdin never blocks, so the REPL must wait for input rather than treat

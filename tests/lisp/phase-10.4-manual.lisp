@@ -56,6 +56,7 @@
   (let ((config (docs-file-text "docs/_config.yml")))
     (check-true (string-search config "baseurl: /cog-lisp"))
     (check-true (string-search config "manual/chapters.lisp"))
-    (check-true (string-search config "manual/introduction.md"))))
+    (check-true (string-search config "manual/introduction.md"))
+    (check-true (string-search config "  - skill\n"))))
 
 (run-tests)

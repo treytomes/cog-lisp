@@ -65,6 +65,7 @@ const missing = required.filter((p) => !text[p]);
 check('the home page, the manual, its ' + chapters.length + ' chapters and the reference are built', chapters.length > 0 && missing.length === 0, missing.join(', '));
 check('no page of the manual sources is published (chapters.lisp, introduction)',
   !fs.existsSync(path.join(site, 'manual', 'chapters.lisp')) && !text['manual/introduction.html']);
+check('the agent skill\'s sources (docs/skill/) are not published', !fs.existsSync(path.join(site, 'skill')));
 
 // every link and stylesheet within the site, and every anchor
 const broken = [];

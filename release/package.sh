@@ -98,6 +98,18 @@ common() {   # $1 the bundle's folder
   cp cog-lisp.sh "$d/"
   cp scripts/pharo-vm.sh "$d/scripts/"
   chmod +x "$d/cog-lisp.sh"
+  # the agent skill, a project skill wherever the bundle is opened (Phase 10 step 10.7)
+  skill "$d/.agents/skills/cog-lisp"
+}
+
+# the agent skill, stamped with the version: $1 the folder to put it in. Bionic
+# ignores front matter fields it does not know; the agent sees which release.
+skill() {
+  mkdir -p "$1"
+  cp .agents/skills/cog-lisp/SKILL.md .agents/skills/cog-lisp/reference.md "$1/"
+  awk -v v="$VERSION" '{ print } /^name: / && !done { print "version: " v; done = 1 }' \
+    .agents/skills/cog-lisp/SKILL.md > "$1/SKILL.md"
+  grep -q "^version: $VERSION\$" "$1/SKILL.md"
 }
 
 # --- Linux -------------------------------------------------------------------
@@ -121,3 +133,8 @@ unzip -q -o "$WIN_VM_ZIP" -d "$WINDOWS_VM"
 copy_vm "$WINDOWS_VM" "$W/pharo" "$WINDOWS_KEEP" "$WINDOWS_DROP"
 (cd "$STAGE/windows" && zip -q -r "$DIST/$NAME-windows-x86_64.zip" "$NAME")
 echo "[ok  ] $DIST/$NAME-windows-x86_64.zip"
+
+# --- the agent skill on its own ----------------------------------------------
+skill "$STAGE/skill/cog-lisp"
+(cd "$STAGE/skill" && zip -q -r "$DIST/cog-lisp-skill-$VERSION.zip" cog-lisp)
+echo "[ok  ] $DIST/cog-lisp-skill-$VERSION.zip"

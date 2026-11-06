@@ -1,6 +1,7 @@
 # cog-lisp release (specs/phase-8.9-ci-cd.md section 4.2). Pushing a tag such as
 # v0.1.0 runs every test (ci.yml), builds the image once on Linux, packages a
-# Linux and a Windows bundle and the VS Code extension, tests each bundle on its
+# Linux and a Windows bundle, the VS Code extension and the agent skill (regenerated
+# from that image), tests each bundle on its
 # own platform, and only then publishes the GitHub release. A tag with a suffix
 # (v0.1.0-rc1) publishes a pre-release. Run by hand (workflow_dispatch) it is a
 # dry run: everything but publishing, under the version given.
@@ -42,6 +43,19 @@ jobs:
         run: ./bootstrap-pharo.sh
       - name: Build the image
         run: ./build-image.sh
+      # the reference, the editor's data, the manual, the site's home page and the
+      # agent skill, generated again from this image: the release ships only what
+      # matches it (Phase 10 steps 10.6 and 10.7)
+      - name: Regenerate the documentation and the agent skill
+        run: |
+          ./cog-lisp.sh tools/generate-docs.lisp < /dev/null
+          changed="$(git status --porcelain -- docs vscode/builtins.json .agents)"
+          if [ -n "$changed" ]; then
+            echo "::error::the committed documentation does not match this release's image:"
+            echo "$changed"
+            git diff --stat
+            exit 1
+          fi
       - name: Package the bundles
         run: release/package.sh "${VERSION#v}"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

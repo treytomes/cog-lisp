@@ -81,6 +81,8 @@ for f in tests/runner/*.stdin; do runcase "$ROOT/$f" repl; done
 for f in examples/*.lisp; do runcase "$ROOT/$f" prog; done
 # multi-file example programs: examples/NAME/main.lisp
 for f in examples/*/main.lisp; do runcase "$ROOT/$f" prog; done
+# the agent skill's examples (Phase 10 step 10.7), shown in SKILL.md with their output
+for f in docs/skill/examples/*.lisp; do runcase "$ROOT/$f" prog; done
 
 # --- REPL input that arrives late, as at an interactive prompt ---------------
 (sleep 2; cat tests/runner/delayed/late.stdin) | "$CL" >"$TMPD/late.out" 2>"$TMPD/late.err"

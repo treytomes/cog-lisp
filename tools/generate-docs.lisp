@@ -11,6 +11,7 @@
 (load "docs.lisp")
 
 (define (docs-write! relative text)
+  [[[(docs-path relative) asFileReference] parent] ensureCreateDirectory]
   (with-output-to-file (docs-path relative) (lambda () (display text)))
   (display "wrote ") (display relative) (newline))
 
@@ -26,3 +27,4 @@
 (docs-write! "vscode/builtins.json" (builtins-json))
 (for-each (lambda (f) (docs-write! (car f) (cdr f))) (manual-files))
 (for-each (lambda (f) (docs-write! (car f) (cdr f))) (site-files))
+(for-each (lambda (f) (docs-write! (car f) (cdr f))) (skill-files))

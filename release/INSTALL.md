@@ -54,6 +54,21 @@ the examples in `examples/`. `docs/builtins.md` lists every built-in with its
 call form and what it does; at the REPL, `(documentation 'name)` answers the
 same.
 
+## AI agents (a skill)
+
+`.agents/skills/cog-lisp/` is a skill: instructions an AI agent reads when a task
+is about cog-lisp. They cover how to run programs and read their errors, the
+mistakes a model used to other Lisps makes, and checked examples, with a terse
+list of every built-in beside them. It is written for small local models.
+
+In Bionic (LM Studio's agent app), either:
+- open this folder as a project, and the skill is active there; or
+- ask Bionic's agent to install the skill from `cog-lisp-skill-VERSION.zip` (a
+  release download) or from the `.agents/skills/cog-lisp` folder, for every
+  project.
+
+Other agent tools that read `SKILL.md` skills can use the same folder.
+
 ## Licenses
 
 cog-lisp is released under the MIT license (`LICENSE`). See

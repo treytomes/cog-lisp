@@ -37,6 +37,13 @@ ok=0; [ -s docs/builtins.md ] && grep -q "string-ref" docs/builtins.md && ok=1
 check "the bundle carries the reference of the built-ins (docs/builtins.md)" $ok
 ok=0; [ -s docs/manual/README.md ] && [ -s docs/manual/01-getting-started.md ] && ok=1
 check "the bundle carries the manual (docs/manual/)" $ok
+# the agent skill (Phase 10 step 10.7), stamped with this bundle's version
+V="$(basename "$B")"; V="${V#cog-lisp-}"
+ok=0; [ -s .agents/skills/cog-lisp/SKILL.md ] && [ -s .agents/skills/cog-lisp/reference.md ] &&
+  head -1 .agents/skills/cog-lisp/SKILL.md | grep -q '^---' &&
+  grep -q "^name: cog-lisp\$" .agents/skills/cog-lisp/SKILL.md &&
+  grep -q "^version: $V\$" .agents/skills/cog-lisp/SKILL.md && ok=1
+check "the bundle carries the agent skill, stamped $V (.agents/skills/cog-lisp/)" $ok
 stray="$(cd pharo && find . -type f \( -iname '*.dll' -o -name '*.so' -o -name '*.so.*' \) | sed 's|.*/||' |
   grep -Ev '^(lib)?(PharoVMCore|ffi|tty|winpthread-1|B2DPlugin|BitBltPlugin|DSAPrims|FileAttributesPlugin|FilePlugin|FloatArrayPlugin|JPEGReaderPlugin|LargeIntegers|LocalePlugin|MiscPrimitivePlugin|NewFilePlugin|SocketPlugin|SqueakSSL|SurfacePlugin|UUIDPlugin|UnixOSProcessPlugin)\.(dll|so)$' || true)"
 ok=0; [ -z "$stray" ] && ok=1
