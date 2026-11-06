@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Done (2026-11-06). Accepted 2026-11-05, with the owner's decisions (§7); decision 4 accepted with 10.5's detailed spec |
+| **Status** | 10.1–10.5 done (2026-11-06). Accepted 2026-11-05, with the owner's decisions (§7); decision 4 accepted with 10.5's detailed spec. 10.6 appended and accepted by the owner (2026-11-06) |
 | **Depends on** | Phase 9 (the language it documents) |
 | **Feeds** | Phase 11 (the pure image; its LISP-visible tools join the reference) |
 | **Review items** | C-18 (compile errors carry no position); R-17 considered and left with the REPL (§7) |
@@ -17,7 +17,9 @@ of truth kept in the image:
 - hover help in VS Code;
 - a user manual built from the examples, whose code and output the suites
   already check;
-- a language server served by the image itself, if the spike says it can be.
+- a language server served by the image itself, if the spike says it can be;
+- the manual and the reference published on the web (10.6, appended
+  2026-11-06).
 
 These were the README's "Later" sections (owner ideas, 2026-11-04). The owner
 moved them ahead of the pure image (now Phase 11) on 2026-11-05.
@@ -362,6 +364,85 @@ diagnostics times on a file the size of `lib/compiler/compiler.lisp`.
   every 20 ms, where Linux blocks in `read`. This is not measured. It is well
   under the 300 ms budget.
 
+### 10.6 The documentation on the web (accepted 2026-11-06)
+
+Appended by the owner on 2026-11-06. `docs/` already holds the manual and the
+reference as committed, checked Markdown. This step publishes them on GitHub
+Pages, so a reader needs neither a checkout nor a bundle. The owner chose:
+- GitHub Pages built by Jekyll;
+- a rebuild on every tagged release (decision 6);
+- no wiki (decision 7).
+
+**Where we start (checked 2026-11-06):**
+- The repository is public.
+- GitHub Pages is not enabled: the Pages API answers 404.
+- The wiki is turned off.
+- `docs/` links only within itself: chapter to chapter, to `README.md`, to
+  `../builtins.md`, and to the reference's section anchors.
+- The generated pages contain no `{{` or `{%`.
+
+**The site is GitHub's own Jekyll build of `docs/`.** There is no converter of
+our own. It is the `github-pages` gem that `actions/jekyll-build-pages` runs:
+- `jekyll-relative-links` turns links to `.md` files into links to pages;
+- `jekyll-readme-index` makes `manual/README.md` the `/manual/` page;
+- the default theme (Primer) looks like GitHub's own Markdown view.
+
+**New files:**
+- `docs/index.md`, the home page. `tools/generate-docs.lisp` generates it from
+  the introduction's opening paragraph, with links to the manual, the reference,
+  the releases and the repository. The 10.4 suite checks it like the manual's
+  pages.
+- `docs/_config.yml`, written by hand:
+  - the title and description;
+  - `baseurl: /cog-lisp`, set here so the links do not depend on what the
+    Pages API answers at build time;
+  - `exclude` for the manual's sources (`chapters.lisp`, `introduction.md`).
+- `.github/actions/build-site`, an action that CI and the release share. It:
+  - stamps the version, when given, onto the home page, in the build's copy
+    only;
+  - runs `actions/jekyll-build-pages` on `docs/`;
+  - runs `tools/check-site.js`.
+- `tools/check-site.js` (Node, no dependencies). It checks that:
+  - every link between the built pages, and every anchor, resolves;
+  - the home page, the manual's contents, each of its chapters and the reference
+    are present.
+- `.github/workflows/pages.yml`:
+  - It builds the site with the shared action, uploads it
+    (`actions/upload-pages-artifact`) and deploys it (`actions/deploy-pages`).
+  - After deployment it fetches the home page, a chapter and the reference from
+    the published URL.
+  - Its permissions are only `pages: write` and `id-token: write`.
+  - It runs when the release calls it, or by hand with a tag to publish.
+
+**When it publishes (decision 6):** each tagged release.
+- `release.yml` calls `pages.yml` after the release itself is published, with
+  the tag's version. The site then documents the release people download, and
+  says which one it is.
+- A pre-release (`v1.2.3-rc1`) does not change the site.
+- The dry run publishes nothing.
+
+**CI builds the site on every push, without publishing it** (a `site` job using
+the shared action). A change that breaks the site fails CI before a release can
+publish it.
+
+**Liquid:** Jekyll runs every page through Liquid, and GitHub's Jekyll (3.x)
+cannot turn that off for one page. The 10.4 suite fails if a page in `docs/`
+contains `{{` or `{%`. The fix then is for the generator to wrap that page in
+`{% raw %}`.
+
+**What the owner does once.** These are repository settings, so the owner
+changes them, not a workflow or Claude:
+- Settings → Pages → Source: *GitHub Actions*.
+- Settings → Environments → `github-pages` → deployment branches and tags: add
+  the tag rule `v*`. The environment allows only the default branch at first,
+  and the release deploys from its tag.
+- The repository's website: `https://treytomes.github.io/cog-lisp/`.
+
+The README and `release/INSTALL.md` link to the site.
+
+**No wiki (decision 7).** A wiki would be a second copy of generated pages that
+can be edited in the browser, and the next release would overwrite any edit.
+
 ## 5. Acceptance criteria
 
 - AC-1 (10.1) Every primitive, special form and `lib/core.lisp` form has
@@ -380,6 +461,11 @@ diagnostics times on a file the size of `lib/compiler/compiler.lisp`.
   diagnostics with positions and macro expansion to VS Code on Windows and
   Linux, with tests on both; or the spike's record says why not and what was
   tried.
+- AC-6 (10.6) CI builds the site from `docs/` on every push and checks every
+  link, anchor and page in it. A release publishes the site to GitHub Pages, and
+  a check after deployment fetches the home page, a manual chapter and the
+  reference from the published URL. A page in `docs/` holding Liquid syntax
+  fails a suite.
 
 ## 6. Examples
 
@@ -402,6 +488,9 @@ diagnostics times on a file the size of `lib/compiler/compiler.lisp`.
    image. (Proposed with 10.5's detailed spec; accepted 2026-11-06.)
 5. **R-17 stays with the REPL**: the server reads whole documents. It is fixed
    when a large form sent to the REPL makes it matter.
+6. **The site is GitHub Pages, built by Jekyll, and rebuilt on every tagged
+   release** (2026-11-06), so it matches the release people download.
+7. **No wiki** (2026-11-06).
 
 ## 8. Risks
 
@@ -413,6 +502,10 @@ diagnostics times on a file the size of `lib/compiler/compiler.lisp`.
   fallback.
 - **A new runtime dependency for the extension** (the language client): packaged
   into the `.vsix`, and its license added to the notices.
+- **GitHub's Jekyll is not GitHub's Markdown view** (10.6). The two can make
+  different heading ids, and Liquid reads `{{` and `{%`. Building the site in CI
+  and checking its links and anchors catches the first; the suite check catches
+  the second.
 - **The runtime moves to LISP in Phase 11.1**: primitive documentation written in
   Smalltalk now must move with it. Keeping it beside each definition makes that
   a move, not a rewrite.
@@ -426,3 +519,4 @@ diagnostics times on a file the size of `lib/compiler/compiler.lisp`.
 | 10.3 Hover help, offline | done (2026-11-05): hover and completion from vscode/builtins.json, checked against the image |
 | 10.4 The user manual | done (2026-11-05): docs/manual/, 14 chapters from all 36 examples |
 | 10.5 The language server | done (2026-11-06): hover, completion, go to definition, diagnostics (C-18 closed) and Expand Macro, served by the image to VS Code on Windows and Linux |
+| 10.6 The documentation on the web | accepted (2026-11-06; decisions 6 and 7) |
