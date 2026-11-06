@@ -46,6 +46,11 @@
         "icon": "$(play)"
       },
       {
+        "command": "cog-lisp.expandMacro",
+        "title": "Expand Macro",
+        "category": "cog-lisp"
+      },
+      {
         "command": "cog-lisp.startRepl",
         "title": "Start REPL",
         "category": "cog-lisp"
@@ -89,6 +94,11 @@
     "configuration": {
       "title": "cog-lisp",
       "properties": {
+        "cogLisp.languageServer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run cog-lisp's language server (lib/lsp.lisp, served by the image) for hover, completion, go to definition, diagnostics and macro expansion. Without it, or with no cog-lisp folder, hover and completion of the built-ins still work."
+        },
         "cogLisp.root": {
           "type": "string",
           "default": "",
@@ -160,5 +170,8 @@
     "@vscode/vsce": "4.0.0",
     "vscode-jsonrpc": "8.2.0",
     "vscode-tmgrammar-test": "0.1.3"
+  },
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
   }
 }

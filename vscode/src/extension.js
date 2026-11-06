@@ -2,10 +2,12 @@
 // Deliberately thin: highlighting and brackets are declarative (package.json,
 // the grammar, language-configuration.json); this file only adds commands that
 // call the repo's own scripts, so the editor runs exactly what the terminal runs.
-// Hover help and completion for the built-ins come from builtins.json, generated
-// from the image's documentation (Phase 10 step 10.3; src/builtins.js); the rest
-// of the language intelligence is planned for a language server served by the
-// image itself (Phase 10 step 10.5).
+// The language intelligence is cog-lisp's own language server, lib/lsp.lisp,
+// served by the image (Phase 10 step 10.5): hover, completion, go to definition,
+// diagnostics and macro expansion. Without it (no cog-lisp folder, the setting
+// off, or the server stopped), hover and completion of the built-ins come from
+// builtins.json, generated from the image's documentation (step 10.3;
+// src/builtins.js).
 'use strict';
 
 const vscode = require('vscode');
@@ -13,6 +15,12 @@ const fs = require('fs');
 const path = require('path');
 const { topLevelFormAt } = require('./forms');
 const { loadBuiltins, symbolAt, hoverMarkdown, completions } = require('./builtins');
+const cp = require('child_process');
+const lc = require('vscode-languageclient/node');
+
+// the language server's client, while it serves; the offline help steps aside then
+let client = null;
+let serverActive = false;
 
 const REPL_NAME = 'cog-lisp REPL';
 let replTerminal = null;
@@ -193,6 +201,7 @@ function registerBuiltins(context) {
   context.subscriptions.push(
     vscode.languages.registerHoverProvider('cog-lisp', {
       provideHover(document, position) {
+        if (serverActive) return undefined;
         const found = symbolAt(document.lineAt(position.line).text, position.character);
         if (!found || !Object.prototype.hasOwnProperty.call(builtins, found.name)) return undefined;
         const range = new vscode.Range(position.line, found.start, position.line, found.end);
@@ -201,6 +210,7 @@ function registerBuiltins(context) {
     }),
     vscode.languages.registerCompletionItemProvider('cog-lisp', {
       provideCompletionItems(document, position) {
+        if (serverActive) return undefined;
         const found = symbolAt(document.lineAt(position.line).text, position.character);
         const prefix = found ? document.lineAt(position.line).text.slice(found.start, position.character) : '';
         return completions(builtins, prefix).map((name) => {
@@ -216,8 +226,67 @@ function registerBuiltins(context) {
   );
 }
 
+// Start lib/lsp.lisp with the workspace's launcher, as Run File runs programs
+async function startLanguageServer(context) {
+  if (!vscode.workspace.getConfiguration('cogLisp').get('languageServer', true)) return;
+  const root = SUPPORTED ? cogLispRoot() : null;
+  if (!root || !fs.existsSync(path.join(root, 'lib', 'lsp.lisp'))) return;
+  const serverOptions = () => Promise.resolve(WINDOWS
+    ? cp.spawn('cmd.exe', ['/d', '/c', '.\\' + script('cog-lisp'), 'lib\\lsp.lisp'], { cwd: root })
+    : cp.spawn('./' + script('cog-lisp'), ['lib/lsp.lisp'], { cwd: root }));
+  let told = false;
+  const clientOptions = {
+    documentSelector: [{ language: 'cog-lisp' }],
+    outputChannelName: 'cog-lisp language server',
+    errorHandler: {
+      error: () => ({ action: lc.ErrorAction.Continue }),
+      closed: () => {
+        serverActive = false;
+        if (!told) {
+          told = true;
+          vscode.window.showWarningMessage('cog-lisp: the language server stopped; hover and completion of the built-ins go on without it.');
+        }
+        return { action: lc.CloseAction.DoNotRestart, handled: true };
+      }
+    }
+  };
+  client = new lc.LanguageClient('cogLisp', 'cog-lisp language server', serverOptions, clientOptions);
+  try {
+    await client.start();
+    serverActive = true;
+  } catch (e) {
+    serverActive = false;
+    client = null;
+  }
+}
+
+// cog-lisp: Expand Macro -- the server expands the macro call at the cursor
+async function expandMacro() {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) return;
+  if (!client || !serverActive) {
+    vscode.window.showInformationMessage('cog-lisp: Expand Macro needs the language server (a cog-lisp folder, and cogLisp.languageServer on).');
+    return;
+  }
+  const answer = await client.sendRequest('cog-lisp/expand', {
+    textDocument: { uri: editor.document.uri.toString() },
+    position: { line: editor.selection.active.line, character: editor.selection.active.character }
+  });
+  if (!answer) {
+    vscode.window.showInformationMessage('cog-lisp: no macro call at the cursor.');
+    return;
+  }
+  const doc = await vscode.workspace.openTextDocument({
+    language: 'cog-lisp',
+    content: ';; ' + answer.form.split('\n').join('\n;; ') + '\n;; expands to\n' + answer.expansion + '\n'
+  });
+  await vscode.window.showTextDocument(doc, { preview: true, viewColumn: vscode.ViewColumn.Beside });
+}
+
 function activate(context) {
   registerBuiltins(context);
+  context.subscriptions.push(vscode.commands.registerCommand('cog-lisp.expandMacro', expandMacro));
+  startLanguageServer(context);
   context.subscriptions.push(
     vscode.commands.registerCommand('cog-lisp.runFile', runFile),
     vscode.commands.registerCommand('cog-lisp.startRepl', () => ensureRepl(true)),
@@ -244,6 +313,6 @@ function activate(context) {
   checkStale();
 }
 
-function deactivate() {}
+function deactivate() { return client ? client.stop() : undefined; }
 
-module.exports = { activate, deactivate, _test: { staleSource, scriptArgs } };
+module.exports = { activate, deactivate, _test: { staleSource, scriptArgs, serverActive: () => serverActive } };

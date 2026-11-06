@@ -1,7 +1,9 @@
 # cog-lisp CI (specs/phase-8.9-ci-cd.md section 4.1): every suite on Linux and on
 # Windows, every suite on Linux again with the seed rebuilt from its source
 # (the recovery path, Phase 9 step 9.1), and the VS Code extension's tests, on
-# every push and pull request.
+# every push and pull request. The language server (Phase 10 step 10.5) is
+# tested on Linux and on Windows, on the image each job's suites built; the VS
+# Code job has no image, so it checks the extension offline.
 # (Until Phase 9 step 9.1, Linux ran every suite twice: once with the Smalltalk
 # reader and compiler, which retired then.) release.yml calls this workflow before it builds a
 # release. Actions are pinned to commits; the version is in the comment.
@@ -39,6 +41,17 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
         run: tests/run-all.sh
+      # the language server (Phase 10 step 10.5), on the image the suites built
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      - name: The language server
+        working-directory: vscode
+        run: |
+          npm ci
+          node test/lsp.test.js
       - name: Keep the suite outputs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -109,6 +122,17 @@ jobs:
           TEMP: ${{ runner.temp }}
           TMP: ${{ runner.temp }}
         run: tests\run-all.bat
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      - name: The language server
+        shell: cmd
+        working-directory: vscode
+        run: |
+          call npm ci || exit /b 1
+          node test\lsp.test.js
       - name: Keep the suite outputs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -1,11 +1,13 @@
-// The language server spike (specs/phase-10-documentation-and-editor.md step
-// 10.5): VS Code's own message layer (vscode-jsonrpc, which vscode-languageclient
-// is built on) talks to lib/lsp.lisp, served by the image. Needs a built image;
+// The language server (specs/phase-10-documentation-and-editor.md step 10.5):
+// VS Code's own message layer (vscode-jsonrpc, which vscode-languageclient is
+// built on) talks to lib/lsp.lisp, served by the image. Needs a built image;
 // run from vscode/ with `node test/lsp.test.js`. PASS/FAIL + RESULT convention.
 'use strict';
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const cp = require('child_process');
+const { pathToFileURL } = require('url');
 const rpc = require('vscode-jsonrpc/node');
 
 const root = path.join(__dirname, '..', '..');
@@ -17,6 +19,21 @@ function check(label, ok) {
   if (ok) pass++;
   console.log((ok ? '  PASS  ' : '  FAIL  ') + label);
 }
+const median = (xs) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+
+// a workspace of its own: a library, a program that uses it, and a broken file
+const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'cog-lisp-lsp-'));
+const files = {
+  'lib.lisp': '(define (area w h)\n  "(area w h)\nThe area of a w by h rectangle."\n  (* w h))\n\n' +
+    '(define-syntax swap!\n  "(swap! a b)\nExchanges a and b."\n  (syntax-rules () ((_ a b) (let ((t a)) (set! a b) (set! b t)))))\n',
+  'main.lisp': '(define-syntax twice (syntax-rules () ((_ e) (begin e e))))\n' +
+    '(display (area 2 3))\n(twice (display "x"))\n(define (f x) (if))\n; 😀 (string-ref "s" 0)\n(string-ref "s" 0)\n',
+  'broken.lisp': '(define ok 1)\n(display "unterminated\n',
+};
+for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(workspace, name), text);
+const uri = (name) => pathToFileURL(path.join(workspace, name)).href;
+// two URIs of one file may spell ~ or a drive letter differently
+const same = (a, b) => decodeURIComponent(a).toLowerCase() === decodeURIComponent(b).toLowerCase();
 
 async function main() {
   console.log('== cog-lisp language server, through vscode-jsonrpc ==');
@@ -29,32 +46,104 @@ async function main() {
     : cp.spawn('./cog-lisp.sh', ['lib/lsp.lisp'], { cwd: root });
   const connection = rpc.createMessageConnection(
     new rpc.StreamMessageReader(server.stdout), new rpc.StreamMessageWriter(server.stdin));
+  const diagnostics = {};
+  const waiters = [];
+  connection.onNotification('textDocument/publishDiagnostics', (p) => {
+    diagnostics[p.uri] = p.diagnostics;
+    waiters.splice(0).forEach((w) => w());
+  });
+  const nextDiagnostics = () => new Promise((r) => waiters.push(r));
   connection.listen();
 
-  const started = Date.now();
-  const init = await connection.sendRequest('initialize', { processId: process.pid, rootUri: null, capabilities: {} });
-  check('initialize: hover is offered (' + (Date.now() - started) + ' ms)', init.capabilities.hoverProvider === true);
-  check('... by cog-lisp', init.serverInfo.name === 'cog-lisp');
+  let t = Date.now();
+  const init = await connection.sendRequest('initialize',
+    { processId: process.pid, rootUri: pathToFileURL(workspace).href, workspaceFolders: [{ uri: pathToFileURL(workspace).href, name: 'w' }], capabilities: {} });
+  const startup = Date.now() - t;
+  const caps = init.capabilities;
+  check('initialize offers hover, completion and definition (' + startup + ' ms)',
+    caps.hoverProvider === true && !!caps.completionProvider && caps.definitionProvider === true);
   connection.sendNotification('initialized', {});
 
-  const uri = 'file:///spike.lisp';
-  connection.sendNotification('textDocument/didOpen',
-    { textDocument: { uri, languageId: 'cog-lisp', version: 1, text: '(define (f h)\n  (hash-table-ref h \'k))\n' } });
-  const hover = await connection.sendRequest('textDocument/hover',
-    { textDocument: { uri }, position: { line: 1, character: 5 } });
-  check('hover shows the documentation from the image',
-    hover && hover.contents.kind === 'markdown' && hover.contents.value.includes('(hash-table-ref table key [missing])'));
-  const none = await connection.sendRequest('textDocument/hover', { textDocument: { uri }, position: { line: 0, character: 11 } });
-  check('no documentation: no hover', none === null);
+  const open = async (name) => {
+    const seen = nextDiagnostics();
+    connection.sendNotification('textDocument/didOpen',
+      { textDocument: { uri: uri(name), languageId: 'cog-lisp', version: 1, text: files[name] } });
+    await seen;
+  };
+  t = Date.now();
+  await open('main.lisp');
+  const diagnoseTime = Date.now() - t;
+  await open('broken.lisp');
+  const at = (name, line, character) => ({ textDocument: { uri: uri(name) }, position: { line, character } });
+  const hover = async (name, line, character) => {
+    const h = await connection.sendRequest('textDocument/hover', at(name, line, character));
+    return h ? h.contents.value : '';
+  };
 
-  const timings = [];
-  for (let i = 0; i < 20; i++) {
-    const t = Date.now();
-    await connection.sendRequest('textDocument/hover', { textDocument: { uri }, position: { line: 1, character: 5 } });
-    timings.push(Date.now() - t);
+  // hover
+  check('hover on a built-in shows its documentation', (await hover('main.lisp', 1, 3)).includes('(display x [port])'));
+  const areaHover = await hover('main.lisp', 1, 11);
+  check('hover on a definition in the workspace shows its documentation and source',
+    areaHover.includes('The area of a w by h rectangle.') && areaHover.includes('(* w h)'));
+  check('hover after a character outside the BMP is placed in UTF-16 units',
+    (await hover('main.lisp', 5, 3)).includes('(string-ref string k)'));
+  check('no hover on white space', (await hover('main.lisp', 1, 0)) === '');
+
+  // completion
+  const items = await connection.sendRequest('textDocument/completion', at('main.lisp', 1, 2));
+  const labels = new Set(items.map((i) => i.label));
+  check('completion offers built-ins, special forms and derived forms',
+    labels.has('display') && labels.has('lambda') && labels.has('case'));
+  check('completion offers the names the workspace defines', labels.has('area') && labels.has('swap!'));
+  check('a built-in completion carries its call form', items.find((i) => i.label === 'string-ref').detail === '(string-ref string k)');
+
+  // definition
+  const defs = await connection.sendRequest('textDocument/definition', at('main.lisp', 1, 11));
+  check('go to definition finds area in lib.lisp, at its define',
+    defs.length === 1 && same(defs[0].uri, uri('lib.lisp')) && defs[0].range.start.line === 0);
+
+  // diagnostics
+  const mainDiags = diagnostics[uri('main.lisp')] || [];
+  check('a compile error is reported once, at its innermost form (C-18)',
+    mainDiags.length === 1 && mainDiags[0].message.includes('if: bad syntax') &&
+    mainDiags[0].range.start.line === 3 && mainDiags[0].range.start.character === 14);
+  check("the document's own macro (twice) is known: no error at its use",
+    !mainDiags.some((d) => d.range.start.line === 2));
+  const brokenDiags = diagnostics[uri('broken.lisp')] || [];
+  check('a read error is reported where reading stopped', brokenDiags.length === 1 && brokenDiags[0].message.includes('string'));
+  let seen = nextDiagnostics();
+  connection.sendNotification('textDocument/didChange',
+    { textDocument: { uri: uri('main.lisp'), version: 2 }, contentChanges: [{ text: '(display 1)\n' }] });
+  await seen;
+  check('a fixed document has no diagnostics', (diagnostics[uri('main.lisp')] || ['x']).length === 0);
+
+  // macro expansion
+  connection.sendNotification('textDocument/didChange',
+    { textDocument: { uri: uri('main.lisp'), version: 3 }, contentChanges: [{ text: files['lib.lisp'] + '(define (g p q) (when p (swap! p q)))\n' }] });
+  const ex = await connection.sendRequest('cog-lisp/expand', at('main.lisp', 9, 27));
+  check('expand the innermost macro call at the cursor',
+    ex && ex.form === '(swap! p q)' && ex.expansion.startsWith('(let ((t p))'));
+  const ex2 = await connection.sendRequest('cog-lisp/expand', at('main.lisp', 9, 18));
+  check('... or the enclosing one', ex2 && ex2.form.startsWith('(when p') && ex2.expansion.startsWith('(if p'));
+
+  // speed, on a file the size of the compiler
+  const big = fs.readFileSync(path.join(root, 'lib', 'compiler', 'compiler.lisp'), 'utf8');
+  seen = nextDiagnostics();
+  t = Date.now();
+  connection.sendNotification('textDocument/didChange', { textDocument: { uri: uri('main.lisp'), version: 4 }, contentChanges: [{ text: big }] });
+  await seen;
+  const bigDiagnose = Date.now() - t;
+  const hoverTimes = [];
+  const completionTimes = [];
+  for (let i = 0; i < 15; i++) {
+    t = Date.now(); await connection.sendRequest('textDocument/hover', at('main.lisp', 40, 3)); hoverTimes.push(Date.now() - t);
+    t = Date.now(); await connection.sendRequest('textDocument/completion', at('main.lisp', 40, 3)); completionTimes.push(Date.now() - t);
   }
-  timings.sort((a, b) => a - b);
-  check('a hover answers quickly (median ' + timings[10] + ' ms over 20)', timings[10] < 200);
+  console.log('  times: start-up ' + startup + ' ms; diagnostics ' + diagnoseTime + ' ms on a small file, ' + bigDiagnose +
+    ' ms on compiler.lisp (' + big.split('\n').length + ' lines); hover median ' + median(hoverTimes) +
+    ' ms; completion median ' + median(completionTimes) + ' ms');
+  check('diagnostics on the compiler source within 5 s', bigDiagnose < 5000);
+  check('hover and completion answer quickly (medians under 300 ms)', median(hoverTimes) < 300 && median(completionTimes) < 300);
 
   await connection.sendRequest('shutdown');
   const exited = new Promise((resolve) => server.on('exit', (code) => resolve(code)));

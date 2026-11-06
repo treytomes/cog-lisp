@@ -27,7 +27,7 @@
 (define (make-lisp-compiler)
   ;; counter source-map options self-loop inline-temps top-form source-context
   ;; in-body expansion-depth expr-depth
-  (vector 0 #f [[(smalltalk LispCompiler) defaultOptions] copy] #f 0 #f #f #f 0 0 #f))
+  (vector 0 #f [[(smalltalk LispCompiler) defaultOptions] copy] #f 0 #f #f #f 0 0 #f '()))
 
 (define (c-counter c) (vector-ref c 0))
 (define (c-counter! c v) (vector-set! c 0 v))
@@ -51,6 +51,10 @@
 ;; true once this compilation expanded a syntax-rules macro, which makes aliases
 (define (c-hygienic c) (vector-ref c 10))
 (define (c-hygienic! c v) (vector-set! c 10 v))
+;; the forms being translated, innermost first: a compile error records them, so
+;; an editor can place it (Phase 10 step 10.5; review C-18)
+(define (c-forms c) (vector-ref c 11))
+(define (c-forms! c v) (vector-set! c 11 v))
 
 ;; A self loop (translateLambda:...): name local params proc again result temps used scratch
 (define (make-loop name local params proc again result)
@@ -433,6 +437,14 @@
 ;; Past a depth budget, a form not in tail position is compiled in a block of its
 ;; own, [form] value, which starts a fresh frame
 (define (lc-translate-nested c form scope tail)
+  (let* ((outer (c-forms c))
+         (node (begin (c-forms! c (cons form outer))
+                      (lc-translate-nested* c form scope tail))))
+    ;; popped only on a normal return: after an error the stack still says where
+    (c-forms! c outer)
+    node))
+
+(define (lc-translate-nested* c form scope tail)
   (c-expr-depth! c (+ (c-expr-depth c) 1))
   (lc-ensure
    (lambda ()
@@ -1152,16 +1164,30 @@ Stops compilation with message and the forms, for a macro to report a misuse."
   (c-in-body! c #f)
   (c-inline-temps! c 0)
   (c-expansion-depth! c 0)
+  (c-forms! c '())
   (let* ((expr-node
           ;; a host error while translating is malformed input the checks did not catch
           (lc-on-error (lambda () (lc-translate c datum (scope-new) #f))
                        (lambda (e)
                          (if [e isKindOf: (smalltalk LispCompileError)]
-                             [e pass]
-                             (lc-error (string-append "bad syntax: " (lc-show datum)))))))
+                             (begin (lc-note-forms e (c-forms c) datum) [e pass])
+                             (lc-error-at-forms (string-append "bad syntax: " (lc-show datum)) (c-forms c) datum)))))
          (method (opal-method-node expr-node)))
     (lc-on-error (lambda () (opal-generate method))
-                 (lambda (e) (lc-error (string-append (lc-describe-back-end-error e) ": " (lc-show datum)))))))
+                 (lambda (e) (lc-error-at-forms (string-append (lc-describe-back-end-error e) ": " (lc-show datum))
+                                                '() datum)))))
+
+;; a compile error knows the forms it happened in, innermost first, ending with
+;; the top-level form (review C-18); the innermost record wins
+(define (lc-note-forms e forms datum)
+  (when (smalltalk-nil? [e forms])
+    [e forms: (lc-forms-to-top forms datum)]))
+(define (lc-forms-to-top forms datum)
+  (if (and (pair? forms) (eq? (lc-last forms) datum)) forms (append forms (list datum))))
+(define (lc-error-at-forms msg forms datum)
+  (let ((e [(smalltalk LispCompileError) new]))
+    [e forms: (lc-forms-to-top forms datum)]
+    [e signal: msg]))
 
 (define (lc-describe-back-end-error e)
   (let ((text (let ((t [e messageText])) (if (smalltalk-nil? t) "" t))))

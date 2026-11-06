@@ -28,11 +28,18 @@ comp := (Object << #LispCompiler)
 	sharedVariables: { #DefaultOptions. #LispEntries. #BuildInfo };
 	package: 'CogLisp-Compiler';
 	install.
-err  := (LispError << #LispCompileError) package: 'CogLisp-Compiler'; install.
+err  := (LispError << #LispCompileError) slots: { #forms }; package: 'CogLisp-Compiler'; install.
 "The full path of the file being loaded or run, per process (Phase 7.9 section 5.3)."
 lpath := (DynamicVariable << #LispLoadPath) package: 'CogLisp-Compiler'; install.
 "The reader written in LISP, behind LispReader's protocol (Phase 8 step 8.5)."
 lread := (Object << #LispReaderInLisp) slots: { #state. #stream. #source }; package: 'CogLisp-Compiler'; install.
+
+cm value: err value: 'accessing' value: 'forms
+	"The forms the error happened in, innermost first, ending with the top-level
+	 form, or nil (Phase 10 step 10.5; review C-18)."
+	^ forms'.
+cm value: err value: 'accessing' value: 'forms: aList
+	forms := aList'.
 
 "=== options ==============================================================="
 cm value: comp class value: 'options' value: 'allOptions

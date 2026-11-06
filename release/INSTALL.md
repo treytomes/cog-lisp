@@ -40,7 +40,9 @@ output it prints (`.expected`).
 Install the extension from `cog-lisp-VERSION.vsix` (Extensions view, `...` menu,
 *Install from VSIX...*), then open this folder. *cog-lisp: Run File* (the ▷
 button) runs the file you are editing, errors show in *Problems*, and
-*cog-lisp: Start REPL* opens the REPL in a terminal.
+*cog-lisp: Start REPL* opens the REPL in a terminal. Hover over a name for its
+documentation; the image serves a language server for completion, *Go to
+Definition*, errors as you type and *cog-lisp: Expand Macro*.
 
 ## Documentation
 

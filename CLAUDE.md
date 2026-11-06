@@ -416,6 +416,14 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **An example's opening comment is manual prose**: its first line
   (`name.lisp -- what it shows`) becomes the section title, and the rest of the
   comment its explanation, so write it for a reader.
+- **The language server is `lib/lsp.lisp`**, run by the ordinary launcher.
+  `vscode/test/lsp.test.js` (needs a built image) and `npm run test:vscode` (a
+  real VS Code 1.90 in `vscode/.vscode-test/`, once offline and once with the
+  server) test it. A terminal inside VS Code or Claude Code sets
+  `ELECTRON_RUN_AS_NODE=1`, which makes a test VS Code run as plain Node; the
+  runner unsets it. The `.vsix` in `vscode/` is git-ignored and goes stale:
+  rebuild it (`npm run package`) before installing it. A new npm dependency
+  shipped in the `.vsix` needs a row in `vscode/THIRD-PARTY-NOTICES.md`.
 
 ## Writing the compiler in LISP (Phase 8)
 

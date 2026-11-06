@@ -25,12 +25,26 @@ A thin extension for working on cog-lisp in VS Code
   when `src\*.st`, `lib\core.lisp` or `lib\compiler\*.lisp` is newer than `pharo\cog-lisp.image` and
   offers to rebuild (setting `cogLisp.warnStaleImage`).
 
-The language intelligence (hover with procedure source, completion from the
-image's globals, diagnostics, macro expansion) is planned for a language server
-that the cog-lisp image serves itself (§5.4), not for this extension.
+- **The language server** (Phase 10 step 10.5): when the folder has a cog-lisp
+  launcher (or `cogLisp.root` names one), the extension starts `lib/lsp.lisp`,
+  a language server the cog-lisp image serves itself. It adds:
+  - hover over the program's own top-level definitions (their documentation
+    string and source), in the open file and across the workspace;
+  - completion of the names the workspace defines;
+  - **Go to Definition** (F12) for those names;
+  - diagnostics as you type: read errors, and compile errors underlined at the
+    innermost form that failed. The server reads and compiles each form but
+    runs only the file's `define-syntax` and `define-macro` forms, so the file's
+    own macros expand as they will when it runs;
+  - **cog-lisp: Expand Macro**, which opens the expansion of the macro call at
+    the cursor (the innermost one) beside the file.
 
-`.lisp` is associated with cog-lisp only in this workspace
-(`.vscode/settings.json`), so a Common Lisp extension elsewhere is unaffected.
+  Without a launcher, or with `cogLisp.languageServer` set to `false`, the
+  built-ins' hover help and completion above still work. If the server stops,
+  the extension says so once and goes on with them.
+
+The extension claims `.lisp` files, so it works in any folder; disable it in a
+workspace where `.lisp` means Common Lisp.
 Running programs works on Windows and Linux (Phase 8.9), in a checkout or in an
 unpacked release; macOS is not supported yet.
 
@@ -45,10 +59,16 @@ code --install-extension cog-lisp.vsix
 ```
 
 `npm test` runs the form-scanner checks, the hover-help checks, the package
-checks (the `.vsix` holds `builtins.json` and claims `.lisp` files) and the
-grammar assertions in `test/syntax.test.lisp` (scopes checked with
-`vscode-tmgrammar-test`). `test/lsp.test.js` talks to the language server and
-needs a built image.
+checks (the `.vsix` holds `builtins.json`, the language client and a notice for
+every npm package it ships, and claims `.lisp` files) and the grammar assertions
+in `test/syntax.test.lisp` (scopes checked with `vscode-tmgrammar-test`).
+`node test/lsp.test.js` talks to the language server through VS Code's own
+message layer, and needs a built image. `npm run test:vscode` runs the extension
+inside a real VS Code (1.90, downloaded into `.vscode-test/`): once offline, and
+once with the language server, when the image is built.
+
+The extension ships `vscode-languageclient` and its dependencies, all MIT or
+ISC: `THIRD-PARTY-NOTICES.md`.
 
 **Rebuild the `.vsix` before installing it** (`npm run package`): it is not kept
 in git, so an old one stays in this folder until you do. A release builds its

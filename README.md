@@ -41,7 +41,7 @@ Cog runs it native. We deliberately do **not** modify the VM itself.
 | 8 | Self-hosting (meta-circular) | ✅ **done** — [spec](specs/phase-8-self-hosting.md); 8.1 tests in LISP, 8.2 reader and 8.3 compiler in LISP, 8.4 the compiler compiles itself to a fixpoint, 8.5 the LISP reader and compiler are the ones in use, 8.6 it writes bytecode itself, compiling 2.1× faster than Phase 7.9 ([`lib/compiler/`](lib/compiler/), examples [read-yourself](examples/read-yourself.lisp), [compile-yourself](examples/compile-yourself.lisp), [extend-the-compiler](examples/extend-the-compiler.lisp), [bootstrap](examples/bootstrap.lisp), [sealed-compiler](examples/sealed-compiler.lisp)) done; all suites 2506/2506, with either compiler |
 | 8.9 | CI/CD, and running on Linux | ✅ **done** — [spec](specs/phase-8.9-ci-cd.md); every push tested on Linux (both compilers) and Windows; a `v*` tag publishes Linux and Windows bundles and the `.vsix` |
 | 9 | Finishing the language: seeded builds, the numeric tower, hygienic macros | ✅ **done** — [spec](specs/phase-9-language.md); 9.1 seeded builds, 9.2 the numeric tower, 9.3 hygienic macros (examples [seeded-build](examples/seeded-build.lisp), [numbers](examples/numbers.lisp), [new-number-type](examples/new-number-type.lisp), [syntax-rules](examples/syntax-rules.lisp), [shadowing](examples/shadowing.lisp)) |
-| 10 | Knowing the language: documentation, the built-ins reference, hover help, the manual, a language server | ⬜ [spec](specs/phase-10-documentation-and-editor.md) accepted |
+| 10 | Knowing the language: documentation, the built-ins reference, hover help, the manual, a language server | ✅ **done** — [spec](specs/phase-10-documentation-and-editor.md); 10.1 documentation in the image, 10.2 [the reference](docs/builtins.md), 10.3 hover help offline, 10.4 [the manual](docs/manual/README.md), 10.5 a language server served by the image ([`lib/lsp.lisp`](lib/lsp.lisp)); all suites 1488/1488 (Windows), 1491/1491 (Linux) |
 | 11 | A world of its own: the pure LISP image, then networking and graphics from LISP | ⬜ [spec](specs/phase-11-pure-image.md) accepted in outline |
 
 Phase 0 is proven, not just planned: [`poc/answer.st`](poc/answer.st) builds
@@ -370,7 +370,7 @@ and examples:
   `define-macro` stays.
 
 ### Phase 10 — Knowing the language
-[Spec](specs/phase-10-documentation-and-editor.md), accepted. Makes cog-lisp
+[Spec](specs/phase-10-documentation-and-editor.md), done (2026-11-06). Makes cog-lisp
 knowable, by a reader and by the editor, from documentation kept with each
 definition in the image (owner ideas of 2026-11-04, moved ahead of the pure
 image on 2026-11-05):
@@ -383,9 +383,10 @@ image on 2026-11-05):
   form and description, and completes its name, from generated data.
 - **10.4 The user manual**: `docs/manual/`, generated from the examples (their
   comments, code and checked output) and a chapter list.
-- **10.5 A language server**, served by the image over stdio: a spike first, then
-  hover, completion, go to definition, diagnostics with positions, and macro
-  expansion.
+- **10.5 A language server**, `lib/lsp.lisp`, served by the image over stdio
+  and started by the extension: hover over the program's own definitions,
+  completion, go to definition, diagnostics as you type (a compile error at its
+  innermost form), and *cog-lisp: Expand Macro*.
 
 ### Phase 11 — A world of its own
 [Spec](specs/phase-11-pure-image.md), accepted in outline; a long phase, each

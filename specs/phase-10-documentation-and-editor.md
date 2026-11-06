@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-11-05), with the owner's decisions (§7); decision 4 is settled with 10.5's detailed spec |
+| **Status** | Done (2026-11-06). Accepted 2026-11-05, with the owner's decisions (§7); decision 4 accepted with 10.5's detailed spec |
 | **Depends on** | Phase 9 (the language it documents) |
 | **Feeds** | Phase 11 (the pure image; its LISP-visible tools join the reference) |
 | **Review items** | C-18 (compile errors carry no position); R-17 considered and left with the REPL (§7) |
@@ -270,7 +270,7 @@ As built (10.2 to 10.4):
   `.\cog-lisp.bat` (as the extension's tasks do), and must stop the VM itself
   if it stops the server: killing `cmd` leaves the VM running.
 
-#### 10.5 in detail (proposed 2026-11-05, for the owner's acceptance)
+#### 10.5 in detail (accepted 2026-11-06, with decision 4 as proposed)
 
 **The extension starts the server and falls back.** It uses
 `vscode-languageclient` 9.0.1 (MIT; its license added to the extension's
@@ -321,6 +321,47 @@ notices), packaged in the `.vsix`.
 **Measured and recorded**: start-up, and the median hover, completion and
 diagnostics times on a file the size of `lib/compiler/compiler.lisp`.
 
+#### 10.5 as built (2026-11-06)
+
+- **The server**, `lib/lsp.lisp`, does all of the above.
+  - Open documents are fully synced. The workspace index holds the top-level
+    `define`, `define-macro` and `define-syntax` forms of every `.lisp` file. It
+    skips `pharo`, `node_modules`, `.vscode-test`, `.git` and `dist`.
+  - Paths are compared lowercased on Windows.
+- **C-18 is closed.** A `LispCompileError` carries the forms being translated,
+  outermost to innermost (`forms`). The server underlines the innermost one the
+  reader has a range for.
+- **The extension** starts the server through `vscode-languageclient` 9.0.1,
+  spawning the launcher itself:
+  - Windows: `cmd /d /c .\cog-lisp.bat lib\lsp.lisp`;
+  - Linux: `./cog-lisp.sh lib/lsp.lisp`.
+
+  While the server runs, the offline hover and completion answer nothing, so
+  nothing shows twice. If the server stops, the extension warns once, does not
+  restart it, and the offline help answers again.
+- **The `.vsix` ships 8 npm packages, all MIT or ISC.** They are listed in
+  `vscode/THIRD-PARTY-NOTICES.md`, and the package test fails on an unlisted one.
+- **Checks:**
+  - `vscode/test/lsp.test.js`: 18/18 on Windows and on Linux (Docker).
+  - `npm run test:vscode`, inside VS Code 1.90:
+    - offline 5/5;
+    - with the server 7/7, covering one hover per name, go to definition,
+      diagnostics, completion and Expand Macro.
+  - CI runs `lsp.test.js` in its Linux and Windows jobs. Its VS Code job has no
+    image, so it runs only the offline pass.
+
+  | | Windows | Linux (Docker) |
+  |---|---:|---:|
+  | start-up, to the `initialize` answer | 352 ms | 277 ms |
+  | diagnostics, a small file | 53 ms | 10 ms |
+  | diagnostics, `compiler.lisp` (1295 lines) | 374 ms | 350 ms |
+  | hover, median of 15 | 51 ms | 1 ms |
+  | completion, median of 15 | 42 ms | 5 ms |
+
+  Windows' extra time per request is probably `LispStdin` polling an empty pipe
+  every 20 ms, where Linux blocks in `read`. This is not measured. It is well
+  under the 300 ms budget.
+
 ## 5. Acceptance criteria
 
 - AC-1 (10.1) Every primitive, special form and `lib/core.lisp` form has
@@ -355,10 +396,10 @@ diagnostics times on a file the size of `lib/compiler/compiler.lisp`.
 2. **Every generated file is committed** and checked against the image by a
    suite: the reference, the editor's data, the manual.
 3. **The manual is Markdown.**
-4. **Open**: whether the language server evaluates a document's syntax
-   definitions so later forms expand (proposed), accepting that a document's
-   macros run inside the server's image. Settled with 10.5's detailed spec,
-   after the spike.
+4. **The language server evaluates a document's top-level syntax definitions**
+   (`define-syntax`, `define-macro`), so later forms expand as they will when
+   the file runs. This accepts that a document's macros run inside the server's
+   image. (Proposed with 10.5's detailed spec; accepted 2026-11-06.)
 5. **R-17 stays with the REPL**: the server reads whole documents. It is fixed
    when a large form sent to the REPL makes it matter.
 
@@ -384,4 +425,4 @@ diagnostics times on a file the size of `lib/compiler/compiler.lisp`.
 | 10.2 The reference of the built-ins | done (2026-11-05): docs/builtins.md, 283 entries in 17 sections, checked against the image |
 | 10.3 Hover help, offline | done (2026-11-05): hover and completion from vscode/builtins.json, checked against the image |
 | 10.4 The user manual | done (2026-11-05): docs/manual/, 14 chapters from all 36 examples |
-| 10.5 The language server | the spike done (2026-11-05): framing, hover, on Windows and Linux, from VS Code's message layer; the rest awaits its detailed spec |
+| 10.5 The language server | done (2026-11-06): hover, completion, go to definition, diagnostics (C-18 closed) and Expand Macro, served by the image to VS Code on Windows and Linux |
