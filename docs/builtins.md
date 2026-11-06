@@ -10,6 +10,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 `(documentation 'name)` answers the same text at the REPL.
 
 - [Special forms](#special-forms) (16)
+- [Derived forms](#derived-forms) (14)
 - [Equality and types](#equality-and-types) (11)
 - [Numbers](#numbers) (62)
 - [Lists](#lists) (20)
@@ -26,7 +27,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [The system](#the-system) (7)
 - [Smalltalk interop](#smalltalk-interop) (11)
 - [Language server](#language-server) (2)
-- [The compiler and reader](#the-compiler-and-reader) (17)
+- [The compiler and reader](#the-compiler-and-reader) (23)
 
 ## Special forms
 
@@ -48,6 +49,25 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `smalltalk` | `(smalltalk Name)` | special form | The Smalltalk global Name, such as a class. |
 | `syntax-error` | `(syntax-error message form ...)` | special form | Stops compilation with message and the forms, for a macro to report a misuse. |
 | `syntax-rules` | `(syntax-rules [ellipsis] (literal ...) (pattern template) ...)` | special form | The transformer of a hygienic macro: the first pattern a use matches gives its template, filled in. |
+
+## Derived forms
+
+| Name | Call | Kind | What it does |
+|---|---|---|---|
+| `and` | `(and e ...)` | macro | The first false value, or the last value; #t for none. Evaluation stops at the first false value. |
+| `case` | `(case key ((datum ...) e ...) ... (else e ...))` | macro | The body of the first clause with a datum eqv? to key; a clause may use => proc, called with key. |
+| `cond` | `(cond (test e ...) ... (test => proc) ... (else e ...))` | macro | The body of the first clause whose test is true; with =>, proc called with the test value; else matches anything. |
+| `do` | `(do ((var init step) ...) (test result ...) body ...)` | macro | A loop: binds each var to its init, then until test is true runs the body and steps each var; answers the results. |
+| `guard` | `(guard (var clause ...) body ...)` | macro | Evaluates the body; if it raises, binds var to what was raised and tries the cond clauses, raising again if none matches. |
+| `let*` | `(let* ((name init) ...) body ...)` | macro | As let, but each init sees the bindings before it. |
+| `let*-values` | `(let*-values ((formals expr) ...) body ...)` | macro | As let-values, but each expr sees the bindings before it. |
+| `let-values` | `(let-values ((formals expr) ...) body ...)` | macro | Binds the values of each expr to its formals, as lambda parameters, evaluated outside the bindings. |
+| `letrec` | `(letrec ((name init) ...) body ...)` | macro | As letrec*: bindings visible to every init and the body. |
+| `letrec*` | `(letrec* ((name init) ...) body ...)` | macro | Bindings visible to every init and the body, assigned in order: for procedures that call each other. |
+| `or` | `(or e ...)` | macro | The first true value, or #f; evaluation stops there. |
+| `restart-case` | `(restart-case form (name (param ...) body ...) ...)` | macro | Evaluates form with named restarts; invoking one leaves form and evaluates its body with the arguments. |
+| `unless` | `(unless test body ...)` | macro | Evaluates the body when test is false. |
+| `when` | `(when test body ...)` | macro | Evaluates the body when test is true. |
 
 ## Equality and types
 
@@ -385,6 +405,11 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 
 | Name | Call | Kind | What it does |
 |---|---|---|---|
+| `bootstrap-compiler` | `(bootstrap-compiler directory)` | procedure | Compiles the compiler source in directory with the running compiler, then with each new stage in turn, three times; answers the stages, for bootstrap-fixpoint? and bootstrap-differences. The last stage is left installed. |
+| `bootstrap-compiler-from-seed` | `(bootstrap-compiler-from-seed directory entries)` | procedure | As bootstrap-compiler, with a seed compiler (its entry points) as stage 0, as the image build does. |
+| `bootstrap-differences` | `(bootstrap-differences stages i j)` | procedure | The labels of the forms whose methods differ between stages i and j. |
+| `bootstrap-fixpoint?` | `(bootstrap-fixpoint? stages)` | procedure | True if stages 1, 2 and 3 of a bootstrap made the same methods: the compiler compiles itself into itself. |
+| `bootstrap-stage0` | `(bootstrap-stage0 stages)` | procedure | What stage 0 of a bootstrap was: the symbol seed. |
 | `compile-form` | `(compile-form datum [reader [context]])` | procedure | The Smalltalk CompiledMethod that runs datum, made by the compiler in use. reader is the LISP reader that read datum, so its procedures keep their text. |
 | `define-number-syntax` | `(define-number-syntax predicate parser)` | procedure | A new number syntax for the reader and string->number: a token that no built-in syntax reads and that satisfies predicate is read as (parser token). |
 | `define-special-form` | `(define-special-form name [documentation] translator)` | procedure | Makes name a special form of the running compiler: translator, called with the compiler's state, the form, the scope and whether the form is in tail position, answers its code. The documentation is what (documentation name) answers. |
@@ -393,6 +418,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `lisp-eval` | `(lisp-eval datum [reader])` | procedure | Compiles and runs datum with the compiler in use, as eval does. |
 | `lisp-eval-string` | `(lisp-eval-string string)` | procedure | Reads and evaluates every datum of string in turn, so procedures keep their text; answers the last value. |
 | `make-reader` | `(make-reader string)` | procedure | A reader over string: reader-next reads its datums one at a time. |
+| `method-listing` | `(method-listing method)` | procedure | A fingerprint of a CompiledMethod: its header, its bytecode bytes and its literals, blocks included, to compare two compilations. |
 | `opal-run` | `(opal-run method)` | procedure | Runs a CompiledMethod that compile-form made, and answers its value. |
 | `read-all` | `(read-all string)` | procedure | A list of every datum of string. |
 | `read-from-string` | `(read-from-string string)` | procedure | The one datum string holds; an error for none or more than one. |

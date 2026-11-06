@@ -38,6 +38,15 @@
   (check (sr-filter (lambda (n) (not (documentation n))) (special-form-names)) '())
   (check (sr-filter (lambda (n) (not (names-itself? n (documentation n)))) (special-form-names)) '()))
 
+(define-test "AC-1 every derived form of lib/core.lisp is documented (10.1b)"
+  (let ((core (sr-filter (lambda (g) (and [(cdr g) isKindOf: (smalltalk LispSyntax)]
+                                          (equal? (documentation-category (car g)) "Derived forms")))
+                         (all-globals)))
+        (forms '(cond and or when unless let* letrec* letrec case do let-values let*-values guard restart-case)))
+    (check (sr-filter (lambda (n) (not (documentation n))) forms) '())
+    (check (sr-filter (lambda (n) (not (names-itself? n (documentation n)))) forms) '())
+    (check (length core) (length forms))))
+
 (define-test "AC-1 every primitive has a category"
   (check (sr-filter (lambda (g) (and (primitive? (cdr g)) (not (internal-name? (car g)))
                                       (not (documentation-category (car g)))))
@@ -81,7 +90,7 @@ x times x."
 
 (define-test "AC-1 a definition takes the category of the file it was loaded from"
   (check (documentation-category 'doc-test-global) "phase-10.1-documentation.lisp")
-  (check (documentation-category 'when) #f))
+  (check (documentation-category 'when) "Derived forms"))
 
 (define-test "AC-1 an old name has documentation of its own"
   (check (first-line (documentation 'hash-table-exists?)) "(hash-table-exists? table key)")

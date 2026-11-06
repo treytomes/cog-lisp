@@ -413,7 +413,7 @@ make the same methods (a fixpoint). The image remembers how that went.
 Its output:
 
 ```text
-built from the seed: v0.1.3
+built from the seed: v0.2.0
 the seed's checksum is pinned: #t
 stage 0 of the bootstrap was the seed
 the compiler compiled its own source, form by form: #t

@@ -380,7 +380,7 @@ diagnostics times on a file the size of `lib/compiler/compiler.lisp`.
 
 | Step | Status |
 |---|---|
-| 10.1 Documentation in the image | 10.1a done (2026-11-05): the machinery; 249 primitives, 16 special forms and the compiler's entry points documented; 10.1b (the derived forms) after the v0.2.0 seed |
+| 10.1 Documentation in the image | done: the machinery; 249 primitives, 16 special forms and the compiler's entry points documented (10.1a, 2026-11-05); the 14 derived forms, by define-syntax's string, compiled by the v0.2.0 seed (10.1b, 2026-11-06) |
 | 10.2 The reference of the built-ins | done (2026-11-05): docs/builtins.md, 283 entries in 17 sections, checked against the image |
 | 10.3 Hover help, offline | done (2026-11-05): hover and completion from vscode/builtins.json, checked against the image |
 | 10.4 The user manual | done (2026-11-05): docs/manual/, 14 chapters from all 36 examples |
