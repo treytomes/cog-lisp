@@ -191,6 +191,22 @@ As built (10.2 to 10.4):
   `STONJSON` writes a dictionary in hash order.
 - The extension activates when a cog-lisp file opens, not only in a folder with
   the launcher, so help works in any workspace.
+- **Found by the owner, 2026-11-06: no hover after installing.** There were two
+  causes:
+  - The `.vsix` in `vscode/` was a Nov 4 build. It is git-ignored, and nothing
+    had rebuilt it since hover help landed.
+  - The extension's language claimed no file extension, so `.lisp` files became
+    `cog-lisp` only through this repository's `.vscode/settings.json`. Anywhere
+    else (an unpacked release, say) they opened as plain text, with no help.
+
+  Fixes:
+  - The language claims `.lisp`.
+  - `test/package.test.js` checks the package holds `builtins.json` and makes
+    that claim.
+  - `test/integration/` runs the extension in a real VS Code
+    (`@vscode/test-electron`, VS Code 1.90). It hovers over `define` and
+    `display` in a folder with no cog-lisp settings, in CI under `xvfb`. It
+    passes 5/5; without the `.lisp` claim it fails 4 of 5.
 - A manual section's title is the example's first comment line, after `--` and
   without its spec reference. A folder example shows each of its files, an
   `.args` or `.input` file is shown with it, and an example without

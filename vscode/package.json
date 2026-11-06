@@ -25,6 +25,9 @@
         "aliases": [
           "cog-lisp"
         ],
+        "extensions": [
+          ".lisp"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -148,10 +151,12 @@
     }
   },
   "scripts": {
-    "test": "node test/forms.test.js && node test/matcher.test.js && node test/builtins.test.js && node test/grammar.test.js",
+    "test": "node test/forms.test.js && node test/matcher.test.js && node test/builtins.test.js && node test/package.test.js && node test/grammar.test.js",
+    "test:vscode": "node test/integration/run.js",
     "package": "vsce package --skip-license --allow-missing-repository --out cog-lisp.vsix"
   },
   "devDependencies": {
+    "@vscode/test-electron": "2.4.1",
     "@vscode/vsce": "4.0.0",
     "vscode-jsonrpc": "8.2.0",
     "vscode-tmgrammar-test": "0.1.3"

@@ -44,8 +44,16 @@ npm run package
 code --install-extension cog-lisp.vsix
 ```
 
-`npm test` runs the form-scanner checks and the grammar assertions in
-`test/syntax.test.lisp` (scopes checked with `vscode-tmgrammar-test`).
+`npm test` runs the form-scanner checks, the hover-help checks, the package
+checks (the `.vsix` holds `builtins.json` and claims `.lisp` files) and the
+grammar assertions in `test/syntax.test.lisp` (scopes checked with
+`vscode-tmgrammar-test`). `test/lsp.test.js` talks to the language server and
+needs a built image.
+
+**Rebuild the `.vsix` before installing it** (`npm run package`): it is not kept
+in git, so an old one stays in this folder until you do. A release builds its
+own (`cog-lisp-VERSION.vsix`). After installing, reload the window
+(*Developer: Reload Window*).
 Uninstall with `code --uninstall-extension cog-lisp.cog-lisp`.
 
 ## Checking it by hand (AC-8 to AC-10)

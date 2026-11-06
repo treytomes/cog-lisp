@@ -133,6 +133,8 @@ jobs:
           cache: npm
           cache-dependency-path: vscode/package-lock.json
       - run: npm ci
-      - run: npm test
       - name: The extension packages
         run: npm run package
+      - run: npm test
+      - name: Hover help and completion, inside VS Code
+        run: xvfb-run -a npm run test:vscode

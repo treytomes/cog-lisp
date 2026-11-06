@@ -31,3 +31,4 @@ crash.dmp
 Thumbs.db
 Desktop.ini
 .DS_Store
+/vscode/.vscode-test/

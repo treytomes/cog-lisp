@@ -3,3 +3,4 @@ test/**
 *.vsix
 .vscodeignore
 package-lock.json
+.vscode-test/**
