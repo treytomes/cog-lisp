@@ -1,0 +1,5 @@
+"--write"
+"-x"
+":keep"
+"a b"
+"plain"

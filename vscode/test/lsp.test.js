@@ -140,6 +140,28 @@ async function main() {
   const ex2 = await connection.sendRequest('cog-lisp/expand', at('main.lisp', 9, 18));
   check('... or the enclosing one', ex2 && ex2.form.startsWith('(when p') && ex2.expansion.startsWith('(if p'));
 
+  // formatting (specs/formatter.md R-4, AC-4)
+  check('initialize offers formatting', caps.documentFormattingProvider === true);
+  const openText = async (name, text) => {
+    const seen = nextDiagnostics();
+    connection.sendNotification('textDocument/didOpen', { textDocument: { uri: uri(name), languageId: 'cog-lisp', version: 1, text } });
+    await seen;
+  };
+  await openText('fmt.lisp', '(define (f x) (* x x))\n');
+  const format = (name, options) => connection.sendRequest('textDocument/formatting', { textDocument: { uri: uri(name) }, options });
+  const tabbed = await format('fmt.lisp', { tabSize: 4, insertSpaces: false });
+  check('formatting answers one edit over the whole document, with tabs',
+    tabbed.length === 1 && tabbed[0].newText === '(define (f x)\n\t(* x x)\n)\n' &&
+    tabbed[0].range.start.line === 0 && tabbed[0].range.start.character === 0 && tabbed[0].range.end.line === 1);
+  const spaced = await format('fmt.lisp', { tabSize: 2, insertSpaces: true });
+  check('... or with the spaces the request asks for', spaced.length === 1 && spaced[0].newText === '(define (f x)\n  (* x x)\n)\n');
+  await openText('fmt-done.lisp', '(define (f x)\n\t(* x x)\n)\n');
+  check('a document already formatted gets no edit', (await format('fmt-done.lisp', { tabSize: 4, insertSpaces: false })).length === 0);
+  await openText('fmt-broken.lisp', '(define (f x)\n');
+  let refused = null;
+  try { await format('fmt-broken.lisp', { tabSize: 4, insertSpaces: false }); } catch (e) { refused = e.message; }
+  check('a document that does not read is an error, naming the line', !!refused && refused.includes('never closed (line 1)'));
+
   // speed, on a file the size of the compiler
   const big = fs.readFileSync(path.join(root, 'lib', 'compiler', 'compiler.lisp'), 'utf8');
   seen = nextDiagnostics();

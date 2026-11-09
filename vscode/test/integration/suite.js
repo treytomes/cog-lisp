@@ -76,6 +76,21 @@ async function run() {
     check('Expand Macro shows the expansion of the call at the cursor',
       expansion.includes('(twice (greet "b"))') && expansion.includes('(begin (greet "b") (greet "b"))'));
 
+    // Format Document, through the server (specs/formatter.md R-4, R-5, AC-4)
+    const fmtPath = path.join(folder, 'to-format.lisp');
+    fs.writeFileSync(fmtPath, '(define (f x) (* x x))\n');
+    const fmtDoc = await vscode.workspace.openTextDocument(fmtPath);
+    await vscode.window.showTextDocument(fmtDoc);
+    const indent = vscode.workspace.getConfiguration('editor', { languageId: 'cog-lisp' });
+    check('cog-lisp files indent with tabs by default', indent.get('insertSpaces') === false && indent.get('detectIndentation') === false);
+    let edits = [];
+    await until(async () => (edits = (await vscode.commands.executeCommand('vscode.executeFormatDocumentProvider', fmtDoc.uri,
+      { tabSize: 4, insertSpaces: false })) || []).length > 0, 10000);
+    const formatted = new vscode.WorkspaceEdit();
+    edits.forEach((e) => formatted.replace(fmtDoc.uri, e.range, e.newText));
+    await vscode.workspace.applyEdit(formatted);
+    check('Format Document lays the file out with tabs', fmtDoc.getText() === '(define (f x)\n\t(* x x)\n)\n');
+
     // the server must not hold the checkout's image: two VMs on one image collide
     const ext = require(path.join(__dirname, '..', '..', 'src', 'extension.js'))._test;
     const root = vscode.workspace.getConfiguration('cogLisp').get('root');

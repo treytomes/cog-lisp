@@ -511,10 +511,18 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   wrong-host and revoked certificates. Live checks need `COGLISP_LIVE_HTTPS=1`
   (the suite and `release/smoke-test.sh`). Linux needs curl; the Docker
   container got it with `apt-get install -y curl`.
+- **A program's arguments go through Pharo's command-line parser (Clap)**, which
+  refuses any word starting with `-` as an unknown option. The launchers
+  (`cog-lisp.bat`/`.sh`) therefore send each argument after the program with a
+  leading `:`, and the shell removes one, so `--write` reaches `(command-line)`
+  as typed. Calling the VM directly (`lisp run FILE ARGS`) skips that.
+- **`#\page` is not a character name here** (R7RS has none for form feed): use
+  `(integer->char 12)`.
 - **`apply` takes exactly two arguments** (`(apply proc list)`): cons any
   leading arguments onto the list.
-- **Libraries to `require`:** `cl`, `test`, `datetime` and `pretty`
-  (`lib/*.lisp`); `format`, `json-read`/`json-write` and `coverage-*` are built in.
+- **Libraries to `require`:** `cl`, `test`, `datetime`, `pretty` and
+  `format-source` (the source formatter, also `tools/format.lisp` and the
+  language server's formatting; specs/formatter.md) (`lib/*.lisp`); `format`, `json-read`/`json-write` and `coverage-*` are built in.
 - **The LISP compiler's errors hide its own bugs.** As in `LispCompiler>>compile:`,
   an unexpected error while translating becomes `bad syntax: <form>`, so a bug in
   `lib/compiler/*.lisp` (an unbound helper, say) shows only as "bad syntax" on

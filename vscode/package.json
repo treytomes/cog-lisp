@@ -19,6 +19,12 @@
     "workspaceContains:cog-lisp.sh"
   ],
   "contributes": {
+    "configurationDefaults": {
+      "[cog-lisp]": {
+        "editor.insertSpaces": false,
+        "editor.detectIndentation": false
+      }
+    },
     "languages": [
       {
         "id": "cog-lisp",

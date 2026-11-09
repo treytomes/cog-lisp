@@ -500,7 +500,7 @@
 ;;; The libraries' names are read from their files, not by requiring them, so
 ;;; that a library's names (cl's remove, say) never change the built-ins'.
 
-(define spelling-libraries '("cl" "test" "datetime" "pretty"))
+(define spelling-libraries '("cl" "test" "datetime" "pretty" "format-source"))
 
 ;; the names a library file defines at its top level, as strings
 (define (library-defined-names library)

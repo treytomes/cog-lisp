@@ -22,13 +22,15 @@ set "CAP=--maxOldSpaceSize=8589934592"
 if not exist "%IMG%" goto :noimage
 
 if "%~1"=="" goto :repl
-rem  the program, then any arguments for it: (command-line) answers them all
+rem  the program, then any arguments for it: (command-line) answers them all.
+rem  Each argument goes with a leading : that the shell removes, so the VM's
+rem  command-line parser never takes a program's --flag for one of its own.
 set "PROG=%~f1"
 set "ARGS="
 :collect
 shift
 if "%~1"=="" goto :run
-set ARGS=%ARGS% "%~1"
+set ARGS=%ARGS% ":%~1"
 goto :collect
 :run
 "%VM%" --headless %CAP% "%IMG%" --no-default-preferences lisp run "%PROG%"%ARGS%

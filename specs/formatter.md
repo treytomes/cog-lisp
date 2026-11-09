@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (owner, 2026-11-09), with the leanings of §4 |
+| **Status** | Done (2026-11-09); accepted with the leanings of §4. R-2's one-line rule refined from lisp-expert's code (§5); AC-3's differences are the owner's to accept |
 | **Issue** | [#8](https://github.com/treytomes/cog-lisp/issues/8) "Implement a VS.Code-compatible auto-formatter. Simple expressions can be retained in a single line. Complex expressions with sub-expressions should place each parameter on its own line, with closing parenthesis on their own line. Favor tabs over spaces." |
 | **Relates to** | The language server, `lib/lsp.lisp` (Phase 10 step 10.5) |
 
@@ -55,8 +55,13 @@
   - text that does not read (an unclosed list, say) is an error naming the
     line, and nothing is changed.
 - **R-2. The layout**, from the issue:
-  - **simple** (no element is itself a list, or quoted list, or vector): on one
-    line, as `(+ a b)`;
+  - **one line** for any form that is not, and holds nothing that is, a form
+    with a body: `let` and its kin, `cond`, `case`, `do`, `begin`, `guard`,
+    `parameterize`, `syntax-rules`, `define-test`, the `cl` forms with bodies,
+    and a `define` of a procedure. So `(+ a b)`, `(f (g x) (h y))`,
+    `(if (null? x) 0 (car x))` and `(map (lambda (x) (* x x)) xs)` stay whole.
+    (As first written, "no element is itself a list"; that put `(loop (+ i 1))`
+    on three lines, which is not how lisp-expert is written. §5.)
   - **complex:** the head, then the form's *header* arguments on the first
     line, each remaining argument on its own line one level deeper, and `)` on
     its own line at the form's own level;
@@ -125,3 +130,53 @@
    yes, as the issue says; a user's own settings override it.
 5. **No line-length rule:** a simple form stays on one line however long it
    is. Leaning: none at first; a width can come later.
+
+## 5. As built (2026-11-09)
+
+- **`lib/format-source.lisp`** (`(require 'format-source)`): a tokenizer with
+  the reader's lexical rules, a tree of the tokens (comments kept as nodes), and
+  the layout. Every run tokenizes its own output and compares the tokens with
+  the input's, answering an error rather than different code.
+- **R-2's one-line rule was refined** before the code was kept: the literal
+  rule ("no element is a list") broke every call that had a call inside it
+  (`(loop (+ i 1))` on three lines), unlike the code it was taken from. The
+  rule now: a form with a body always breaks; any other form breaks only when
+  it holds one, or a comment. A binding list stays on one line when every
+  binding does.
+- **A Smalltalk send in `[brackets]` is copied exactly as written**, inside
+  and all: its layout is Smalltalk's, not LISP's.
+- **The language server** announces `documentFormattingProvider` and answers
+  `textDocument/formatting` (`lsp-formatting`) with the request's `tabSize` and
+  `insertSpaces`; the extension's `[cog-lisp]` defaults are
+  `editor.insertSpaces: false` and `editor.detectIndentation: false`.
+- **`tools/format.lisp FILE [--write] [--spaces N]`.**
+- **Found and fixed: a program could not be given an argument starting with
+  `-`.** Pharo's command-line parser (Clap) took `--write` for an option of its
+  own and refused it, before cog-lisp ran. The launchers now send each argument
+  after the program with a leading `:`, and the shell removes one, so every
+  argument arrives as typed (a user's own `:x` too). Checked by both runner
+  suites (`tests/runner/args/show.lisp`).
+- **Found:** `#\page` is not a character name cog-lisp knows; the form feed is
+  `(integer->char 12)`.
+- **AC-1, AC-2:** `tests/lisp/format-source.lisp`, 293 checks: each rule, and
+  every `.lisp` file of `lib/`, `examples/`, `tests/` and `tools/` keeping its
+  tokens, idempotent and reading back the same forms. Run once by hand over
+  both repositories too: 172 files, none failing (with the forms compared as
+  written text, since `+nan.0` is not `equal?` to itself). Of the 41 examples
+  with expected output, 39 print the same formatted; `cl-style` and `closures`
+  print their own source text, so their output changes with the layout, as it
+  should.
+- **AC-3, for the owner** (`lisp-expert`'s `expert/knowledge-base.lisp`, 396
+  lines, 364 after): the differences are of three kinds.
+  1. Its newer parts stack their closing parentheses in the traditional
+     style; the formatter puts each on its own line, as its hand-written parts
+     do.
+  2. A `cond` clause or an `if` whose parts all stay whole goes on one line,
+     where the hand-written code sometimes broke it:
+     `((null? current) (set-oav subject attribute value))`.
+  3. A `'()` indented with spaces among tabs is indented with tabs.
+- **AC-4:** `vscode/test/lsp.test.js` (formatting with tabs, with spaces, no
+  edit when there is nothing to change, an error for text that does not read),
+  and the VS Code test formats a document through the server.
+- **AC-5:** `tools/format.lisp` to stdout, `--spaces 2`, `--write` in place,
+  an unreadable file (exit 1, the line named) and a bad flag (exit 2).

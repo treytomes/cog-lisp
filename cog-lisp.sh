@@ -47,5 +47,9 @@ case "$1" in
 esac
 command -v cygpath >/dev/null 2>&1 && PROG="$(cygpath -w "$PROG")"
 shift
-"$VM" --headless "$CAP" "$IMG" --no-default-preferences lisp run "$PROG" "$@"
+# Each argument goes with a leading : that the shell removes, so the VM's
+# command-line parser never takes a program's --flag for one of its own.
+ARGS=()
+for a in "$@"; do ARGS+=(":$a"); done
+"$VM" --headless "$CAP" "$IMG" --no-default-preferences lisp run "$PROG" ${ARGS[@]+"${ARGS[@]}"}
 exit $?

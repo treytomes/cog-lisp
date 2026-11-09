@@ -135,6 +135,10 @@ cp tests/runner/elsewhere/uses-libs.lisp "$CWD/"
 check "require finds cog-lisp's libraries from a program in another folder" \
   "$(same tests/runner/elsewhere/uses-libs.expected "$TMPD/uses-libs.out")"
 rm -f "$CWD/uses-libs.lisp"
+# a program's arguments arrive as typed, a leading dash or colon included
+"$CL" tests/runner/args/show.lisp --write -x :keep "a b" plain </dev/null >"$TMPD/args.out" 2>"$TMPD/args.err"
+check "a program's arguments arrive as typed: --write -x :keep \"a b\" plain" \
+  "$(same tests/runner/args/show.expected "$TMPD/args.out")"
 if [ "$(uname -s)" = Linux ] && [ "$(id -u)" != 0 ]; then
   chmod 555 "$CWD"
   (cd "$CWD" && "$CL" "$ROOT/examples/hello.lisp" </dev/null >"$TMPD/cwd-ro.out" 2>"$TMPD/cwd-ro.err")

@@ -85,6 +85,11 @@ set OK=0
 fc /b "tests\runner\elsewhere\uses-libs.expected" "%TMPD%\uses-libs.out" >nul 2>&1 && set OK=1
 call :check "require finds cog-lisp's libraries from a program in another folder" !OK!
 del "%CWDCHECK%\uses-libs.lisp" 2>nul
+rem  a program's arguments arrive as typed, a leading dash or colon included
+call "%HERE%\cog-lisp.bat" tests\runner\args\show.lisp --write -x :keep "a b" plain <nul >"%TMPD%\args.out" 2>"%TMPD%\args.err"
+set OK=0
+fc /b "tests\runner\args\show.expected" "%TMPD%\args.out" >nul 2>&1 && set OK=1
+call :check "a program's arguments arrive as typed: --write -x :keep and a b" !OK!
 
 rem --- AC-13 / AC-21: persistence across save-image and a new process -------------
 copy /y "pharo\cog-lisp.image" "pharo\cog-lisp-test.image" >nul

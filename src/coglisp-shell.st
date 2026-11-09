@@ -356,8 +356,12 @@ cm value: shell value: 'running' value: 'execute
 	  self startEnvironment.
 	  (args isEmpty or: [args first = ''repl'']) ifTrue: [^ self runRepl].
 	  args first = ''run'' ifTrue: [
-		"(command-line): the program, then its arguments (Phase 7.9 section 5.3)"
-		LispPrimitives commandLine: (args allButFirst collect: [:a | a asString]).
+		"(command-line): the program, then its arguments (Phase 7.9 section 5.3). The
+		 launchers send each argument after the program with a leading colon, so that
+		 the command-line parser never takes a program''s --flag for one of its own;
+		 one colon is removed (specs/formatter.md, as built)."
+		LispPrimitives commandLine: (args allButFirst withIndexCollect: [:a :i |
+			(i > 1 and: [a notEmpty and: [a first = $:]]) ifTrue: [a allButFirst asString] ifFalse: [a asString]]).
 		^ self runFile: (args at: 2 ifAbsent: [nil])].
 	  self fail: ''unknown lisp command: '' , args first]
 		on: Warning do: [:w | w resume]]

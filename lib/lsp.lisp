@@ -8,14 +8,17 @@
 ;;; write-framed-message). JSON is Pharo's STONJSON, so a message is a Smalltalk
 ;;; Dictionary, reached through interop, and a JSON array is a vector.
 ;;;
-;;; It serves hover, completion, go to definition, diagnostics and macro
-;;; expansion (the cog-lisp/expand request). It reads the workspace's .lisp files
+;;; It serves hover, completion, go to definition, diagnostics, macro
+;;; expansion (the cog-lisp/expand request) and formatting (format-source,
+;;; specs/formatter.md R-4). It reads the workspace's .lisp files
 ;;; but never runs them, except a document's top-level define-syntax,
 ;;; define-macro and require forms, so later forms expand as they will when the
 ;;; file runs (the owner's decision 4; require, specs/library-path.md AC-5).
 
 ;;; ---------------------------------------------------------------------------
 ;;; JSON
+
+(require 'format-source)
 
 (define (lsp-parse text) [(smalltalk STONJSON) fromString: text])
 (define (lsp-text object) [(smalltalk STONJSON) toString: object])
@@ -449,7 +452,8 @@
    "capabilities" (lsp-object "textDocumentSync" 1
                               "hoverProvider" #t
                               "completionProvider" (lsp-object "resolveProvider" #f)
-                              "definitionProvider" #t)
+                              "definitionProvider" #t
+                              "documentFormattingProvider" #t)
    "serverInfo" (lsp-object "name" "cog-lisp" "version" "0.2")))
 
 (define lsp-roots '())
@@ -466,6 +470,22 @@
   (lsp-open! uri text)
   (lsp-index-text! (lsp-key (lsp-uri->path uri)) uri text)
   (lsp-publish-diagnostics! uri))
+
+;; textDocument/formatting (specs/formatter.md R-4): one edit replacing the whole
+;; document, indented as the request's options say; none if nothing changes. Text
+;; that does not read is an error, answered as one, and the document is untouched.
+(define (lsp-formatting params)
+  (let ((doc (lsp-document (lsp-path params "textDocument" "uri"))))
+    (if (not doc)
+        (vector)
+        (let* ((text (vector-ref doc 1))
+               (spaces? (eq? (lsp-path params "options" "insertSpaces") #t))
+               (size (let ((n (lsp-path params "options" "tabSize"))) (if (number? n) n 4)))
+               (formatted (if spaces? (format-source text 'spaces size) (format-source text))))
+          (if (string=? formatted text)
+              (vector)
+              (vector (lsp-object "range" (lsp-range text (vector-ref doc 2) 0 (string-length text))
+                                  "newText" formatted)))))))
 
 ;; one message: a request (it has an id) gets a response; a notification none
 (define (lsp-handle! message)
@@ -491,6 +511,7 @@
           ((string=? method "textDocument/completion") (lsp-respond! id (lsp-completion params)))
           ((string=? method "textDocument/definition") (lsp-respond! id (lsp-definition params)))
           ((string=? method "cog-lisp/expand") (lsp-respond! id (lsp-expand params)))
+          ((string=? method "textDocument/formatting") (lsp-respond! id (lsp-formatting params)))
           ((string=? method "shutdown") (set! lsp-shutting-down #t) (lsp-respond! id lsp-null))
           ((string=? method "exit") (exit (if lsp-shutting-down 0 1)))
           (id (lsp-respond-error! id -32601 (string-append "cog-lisp does not handle " method)))
