@@ -125,12 +125,47 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 - `(assoc key alist)`: The first pair of the association list whose car is equal? to key, or #f.
 - `(assq key alist)`: The first pair of the association list whose car is eq? to key, or #f.
 - `(assv key alist)`: The first pair of the association list whose car is eqv? to key, or #f.
+- `(caaaar pair)`: The car of the car of the car of the car of pair.
+- `(caaadr pair)`: The car of the car of the car of the cdr of pair.
+- `(caaar pair)`: The car of the car of the car of pair.
+- `(caadar pair)`: The car of the car of the cdr of the car of pair.
+- `(caaddr pair)`: The car of the car of the cdr of the cdr of pair.
+- `(caadr pair)`: The car of the car of the cdr of pair.
+- `(caar pair)`: The car of the car of pair.
+- `(cadaar pair)`: The car of the cdr of the car of the car of pair.
+- `(cadadr pair)`: The car of the cdr of the car of the cdr of pair.
+- `(cadar pair)`: The car of the cdr of the car of pair.
+- `(caddar pair)`: The car of the cdr of the cdr of the car of pair.
+- `(cadddr pair)`: The car of the cdr of the cdr of the cdr of pair: the fourth element of a list.
+- `(caddr pair)`: The car of the cdr of the cdr of pair: the third element of a list.
+- `(cadr pair)`: The car of the cdr of pair: the second element of a list.
 - `(car pair)`: The first element of pair.
+- `(cdaaar pair)`: The cdr of the car of the car of the car of pair.
+- `(cdaadr pair)`: The cdr of the car of the car of the cdr of pair.
+- `(cdaar pair)`: The cdr of the car of the car of pair.
+- `(cdadar pair)`: The cdr of the car of the cdr of the car of pair.
+- `(cdaddr pair)`: The cdr of the car of the cdr of the cdr of pair.
+- `(cdadr pair)`: The cdr of the car of the cdr of pair.
+- `(cdar pair)`: The cdr of the car of pair.
+- `(cddaar pair)`: The cdr of the cdr of the car of the car of pair.
+- `(cddadr pair)`: The cdr of the cdr of the car of the cdr of pair.
+- `(cddar pair)`: The cdr of the cdr of the car of pair.
+- `(cdddar pair)`: The cdr of the cdr of the cdr of the car of pair.
+- `(cddddr pair)`: The cdr of the cdr of the cdr of the cdr of pair.
+- `(cdddr pair)`: The cdr of the cdr of the cdr of pair.
+- `(cddr pair)`: The cdr of the cdr of pair: a list without its first two elements.
 - `(cdr pair)`: The second element of pair: for a list, the rest of it.
 - `(cons a b)`: A new pair whose car is a and whose cdr is b.
+- `(delete x list [=])`: The elements of list that are not x, compared with = (equal? by default), in order.
+- `(delete-duplicates list [=])`: list without its repeated elements, compared with = (equal? by default): the first of each is kept, in order.
+- `(filter pred list)`: The elements of list for which (pred element) is true, in order.
+- `(fold kons knil list)`: Combines the elements of list from the left: (kons element accumulator), starting from knil. (fold + 0 list) sums a list; (fold cons '() list) reverses it.
 - `(for-each proc list)`: Calls proc on each element of list, in order, for its effect.
+- `(iota count [start [step]])`: A list of count numbers: start (0 by default), then each step (1 by default) more. (iota 5) is (0 1 2 3 4); (iota 5 1) is (1 2 3 4 5).
 - `(length list)`: The number of elements of list; an error for an improper or circular list.
 - `(list x ...)`: A new list of the arguments.
+- `(list-ref list k)`: Element k of list, counting from 0.
+- `(list-tail list k)`: The list after its first k elements, sharing its structure.
 - `(list? x)`: True if x is a proper list: finite, and ending in the empty list.
 - `(map proc list)`: A new list of the results of calling proc on each element of list.
 - `(member x list)`: The first tail of list whose car is equal? to x, or #f.
@@ -138,9 +173,12 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 - `(memv x list)`: The first tail of list whose car is eqv? to x, or #f.
 - `(null? x)`: True if x is the empty list.
 - `(pair? x)`: True if x is a pair.
+- `(reduce f ridentity list)`: As fold with the first element as the start: (reduce + 0 list) sums a list, and an empty list answers ridentity.
+- `(remove pred list)`: The elements of list for which (pred element) is false, in order: filter with the test turned around (SRFI 1).
 - `(reverse list)`: A new list of the elements of list in reverse order.
 - `(set-car! pair x)`: Replaces the car of pair with x.
 - `(set-cdr! pair x)`: Replaces the cdr of pair with x.
+- `(sort sequence less?)`: A new list (or vector, for a vector) of the elements of sequence in order by less?, stable: equal elements keep their order. (sort (list 3 1 2) <) is (1 2 3).
 
 ## Characters
 

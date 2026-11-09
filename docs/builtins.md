@@ -13,7 +13,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Derived forms](#derived-forms) (14)
 - [Equality and types](#equality-and-types) (11)
 - [Numbers](#numbers) (62)
-- [Lists](#lists) (20)
+- [Lists](#lists) (58)
 - [Characters](#characters) (16)
 - [Strings](#strings) (29)
 - [Vectors](#vectors) (14)
@@ -160,12 +160,47 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `assoc` | `(assoc key alist)` | procedure | The first pair of the association list whose car is equal? to key, or #f. |
 | `assq` | `(assq key alist)` | procedure | The first pair of the association list whose car is eq? to key, or #f. |
 | `assv` | `(assv key alist)` | procedure | The first pair of the association list whose car is eqv? to key, or #f. |
+| `caaaar` | `(caaaar pair)` | procedure | The car of the car of the car of the car of pair. |
+| `caaadr` | `(caaadr pair)` | procedure | The car of the car of the car of the cdr of pair. |
+| `caaar` | `(caaar pair)` | procedure | The car of the car of the car of pair. |
+| `caadar` | `(caadar pair)` | procedure | The car of the car of the cdr of the car of pair. |
+| `caaddr` | `(caaddr pair)` | procedure | The car of the car of the cdr of the cdr of pair. |
+| `caadr` | `(caadr pair)` | procedure | The car of the car of the cdr of pair. |
+| `caar` | `(caar pair)` | procedure | The car of the car of pair. |
+| `cadaar` | `(cadaar pair)` | procedure | The car of the cdr of the car of the car of pair. |
+| `cadadr` | `(cadadr pair)` | procedure | The car of the cdr of the car of the cdr of pair. |
+| `cadar` | `(cadar pair)` | procedure | The car of the cdr of the car of pair. |
+| `caddar` | `(caddar pair)` | procedure | The car of the cdr of the cdr of the car of pair. |
+| `cadddr` | `(cadddr pair)` | procedure | The car of the cdr of the cdr of the cdr of pair: the fourth element of a list. |
+| `caddr` | `(caddr pair)` | procedure | The car of the cdr of the cdr of pair: the third element of a list. |
+| `cadr` | `(cadr pair)` | procedure | The car of the cdr of pair: the second element of a list. |
 | `car` | `(car pair)` | procedure | The first element of pair. |
+| `cdaaar` | `(cdaaar pair)` | procedure | The cdr of the car of the car of the car of pair. |
+| `cdaadr` | `(cdaadr pair)` | procedure | The cdr of the car of the car of the cdr of pair. |
+| `cdaar` | `(cdaar pair)` | procedure | The cdr of the car of the car of pair. |
+| `cdadar` | `(cdadar pair)` | procedure | The cdr of the car of the cdr of the car of pair. |
+| `cdaddr` | `(cdaddr pair)` | procedure | The cdr of the car of the cdr of the cdr of pair. |
+| `cdadr` | `(cdadr pair)` | procedure | The cdr of the car of the cdr of pair. |
+| `cdar` | `(cdar pair)` | procedure | The cdr of the car of pair. |
+| `cddaar` | `(cddaar pair)` | procedure | The cdr of the cdr of the car of the car of pair. |
+| `cddadr` | `(cddadr pair)` | procedure | The cdr of the cdr of the car of the cdr of pair. |
+| `cddar` | `(cddar pair)` | procedure | The cdr of the cdr of the car of pair. |
+| `cdddar` | `(cdddar pair)` | procedure | The cdr of the cdr of the cdr of the car of pair. |
+| `cddddr` | `(cddddr pair)` | procedure | The cdr of the cdr of the cdr of the cdr of pair. |
+| `cdddr` | `(cdddr pair)` | procedure | The cdr of the cdr of the cdr of pair. |
+| `cddr` | `(cddr pair)` | procedure | The cdr of the cdr of pair: a list without its first two elements. |
 | `cdr` | `(cdr pair)` | procedure | The second element of pair: for a list, the rest of it. |
 | `cons` | `(cons a b)` | procedure | A new pair whose car is a and whose cdr is b. |
+| `delete` | `(delete x list [=])` | procedure | The elements of list that are not x, compared with = (equal? by default), in order. |
+| `delete-duplicates` | `(delete-duplicates list [=])` | procedure | list without its repeated elements, compared with = (equal? by default): the first of each is kept, in order. |
+| `filter` | `(filter pred list)` | procedure | The elements of list for which (pred element) is true, in order. |
+| `fold` | `(fold kons knil list)` | procedure | Combines the elements of list from the left: (kons element accumulator), starting from knil. (fold + 0 list) sums a list; (fold cons '() list) reverses it. |
 | `for-each` | `(for-each proc list)` | procedure | Calls proc on each element of list, in order, for its effect. |
+| `iota` | `(iota count [start [step]])` | procedure | A list of count numbers: start (0 by default), then each step (1 by default) more. (iota 5) is (0 1 2 3 4); (iota 5 1) is (1 2 3 4 5). |
 | `length` | `(length list)` | procedure | The number of elements of list; an error for an improper or circular list. |
 | `list` | `(list x ...)` | procedure | A new list of the arguments. |
+| `list-ref` | `(list-ref list k)` | procedure | Element k of list, counting from 0. |
+| `list-tail` | `(list-tail list k)` | procedure | The list after its first k elements, sharing its structure. |
 | `list?` | `(list? x)` | procedure | True if x is a proper list: finite, and ending in the empty list. |
 | `map` | `(map proc list)` | procedure | A new list of the results of calling proc on each element of list. |
 | `member` | `(member x list)` | procedure | The first tail of list whose car is equal? to x, or #f. |
@@ -173,9 +208,12 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `memv` | `(memv x list)` | procedure | The first tail of list whose car is eqv? to x, or #f. |
 | `null?` | `(null? x)` | procedure | True if x is the empty list. |
 | `pair?` | `(pair? x)` | procedure | True if x is a pair. |
+| `reduce` | `(reduce f ridentity list)` | procedure | As fold with the first element as the start: (reduce + 0 list) sums a list, and an empty list answers ridentity. |
+| `remove` | `(remove pred list)` | procedure | The elements of list for which (pred element) is false, in order: filter with the test turned around (SRFI 1). |
 | `reverse` | `(reverse list)` | procedure | A new list of the elements of list in reverse order. |
 | `set-car!` | `(set-car! pair x)` | procedure | Replaces the car of pair with x. |
 | `set-cdr!` | `(set-cdr! pair x)` | procedure | Replaces the cdr of pair with x. |
+| `sort` | `(sort sequence less?)` | procedure | A new list (or vector, for a vector) of the elements of sequence in order by less?, stable: equal elements keep their order. (sort (list 3 1 2) <) is (1 2 3). |
 
 ## Characters
 

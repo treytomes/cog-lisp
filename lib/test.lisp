@@ -32,14 +32,20 @@
     ((_ name body ...)
      (set! %tests (append %tests (list (cons 'name (lambda () (eval '(let () body ...))))))))))
 
-(define (%text x) (with-output-to-string (lambda () (%write x))))
+(define (%text x)
+  "(%text x)\nReturns the printed representation of a value."
+  (with-output-to-string (lambda () (%write x))))
 
-(define (%name x) (if (symbol? x) (symbol->string x) x))
+(define (%name x)
+  "(%name x)\nReturns a readable test label."
+  (if (symbol? x) (symbol->string x) x))
 
 (define (%message e)
+  "(%message e)\nFormats an error as a test failure message."
   (if (condition? e) (condition-report e) (%string-append "uncaught raise: " (%text e))))
 
 (define (%report ok label detail)
+  "(%report ok label detail)\nReports a test result and updates the summary."
   (set! %total (%+ %total 1))
   (%display (if ok "  PASS  " "  FAIL  "))
   (%display (%string-append %current ": " label))
@@ -53,6 +59,7 @@
     ((_ expr expected) (%check 'expr (lambda () expr) expected))))
 
 (define (%check expr thunk expected)
+  "(%check expr thunk expected)\nEvaluates an assertion and records whether it matches the expected value."
   (let ((actual (thunk)))
     (%report (%equal? actual expected) (%text expr)
              (%string-append "  got=" (%text actual) "  want=" (%text expected)))))
@@ -74,6 +81,7 @@
     ((_ expr text) (%check-error 'expr (lambda () expr) text))))
 
 (define (%check-error expr thunk text)
+  "(%check-error expr thunk text)\nChecks that an expression raises an error containing expected text."
   (let ((outcome (guard (e (#t (list 'raised (%message e))))
                    (list 'value (thunk)))))
     (cond ((eq? (car outcome) 'value)
@@ -86,6 +94,7 @@
 
 ;; (run-tests/report) -- runs every test; answers (passed total), no exit
 (define (run-tests/report)
+  "(run-tests/report)\nRuns registered tests and returns a summary report."
   (for-each
     (lambda (t)
       (set! %current (%name (car t)))
@@ -100,6 +109,7 @@
 
 ;; (run-tests) -- runs every test, then exits 0 if all checks passed, else 1
 (define (run-tests)
+  "(run-tests)\nRuns registered tests and exits with a status based on the results."
   (let ((r (run-tests/report)))
     (exit (if (and (%> (car (cdr r)) 0) (%= (car r) (car (cdr r)))) 0 1))))
 
@@ -109,6 +119,7 @@
 ;; order, as the Smalltalk suites' evalAll: did, so procedures keep their source
 ;; text; answers the last value
 (define (eval-all source)
+  "(eval-all source)\nEvaluates each expression in source and returns the last result."
   [[(smalltalk LispCompiler) new] evalAll: source])
 
 ;; (check-written expr "text") -- passes when write prints expr's value as text
@@ -117,6 +128,7 @@
     ((_ expr text) (%check-written 'expr (lambda () expr) text))))
 
 (define (%check-written expr thunk text)
+  "(%check-written expr thunk text)\nChecks the text written by evaluating an expression."
   (let ((actual (%text (thunk))))
     (%report (%equal? actual text) (%text expr)
              (%string-append "  got=" actual "  want=" text))))
@@ -128,6 +140,7 @@
     ((_ expr class) (%check-error-class 'expr (lambda () expr) 'class))))
 
 (define (%check-error-class expr thunk class)
+  "(%check-error-class expr thunk class)\nChecks that an expression raises an error of the given class."
   (let ((outcome (guard (e (#t (list 'raised e))) (list 'value (thunk)))))
     (cond ((eq? (car outcome) 'value)
            (%report #f (%text expr) (%string-append "  no error; got=" (%text (car (cdr outcome))))))

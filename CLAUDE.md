@@ -488,9 +488,15 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **A Windows path inside generated LISP text is full of escapes** (`\U`, `\c`):
   build the datum (`LispCons fromArray: {...}`) instead of reading text.
 
-- **cog-lisp has no `list-ref`, and `for-each` takes one list** (`for-each:
-  expected 2 arguments, got 3`). `map`'s order is not guaranteed by R7RS;
-  `lib/compiler/` uses its own strictly left-to-right `lc-map` and `lc-map2`.
+- **`for-each` and `map` take one list** (`for-each: expected 2 arguments, got
+  3`). `map`'s order is not guaranteed by R7RS; `lib/compiler/` uses its own
+  strictly left-to-right `lc-map` and `lc-map2`. R7RS's `list-ref`, `list-tail`
+  and `c[ad]r` names, and SRFI 1's `filter`, `remove`, `delete`,
+  `delete-duplicates`, `fold`, `reduce` and `iota`, with `sort`, are built in
+  (`lib/core.lisp`, specs/lisp-expert-libraries.md). The compiler may use them
+  only once a seed has them.
+- **Libraries to `require`:** `cl`, `test`, `datetime` and `pretty`
+  (`lib/*.lisp`); `format`, `json-read`/`json-write` and `coverage-*` are built in.
 - **The LISP compiler's errors hide its own bugs.** As in `LispCompiler>>compile:`,
   an unexpected error while translating becomes `bad syntax: <form>`, so a bug in
   `lib/compiler/*.lisp` (an unbound helper, say) shows only as "bad syntax" on

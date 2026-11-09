@@ -692,6 +692,7 @@ through the server at `http://localhost:1235/v1`. It ran 10 tasks, with up to
 | 2, 3 runs per task | + 3 traps, `iota` with a start | 1/30, 7/30 | 14/30, 16/30 |
 | 3, 3 runs per task | + the rule first, `first`/`second`/`last` named | 0/30, 4/30 | **17/30, 20/30** |
 | 4, 3 runs per task (2026-11-09) | `format` built in: its trap became an example; two sentences shortened | 0/30, 7/30 | 14/30, 15/30 |
+| 5, 3 runs per task (2026-11-09) | list built-ins (specs/lisp-expert-libraries.md): the helpers example became `list-tools`; the `second` trap names `cadr` and `list-ref` | 1/30, 9/30 | **17/30, 20/30** |
 
 - **Without the skill** the model writes some other Lisp:
   - names that do not exist: `print`, `second`, `split`, `defun`, `format`;
@@ -729,6 +730,13 @@ through the server at `http://localhost:1235/v1`. It ran 10 tasks, with up to
   `iota`, and the model's own bugs. None of its answers used `format`, which no
   task needs, and none of its failures came from the change. Its lower count
   is read as sampling: runs 2 and 3 differed by as much.
+- **Run 5** came after R7RS's and SRFI 1's list procedures were built in.
+  `second-element`, which no earlier run passed, passed all 3 times. The other
+  failures are the old ones: "object is not applicable: 1" (all 3
+  `sort-numbers` answers, and one each of `squares` and `keep-odd`) and
+  "unbound variable: red" (`join-with-commas`) are the result written instead of
+  a program, and `fix-a-program` twice printed nothing. The answers were not
+  saved (`--out`), so these readings come from the errors alone.
 - Sampling makes these numbers noisy (3 runs per task, temperature 0.2), so a
   difference of two or three tasks is not a finding.
 

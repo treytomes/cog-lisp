@@ -56,8 +56,9 @@ Never run `cog-lisp` without a file: its REPL waits for typing.
 - **for-each takes one list (not several)**
   - Wrong: `(for-each (lambda (a b) (display (+ a b))) (list 1 2) (list 3 4))` stops with `error: for-each: expected 2 arguments, got 3`
   - Right: `(for-each (lambda (a) (display a)) (list 1 2))`
-- **There is no list-ref, first, second, last, filter, fold, reduce, iota or sort: define them (the helpers example)**
-  - Wrong: `(display (list-ref (list 1 2 3) 1))` stops with `error: unbound variable: list-ref`
+- **There is no first, second or last: use car, cadr, caddr or list-ref**
+  - Wrong: `(display (second (list 1 2 3)))` stops with `error: unbound variable: second`
+  - Right: `(display (cadr (list 1 2 3)))`
 - **A string literal cannot be changed: change a copy**
   - Wrong: `(define s "cat") (string-set! s 0 #\b)` stops with `error: string-set!: string is immutable (a literal); copy it first`
   - Right: `(define s (string-copy "cat")) (string-set! s 0 #\b)`
@@ -139,49 +140,30 @@ It prints:
 #t
 ```
 
-### Filter, fold, iota, list-ref and sort do not exist: copy these
+### Built in: list-ref, filter, remove, delete, fold, reduce, iota, sort
 
-`helpers.lisp`:
+`list-tools.lisp`:
 
 ```scheme
-(define (filter keep? lst)
-  (cond ((null? lst) '())
-        ((keep? (car lst)) (cons (car lst) (filter keep? (cdr lst))))
-        (else (filter keep? (cdr lst)))))
-
-(define (fold f acc lst)            ; (f acc element), left to right
-  (if (null? lst) acc (fold f (f acc (car lst)) (cdr lst))))
-
-(define (iota count . start)        ; (iota 5) is (0 1 2 3 4); (iota 5 1) is (1 2 3 4 5)
-  (let ((from (if (null? start) 0 (car start))))
-    (let loop ((i (- count 1)) (acc '()))
-      (if (< i 0) acc (loop (- i 1) (cons (+ from i) acc))))))
-
-(define (list-ref lst k)
-  (if (= k 0) (car lst) (list-ref (cdr lst) (- k 1))))
-
-(define (insert x sorted less?)
-  (cond ((null? sorted) (list x))
-        ((less? x (car sorted)) (cons x sorted))
-        (else (cons (car sorted) (insert x (cdr sorted) less?)))))
-(define (sort lst less?)
-  (fold (lambda (acc x) (insert x acc less?)) '() lst))
-
-(display (filter even? (iota 10))) (newline)
-(display (iota 5 1)) (newline)
-(display (fold + 0 (list 1 2 3 4))) (newline)
-(display (list-ref (list "a" "b" "c") 1)) (newline)
+(display (list-ref (list "a" "b" "c") 1)) (newline)      ; from 0
+(display (filter even? (iota 10))) (newline)            ; (iota 10) is 0 to 9
+(display (remove even? (list 1 2 3 4))) (newline)       ; remove takes a test
+(display (delete 'b (list 'a 'b 'c 'b))) (newline)      ; delete takes an item
+(display (fold + 0 (list 1 2 3 4))) (newline)           ; (kons element acc)
 (display (sort (list 3 1 4 1 5) <)) (newline)
+(display (cadr (list 1 2 3))) (newline)                 ; second: cadr; third: caddr
 ```
 
 It prints:
 
 ```text
-(0 2 4 6 8)
-(1 2 3 4 5)
-10
 b
+(0 2 4 6 8)
+(1 3)
+(a c)
+10
 (1 1 3 4 5)
+2
 ```
 
 ### Loop with a named let (or do); there is no loop macro

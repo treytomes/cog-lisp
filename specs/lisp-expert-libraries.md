@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-11-09), with the owner's decisions (§5) |
+| **Status** | Done (2026-11-09); accepted with the owner's decisions (§5) |
 | **Asked for by** | The owner (2026-11-09): sort out the library functions and test files in `~/projects/lisp-expert`'s root and `lib/`, set them up with their tests in cog-lisp, and remove them from lisp-expert |
 | **Before** | HTTPS (specs/https-and-json.md), which comes next, before Phase 11 |
 
@@ -116,3 +116,30 @@ What `common.lisp` defines:
 3. **The pretty-printer is `pretty-string`**, with no alias: it is new.
 4. **The release comes after lisp-expert is cleaned up and verified**, not
    straight after this step.
+
+## 6. As built (2026-11-09)
+
+- **Built in** (`lib/core.lisp`, category Lists, each documented): `list-tail`,
+  `list-ref` (both signal "index out of range"), the 28 `c[ad]r` names,
+  `filter`, `remove`, `delete` and `delete-duplicates` (`equal?` unless a test
+  is given), `fold` (`(kons element acc)`), `reduce`, `iota` and `sort` (a list
+  or a vector; a stable merge sort). `tests/lisp/lists-r7rs-srfi1.lisp`.
+- **`lib/cl.lisp`** gained lisp-expert's docstrings and the names its programs
+  used: `fourth` to `tenth` (with `setf`), `boundp`, the item `remove` (which
+  shadows SRFI 1's once `cl` is required), `remove-if`, `remove-duplicates`
+  (`eqv?`) and `string-capitalize`. `tests/lisp/cl.lisp` (moved),
+  `tests/lisp/cl-common-names.lisp` (new).
+- **`lib/test.lisp`** gained its docstrings; its self-test moved as
+  `tests/lisp/test-library.lisp`.
+- **Libraries to `require`:** `datetime` (lisp-expert's, its Smalltalk names
+  through `smalltalk`) and `pretty` (`pretty-string`: hash-table keys sorted by
+  their printed form, vectors as `#( )`, Smalltalk `nil` as `#<null>`).
+  `tests/lisp/datetime.lisp` (moved), `tests/lisp/pretty.lisp` (new).
+- **`examples/lists.lisp`** names its own filter `keep-if`, since `filter` is
+  built in. **The skill's** helpers example became `list-tools` (the built-ins
+  instead of definitions a model had to write), and its trap now names
+  `cadr`/`list-ref`.
+- **lisp-expert** keeps only its own code: the expert system's two display-name
+  helpers moved to `expert/names.lisp`; its programs `require` `cl`,
+  `datetime`, `test` and `pretty`, and use the R7RS/SRFI 1 names (`list-ref`,
+  `list-tail`, `delete-duplicates`). It needs a cog-lisp newer than 0.2.2.

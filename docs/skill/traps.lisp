@@ -26,9 +26,9 @@
       "(for-each (lambda (a b) (display (+ a b))) (list 1 2) (list 3 4))" (error "for-each: expected 2 arguments, got 3")
       "(for-each (lambda (a) (display a)) (list 1 2))")
 
-(trap "There is no list-ref, first, second, last, filter, fold, reduce, iota or sort: define them (the helpers example)"
-      "(display (list-ref (list 1 2 3) 1))" (error "unbound variable: list-ref")
-      #f)
+(trap "There is no first, second or last: use car, cadr, caddr or list-ref"
+      "(display (second (list 1 2 3)))" (error "unbound variable: second")
+      "(display (cadr (list 1 2 3)))")
 
 (trap "A string literal cannot be changed: change a copy"
       "(define s \"cat\") (string-set! s 0 #\\b)" (error "string-set!: string is immutable (a literal); copy it first")

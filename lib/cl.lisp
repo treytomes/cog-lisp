@@ -19,13 +19,17 @@
 ;;;     gives a function a setter; define-setf-expander is not provided.
 ;;;   - gethash answers only the value, not whether the key was there (use
 ;;;     hash-table-contains?); aref takes one index.
-;;;   - Not provided: loop, format, keywords, multiple values, &optional, &key.
+;;;   - remove takes an item, as in Common Lisp: it shadows cog-lisp's own remove,
+;;;     which takes a test (SRFI 1), while this file is loaded.
+;;;   - format is cog-lisp's own, built in, with Common Lisp's directives.
+;;;   - Not provided: loop, keywords, Common Lisp's multiple values, &optional, &key.
 
 (define t #t)
 (define nil '())
 
 ;; (a b &rest r) -> (a b . r), for define and define-macro
 (define (%cl-params ps)
+  "(%cl-params ps)\nNormalizes a parameter list for Common Lisp style functions."
   (cond ((null? ps) '())
         ((eq? (car ps) '&rest) (car (cdr ps)))
         (else (cons (car ps) (%cl-params (cdr ps))))))
@@ -142,13 +146,27 @@ Gives access a setter, so (setf (access arg ...) v) works: the short form calls 
 
 ;;; lists and predicates
 
-(define (first x) (car x))
-(define (second x) (car (cdr x)))
-(define (third x) (car (cdr (cdr x))))
-(define (rest x) (cdr x))
-(define (nthcdr n lst) (if (= n 0) lst (nthcdr (- n 1) (cdr lst))))
-(define (nth n lst) (car (nthcdr n lst)))
-(define (last lst) (if (null? (cdr lst)) lst (last (cdr lst))))   ; the last cons
+(define (first x)
+  "(first x)\nReturns the first element of a list."
+  (car x))
+(define (second x)
+  "(second x)\nReturns the second element of a list."
+  (car (cdr x)))
+(define (third x)
+  "(third x)\nReturns the third element of a list."
+  (car (cdr (cdr x))))
+(define (rest x)
+  "(rest x)\nReturns the list after its first element."
+  (cdr x))
+(define (nthcdr n lst)
+  "(nthcdr n lst)\nReturns the tail reached after dropping n elements."
+  (if (= n 0) lst (nthcdr (- n 1) (cdr lst))))
+(define (nth n lst)
+  "(nth n lst)\nReturns the element at zero-based index n."
+  (car (nthcdr n lst)))
+(define (last lst)
+  "(last lst)\nReturns the final cons cell of a non-empty list."
+  (if (null? (cdr lst)) lst (last (cdr lst))))   ; the last cons
 
 ;; the accessors' setters, for setf (specs/phase-9-language.md step 9.4b)
 (set! (setter first) (lambda (x v) (set-car! x v)))
@@ -156,6 +174,57 @@ Gives access a setter, so (setf (access arg ...) v) works: the short form calls 
 (set! (setter third) (lambda (x v) (set-car! (cdr (cdr x)) v)))
 (set! (setter rest) (lambda (x v) (set-cdr! x v)))
 (set! (setter nth) (lambda (n lst v) (set-car! (nthcdr n lst) v)))
+
+;; fourth to tenth, with their setters (specs/lisp-expert-libraries.md R-2)
+(define (fourth x) "(fourth list)\nThe fourth element of list." (nth 3 x))
+(define (fifth x) "(fifth list)\nThe fifth element of list." (nth 4 x))
+(define (sixth x) "(sixth list)\nThe sixth element of list." (nth 5 x))
+(define (seventh x) "(seventh list)\nThe seventh element of list." (nth 6 x))
+(define (eighth x) "(eighth list)\nThe eighth element of list." (nth 7 x))
+(define (ninth x) "(ninth list)\nThe ninth element of list." (nth 8 x))
+(define (tenth x) "(tenth list)\nThe tenth element of list." (nth 9 x))
+(set! (setter fourth) (lambda (x v) (set-car! (nthcdr 3 x) v)))
+(set! (setter fifth) (lambda (x v) (set-car! (nthcdr 4 x) v)))
+(set! (setter sixth) (lambda (x v) (set-car! (nthcdr 5 x) v)))
+(set! (setter seventh) (lambda (x v) (set-car! (nthcdr 6 x) v)))
+(set! (setter eighth) (lambda (x v) (set-car! (nthcdr 7 x) v)))
+(set! (setter ninth) (lambda (x v) (set-car! (nthcdr 8 x) v)))
+(set! (setter tenth) (lambda (x v) (set-car! (nthcdr 9 x) v)))
+
+;; (boundp symbol): does the global environment bind it?
+(define (boundp symbol)
+  "(boundp symbol)
+True if the global environment binds symbol; an error if it is not a symbol."
+  (if (not (symbol? symbol)) (error (string-append "boundp: not a symbol: " (with-output-to-string (lambda () (write symbol))))))
+  [[(smalltalk LispEnvironment) default] isBound: symbol])
+
+;; Common Lisp's remove and delete take an item, not a test: they shadow SRFI 1's
+;; remove (built in) while this file is loaded
+(define (remove item lst)
+  "(remove item list)
+list without the elements eql to item (Common Lisp's; cog-lisp's own remove takes a test, as SRFI 1's does)."
+  (filter (lambda (x) (not (eqv? x item))) lst))
+(define (remove-if test lst)
+  "(remove-if test list)
+list without the elements for which test is true."
+  (filter (lambda (x) (not (test x))) lst))
+(define (remove-duplicates lst)
+  "(remove-duplicates list)
+list without its repeated elements (eql), the first of each kept."
+  (delete-duplicates lst eqv?))
+
+;; (string-capitalize string): each word capitalized, the rest lower case
+(define (string-capitalize s)
+  "(string-capitalize string)
+string with each word capitalized and the rest of it in lower case."
+  (let ((out (open-output-string)))
+    (let loop ((i 0) (in-word #f))
+      (if (< i (string-length s))
+          (let ((c (string-ref s i)))
+            (if (or (char-alphabetic? c) (char-numeric? c))
+                (begin (write-char (if in-word (char-downcase c) (char-upcase c)) out) (loop (+ i 1) #t))
+                (begin (write-char c out) (loop (+ i 1) #f))))
+          (get-output-string out)))))
 
 ;; (aref vector index): cog-lisp's vectors have one dimension
 (define (aref v . indexes)
@@ -180,24 +249,60 @@ Gives access a setter, so (setf (access arg ...) v) works: the short form calls 
   (let ((had (hash-table-contains? table key)))
     (hash-table-delete! table key)
     had))
-(define (consp x) (pair? x))
-(define (listp x) (or (pair? x) (null? x)))
-(define (atom x) (not (pair? x)))
-(define (null x) (null? x))
-(define (eql a b) (eqv? a b))
-(define (eq a b) (eq? a b))
-(define (equal a b) (equal? a b))
-(define (numberp x) (number? x))
-(define (symbolp x) (symbol? x))
-(define (zerop x) (= x 0))
-(define (plusp x) (> x 0))
-(define (minusp x) (< x 0))
-(define (evenp x) (= (modulo x 2) 0))
-(define (oddp x) (= (modulo x 2) 1))
-(define (1+ x) (+ x 1))
-(define (1- x) (- x 1))
-(define (mapcar f lst) (map f lst))
-(define (funcall f . args) (apply f args))
+(define (consp x)
+  "(consp x)\nTests whether a value is a pair."
+  (pair? x))
+(define (listp x)
+  "(listp x)\nTests whether a value is a list."
+  (or (pair? x) (null? x)))
+(define (atom x)
+  "(atom x)\nTests whether a value is not a pair."
+  (not (pair? x)))
+(define (null x)
+  "(null x)\nTests whether a value is the empty list."
+  (null? x))
+(define (eql a b)
+  "(eql a b)\nCompares values using eqv? semantics."
+  (eqv? a b))
+(define (eq a b)
+  "(eq a b)\nCompares values using eq? semantics."
+  (eq? a b))
+(define (equal a b)
+  "(equal a b)\nCompares values structurally."
+  (equal? a b))
+(define (numberp x)
+  "(numberp x)\nTests whether a value is numeric."
+  (number? x))
+(define (symbolp x)
+  "(symbolp x)\nTests whether a value is a symbol."
+  (symbol? x))
+(define (zerop x)
+  "(zerop x)\nTests whether a number is zero."
+  (= x 0))
+(define (plusp x)
+  "(plusp x)\nTests whether a number is positive."
+  (> x 0))
+(define (minusp x)
+  "(minusp x)\nTests whether a number is negative."
+  (< x 0))
+(define (evenp x)
+  "(evenp x)\nTests whether an integer is even."
+  (= (modulo x 2) 0))
+(define (oddp x)
+  "(oddp x)\nTests whether an integer is odd."
+  (= (modulo x 2) 1))
+(define (1+ x)
+  "(1+ x)\nReturns a number incremented by one."
+  (+ x 1))
+(define (1- x)
+  "(1- x)\nReturns a number decremented by one."
+  (- x 1))
+(define (mapcar f lst)
+  "(mapcar f lst)\nMaps a function over a list and returns the results."
+  (map f lst))
+(define (funcall f . args)
+  "(funcall f args ...)\nCalls a function with the supplied arguments."
+  (apply f args))
 
 (define-macro (push x place)
   `(set! ,place (cons ,x ,place)))
@@ -213,6 +318,7 @@ Gives access a setter, so (setf (access arg ...) v) works: the short form calls 
 ;;; exception class such as ZeroDivide. restart-case and invoke-restart are core.
 
 (define (%cl-type-match? type c)
+  "(%cl-type-match? type c)\nTests whether a value matches a Common Lisp type specifier."
   (cond ((memq type '(t condition)) #t)
         ((eq? type 'error) (error-object? c))
         (else (let ((cls (smalltalk-global type)))

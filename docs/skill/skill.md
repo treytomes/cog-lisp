@@ -48,7 +48,7 @@ Each runs, and prints exactly what is shown.
 
 <!-- example: hello -->
 <!-- example: lists -->
-<!-- example: helpers -->
+<!-- example: list-tools -->
 <!-- example: loops -->
 <!-- example: strings -->
 <!-- example: format -->

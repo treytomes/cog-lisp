@@ -262,3 +262,130 @@ Loads the library name.lisp from the first folder of (hash-table-ref *env* 'libr
           (load file)
           file))))
 [require category: "Files"]
+
+;;; Lists: R7RS's list-ref, list-tail and c[ad]r names, and SRFI 1's filter,
+;;; remove, delete, delete-duplicates, fold, reduce and iota, with sort
+;;; (specs/lisp-expert-libraries.md). Compiled by the seed, so plain code.
+
+(define (list-tail lst k)
+  "(list-tail list k)
+The list after its first k elements, sharing its structure."
+  (let loop ((l lst) (i k))
+    (cond ((= i 0) l)
+          ((pair? l) (loop (cdr l) (- i 1)))
+          (else (error (string-append "list-tail: index out of range: " (number->string k)))))))
+
+(define (list-ref lst k)
+  "(list-ref list k)
+Element k of list, counting from 0."
+  (let ((tail (list-tail lst k)))
+    (if (pair? tail)
+        (car tail)
+        (error (string-append "list-ref: index out of range: " (number->string k))))))
+
+(define (caar x) "(caar pair)\nThe car of the car of pair." (car (car x)))
+(define (cadr x) "(cadr pair)\nThe car of the cdr of pair: the second element of a list." (car (cdr x)))
+(define (cdar x) "(cdar pair)\nThe cdr of the car of pair." (cdr (car x)))
+(define (cddr x) "(cddr pair)\nThe cdr of the cdr of pair: a list without its first two elements." (cdr (cdr x)))
+(define (caaar x) "(caaar pair)\nThe car of the car of the car of pair." (car (car (car x))))
+(define (caadr x) "(caadr pair)\nThe car of the car of the cdr of pair." (car (car (cdr x))))
+(define (cadar x) "(cadar pair)\nThe car of the cdr of the car of pair." (car (cdr (car x))))
+(define (caddr x) "(caddr pair)\nThe car of the cdr of the cdr of pair: the third element of a list." (car (cdr (cdr x))))
+(define (cdaar x) "(cdaar pair)\nThe cdr of the car of the car of pair." (cdr (car (car x))))
+(define (cdadr x) "(cdadr pair)\nThe cdr of the car of the cdr of pair." (cdr (car (cdr x))))
+(define (cddar x) "(cddar pair)\nThe cdr of the cdr of the car of pair." (cdr (cdr (car x))))
+(define (cdddr x) "(cdddr pair)\nThe cdr of the cdr of the cdr of pair." (cdr (cdr (cdr x))))
+(define (caaaar x) "(caaaar pair)\nThe car of the car of the car of the car of pair." (car (car (car (car x)))))
+(define (caaadr x) "(caaadr pair)\nThe car of the car of the car of the cdr of pair." (car (car (car (cdr x)))))
+(define (caadar x) "(caadar pair)\nThe car of the car of the cdr of the car of pair." (car (car (cdr (car x)))))
+(define (caaddr x) "(caaddr pair)\nThe car of the car of the cdr of the cdr of pair." (car (car (cdr (cdr x)))))
+(define (cadaar x) "(cadaar pair)\nThe car of the cdr of the car of the car of pair." (car (cdr (car (car x)))))
+(define (cadadr x) "(cadadr pair)\nThe car of the cdr of the car of the cdr of pair." (car (cdr (car (cdr x)))))
+(define (caddar x) "(caddar pair)\nThe car of the cdr of the cdr of the car of pair." (car (cdr (cdr (car x)))))
+(define (cadddr x) "(cadddr pair)\nThe car of the cdr of the cdr of the cdr of pair: the fourth element of a list." (car (cdr (cdr (cdr x)))))
+(define (cdaaar x) "(cdaaar pair)\nThe cdr of the car of the car of the car of pair." (cdr (car (car (car x)))))
+(define (cdaadr x) "(cdaadr pair)\nThe cdr of the car of the car of the cdr of pair." (cdr (car (car (cdr x)))))
+(define (cdadar x) "(cdadar pair)\nThe cdr of the car of the cdr of the car of pair." (cdr (car (cdr (car x)))))
+(define (cdaddr x) "(cdaddr pair)\nThe cdr of the car of the cdr of the cdr of pair." (cdr (car (cdr (cdr x)))))
+(define (cddaar x) "(cddaar pair)\nThe cdr of the cdr of the car of the car of pair." (cdr (cdr (car (car x)))))
+(define (cddadr x) "(cddadr pair)\nThe cdr of the cdr of the car of the cdr of pair." (cdr (cdr (car (cdr x)))))
+(define (cdddar x) "(cdddar pair)\nThe cdr of the cdr of the cdr of the car of pair." (cdr (cdr (cdr (car x)))))
+(define (cddddr x) "(cddddr pair)\nThe cdr of the cdr of the cdr of the cdr of pair." (cdr (cdr (cdr (cdr x)))))
+
+(define (filter keep? lst)
+  "(filter pred list)
+The elements of list for which (pred element) is true, in order."
+  (let loop ((l lst) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((keep? (car l)) (loop (cdr l) (cons (car l) acc)))
+          (else (loop (cdr l) acc)))))
+
+(define (remove drop? lst)
+  "(remove pred list)
+The elements of list for which (pred element) is false, in order: filter with the test turned around (SRFI 1)."
+  (filter (lambda (x) (not (drop? x))) lst))
+
+(define (delete item lst . same?)
+  "(delete x list [=])
+The elements of list that are not x, compared with = (equal? by default), in order."
+  (let ((same (if (pair? same?) (car same?) equal?)))
+    (filter (lambda (y) (not (same item y))) lst)))
+
+(define (delete-duplicates lst . same?)
+  "(delete-duplicates list [=])
+list without its repeated elements, compared with = (equal? by default): the first of each is kept, in order."
+  (let ((same (if (pair? same?) (car same?) equal?)))
+    (let loop ((l lst) (kept '()))
+      (cond ((null? l) (reverse kept))
+            ((let seen ((k kept)) (and (pair? k) (or (same (car k) (car l)) (seen (cdr k)))))
+             (loop (cdr l) kept))
+            (else (loop (cdr l) (cons (car l) kept)))))))
+
+(define (fold kons knil lst)
+  "(fold kons knil list)
+Combines the elements of list from the left: (kons element accumulator), starting from knil. (fold + 0 list) sums a list; (fold cons '() list) reverses it."
+  (let loop ((l lst) (acc knil))
+    (if (null? l) acc (loop (cdr l) (kons (car l) acc)))))
+
+(define (reduce f ridentity lst)
+  "(reduce f ridentity list)
+As fold with the first element as the start: (reduce + 0 list) sums a list, and an empty list answers ridentity."
+  (if (null? lst) ridentity (fold f (car lst) (cdr lst))))
+
+(define (iota count . start-step)
+  "(iota count [start [step]])
+A list of count numbers: start (0 by default), then each step (1 by default) more. (iota 5) is (0 1 2 3 4); (iota 5 1) is (1 2 3 4 5)."
+  (let ((start (if (pair? start-step) (car start-step) 0))
+        (step (if (and (pair? start-step) (pair? (cdr start-step))) (car (cdr start-step)) 1)))
+    (let loop ((i (- count 1)) (acc '()))
+      (if (< i 0) acc (loop (- i 1) (cons (+ start (* i step)) acc))))))
+
+;; a stable merge of two sorted lists
+(define (%sort-merge a b less?)
+  (let loop ((a a) (b b) (acc '()))
+    (cond ((null? a) (append (reverse acc) b))
+          ((null? b) (append (reverse acc) a))
+          ((less? (car b) (car a)) (loop a (cdr b) (cons (car b) acc)))
+          (else (loop (cdr a) b (cons (car a) acc))))))
+
+(define (%sort-list lst less?)
+  (let ((n (length lst)))
+    (if (< n 2)
+        lst
+        (let split ((front '()) (back lst) (i (quotient n 2)))
+          (if (= i 0)
+              (%sort-merge (%sort-list (reverse front) less?) (%sort-list back less?) less?)
+              (split (cons (car back) front) (cdr back) (- i 1)))))))
+
+(define (sort sequence less?)
+  "(sort sequence less?)
+A new list (or vector, for a vector) of the elements of sequence in order by less?, stable: equal elements keep their order. (sort (list 3 1 2) <) is (1 2 3)."
+  (if (vector? sequence)
+      (list->vector (%sort-list (vector->list sequence) less?))
+      (%sort-list sequence less?)))
+
+(for-each (lambda (p) [p category: "Lists"])
+          (list list-tail list-ref filter remove delete delete-duplicates fold reduce iota sort
+                caar cadr cdar cddr caaar caadr cadar caddr cdaar cdadr cddar cdddr
+                caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
+                cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr))

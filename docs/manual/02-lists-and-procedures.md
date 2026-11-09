@@ -23,15 +23,16 @@ they were made with.
 (show "appended" (append nums '(6 7)))
 (show "reversed" (reverse nums))
 
-; keep only the elements that satisfy keep?
-(define (filter keep? lst)
+; keep only the elements that satisfy keep?: the built-in filter does this; here
+; is how such a procedure is written
+(define (keep-if keep? lst)
   (if (null? lst)
       '()
       (if (keep? (car lst))
-          (cons (car lst) (filter keep? (cdr lst)))
-          (filter keep? (cdr lst)))))
+          (cons (car lst) (keep-if keep? (cdr lst)))
+          (keep-if keep? (cdr lst)))))
 
-(show "evens" (filter (lambda (n) (= (modulo n 2) 0)) nums))
+(show "evens" (keep-if (lambda (n) (= (modulo n 2) 0)) nums))
 
 (define (sum lst)
   (if (null? lst)
