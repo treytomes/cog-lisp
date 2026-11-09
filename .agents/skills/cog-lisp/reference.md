@@ -264,6 +264,9 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 
 ## Evaluation and macros
 
+- `(coverage-report counts [port])`: Writes what counts (from coverage-stop) never reached, by file and line: the procedures never called and the sides of an if never taken, after a summary line. Writes to port, or the current output.
+- `(coverage-start [files])`: Starts a coverage session: code compiled from now on counts each procedure entry and each side of every if, so start before loading the program. files, a list of paths, limits it to those files; by default every file but cog-lisp's own lib folder. Answers #t.
+- `(coverage-stop)`: Ends the coverage session, and answers its counts: a list, in the order the code was compiled, of #(file line column kind count text). kind is procedure (an entry), true or false (a side of an if); file is #f for a form typed at the REPL, and line and column #f where no position is known.
 - `(eval form)`: Compiles and runs form at top level, and answers its value.
 - `(gensym [prefix])`: A new uninterned symbol, unlike any other, for a name a macro makes up.
 - `(image-build-info)`: How this image was built: an association list of its seed, the bootstrap and its fixpoint.

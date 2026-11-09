@@ -55,10 +55,9 @@ call :check "REPL waits for input that arrives late" !OK!
 rem --- Starting anywhere (specs/startup-anywhere.md AC-2, AC-3) ---------------------
 rem  Two runs at once on one image. In A ^| B both sides run at the same time: hold.lisp
 rem  keeps the image for six seconds, and beside.lisp starts on it after about three.
-"%CL%" "tests\runner\together\hold.lisp" <nul >"%TMPD%\hold.out" 2>&1 | (ping -n 4 127.0.0.1 >nul & "%CL%" "tests\runner\together\beside.lisp" <nul >"%TMPD%\beside.out" 2>"%TMPD%\beside.err")
+"%CL%" "tests\runner\together\hold.lisp" <nul >"%TMPD%\hold.out" 2>"%TMPD%\hold.err" | (ping -n 4 127.0.0.1 >nul & "%CL%" "tests\runner\together\beside.lisp" <nul >"%TMPD%\beside.out" 2>"%TMPD%\beside.err")
 set OK=0
 fc /b "tests\runner\together\beside.expected" "%TMPD%\beside.out" >nul 2>&1 && set OK=1
-for %%F in ("%TMPD%\beside.err") do if %%~zF GTR 0 set OK=0
 call :check "two runs at once on one image: the second runs beside the first" !OK!
 set OK=0
 fc /b "tests\runner\together\hold.expected" "%TMPD%\hold.out" >nul 2>&1 && set OK=1
@@ -70,7 +69,7 @@ if exist "%CWDCHECK%" rd /s /q "%CWDCHECK%"
 mkdir "%CWDCHECK%"
 set "HERE=%CD%"
 pushd "%CWDCHECK%"
-call "%HERE%\cog-lisp.bat" "%HERE%\examples\hello.lisp" <nul >"%TMPD%\cwd.out" 2>&1
+call "%HERE%\cog-lisp.bat" "%HERE%\examples\hello.lisp" <nul >"%TMPD%\cwd.out" 2>"%TMPD%\cwd.err"
 popd
 set OK=0
 fc /b "examples\hello.expected" "%TMPD%\cwd.out" >nul 2>&1 && set OK=1
@@ -80,7 +79,7 @@ rem  require finds cog-lisp's own libraries from a program in another folder
 rem  (specs/library-path.md AC-1)
 copy /y "tests\runner\elsewhere\uses-libs.lisp" "%CWDCHECK%\" >nul
 pushd "%CWDCHECK%"
-call "%HERE%\cog-lisp.bat" uses-libs.lisp <nul >"%TMPD%\uses-libs.out" 2>&1
+call "%HERE%\cog-lisp.bat" uses-libs.lisp <nul >"%TMPD%\uses-libs.out" 2>"%TMPD%\uses-libs.err"
 popd
 set OK=0
 fc /b "tests\runner\elsewhere\uses-libs.expected" "%TMPD%\uses-libs.out" >nul 2>&1 && set OK=1

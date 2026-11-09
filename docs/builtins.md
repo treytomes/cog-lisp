@@ -20,7 +20,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Hash tables](#hash-tables) (19)
 - [Control](#control) (5)
 - [Conditions and restarts](#conditions-and-restarts) (19)
-- [Evaluation and macros](#evaluation-and-macros) (5)
+- [Evaluation and macros](#evaluation-and-macros) (8)
 - [Output](#output) (4)
 - [Ports](#ports) (14)
 - [Files](#files) (20)
@@ -313,6 +313,9 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 
 | Name | Call | Kind | What it does |
 |---|---|---|---|
+| `coverage-report` | `(coverage-report counts [port])` | procedure | Writes what counts (from coverage-stop) never reached, by file and line: the procedures never called and the sides of an if never taken, after a summary line. Writes to port, or the current output. |
+| `coverage-start` | `(coverage-start [files])` | procedure | Starts a coverage session: code compiled from now on counts each procedure entry and each side of every if, so start before loading the program. files, a list of paths, limits it to those files; by default every file but cog-lisp's own lib folder. Answers #t. |
+| `coverage-stop` | `(coverage-stop)` | procedure | Ends the coverage session, and answers its counts: a list, in the order the code was compiled, of #(file line column kind count text). kind is procedure (an entry), true or false (a side of an if); file is #f for a form typed at the REPL, and line and column #f where no position is known. |
 | `eval` | `(eval form)` | procedure | Compiles and runs form at top level, and answers its value. |
 | `gensym` | `(gensym [prefix])` | procedure | A new uninterned symbol, unlike any other, for a name a macro makes up. |
 | `image-build-info` | `(image-build-info)` | procedure | How this image was built: an association list of its seed, the bootstrap and its fixpoint. |

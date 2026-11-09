@@ -242,7 +242,9 @@ how the compiler translates if:
                           (lc-translate c (car (cdr (cdr args))) scope tail)
                           (lc-unspecified-node)))
            (truthy (opal-send (opal-var "LispCore") "isTruthy:" (vector test-node))))
-      (opal-send truthy "ifTrue:ifFalse:" (vector (opal-thunk then-node) (opal-thunk else-node))))))
+      (opal-send truthy "ifTrue:ifFalse:"
+                 (vector (lc-probed-thunk c 'true (list (car args) form) then-node)
+                         (lc-probed-thunk c 'false (list (car args) form) else-node))))))
 ```
 
 ## A new special form, added to the running compiler

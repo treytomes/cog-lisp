@@ -1518,6 +1518,16 @@ cm value: prims class value: 'installing' value: 'installFilesInto: anEnv
 			''The value of the environment variable name, a string, or #f if it is not set.''
 		''write-shared'' ''(write-shared x [port])''
 			''Writes x with a datum label for every part it shares, so the sharing reads back.'')'.
+cm value: prims class value: 'exiting' value: 'runAtExit
+	"Before the process ends, through exit or the end of a program, call %at-exit if a
+	 library defined it: lib/coverage.lisp writes its report there (specs/coverage.md
+	 R-6). It runs once, and an error in it does not stop the exit."
+	| name hook |
+	name := LispSymbol named: ''%at-exit''.
+	(LispEnvironment default isBound: name) ifFalse: [^ self].
+	hook := LispEnvironment default lookup: name.
+	LispEnvironment default define: name value: false.
+	(hook isKindOf: LispProcedure) ifTrue: [[hook value] on: Error do: [:e | nil]]'.
 cm value: prims class value: 'output' value: 'withOutput: aStream do: aBlock
 	| previous |
 	previous := Output.
@@ -2018,7 +2028,7 @@ cm value: prims class value: 'installing' value: 'installSystemInto: anEnv
 		c == true ifTrue: [c := 0].
 		c == false ifTrue: [c := 1].
 		((c isKindOf: Integer) and: [c between: 0 and: 255])
-			ifTrue: [Smalltalk exit: c]
+			ifTrue: [self runAtExit. Smalltalk exit: c]
 			ifFalse: [(LispError new) signal: ''exit: expected #t, #f or an integer from 0 to 255: '' , (LispPrinter writeString: c limitedTo: 60)]] required: 0).
 	anEnv define: (LispSymbol named: ''save-image'') value: (LispProcedure fixed: [self saveImage] arity: 0).
 	anEnv define: (LispSymbol named: ''procedure-source'') value: (LispProcedure fixed: [:p | p source ifNil: [false]] arity: 1).

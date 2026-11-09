@@ -850,6 +850,9 @@ Stops compilation with message and the forms, for a macro to report a misuse."
         ((null? datum) (lc-empty-list-node))
         (else (opal-literal datum))))
 
+;; With coverage on, each side of an if is counted (specs/coverage.md), and placed
+;; at the test, which keeps its place in the source even when a macro (cond,
+;; case, and, or) made the if.
 (define (lc-translate-if c form scope tail)
   (let ((args (lc-items (cdr form))))
     (when (< (length args) 2) (lc-error "if needs a test and a then-branch"))
@@ -859,7 +862,48 @@ Stops compilation with message and the forms, for a macro to report a misuse."
                           (lc-translate c (car (cdr (cdr args))) scope tail)
                           (lc-unspecified-node)))
            (truthy (opal-send (opal-var "LispCore") "isTruthy:" (vector test-node))))
-      (opal-send truthy "ifTrue:ifFalse:" (vector (opal-thunk then-node) (opal-thunk else-node))))))
+      (opal-send truthy "ifTrue:ifFalse:"
+                 (vector (lc-probed-thunk c 'true (list (car args) form) then-node)
+                         (lc-probed-thunk c 'false (list (car args) form) else-node))))))
+
+;;; ---------------------------------------------------------------------------
+;;; Coverage (specs/coverage.md): with the coverage option on, each procedure
+;;; entry and each side of an if counts into a record that lib/coverage.lisp's
+;;; %coverage-register makes as the form is compiled. Off, nothing changes.
+
+;; the record for a probe of kind, or #f: placed at the first of forms, then of
+;; the forms being compiled, that the reader has a range for (so a macro's
+;; expansion counts at the macro's use)
+(define (lc-probe-record c kind forms)
+  (and (lc-uses? c "coverage")
+       (let* ((sm (c-source-map c))
+              (source (and (vector? sm) [sm at: 1]))
+              (file (let ((p [(smalltalk LispLoadPath) value])) (if (smalltalk-nil? p) #f [p asString]))))
+         (let loop ((candidates (append forms (c-forms c))))
+           (if (null? candidates)
+               (%coverage-register kind file #f #f #f (lc-show (car forms)))
+               (let ((range (and source (pair? (car candidates)) (reader-range-of sm (car candidates)))))
+                 (if range
+                     (%coverage-register kind file source (car range) (cdr range) #f)
+                     (loop (cdr candidates)))))))))
+
+;; the statement that counts a probe: rec[1] := rec[1] + 1
+(define (lc-probe-node rec)
+  (opal-send (opal-literal rec) "at:put:"
+             (vector (opal-literal 1)
+                     (opal-send (opal-send (opal-literal rec) "at:" (vector (opal-literal 1))) "+" (vector (opal-literal 1))))))
+
+;; the probes to run first, as a list of statements: none, or one
+(define (lc-probe-statements c kind forms)
+  (let ((rec (lc-probe-record c kind forms)))
+    (if rec (list (lc-probe-node rec)) '())))
+
+;; a branch of an if, counted when it is taken
+(define (lc-probed-thunk c kind forms node)
+  (let ((probes (lc-probe-statements c kind forms)))
+    (if (null? probes)
+        (opal-thunk node)
+        (opal-block (vector) (vector) (list->vector (append probes (list node)))))))
 
 (define (lc-translate-begin c data scope tail)
   (cond ((null? data) (lc-unspecified-node))
@@ -947,7 +991,8 @@ Stops compilation with message and the forms, for a macro to report a misuse."
     (c-self-loop! c loop)
     (c-inline-temps! c 0)
     (c-expr-depth! c 0)
-    (let* ((body (lc-ensure (lambda () (lc-translate-scoped-body c (cdr parts) child-scope tail))
+    (let* ((entry-probes (lc-probe-statements c 'procedure (list form)))
+           (body (lc-ensure (lambda () (lc-translate-scoped-body c (cdr parts) child-scope tail))
                             (lambda ()
                               (c-self-loop! c saved-loop)
                               (c-inline-temps! c saved-inline-temps)
@@ -960,6 +1005,7 @@ Stops compilation with message and the forms, for a macro to report a misuse."
                 (let* ((again (loop-again loop))
                        (statements
                         (append init-nodes
+                                entry-probes
                                 (list (opal-assign again (opal-literal #t))
                                       (opal-send (opal-thunk (opal-var again)) "whileTrue:"
                                         (vector (opal-block (vector) (list->vector local-nodes)
@@ -974,7 +1020,7 @@ Stops compilation with message and the forms, for a macro to report a misuse."
                   (opal-block (list->vector arg-nodes) (list->vector temps) (list->vector statements)))
                 (opal-block (list->vector arg-nodes)
                             (list->vector (append temp-nodes local-nodes))
-                            (list->vector (append init-nodes iter-inits body-nodes)))))
+                            (list->vector (append init-nodes iter-inits entry-probes body-nodes)))))
            (proc-node0 (opal-send (opal-var "LispProcedure")
                                   (if rest-sym "variadic:required:source:" "fixed:arity:source:")
                                   (vector block (opal-literal (length fixed)) (opal-literal source-text))))

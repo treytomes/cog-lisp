@@ -417,7 +417,7 @@ system, `format`, a weather REPL), found bugs and gaps that are not its own:
   environment.
 - [**`format`**](specs/format.md) (done): `lisp-expert`'s version, finished
   and built in.
-- [**Code coverage**](specs/coverage.md) (accepted): a compiler option that
+- [**Code coverage**](specs/coverage.md) (done): a compiler option that
   reports the procedures and branches a test run never reached.
 - [**HTTP(S) and JSON**](specs/https-and-json.md) (proposed; a spike first): an
   early slice of Phase 11.6.

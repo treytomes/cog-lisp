@@ -346,6 +346,7 @@ cm value: shell value: 'running' value: 'runFile: aPath
 		do: [self withMemoryLimitDo: [
 			LispPrimitives withInput: (LispInputPort onStream: (LispLineStream on: LispStdin new))
 				do: [LispCompiler new evalFile: aPath]]].
+	LispPrimitives runAtExit.
 	LispTextOutput stdout flush.
 	Smalltalk exit: 0'.
 cm value: shell value: 'running' value: 'execute
@@ -371,6 +372,9 @@ cm value: shell value: 'running' value: 'startEnvironment
 	 %env-start!! of lib/core.lisp (a stock image with src/ filed in) has none."
 	| name |
 	name := LispSymbol named: ''%env-start!!''.
+	(LispEnvironment default isBound: name) ifTrue: [(LispEnvironment default lookup: name) value].
+	"COGLISP_COVERAGE: a coverage session for the whole run (specs/coverage.md R-6)"
+	name := LispSymbol named: ''%coverage-from-environment''.
 	(LispEnvironment default isBound: name) ifTrue: [(LispEnvironment default lookup: name) value]'.
 
 "=== load report ==========================================================="
