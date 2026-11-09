@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Implemented (2026-11-05); accepted 2026-11-04 |
+| **Status** | 9.1–9.3 implemented (2026-11-05); accepted 2026-11-04. 9.4 appended from issue #5 and accepted (2026-11-09) |
 | **Depends on** | Phase 8 (complete), Phase 8.9 (CI, pinned Pharo) |
 | **Feeds** | Phase 11 (the pure LISP image) |
 | **Review items** | R-11 (reading rationals), R-21 (infinity and NaN), C-14 (shadowing and capture) |
@@ -464,6 +464,180 @@ Two commits.
     capture nothing;
   - the examples and tests of `define-macro` itself.
 
+### 9.4 Generalized `set!` (SRFI 17), and `setf` (accepted 2026-11-09)
+
+Two parts: **9.4a**, this section, and **9.4b**, the rest, below.
+
+Appended on 2026-11-09 from issue #5, "Dynamic array assignment". The issue
+asks that `(set! (car x) 'n)` assign the list's first element. Today it fails
+with `set!: bad name: (car x)`. `set-car!` and `set-cdr!` do it already, but the
+place syntax is the familiar one.
+
+**Where we start (checked 2026-11-09):**
+- `set!` takes only a variable, as in R7RS: the special form in
+  `lib/compiler/compiler.lisp` rejects anything that is not an identifier.
+- `setf` is not defined anywhere. `lib/cl.lisp` has `setq`, `defparameter`,
+  `push` and `pop`, and `push` and `pop` expand to `set!` of their place.
+- `set-car!`, `set-cdr!`, `vector-set!`, `string-set!` and `hash-table-set!`
+  exist.
+
+**Follow SRFI 17 ("Generalized set!")**, which Guile, Chicken, Gauche and Kawa
+implement, rather than invent a rule of our own:
+- `(set! (proc arg ...) value)` means `((setter proc) arg ... value)`.
+- `proc` and the arguments are evaluated as usual, in the scope of the `set!`,
+  so a local `car` is that local procedure.
+- `(set! name value)` is unchanged.
+
+**What changes:**
+- **The `set!` special form** (`lib/compiler/compiler.lisp`): a target that is
+  a call, `(proc arg ...)`, compiles to `((setter proc) arg ... value)`.
+  - The `setter` it calls is the global one, reached directly, the way the
+    compiler reaches its other runtime procedures. A program's own local
+    `setter` cannot capture it.
+  - Any other target (a number, a string, `()`) is still
+    `set!: bad name: <target>`.
+- **`setter`** (`lib/core.lisp`): `(setter proc)` answers proc's setter
+  procedure. It signals `setter: no setter for <proc>` when proc has none.
+  - It knows, from the start:
+
+    | getter | setter |
+    |---|---|
+    | `car` | `set-car!` |
+    | `cdr` | `set-cdr!` |
+    | `vector-ref` | `vector-set!` |
+    | `string-ref` | `string-set!` |
+    | `hash-table-ref` | `hash-table-set!` |
+    | `hash-table-ref/default` | a procedure that ignores the default and sets the key |
+
+    The last one makes a counter read naturally:
+    `(set! (hash-table-ref/default h w 0) (+ 1 (hash-table-ref/default h w 0)))`.
+  - **A program adds its own** with `(set! (setter f) g)`, which is
+    generalized `set!` itself: `setter`'s own setter registers one, as SRFI 17
+    specifies.
+  - The table is keyed by the procedure object, so a renamed or copied
+    procedure needs its own entry.
+  - `hash-table-ref` with its optional `missing` argument passes that argument
+    on to `hash-table-set!`, which then fails on its arity. SRFI 17 behaves the
+    same way, and the documentation says so.
+- **`setf`** (`lib/cl.lisp`):
+  - `(setf place value ...)` takes pairs, like `setq`.
+  - Each place is a variable or a call, assigned with the generalized `set!`.
+  - It answers the last value, as Common Lisp's does, evaluating each value
+    once.
+  - `push` and `pop` then work on places too: `(push 0 (car x))`.
+- **Documentation:**
+  - `set!`'s documentation string gains the call form;
+  - `setter` and `setf` are documented, and the reference, hover data, manual
+    and skill are regenerated;
+  - the skill gains a line or a trap only if its suite shows the need.
+- **The rest is 9.4b**, below: `getter-with-setter`, `defsetf`, the Common Lisp
+  accessors' setters, and the compile-time shortcut. This part, 9.4a, is
+  generalized `set!`, `setter` and `setf`.
+
+**Checks:** a LISP test, `tests/lisp/phase-9.4-generalized-set.lisp`:
+- the issue's example, `(set! (car x) 'n)` giving `(n b c)`;
+- each built-in setter, including `vector-ref` (the issue's title) and
+  `hash-table-ref/default`;
+- `(set! (setter f) g)` and then `(set! (f ...) v)`;
+- the arguments and the value evaluated once each, left to right;
+- a local `car`, and a local `setter`, that do not change what the compiler
+  does;
+- the errors: no setter, and a bad target;
+- `setf` with pairs and its answer, and `push` and `pop` on `(car x)`;
+- a `syntax-rules` macro that expands to `(set! (car ,a) ...)`.
+
+**The example:** `examples/places.lisp`, with its `.expected`, added to the
+lists chapter of the manual.
+
+**The self-hosting rule:**
+- The compiler gains the feature but does not use it.
+- `setter` in `lib/core.lisp` is plain code: a hash table and procedures.
+  The seed compiles `core.lisp`, so it must not use the generalized `set!`
+  either.
+- `lib/cl.lisp` is loaded by programs at run time, by the new compiler, so
+  `setf` may use the generalized `set!` from the start.
+
+**Issue #5** is closed by the commit that implements 9.4a.
+
+#### 9.4b The rest of generalized assignment (accepted 2026-11-09)
+
+What 9.4a leaves out, specified at the owner's request (2026-11-09). It follows
+9.4a and needs it.
+
+**`getter-with-setter`** (SRFI 17, `lib/core.lisp`):
+- `(getter-with-setter get set)` answers a new procedure that does what `get`
+  does, and whose setter is `set`: `(set! ((getter-with-setter get set) x) v)`
+  calls `(set x v)`.
+- `get` itself is left as it is.
+- The new procedure keeps `get`'s documentation.
+
+**`defsetf`** (`lib/cl.lisp`), both of Common Lisp's forms, each defined
+through `(set! (setter access) ...)`:
+- **The short form:** `(defsetf access update)`. Here `(setf (access arg ...) v)`
+  calls `(update arg ... v)`: the new value last, as Common Lisp's short form
+  and SRFI 17 both pass it.
+- **The long form:** `(defsetf access (param ...) (store) body ...)`. Here
+  `(setf (access arg ...) v)` runs the body with each param bound to its
+  argument and `store` to `v`. The parameters take `&rest`, as `cl.lisp`'s
+  `defun` does.
+- It answers `access`'s name, as in Common Lisp.
+
+**`define-setf-expander`: considered, and not provided** (the owner accepted this, 2026-11-09).
+- Common Lisp's expander protocol (`get-setf-expansion` and its five values)
+  assumes that `setf` expands each place at compile time. cog-lisp's `setf`
+  finds its setter at run time, through `setter`, so an expander would have
+  nothing to hook into.
+- What programs use expanders for, places that read and write through
+  temporaries, `defsetf`'s long form covers here.
+- If the owner wants it anyway, it needs `setf` rebuilt as a compile-time
+  expansion: a step of its own.
+
+**The Common Lisp accessors' setters** (`lib/cl.lisp`):
+- **Existing accessors** gain setters:
+  - `first`, `second` and `third`, through `set-car!` on the right pair;
+  - `rest`, through `set-cdr!`;
+  - `nth`: `(setf (nth n lst) v)` sets the element.
+- **New accessors**, with their setters:
+  - `(aref vector index ...)`: one index, since cog-lisp's vectors have one
+    dimension; more indexes are an error that says so. Its setter is
+    `vector-set!`.
+  - `(gethash key table [default])`: the value, or `default` (else `nil`, which
+    is `()` here). The argument order is Common Lisp's, key first. Its setter
+    sets the key, ignoring any default. Common Lisp's second value, whether the
+    key was there, is answered as a second value: `values` exists.
+  - `(remhash key table)`, so that a table written with `gethash` can lose a
+    key.
+- They are documented, and `lib/cl.lisp`'s list of known gaps changes to
+  match.
+
+**The compile-time shortcut**, only if a benchmark shows it is worth having:
+- **First, measure.** A benchmark in `bench/` runs `(set! (car p) i)` against
+  `(set-car! p i)`, and `(set! (vector-ref v i) x)` against `(vector-set! v i x)`,
+  a million times each, after a warm-up (CLAUDE.md, Phase 6). The result is
+  recorded in `bench/results.md`.
+- **Build it only if** the generalized form is more than 1.5 times slower.
+- **What it would do:** when the target's head is a global name, not a local
+  one, for one of the built-in getters, compile
+  `(if (eq? car <the built-in car>) (set-car! x v) ((setter car) x v))`.
+  - The built-in procedure is a literal in the method, so a program that
+    redefines `car` still gets its own setter.
+  - **The cost to SRFI 17:** a program can no longer change a built-in getter's
+    setter. `(set! (setter car) g)` then signals
+    `setter: the setter of car is built in`. The shortcut could not see such a
+    change without the very lookup it removes.
+- **If it is not built,** the measurement is recorded with the reason, and
+  SRFI 17's behavior stays complete.
+
+**Checks** (`tests/lisp/phase-9.4-generalized-set.lisp`, a second part):
+- `getter-with-setter`;
+- both forms of `defsetf`, with `&rest`;
+- each Common Lisp accessor and its `setf`;
+- `aref` with two indexes, and `gethash`'s default and its second value;
+- if the shortcut is built: a redefined `car`, and the refused
+  `(set! (setter car) g)`.
+
+The examples in `examples/` that use `lib/cl.lisp` gain a `setf` of a place.
+
 ## 5. Acceptance criteria
 
 - AC-1 (9.1) The build starts from a pinned seed image, not the stock image, and
@@ -480,6 +654,16 @@ Two commits.
   two examples give the Scheme answers; every existing suite passes.
 
 **Checked 2026-11-05.**
+- AC-4 (9.4) `(set! (proc arg ...) value)` assigns through `(setter proc)`, as
+  SRFI 17 specifies, for the built-in getters and for setters a program adds.
+  `setf` in `lib/cl.lisp` assigns variables and places. Issue #5's example
+  gives `(n b c)`. All of it is checked by
+  `tests/lisp/phase-9.4-generalized-set.lisp`, and the example runs (9.4a).
+  9.4b adds `getter-with-setter`, `defsetf` (both forms), and setters for
+  Common Lisp's `first`, `second`, `third`, `rest`, `nth` and the new `aref`
+  and `gethash`, each checked by the same test. The benchmark of the
+  generalized form is recorded, with the shortcut built only if it is more than
+  1.5 times slower.
 - AC-1: every suite passes on Windows and Linux, and in CI; the recovery job
   rebuilds the seed from source (recursively, v0.1.3 then v0.1.2).
 - The benchmarks pass 14/14 on Windows and, by the benchmarks workflow
@@ -496,6 +680,7 @@ Two commits.
 | `examples/new-number-type.lisp` | a number type added from outside the core, used in ordinary arithmetic |
 | `examples/syntax-rules.lisp` | `syntax-rules` macros, ellipses, and hygiene in both directions |
 | `examples/shadowing.lisp` | a local named `if`, and a local `memv` that `case` does not see |
+| `examples/places.lisp` | `set!` of a list's element, a vector's slot and a hash table's entry, and a setter a program adds (9.4) |
 
 ## 7. Risks
 
@@ -525,3 +710,5 @@ Two commits.
 | 9.1 Seeded builds | done (2026-11-05): built from the v0.1.2 seed (9.1a); the Smalltalk reader and compiler retired (9.1b); the seed rebuilt from its source in CI (9.1c) |
 | 9.2 Numeric tower | done (2026-11-05): read, print, predicates, exactness, IEEE division, type errors (9.2a; R-11, R-21 closed); multiple values and the numeric procedures (9.2b); dual numbers added from outside the core, with their read syntax (9.2c) |
 | 9.3 Hygienic macros | done (2026-11-05): aliases and resolution, shadowable special forms, syntax-rules, define-syntax, let-syntax, letrec-syntax, syntax-error (9.3a); the derived forms hygienic, in lib/core-syntax.lisp (9.3b); C-14 closed |
+| 9.4a Generalized set! and setf | accepted (2026-11-09, issue #5) |
+| 9.4b getter-with-setter, defsetf, the CL accessors' setters, the shortcut | accepted (2026-11-09) |
