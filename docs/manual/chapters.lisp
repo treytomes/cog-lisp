@@ -16,7 +16,7 @@ Windows. With no file, the launcher starts the REPL."
 (chapter "lists-and-procedures" "Lists and procedures"
   "Lists are made of pairs, and procedures are values that keep the variables
 they were made with."
-  "lists" "closures")
+  "lists" "places" "closures")
 
 (chapter "numbers" "Numbers"
   "Exact integers of any size, exact rationals, and inexact reals, with the

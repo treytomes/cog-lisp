@@ -517,13 +517,14 @@ Binds each name to its init, evaluated outside the bindings; the named form also
 Defines name, globally at top level or locally at the start of a body. A body that starts with a string keeps it as its documentation."
   (lambda (c form scope tail) (lc-check-define form) (lc-translate-define c form scope)))
 (define-special-form 'set!
-  "(set! name value)
-Assigns value to the variable name, local or global."
+  "(set! name value), (set! (proc arg ...) value)
+Assigns value to the variable name, local or global. With a call as its target it assigns through the setter of proc, as SRFI 17 specifies: ((setter proc) arg ... value), so (set! (car x) v) sets the first element of x and (set! (vector-ref v i) x) a slot of v."
   (lambda (c form scope tail)
     (lc-check form 2 2)
-    (unless (lc-identifier? (car (cdr form)))
-      (lc-error (string-append "set!: bad name: " (lc-show (car (cdr form))))))
-    (lc-translate-set c form scope)))
+    (let ((target (car (cdr form))))
+      (cond ((lc-identifier? target) (lc-translate-set c form scope))
+            ((and (pair? target) (list? target)) (lc-translate-set-place c form scope))
+            (else (lc-error (string-append "set!: bad name: " (lc-show target))))))))
 (define-special-form 'quasiquote
   "(quasiquote template), `template
 The template as data, with (unquote x) and (unquote-splicing x), written ,x and ,@x, filled in."
@@ -1151,6 +1152,18 @@ Stops compilation with message and the forms, for a macro to report a misuse."
     (cond ((string? b) (lc-and-unspecified (opal-assign b value-node)))
           ((symbol? b) (lc-and-unspecified (lc-global-assign-symbol c b value-node)))
           (else (lc-error (string-append "set!: not a variable: " (symbol->string (lc-id-symbol sym))))))))
+
+;; (set! (proc arg ...) value): ((setter proc) arg ... value), SRFI 17 (Phase 9
+;; step 9.4). The setter is the global one, read from its cell, so a local named
+;; setter cannot capture it; proc, the arguments and the value are evaluated in
+;; order, in the scope of the set!.
+(define (lc-translate-set-place c form scope)
+  (let* ((target (car (cdr form)))
+         (proc-node (lc-translate c (car target) scope #f))
+         (setter-node (lc-call-node c (lc-global-read-symbol c 'setter) (list proc-node)))
+         (arg-nodes (lc-map (lambda (a) (lc-translate c a scope #f)) (cdr target)))
+         (value-node (lc-translate c (car (cdr (cdr form))) scope #f)))
+    (lc-and-unspecified (lc-call-node c setter-node (append arg-nodes (list value-node))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Entry points

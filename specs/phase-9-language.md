@@ -710,5 +710,5 @@ The examples in `examples/` that use `lib/cl.lisp` gain a `setf` of a place.
 | 9.1 Seeded builds | done (2026-11-05): built from the v0.1.2 seed (9.1a); the Smalltalk reader and compiler retired (9.1b); the seed rebuilt from its source in CI (9.1c) |
 | 9.2 Numeric tower | done (2026-11-05): read, print, predicates, exactness, IEEE division, type errors (9.2a; R-11, R-21 closed); multiple values and the numeric procedures (9.2b); dual numbers added from outside the core, with their read syntax (9.2c) |
 | 9.3 Hygienic macros | done (2026-11-05): aliases and resolution, shadowable special forms, syntax-rules, define-syntax, let-syntax, letrec-syntax, syntax-error (9.3a); the derived forms hygienic, in lib/core-syntax.lisp (9.3b); C-14 closed |
-| 9.4a Generalized set! and setf | accepted (2026-11-09, issue #5) |
+| 9.4a Generalized set! and setf | done (2026-11-09): set! of a call through (setter proc), setters for car, cdr, vector-ref, string-ref, hash-table-ref and hash-table-ref/default, (set! (setter f) g); setf in lib/cl.lisp; examples/places.lisp; issue #5 closed |
 | 9.4b getter-with-setter, defsetf, the CL accessors' setters, the shortcut | accepted (2026-11-09) |

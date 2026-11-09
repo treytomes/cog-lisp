@@ -18,7 +18,7 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 - `` (quasiquote template), `template ``: The template as data, with (unquote x) and (unquote-splicing x), written ,x and ,@x, filled in.
 - `(quote datum), 'datum`: The datum itself, not evaluated.
 - `(send receiver selector arg ...), [receiver selector arg ...]`: Sends a Smalltalk message; the selector is spelled as in Smalltalk (at:put:).
-- `(set! name value)`: Assigns value to the variable name, local or global.
+- `(set! name value), (set! (proc arg ...) value)`: Assigns value to the variable name, local or global. With a call as its target it assigns through the setter of proc, as SRFI 17 specifies: ((setter proc) arg ... value), so (set! (car x) v) sets the first element of x and (set! (vector-ref v i) x) a slot of v.
 - `(smalltalk Name)`: The Smalltalk global Name, such as a class.
 - `(syntax-error message form ...)`: Stops compilation with message and the forms, for a macro to report a misuse.
 - `(syntax-rules [ellipsis] (literal ...) (pattern template) ...)`: The transformer of a hygienic macro: the first pattern a use matches gives its template, filled in.
@@ -236,6 +236,7 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 
 - `(apply proc list)`: Calls proc with the elements of list as its arguments.
 - `(call-with-values producer consumer)`: Calls consumer with the values producer answers.
+- `(setter proc)`: The procedure (set! (proc arg ...) value) calls, as (s arg ... value): set-car! for car, set-cdr! for cdr, vector-set! for vector-ref, string-set! for string-ref, hash-table-set! for hash-table-ref and for hash-table-ref/default, and any a program adds with (set! (setter proc) s). Signals an error if proc has none.
 - `(values x ...)`: Answers its arguments as several values; one value is just itself.
 
 ## Conditions and restarts

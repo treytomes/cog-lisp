@@ -13,6 +13,8 @@
 ;;;   - Parameter lists support &rest only: no &optional, &key, or &aux.
 ;;;   - defvar always assigns (no "only if unbound" rule).
 ;;;   - setq on a name that was never defined is an error; defvar it first.
+;;;   - setf assigns variables and places through set!'s setters (SRFI 17), found
+;;;     at run time; push and pop evaluate a place's arguments twice.
 ;;;   - Not provided: loop, format, keywords, multiple values, &optional, &key.
 
 (define t #t)
@@ -48,6 +50,20 @@
         (else
          `(begin (set! ,(car pairs) ,(car (cdr pairs)))
                  (setq ,@(cdr (cdr pairs)))))))
+
+;; (setf place value ...) -- each place a variable or a call such as (car x),
+;; assigned with the generalized set! (specs/phase-9-language.md step 9.4); the
+;; place's arguments are evaluated before its value, each once, and setf
+;; answers the last value
+(define-macro (setf . pairs)
+  "(setf place value ...)
+Assigns each value to its place, in turn: a variable, or a call such as (car x) or (vector-ref v i), which goes through its setter. Answers the last value."
+  (if (null? pairs)
+      ''()
+      (let ((g (gensym)))
+        `(let ((,g #f))
+           (set! ,(car pairs) (begin (set! ,g ,(car (cdr pairs))) ,g))
+           ,(if (null? (cdr (cdr pairs))) g `(setf ,@(cdr (cdr pairs))))))))
 
 (define-macro (progn . body)
   `(begin ,@body))

@@ -151,3 +151,31 @@ Evaluates form with named restarts; invoking one leaves form and evaluates its b
     ((_ form (name params body ...) ...)
      (%restart-case (lambda () form)
                     (list (cons 'name (lambda params body ...)) ...)))))
+
+;;; Generalized set! (SRFI 17; specs/phase-9-language.md step 9.4)
+;;;
+;;; (set! (proc arg ...) value) compiles to ((setter proc) arg ... value). This is
+;;; compiled by the seed, which has no generalized set!, so it is plain code: a
+;;; table from each getter to its setter, keyed by the procedure itself.
+
+(define %setters (make-hash-table))
+
+(define (setter proc)
+  "(setter proc)
+The procedure (set! (proc arg ...) value) calls, as (s arg ... value): set-car! for car, set-cdr! for cdr, vector-set! for vector-ref, string-set! for string-ref, hash-table-set! for hash-table-ref and for hash-table-ref/default, and any a program adds with (set! (setter proc) s). Signals an error if proc has none."
+  (let ((s (hash-table-ref/default %setters proc #f)))
+    (if s
+        s
+        (error (string-append "setter: no setter for "
+                              (with-output-to-string (lambda () (display proc))))))))
+[setter category: "Control"]
+
+(hash-table-set! %setters car set-car!)
+(hash-table-set! %setters cdr set-cdr!)
+(hash-table-set! %setters vector-ref vector-set!)
+(hash-table-set! %setters string-ref string-set!)
+(hash-table-set! %setters hash-table-ref hash-table-set!)
+(hash-table-set! %setters hash-table-ref/default
+                 (lambda (table key default value) (hash-table-set! table key value)))
+;; (set! (setter proc) s) is generalized set! too: setter's own setter adds one
+(hash-table-set! %setters setter (lambda (proc s) (hash-table-set! %setters proc s)))

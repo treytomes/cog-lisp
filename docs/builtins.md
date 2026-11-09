@@ -18,7 +18,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Strings](#strings) (29)
 - [Vectors](#vectors) (14)
 - [Hash tables](#hash-tables) (19)
-- [Control](#control) (3)
+- [Control](#control) (4)
 - [Conditions and restarts](#conditions-and-restarts) (19)
 - [Evaluation and macros](#evaluation-and-macros) (5)
 - [Output](#output) (3)
@@ -45,7 +45,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `quasiquote` | `` (quasiquote template), `template `` | special form | The template as data, with (unquote x) and (unquote-splicing x), written ,x and ,@x, filled in. |
 | `quote` | `(quote datum), 'datum` | special form | The datum itself, not evaluated. |
 | `send` | `(send receiver selector arg ...), [receiver selector arg ...]` | special form | Sends a Smalltalk message; the selector is spelled as in Smalltalk (at:put:). |
-| `set!` | `(set! name value)` | special form | Assigns value to the variable name, local or global. |
+| `set!` | `(set! name value), (set! (proc arg ...) value)` | special form | Assigns value to the variable name, local or global. With a call as its target it assigns through the setter of proc, as SRFI 17 specifies: ((setter proc) arg ... value), so (set! (car x) v) sets the first element of x and (set! (vector-ref v i) x) a slot of v. |
 | `smalltalk` | `(smalltalk Name)` | special form | The Smalltalk global Name, such as a class. |
 | `syntax-error` | `(syntax-error message form ...)` | special form | Stops compilation with message and the forms, for a macro to report a misuse. |
 | `syntax-rules` | `(syntax-rules [ellipsis] (literal ...) (pattern template) ...)` | special form | The transformer of a hygienic macro: the first pattern a use matches gives its template, filled in. |
@@ -281,6 +281,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 |---|---|---|---|
 | `apply` | `(apply proc list)` | procedure | Calls proc with the elements of list as its arguments. |
 | `call-with-values` | `(call-with-values producer consumer)` | procedure | Calls consumer with the values producer answers. |
+| `setter` | `(setter proc)` | procedure | The procedure (set! (proc arg ...) value) calls, as (s arg ... value): set-car! for car, set-cdr! for cdr, vector-set! for vector-ref, string-set! for string-ref, hash-table-set! for hash-table-ref and for hash-table-ref/default, and any a program adds with (set! (setter proc) s). Signals an error if proc has none. |
 | `values` | `(values x ...)` | procedure | Answers its arguments as several values; one value is just itself. |
 
 ## Conditions and restarts

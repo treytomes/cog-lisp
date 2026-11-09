@@ -371,6 +371,11 @@ and examples:
   `letrec-syntax`, by renaming; special-form names can be shadowed, and a macro's
   free names mean what they meant where it was defined (review C-14).
   `define-macro` stays.
+- **9.4 Generalized `set!`** (9.4a done; issue #5): `(set! (car x) 'n)` assigns
+  through `(setter car)`, as SRFI 17 specifies, for the built-in getters and for
+  setters a program adds with `(set! (setter f) g)`; `setf` in `lib/cl.lisp`.
+  9.4b adds `getter-with-setter`, `defsetf` and the Common Lisp accessors'
+  setters.
 
 ### Phase 10 — Knowing the language
 [Spec](specs/phase-10-documentation-and-editor.md), done (2026-11-06). Makes cog-lisp
