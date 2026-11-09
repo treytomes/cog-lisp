@@ -286,6 +286,8 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 - `(eof-object)`: The eof object, which reading answers at the end of its input.
 - `(eof-object? x)`: True if x is the eof object.
 - `(get-output-string port)`: The string of what has been written to the output string port.
+- `(json-read string)`: The value of the JSON text in string: an object is a hash table with string keys, an array a vector, true and false are #t and #f, and null is (), the empty list. Signals an error naming the place for text that is not JSON.
+- `(json-write value [port])`: Writes value as JSON text, to port or the current output: a hash table with string keys as an object (its keys sorted), a vector as an array, a string, a real number, #t and #f, and () as null. Signals an error for anything else, such as a list or a symbol.
 - `(open-input-string string)`: An input port that reads the characters of string.
 - `(open-output-string)`: An output port that collects what is written to it.
 - `(peek-char [port])`: The next character from port, without reading it, or the eof object.

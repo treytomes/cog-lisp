@@ -419,8 +419,8 @@ system, `format`, a weather REPL), found bugs and gaps that are not its own:
   and built in.
 - [**Code coverage**](specs/coverage.md) (done): a compiler option that
   reports the procedures and branches a test run never reached.
-- [**HTTP(S) and JSON**](specs/https-and-json.md) (proposed; a spike first): an
-  early slice of Phase 11.6.
+- [**HTTP(S) and JSON**](specs/https-and-json.md): JSON done (`json-read`,
+  `json-write`); HTTP(S) proposed, an early slice of Phase 11.6, a spike first.
 
 ### Phase 11 — A world of its own
 [Spec](specs/phase-11-pure-image.md), accepted in outline; a long phase, each

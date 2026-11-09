@@ -232,6 +232,8 @@ cm value: comp class value: 'seeded build' value: 'buildFromSeed: build
 	self new evalFile: (lib / ''core.lisp'') fullName.
 	"format, built in (specs/format.md), compiled by the seed like core.lisp"
 	self new evalFile: (lib / ''format.lisp'') fullName.
+	"json-read and json-write (specs/https-and-json.md R-3)"
+	self new evalFile: (lib / ''json.lisp'') fullName.
 	"the coverage recorder (specs/coverage.md), before the compiler, which calls it"
 	self new evalFile: (lib / ''coverage.lisp'') fullName.
 	self compilerSourceNames , #(''bootstrap.lisp'') do: [:name |

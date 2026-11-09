@@ -22,7 +22,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Conditions and restarts](#conditions-and-restarts) (19)
 - [Evaluation and macros](#evaluation-and-macros) (8)
 - [Output](#output) (4)
-- [Ports](#ports) (14)
+- [Ports](#ports) (16)
 - [Files](#files) (20)
 - [The system](#the-system) (7)
 - [Smalltalk interop](#smalltalk-interop) (11)
@@ -339,6 +339,8 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `eof-object` | `(eof-object)` | procedure | The eof object, which reading answers at the end of its input. |
 | `eof-object?` | `(eof-object? x)` | procedure | True if x is the eof object. |
 | `get-output-string` | `(get-output-string port)` | procedure | The string of what has been written to the output string port. |
+| `json-read` | `(json-read string)` | procedure | The value of the JSON text in string: an object is a hash table with string keys, an array a vector, true and false are #t and #f, and null is (), the empty list. Signals an error naming the place for text that is not JSON. |
+| `json-write` | `(json-write value [port])` | procedure | Writes value as JSON text, to port or the current output: a hash table with string keys as an object (its keys sorted), a vector as an array, a string, a real number, #t and #f, and () as null. Signals an error for anything else, such as a list or a symbol. |
 | `open-input-string` | `(open-input-string string)` | procedure | An input port that reads the characters of string. |
 | `open-output-string` | `(open-output-string)` | procedure | An output port that collects what is written to it. |
 | `peek-char` | `(peek-char [port])` | procedure | The next character from port, without reading it, or the eof object. |

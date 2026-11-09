@@ -1,0 +1,6 @@
+7
+#("tea" "café")
+no note
+not paid
+{"id":7,"items":["tea","café"],"note":null,"paid":true}
+{"count":2,"nothing":null}

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed (2026-11-09); decision 2 settled by the owner, decision 1 open; a spike first |
+| **Status** | JSON (R-3) done (2026-11-09), as the owner directed: null reads as `()`, built from lisp-expert's code. HTTP(S) proposed, a spike first; decision 1 open |
 | **Found by** | Reviewing `~/projects/lisp-expert` (2026-11-09), whose weather REPL needed both |
 | **Relates to** | Phase 11.6 "Networking from LISP" (specified when reached); this is its first slice, brought forward |
 
@@ -80,6 +80,29 @@ design is fixed:
 - **R-5. Licenses:** anything shipped (OpenSSL, a helper) gets its license, a
   notices entry and the keep list (CLAUDE.md, "Bundles ship only the VM files
   `release/package.sh` lists").
+
+## 3a. JSON as built (2026-11-09)
+
+- **`lib/json.lisp`** is loaded by the build after `lib/format.lisp`, so
+  `json-read` and `json-write` are built in, documented under "Ports".
+- **Reading** is Pharo's `STONJSON`, with its result turned into LISP data, as
+  `lisp-expert`'s `weather/json.lisp` (`json->lisp`) does.
+  - Two differences from that file, both from the spec's table: an array reads
+    as a vector, not a list, and `null` reads as `()`, not Smalltalk's `nil`.
+  - With arrays as lists, an empty array would have read as `()`, the same as
+    `null`.
+- **Writing** is new, in LISP:
+  - an object's keys are written sorted, so the same table always writes the
+    same text;
+  - a string is escaped (`\"`, `\\`, `\n`, `\r`, `\t`, `\u` for other control
+    characters), and other characters are written as they are;
+  - an exact rational is written as a float;
+  - a NaN, an infinity, a list, a symbol, or a key that is not a string is an
+    error.
+  - It writes into a string first, so a value with no JSON writes nothing.
+- **Found while checking `STONJSON`:** `1e3` reads as the integer `1000`.
+- **Checks:** `tests/lisp/json.lisp`, 33/33; `examples/json.lisp` round-trips an
+  order (AC-2) and joins the "Input and output" chapter.
 
 ## 4. Acceptance criteria
 
