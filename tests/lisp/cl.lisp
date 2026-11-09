@@ -22,11 +22,11 @@
   (check (cl-test-twice 6) 12))
 
 (define-test cl-defvar-and-defparameter
-  (check (macroexpand '(defvar cl-test-var 1)) '(define cl-test-var 1))
+  (check (macroexpand '(defvar cl-test-var 1)) '(begin (define cl-test-var 1) 'cl-test-var))
   (check (macroexpand '(defvar cl-test-uninitialized))
-         '(define cl-test-uninitialized (quote ())))
+         '(begin (define cl-test-uninitialized (quote ())) 'cl-test-uninitialized))
   (check (macroexpand '(defparameter cl-test-parameter 9))
-         '(define cl-test-parameter 9)))
+         '(begin (define cl-test-parameter 9) 'cl-test-parameter)))
 
 (define-test cl-setq-progn-and-prog1
   (setq cl-test-a 0 cl-test-b 0)

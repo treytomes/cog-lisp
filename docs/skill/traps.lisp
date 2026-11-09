@@ -14,7 +14,7 @@
       "(display nil)" (error "unbound variable: nil")
       "(display '())")
 
-(trap "The empty list counts as true; only #f is false: test with null?"
+(trap "The empty list counts as true (so does nil, with cl); only #f is false: test with null?"
       "(display (if '() \"yes\" \"no\"))" (answers "yes")
       "(display (if (null? '()) \"empty\" \"not empty\"))")
 

@@ -1,6 +1,12 @@
 ; cl-style.lisp -- Common Lisp style, with lib/cl.lisp loaded.
 ; In the manner of an introductory CL text's early chapters; written for
-; cog-lisp. Remember: nil is true here, so test lists with null or consp.
+; cog-lisp.
+;
+; Remember: nil is true here. Common Lisp's nil is both the empty list and
+; false, and cog-lisp has two values for those, () and #f; cl binds nil to (),
+; so that (cons 1 nil) is a proper list, and only #f is false. So (if nil ...)
+; takes its first branch, and so does (if (member x lst) ...) when member
+; answers (). Test a list with null or consp, and write #f for false.
 
 (require 'cl)
 

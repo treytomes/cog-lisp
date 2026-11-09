@@ -6,13 +6,19 @@
 ;;; macros and procedures on top of it.
 ;;;
 ;;; Known gaps -- things that work differently from Common Lisp:
-;;;   - nil and () are TRUE here; only #f is false. Test a list for emptiness with
-;;;     (null x) or (consp x), never with plain (if x ...).
+;;;   - nil and () are TRUE here; only #f is false (issue #1, deferred). Common
+;;;     Lisp's nil is both the empty list and false; cog-lisp has two values for
+;;;     those, () and #f, and nil is bound to (): binding it to #f would make
+;;;     (cons 1 nil) an improper list. So (if nil ...) takes its first branch,
+;;;     and so does (if (member x lst) ...) when member answers (). Test a list
+;;;     with (null x) or (consp x), never with plain (if x ...); write #f, or a
+;;;     predicate, for false.
 ;;;   - t is a variable bound to #t, and nil one bound to (). (cond (t ...)) works.
 ;;;   - One namespace: a variable and a function cannot share a name, and there
 ;;;     is no #'f (just write f) and no funcall requirement (funcall is provided).
 ;;;   - Parameter lists support &rest only: no &optional, &key, or &aux.
 ;;;   - defvar always assigns (no "only if unbound" rule).
+;;;   - defconstant is not enforced: the name can still be redefined or set!.
 ;;;   - setq on a name that was never defined is an error; defvar it first.
 ;;;   - setf assigns variables and places through set!'s setters (SRFI 17), found
 ;;;     at run time; push and pop evaluate a place's arguments twice. defsetf
@@ -36,17 +42,23 @@
 
 ;;; definitions
 
+; Each answers the name it defines, as Common Lisp's do (issue #3).
 (define-macro (defun name params . body)
-  `(define (,name . ,(%cl-params params)) ,@body))
+  `(begin (define (,name . ,(%cl-params params)) ,@body) ',name))
 
 (define-macro (defmacro name params . body)
-  `(define-macro (,name . ,(%cl-params params)) ,@body))
+  `(begin (define-macro (,name . ,(%cl-params params)) ,@body) ',name))
 
 (define-macro (defvar name . value)
-  `(define ,name ,(if (null? value) ''() (car value))))
+  `(begin (define ,name ,(if (null? value) ''() (car value))) ',name))
 
 (define-macro (defparameter name value)
-  `(define ,name ,value))
+  `(begin (define ,name ,value) ',name))
+
+; (defconstant name value): defines name, and answers it (issue #4). Not
+; enforced: the name can still be redefined or set!.
+(define-macro (defconstant name value)
+  `(begin (define ,name ,value) ',name))
 
 ;;; assignment and sequencing
 

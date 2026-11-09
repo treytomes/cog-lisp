@@ -482,13 +482,13 @@ The segments of a format control string, in order: each stretch of literal text 
 
 (define (format destination . rest)
   "(format destination control arg ...), (format control arg ...)
-Writes control with its ~ directives filled in from the arguments. destination is #f (answer a string), #t (the current output) or a port; with a control string first, as SRFI 28, the answer is a string. Directives, with Common Lisp parameters and flags: ~A display, ~S write (~mincol,colinc,minpad,padcharA; @ pads on the left); ~D ~B ~O ~X and ~nR integers (~mincol,padchar,commachar,intervalD; : groups digits, @ shows the sign); ~w,dF floats; ~C a character (~@C as #\\c); ~% newline, ~& fresh line, ~~ tilde (each takes a count); ~P plural (~:P the previous argument, ~@P y or ies); ~* skip, ~:* back, ~n@* go to argument n; ~{ ~} iteration (~:{ sublists, ~@{ the arguments left, ~^ leaves); ~[ ~; ~] choice (~:; default, ~:[ false and true, ~@[ when true); ~( ~) case (~:( words, ~@( first word, ~:@( upper); ~? a control string and its arguments. v as a parameter takes it from the arguments, # is the number of arguments left."
+Writes control with its ~ directives filled in from the arguments. destination is #f or () (answer a string; () is what nil is with cl loaded), #t (the current output) or a port; with a control string first, as SRFI 28, the answer is a string. Directives, with Common Lisp parameters and flags: ~A display, ~S write (~mincol,colinc,minpad,padcharA; @ pads on the left); ~D ~B ~O ~X and ~nR integers (~mincol,padchar,commachar,intervalD; : groups digits, @ shows the sign); ~w,dF floats; ~C a character (~@C as #\\c); ~% newline, ~& fresh line, ~~ tilde (each takes a count); ~P plural (~:P the previous argument, ~@P y or ies); ~* skip, ~:* back, ~n@* go to argument n; ~{ ~} iteration (~:{ sublists, ~@{ the arguments left, ~^ leaves); ~[ ~; ~] choice (~:; default, ~:[ false and true, ~@[ when true); ~( ~) case (~:( words, ~@( first word, ~:@( upper); ~? a control string and its arguments. v as a parameter takes it from the arguments, # is the number of arguments left."
   (cond ((string? destination)
          (let ((port (open-output-string)))
            (format-run port destination rest)
            (get-output-string port)))
         ((null? rest) (error "format: no control string"))
-        ((eq? destination #f)
+        ((or (eq? destination #f) (null? destination))   ; () is Common Lisp's nil
          (let ((port (open-output-string)))
            (format-run port (car rest) (cdr rest))
            (get-output-string port)))

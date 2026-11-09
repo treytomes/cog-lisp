@@ -47,7 +47,7 @@ Never run `cog-lisp` without a file: its REPL waits for typing.
 - **There is no nil: the empty list is '() and false is #f**
   - Wrong: `(display nil)` stops with `error: unbound variable: nil`
   - Right: `(display '())`
-- **The empty list counts as true; only #f is false: test with null?**
+- **The empty list counts as true (so does nil, with cl); only #f is false: test with null?**
   - Wrong: `(display (if '() "yes" "no"))` prints `yes`
   - Right: `(display (if (null? '()) "empty" "not empty"))`
 - **map takes one list (not several)**
