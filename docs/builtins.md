@@ -10,15 +10,15 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 `(documentation 'name)` answers the same text at the REPL.
 
 - [Special forms](#special-forms) (16)
-- [Derived forms](#derived-forms) (14)
+- [Derived forms](#derived-forms) (15)
 - [Equality and types](#equality-and-types) (11)
 - [Numbers](#numbers) (62)
-- [Lists](#lists) (58)
+- [Lists](#lists) (64)
 - [Characters](#characters) (16)
-- [Strings](#strings) (29)
+- [Strings](#strings) (31)
 - [Vectors](#vectors) (14)
 - [Hash tables](#hash-tables) (19)
-- [Control](#control) (5)
+- [Control](#control) (6)
 - [Conditions and restarts](#conditions-and-restarts) (19)
 - [Evaluation and macros](#evaluation-and-macros) (8)
 - [Output](#output) (4)
@@ -65,6 +65,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `letrec` | `(letrec ((name init) ...) body ...)` | macro | As letrec*: bindings visible to every init and the body. |
 | `letrec*` | `(letrec* ((name init) ...) body ...)` | macro | Bindings visible to every init and the body, assigned in order: for procedures that call each other. |
 | `or` | `(or e ...)` | macro | The first true value, or #f; evaluation stops there. |
+| `parameterize` | `(parameterize ((param value) ...) body ...)` | macro | Evaluates the body with each param giving value (after its converter), and gives the old values back however the body is left: by returning, an error or a restart. |
 | `restart-case` | `(restart-case form (name (param ...) body ...) ...)` | macro | Evaluates form with named restarts; invoking one leaves form and evaluates its body with the arguments. |
 | `unless` | `(unless test body ...)` | macro | Evaluates the body when test is false. |
 | `when` | `(when test body ...)` | macro | Evaluates the body when test is true. |
@@ -156,7 +157,10 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 
 | Name | Call | Kind | What it does |
 |---|---|---|---|
+| `alist-delete` | `(alist-delete key alist [=])` | procedure | A new alist without the entries whose key is key, compared as (= key entry-key) with = (equal? by default); alist itself is unchanged. |
+| `any` | `(any pred list)` | procedure | The first true value (pred element) answers, trying the elements in order, or #f if there is none: (any (lambda (n) (and (even? n) (* n n))) (list 1 2 3)) is 4. |
 | `append` | `(append list ... x)` | procedure | A list of the elements of each list in turn, ending in x, which is shared, not copied. |
+| `append-map` | `(append-map f list)` | procedure | The lists (f element) answers, appended in order: (apply append (map f list)) in one step. |
 | `assoc` | `(assoc key alist)` | procedure | The first pair of the association list whose car is equal? to key, or #f. |
 | `assq` | `(assq key alist)` | procedure | The first pair of the association list whose car is eq? to key, or #f. |
 | `assv` | `(assv key alist)` | procedure | The first pair of the association list whose car is eqv? to key, or #f. |
@@ -193,7 +197,10 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `cons` | `(cons a b)` | procedure | A new pair whose car is a and whose cdr is b. |
 | `delete` | `(delete x list [=])` | procedure | The elements of list that are not x, compared with = (equal? by default), in order. |
 | `delete-duplicates` | `(delete-duplicates list [=])` | procedure | list without its repeated elements, compared with = (equal? by default): the first of each is kept, in order. |
+| `every` | `(every pred list)` | procedure | #t for an empty list; otherwise #f as soon as (pred element) is false, else the value pred answered for the last element. |
 | `filter` | `(filter pred list)` | procedure | The elements of list for which (pred element) is true, in order. |
+| `filter-map` | `(filter-map f list)` | procedure | The true values of (f element), in order: map, keeping only what is not #f. |
+| `find` | `(find pred list)` | procedure | The first element of list for which (pred element) is true, or #f if there is none. |
 | `fold` | `(fold kons knil list)` | procedure | Combines the elements of list from the left: (kons element accumulator), starting from knil. (fold + 0 list) sums a list; (fold cons '() list) reverses it. |
 | `for-each` | `(for-each proc list)` | procedure | Calls proc on each element of list, in order, for its effect. |
 | `iota` | `(iota count [start [step]])` | procedure | A list of count numbers: start (0 by default), then each step (1 by default) more. (iota 5) is (0 1 2 3 4); (iota 5 1) is (1 2 3 4 5). |
@@ -256,10 +263,12 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `string-index` | `(string-index string char)` | procedure | The index of the first char in string, or #f. |
 | `string-join` | `(string-join list [separator])` | procedure | A new string of the strings of list, with separator between them. |
 | `string-length` | `(string-length string)` | procedure | The number of characters of string. |
+| `string-prefix?` | `(string-prefix? prefix string)` | procedure | #t if string begins with prefix. |
 | `string-ref` | `(string-ref string k)` | procedure | The character of string at index k, from 0. |
 | `string-search` | `(string-search string pattern)` | procedure | The index where pattern first occurs in string, or #f. |
 | `string-set!` | `(string-set! string k char)` | procedure | Replaces the character of string at index k with char. |
 | `string-split` | `(string-split string char)` | procedure | A list of the parts of string between the occurrences of char. |
+| `string-suffix?` | `(string-suffix? suffix string)` | procedure | #t if string ends with suffix. |
 | `string-trim` | `(string-trim string)` | procedure | A new string of string without the white space at either end. |
 | `string-upcase` | `(string-upcase string)` | procedure | A new string of string in upper case. |
 | `string<=?` | `(string<=? s1 s2 ...)` | procedure | True if the strings never decrease, by code point. |
@@ -320,6 +329,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `apply` | `(apply proc list)` | procedure | Calls proc with the elements of list as its arguments. |
 | `call-with-values` | `(call-with-values producer consumer)` | procedure | Calls consumer with the values producer answers. |
 | `getter-with-setter` | `(getter-with-setter get set)` | procedure | A procedure that does what get does and whose setter is set, as SRFI 17 specifies: (set! ((getter-with-setter get set) x) v) calls (set x v). get itself is left as it is. |
+| `make-parameter` | `(make-parameter value [converter])` | procedure | A parameter: a procedure that answers its current value when called with no arguments. A converter is applied to value and to each value parameterize gives it. |
 | `setter` | `(setter proc)` | procedure | The procedure (set! (proc arg ...) value) calls, as (s arg ... value): set-car! for car, set-cdr! for cdr, vector-set! for vector-ref, string-set! for string-ref, hash-table-set! for hash-table-ref and for hash-table-ref/default, and any a program adds with (set! (setter proc) s). Signals an error if proc has none. The setters of the built-in getters cannot be changed. |
 | `values` | `(values x ...)` | procedure | Answers its arguments as several values; one value is just itself. |
 

@@ -115,6 +115,12 @@ design is fixed:
   Linux.
 - **AC-4:** HTTPS: an opt-in check fetches an `https://` URL from a bundle on
   each platform, and fails cleanly against a host whose certificate is invalid.
+- **AC-5 (owner, 2026-11-09):** `lisp-expert`'s
+  `weather/examples/fetch.lisp` is re-tested once HTTPS is done, on Windows
+  and Linux, and fetches Open-Meteo's current weather. Today its curl
+  transport fails on Windows: it builds a POSIX shell command (`/tmp`,
+  `mkdir -p`, single-quote quoting) and `LibC system:` runs `cmd.exe`. Moving
+  it onto the built-in HTTPS replaces that transport.
 
 ## 5. Decisions for the owner
 

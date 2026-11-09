@@ -140,7 +140,7 @@ It prints:
 #t
 ```
 
-### Built in: list-ref, filter, remove, delete, fold, reduce, iota, sort
+### Built in: list-ref, filter, remove, delete, fold, iota, sort, find
 
 `list-tools.lisp`:
 
@@ -152,6 +152,7 @@ It prints:
 (display (fold + 0 (list 1 2 3 4))) (newline)           ; (kons element acc)
 (display (sort (list 3 1 4 1 5) <)) (newline)
 (display (cadr (list 1 2 3))) (newline)                 ; second: cadr; third: caddr
+(display (find even? (list 1 4 5))) (newline)           ; also any, every, filter-map
 ```
 
 It prints:
@@ -164,6 +165,7 @@ b
 10
 (1 1 3 4 5)
 2
+4
 ```
 
 ### Loop with a named let (or do); there is no loop macro

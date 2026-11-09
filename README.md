@@ -421,6 +421,10 @@ system, `format`, a weather REPL), found bugs and gaps that are not its own:
   reports the procedures and branches a test run never reached.
 - [**lisp-expert's libraries**](specs/lisp-expert-libraries.md) (done): R7RS's
   and SRFI 1's list procedures built in; `datetime` and `pretty` to `require`.
+- [**What reviewing lisp-expert's code found**](specs/lisp-expert-review.md)
+  (done): SRFI 1's `any`, `every`, `find`, `filter-map`, `append-map`,
+  `alist-delete`; `string-prefix?`; `parameterize`; ISO dates; and lisp-expert
+  moved onto them, with its bugs fixed.
 - [**HTTP(S) and JSON**](specs/https-and-json.md): JSON done (`json-read`,
   `json-write`); HTTP(S) proposed, an early slice of Phase 11.6, a spike first.
 

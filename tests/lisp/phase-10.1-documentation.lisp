@@ -42,7 +42,7 @@
   (let ((core (sr-filter (lambda (g) (and [(cdr g) isKindOf: (smalltalk LispSyntax)]
                                           (equal? (documentation-category (car g)) "Derived forms")))
                          (all-globals)))
-        (forms '(cond and or when unless let* letrec* letrec case do let-values let*-values guard restart-case)))
+        (forms '(cond and or when unless let* letrec* letrec case do let-values let*-values guard restart-case parameterize)))
     (check (sr-filter (lambda (n) (not (documentation n))) forms) '())
     (check (sr-filter (lambda (n) (not (names-itself? n (documentation n)))) forms) '())
     (check (length core) (length forms))))

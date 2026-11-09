@@ -36,6 +36,7 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 - `(letrec ((name init) ...) body ...)`: As letrec*: bindings visible to every init and the body.
 - `(letrec* ((name init) ...) body ...)`: Bindings visible to every init and the body, assigned in order: for procedures that call each other.
 - `(or e ...)`: The first true value, or #f; evaluation stops there.
+- `(parameterize ((param value) ...) body ...)`: Evaluates the body with each param giving value (after its converter), and gives the old values back however the body is left: by returning, an error or a restart.
 - `(restart-case form (name (param ...) body ...) ...)`: Evaluates form with named restarts; invoking one leaves form and evaluates its body with the arguments.
 - `(unless test body ...)`: Evaluates the body when test is false.
 - `(when test body ...)`: Evaluates the body when test is true.
@@ -121,7 +122,10 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 
 ## Lists
 
+- `(alist-delete key alist [=])`: A new alist without the entries whose key is key, compared as (= key entry-key) with = (equal? by default); alist itself is unchanged.
+- `(any pred list)`: The first true value (pred element) answers, trying the elements in order, or #f if there is none: (any (lambda (n) (and (even? n) (* n n))) (list 1 2 3)) is 4.
 - `(append list ... x)`: A list of the elements of each list in turn, ending in x, which is shared, not copied.
+- `(append-map f list)`: The lists (f element) answers, appended in order: (apply append (map f list)) in one step.
 - `(assoc key alist)`: The first pair of the association list whose car is equal? to key, or #f.
 - `(assq key alist)`: The first pair of the association list whose car is eq? to key, or #f.
 - `(assv key alist)`: The first pair of the association list whose car is eqv? to key, or #f.
@@ -158,7 +162,10 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 - `(cons a b)`: A new pair whose car is a and whose cdr is b.
 - `(delete x list [=])`: The elements of list that are not x, compared with = (equal? by default), in order.
 - `(delete-duplicates list [=])`: list without its repeated elements, compared with = (equal? by default): the first of each is kept, in order.
+- `(every pred list)`: #t for an empty list; otherwise #f as soon as (pred element) is false, else the value pred answered for the last element.
 - `(filter pred list)`: The elements of list for which (pred element) is true, in order.
+- `(filter-map f list)`: The true values of (f element), in order: map, keeping only what is not #f.
+- `(find pred list)`: The first element of list for which (pred element) is true, or #f if there is none.
 - `(fold kons knil list)`: Combines the elements of list from the left: (kons element accumulator), starting from knil. (fold + 0 list) sums a list; (fold cons '() list) reverses it.
 - `(for-each proc list)`: Calls proc on each element of list, in order, for its effect.
 - `(iota count [start [step]])`: A list of count numbers: start (0 by default), then each step (1 by default) more. (iota 5) is (0 1 2 3 4); (iota 5 1) is (1 2 3 4 5).
@@ -217,10 +224,12 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 - `(string-index string char)`: The index of the first char in string, or #f.
 - `(string-join list [separator])`: A new string of the strings of list, with separator between them.
 - `(string-length string)`: The number of characters of string.
+- `(string-prefix? prefix string)`: #t if string begins with prefix.
 - `(string-ref string k)`: The character of string at index k, from 0.
 - `(string-search string pattern)`: The index where pattern first occurs in string, or #f.
 - `(string-set! string k char)`: Replaces the character of string at index k with char.
 - `(string-split string char)`: A list of the parts of string between the occurrences of char.
+- `(string-suffix? suffix string)`: #t if string ends with suffix.
 - `(string-trim string)`: A new string of string without the white space at either end.
 - `(string-upcase string)`: A new string of string in upper case.
 - `(string<=? s1 s2 ...)`: True if the strings never decrease, by code point.
@@ -275,6 +284,7 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 - `(apply proc list)`: Calls proc with the elements of list as its arguments.
 - `(call-with-values producer consumer)`: Calls consumer with the values producer answers.
 - `(getter-with-setter get set)`: A procedure that does what get does and whose setter is set, as SRFI 17 specifies: (set! ((getter-with-setter get set) x) v) calls (set x v). get itself is left as it is.
+- `(make-parameter value [converter])`: A parameter: a procedure that answers its current value when called with no arguments. A converter is applied to value and to each value parameterize gives it.
 - `(setter proc)`: The procedure (set! (proc arg ...) value) calls, as (s arg ... value): set-car! for car, set-cdr! for cdr, vector-set! for vector-ref, string-set! for string-ref, hash-table-set! for hash-table-ref and for hash-table-ref/default, and any a program adds with (set! (setter proc) s). Signals an error if proc has none. The setters of the built-in getters cannot be changed.
 - `(values x ...)`: Answers its arguments as several values; one value is just itself.
 

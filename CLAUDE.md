@@ -493,9 +493,14 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   3`). `map`'s order is not guaranteed by R7RS; `lib/compiler/` uses its own
   strictly left-to-right `lc-map` and `lc-map2`. R7RS's `list-ref`, `list-tail`
   and `c[ad]r` names, and SRFI 1's `filter`, `remove`, `delete`,
-  `delete-duplicates`, `fold`, `reduce` and `iota`, with `sort`, are built in
-  (`lib/core.lisp`, specs/lisp-expert-libraries.md). The compiler may use them
-  only once a seed has them.
+  `delete-duplicates`, `fold`, `reduce`, `iota`, `any`, `every`, `find`,
+  `filter-map`, `append-map` and `alist-delete`, with `sort`, are built in
+  (`lib/core.lisp`; specs/lisp-expert-libraries.md, specs/lisp-expert-review.md).
+  The compiler may use them only once a seed has them. **`map` evaluates right
+  to left**; `append-map`, `filter-map` and the rest go left to right.
+- **`parameterize` and `make-parameter`** (R7RS) are built in, over
+  `dynamic-wind`: one binding per image. cog-lisp has no `call/cc`; its
+  non-local exits are errors and restarts.
 - **Libraries to `require`:** `cl`, `test`, `datetime` and `pretty`
   (`lib/*.lisp`); `format`, `json-read`/`json-write` and `coverage-*` are built in.
 - **The LISP compiler's errors hide its own bugs.** As in `LispCompiler>>compile:`,

@@ -384,6 +384,124 @@ A new list (or vector, for a vector) of the elements of sequence in order by les
       (list->vector (%sort-list (vector->list sequence) less?))
       (%sort-list sequence less?)))
 
+;;; More of SRFI 1: any, every, find, filter-map, append-map and alist-delete
+;;; (specs/lisp-expert-review.md R-1). Each takes one list, as map does.
+
+(define (%not-a-list who x)
+  (error (string-append who ": not a list: " (with-output-to-string (lambda () (write x))))))
+
+(define (any pred lst)
+  "(any pred list)
+The first true value (pred element) answers, trying the elements in order, or #f if there is none: (any (lambda (n) (and (even? n) (* n n))) (list 1 2 3)) is 4."
+  (let loop ((l lst))
+    (cond ((null? l) #f)
+          ((pair? l) (or (pred (car l)) (loop (cdr l))))
+          (else (%not-a-list "any" lst)))))
+
+(define (every pred lst)
+  "(every pred list)
+#t for an empty list; otherwise #f as soon as (pred element) is false, else the value pred answered for the last element."
+  (let loop ((l lst) (last #t))
+    (cond ((null? l) last)
+          ((pair? l) (let ((v (pred (car l)))) (if v (loop (cdr l) v) #f)))
+          (else (%not-a-list "every" lst)))))
+
+(define (find pred lst)
+  "(find pred list)
+The first element of list for which (pred element) is true, or #f if there is none."
+  (let loop ((l lst))
+    (cond ((null? l) #f)
+          ((pair? l) (if (pred (car l)) (car l) (loop (cdr l))))
+          (else (%not-a-list "find" lst)))))
+
+(define (filter-map f lst)
+  "(filter-map f list)
+The true values of (f element), in order: map, keeping only what is not #f."
+  (let loop ((l lst) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((pair? l) (let ((v (f (car l)))) (loop (cdr l) (if v (cons v acc) acc))))
+          (else (%not-a-list "filter-map" lst)))))
+
+(define (append-map f lst)
+  "(append-map f list)
+The lists (f element) answers, appended in order: (apply append (map f list)) in one step."
+  (let loop ((l lst) (acc '()))
+    (cond ((null? l) (apply append (reverse acc)))
+          ((pair? l) (loop (cdr l) (cons (f (car l)) acc)))
+          (else (%not-a-list "append-map" lst)))))
+
+(define (alist-delete key alist . same?)
+  "(alist-delete key alist [=])
+A new alist without the entries whose key is key, compared as (= key entry-key) with = (equal? by default); alist itself is unchanged."
+  (let ((same (if (pair? same?) (car same?) equal?)))
+    (filter (lambda (entry) (not (same key (car entry)))) alist)))
+
+(for-each (lambda (p) [p category: "Lists"])
+          (list any every find filter-map append-map alist-delete))
+
+;;; String prefixes and suffixes (SRFI 13's argument order; R-2)
+
+(define (string-prefix? prefix s)
+  "(string-prefix? prefix string)
+#t if string begins with prefix."
+  (let ((n (string-length prefix)))
+    (and (<= n (string-length s)) (string=? prefix (substring s 0 n)))))
+
+(define (string-suffix? suffix s)
+  "(string-suffix? suffix string)
+#t if string ends with suffix."
+  (let ((n (string-length suffix)) (m (string-length s)))
+    (and (<= n m) (string=? suffix (substring s (- m n) m)))))
+
+(for-each (lambda (p) [p category: "Strings"]) (list string-prefix? string-suffix?))
+
+;;; Parameters (R7RS 4.2.6; R-3). A parameter is a procedure answering its
+;;; value; called with the private token it sets the value (one argument) or
+;;; answers its converter (none). parameterize evaluates every parameter and
+;;; value first, then swaps the values in and out with dynamic-wind, so they come
+;;; back however the body is left. One binding per image, not per process.
+
+(define %parameter-token (list 'parameter))
+
+(define (make-parameter value . converter)
+  "(make-parameter value [converter])
+A parameter: a procedure that answers its current value when called with no arguments. A converter is applied to value and to each value parameterize gives it."
+  (let* ((convert (if (pair? converter) (car converter) (lambda (x) x)))
+         (current (convert value)))
+    (lambda args
+      (cond ((null? args) current)
+            ((and (eq? (car args) %parameter-token) (pair? (cdr args)))
+             (set! current (car (cdr args)))
+             current)
+            ((eq? (car args) %parameter-token) convert)
+            (else (error "parameter: a parameter takes no arguments"))))))
+
+(define (%parameterize params vals thunk)
+  (let ((news (let loop ((ps params) (vs vals) (acc '()))
+                (if (null? ps)
+                    (reverse acc)
+                    (loop (cdr ps) (cdr vs) (cons (((car ps) %parameter-token) (car vs)) acc)))))
+        (swap! (lambda (ps vals)
+                 (let loop ((ps ps) (vs vals) (olds '()))
+                   (if (null? ps)
+                       (reverse olds)
+                       (let ((old ((car ps))))
+                         ((car ps) %parameter-token (car vs))
+                         (loop (cdr ps) (cdr vs) (cons old olds))))))))
+    (dynamic-wind
+      (lambda () (set! news (swap! params news)))
+      thunk
+      (lambda () (set! news (swap! params news))))))
+
+(define-syntax parameterize
+  "(parameterize ((param value) ...) body ...)
+Evaluates the body with each param giving value (after its converter), and gives the old values back however the body is left: by returning, an error or a restart."
+  (syntax-rules ()
+    ((_ ((param value) ...) body ...)
+     (%parameterize (list param ...) (list value ...) (lambda () body ...)))))
+
+[make-parameter category: "Control"]
+
 (for-each (lambda (p) [p category: "Lists"])
           (list list-tail list-ref filter remove delete delete-duplicates fold reduce iota sort
                 caar cadr cdar cddr caaar caadr cadar caddr cdaar cdadr cddar cdddr
