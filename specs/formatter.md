@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Done (2026-11-09); accepted with the leanings of §4. R-2's one-line rule refined from lisp-expert's code (§5); AC-3's differences are the owner's to accept |
+| **Status** | Done (2026-11-09); accepted with the leanings of §4. R-2's one-line rule refined from lisp-expert's code (§5); AC-3's differences accepted by the owner (2026-11-09); issue #8 closed |
 | **Issue** | [#8](https://github.com/treytomes/cog-lisp/issues/8) "Implement a VS.Code-compatible auto-formatter. Simple expressions can be retained in a single line. Complex expressions with sub-expressions should place each parameter on its own line, with closing parenthesis on their own line. Favor tabs over spaces." |
 | **Relates to** | The language server, `lib/lsp.lisp` (Phase 10 step 10.5) |
 

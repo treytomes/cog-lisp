@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Done (2026-11-09); accepted with the leanings of §4. AC-4 is the owner's, in VS Code |
+| **Status** | Done (2026-11-09); accepted with the leanings of §4. AC-4 checked by the owner in VS Code (2026-11-09); issue #7 closed |
 | **Issue** | [#7](https://github.com/treytomes/cog-lisp/issues/7) "Include built-ins in the VS.Code dictionary? There must be a way for these terms to be recognized automatically." |
 | **Relates to** | Phase 10 step 10.3 (hover help and completion from `vscode/builtins.json`) |
 
