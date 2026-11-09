@@ -74,6 +74,10 @@ once with the language server, when the image is built.
 The extension ships `vscode-languageclient` and its dependencies, all MIT or
 ISC: `THIRD-PARTY-NOTICES.md`.
 
+From the repository root, `build-ext.bat` (or `build-ext.sh`) packages it,
+installing the npm packages first if they are missing, and `load-ext.bat` (or
+`load-ext.sh`) installs it.
+
 **Rebuild the `.vsix` before installing it** (`npm run package`): it is not kept
 in git, so an old one stays in this folder until you do. A release builds its
 own (`cog-lisp-VERSION.vsix`). After installing, reload the window

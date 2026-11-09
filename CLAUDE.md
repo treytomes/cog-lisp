@@ -422,7 +422,8 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   server) test it. A terminal inside VS Code or Claude Code sets
   `ELECTRON_RUN_AS_NODE=1`, which makes a test VS Code run as plain Node; the
   runner unsets it. The `.vsix` in `vscode/` is git-ignored and goes stale:
-  rebuild it (`npm run package`) before installing it. A new npm dependency
+  rebuild it (`build-ext.bat`/`.sh`, which runs `npm run package`) before
+  installing it (`load-ext.bat`/`.sh`). A new npm dependency
   shipped in the `.vsix` needs a row in `vscode/THIRD-PARTY-NOTICES.md`.
   The extension runs the server on a copy of the image in the temporary folder
   (`cog-lisp-server-*`), which also survives a rebuild. Never kill the user's
