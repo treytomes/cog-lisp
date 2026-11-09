@@ -230,6 +230,8 @@ cm value: comp class value: 'seeded build' value: 'buildFromSeed: build
 	prims classPool at: #GensymCounter put: nil.
 	prims installDefault.
 	self new evalFile: (lib / ''core.lisp'') fullName.
+	"format, built in (specs/format.md), compiled by the seed like core.lisp"
+	self new evalFile: (lib / ''format.lisp'') fullName.
 	self compilerSourceNames , #(''bootstrap.lisp'') do: [:name |
 		self new evalFile: (lib / ''compiler'' / name) fullName].
 	result := call value: ''bootstrap-compiler-from-seed'' value: { (lib / ''compiler'') fullName. seed }.

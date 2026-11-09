@@ -438,6 +438,11 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   "$BUNDLE_APP_CONFIG" && bin/github-pages build --source
   /github/workspace/docs --destination /github/workspace/_site'`, where `<dir>`
   holds a copy of `docs/`. Its own entrypoint fails without a token.
+- **`format` is built in** (specs/format.md): `lib/format.lisp`, which the build
+  loads after `lib/core.lisp` and the seed compiles (so: plain code, nothing
+  from `lib/cl.lisp`). Its parser and directive records came from
+  `~/projects/lisp-expert` and keep their names, because that project's suites,
+  copied as `tests/lisp/format-*-lisp-expert.lisp`, test them.
 - **The agent skill** (`.agents/skills/cog-lisp/`, Phase 10 step 10.7) is
   generated too, from `docs/skill/` (`skill.md`, `traps.lisp`, `examples/`)
   and the image. Every trap's wrong and right code is run by

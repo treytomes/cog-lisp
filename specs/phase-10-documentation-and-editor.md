@@ -691,6 +691,7 @@ through the server at `http://localhost:1235/v1`. It ran 10 tasks, with up to
 | 1, 1 run per task | as committed | 0/10, 2/10 | 6/10, 6/10 |
 | 2, 3 runs per task | + 3 traps, `iota` with a start | 1/30, 7/30 | 14/30, 16/30 |
 | 3, 3 runs per task | + the rule first, `first`/`second`/`last` named | 0/30, 4/30 | **17/30, 20/30** |
+| 4, 3 runs per task (2026-11-09) | `format` built in: its trap became an example; two sentences shortened | 0/30, 7/30 | 14/30, 15/30 |
 
 - **Without the skill** the model writes some other Lisp:
   - names that do not exist: `print`, `second`, `split`, `defun`, `format`;
@@ -723,6 +724,11 @@ through the server at `http://localhost:1235/v1`. It ran 10 tasks, with up to
   - `tools/skill-eval.js` now caps each answer (`--max-tokens`, 8192), records
     a refused request as a failed attempt, and saves its results as it goes.
   - For agent work, load the model with a larger context: it supports 262,144.
+- **Run 4** came after `format` was built in (specs/format.md). It failed the
+  same ways as run 3: the result instead of a program, `second`, an undefined
+  `iota`, and the model's own bugs. None of its answers used `format`, which no
+  task needs, and none of its failures came from the change. Its lower count
+  is read as sampling: runs 2 and 3 differed by as much.
 - Sampling makes these numbers noisy (3 runs per task, temperature 0.2), so a
   difference of two or three tasks is not a finding.
 

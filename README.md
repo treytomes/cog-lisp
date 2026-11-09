@@ -409,13 +409,13 @@ image on 2026-11-05):
 ### Next: from reviewing a real project (2026-11-09)
 Reviewing `lisp-expert`, a separate project of cog-lisp programs (an expert
 system, `format`, a weather REPL), found bugs and gaps that are not its own:
-- [**Starting anywhere**](specs/startup-anywhere.md) (accepted): a second run
+- [**Starting anywhere**](specs/startup-anywhere.md) (done): a second run
   on the same image, a read-only install, or a read-only current folder each
   fail at start-up today.
-- [**`require` and `*env*`**](specs/library-path.md) (accepted): load cog-lisp's
+- [**`require` and `*env*`**](specs/library-path.md) (done): load cog-lisp's
   own libraries from any folder, through a library path kept in a global
   environment.
-- [**`format`**](specs/format.md) (accepted): `lisp-expert`'s version, finished
+- [**`format`**](specs/format.md) (done): `lisp-expert`'s version, finished
   and built in.
 - [**Code coverage**](specs/coverage.md) (accepted): a compiler option that
   reports the procedures and branches a test run never reached.

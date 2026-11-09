@@ -18,10 +18,6 @@
       "(display (if '() \"yes\" \"no\"))" (answers "yes")
       "(display (if (null? '()) \"empty\" \"not empty\"))")
 
-(trap "There is no format: build text with string-append and number->string"
-      "(display (format #f \"~a\" 42))" (error "unbound variable: format")
-      "(display (string-append \"n = \" (number->string 42)))")
-
 (trap "map takes one list (not several)"
       "(display (map + (list 1 2) (list 10 20)))" (error "map: expected 2 arguments, got 3")
       "(display (map (lambda (n) (* n 10)) (list 1 2)))")

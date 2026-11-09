@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-11-09): base it on `lisp-expert`'s `format.lisp` and finish it (owner) |
+| **Status** | Done (2026-11-09). Accepted: base it on `lisp-expert`'s `format.lisp` and finish it (owner) |
 | **Found by** | Reviewing `~/projects/lisp-expert` (2026-11-09); and Phase 10.7's skill, whose evaluation saw models reach for `format` |
 
 ## 1. Where it stands
@@ -87,7 +87,55 @@
 - **AC-3:** the skill's suite passes with the trap replaced, and the
   evaluation's results are recorded in the Phase 10 spec.
 
-## 4. Decisions
+## 4. As built (2026-11-09)
+
+- **`lib/format.lisp`** is loaded by the build after `lib/core.lisp`
+  (`LispCompiler>>buildFromSeed:`), so `format` is built in. It sets its own
+  category, Output; its helpers are left out of the reference. The extension's
+  stale-image warning watches it.
+- **Copied from `lisp-expert`'s `format.lisp`:** the directive records
+  (`make-directive`, `directive?` and the accessors) and the parser
+  (`format-read-number`, `format-read-parameter`, `format-parse-modifiers`,
+  `format-parse-directive`, `format-parse`).
+  - They keep their names, so `lisp-expert`'s suites test them here.
+  - They are reformatted to cog-lisp's usual style.
+  - `null` (from `lib/cl.lisp`) became `null?`.
+  - `make-directive` takes an optional position, for error messages.
+  - The parser also reads signed numbers, `v` and `#`.
+- **New:**
+  - a second pass (`format-tree`) that groups `~{ ~}`, `~[ ~; ~]` and `~( ~)`
+    with their contents, and reports unbalanced brackets;
+  - an interpreter in which every parameter and flag takes effect;
+  - argument state, so `~*` can move;
+  - `~^`, which leaves its iteration by return value, since cog-lisp has no
+    `call/cc`;
+  - `~newline`.
+- **Found while testing:**
+  - **Parameter order.** A `v` parameter must take its argument before the
+    directive takes its own, as in Common Lisp. The first version took the
+    directive's argument first, so `~v,'*D` of `6 42` printed 41 stars and `6`.
+  - **Two test expectations were mine, and wrong:**
+    - `~3,2,1A` of `"abcd"` is `"abcd "`, because `minpad` already reaches
+      `mincol`;
+    - flags follow parameters, as in `~,1@F`.
+- **`~&` and the column.** The column is known for what one call writes. When a
+  call starts, its port counts as at the start of a line (the documentation
+  says so).
+- **Checks:**
+  - `tests/lisp/format.lisp`: 67/67, covering R-1 to R-3 and the errors, with
+    the position named;
+  - `lisp-expert`'s three suites, copied as `tests/lisp/format-*-lisp-expert.lisp`
+    with only their loads changed: 36/36, 19/19, 26/26 (AC-2).
+- **Documentation:** `examples/format.lisp` joins the text chapter. In the
+  skill, the `format` trap became the example `format.lisp`; the skill is
+  10,225 bytes, under its 10 KB budget after two sentences were shortened.
+- **The evaluation, run again** (AC-3; Ministral 3 8B, 3 runs per task): 14/30
+  on the first attempt with the skill and 0/30 without it; 15/30 and 7/30 after
+  a retry. It is recorded as run 4 in the Phase 10 spec. Its failures are those
+  of run 3, none from `format`, and no task needs `format`, so the skill's
+  `format` example is not yet tested by it.
+
+## 5. Decisions
 
 1. **`lisp-expert`'s `format.lisp` is the starting point** (owner, 2026-11-09),
    under cog-lisp's MIT license: it is the owner's own code, and its tests come

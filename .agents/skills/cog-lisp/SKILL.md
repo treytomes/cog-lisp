@@ -17,8 +17,8 @@ never `(1 4 9)`: data written as code is a call, and fails.
 
 ## Run a program
 
-Work in the cog-lisp folder: the one that holds `cog-lisp.sh` and
-`cog-lisp.bat`. If you cannot find it, ask the user where cog-lisp is.
+Work in the cog-lisp folder, which holds `cog-lisp.sh` and `cog-lisp.bat`; if
+you cannot find it, ask the user.
 
 - Linux, or Git Bash on Windows: `./cog-lisp.sh program.lisp`
 - Windows (cmd or PowerShell): `.\cog-lisp.bat program.lisp`
@@ -28,8 +28,7 @@ An error stops it with exit code 1 and one line,
 `file:line:column: error: message`. The position is the top-level form that
 was running, so look inside that form too.
 
-Never run `cog-lisp` without a file: that starts the REPL, which waits for
-typing.
+Never run `cog-lisp` without a file: its REPL waits for typing.
 
 ## Work in this loop
 
@@ -51,9 +50,6 @@ typing.
 - **The empty list counts as true; only #f is false: test with null?**
   - Wrong: `(display (if '() "yes" "no"))` prints `yes`
   - Right: `(display (if (null? '()) "empty" "not empty"))`
-- **There is no format: build text with string-append and number->string**
-  - Wrong: `(display (format #f "~a" 42))` stops with `error: unbound variable: format`
-  - Right: `(display (string-append "n = " (number->string 42)))`
 - **map takes one list (not several)**
   - Wrong: `(display (map + (list 1 2) (list 10 20)))` stops with `error: map: expected 2 arguments, got 3`
   - Right: `(display (map (lambda (n) (* n 10)) (list 1 2)))`
@@ -250,6 +246,24 @@ a-b-c
 cba
 42
 bat
+```
+
+### Format: ~A display, ~S write, ~D, ~,2F, ~% newline
+
+`format.lisp`:
+
+```scheme
+(display (format #f "~A has ~D item~:P, ~,2F" "Ada" 3 7.5)) (newline)
+(display (format #f "~{~A~^, ~}" (list 1 2 3))) (newline)
+(format #t "~S~%" "x")   ; #t: to the output
+```
+
+It prints:
+
+```text
+Ada has 3 items, 7.50
+1, 2, 3
+"x"
 ```
 
 ### Count words with a hash table

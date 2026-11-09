@@ -26,7 +26,7 @@ procedures of R7RS."
 (chapter "text-and-vectors" "Strings, characters and vectors"
   "Strings are mutable sequences of Unicode characters; vectors are fixed-size,
 indexed sequences of anything."
-  "strings" "escapes" "vectors")
+  "strings" "escapes" "format" "vectors")
 
 (chapter "hash-tables" "Hash tables"
   "Tables from keys to values, compared with eq?, eqv? or equal?."
