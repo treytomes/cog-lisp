@@ -14,6 +14,13 @@
 (define-test "AC-3 vscode/builtins.json is what the image's documentation generates"
   (check-true (string=? (builtins-json) (committed "vscode/builtins.json"))))
 
+(define-test "the spell checker's word list is what the image generates (specs/vscode-spelling.md AC-1)"
+  (check-true (string=? (spelling-words) (committed spelling-words-file)))
+  (for-each (lambda (w) (check-true (and (string-search (committed spelling-words-file) (string-append "
+" w "
+")) #t)))
+            '("nthcdr" "zerop" "letrec" "cdar" "cadddr")))
+
 (define-test "AC-2 the reference lists every public built-in, once"
   (let ((names (map docs-entry-name (builtin-entries))))
     (check-true (> (length names) 280))

@@ -425,6 +425,11 @@ system, `format`, a weather REPL), found bugs and gaps that are not its own:
   (done): SRFI 1's `any`, `every`, `find`, `filter-map`, `append-map`,
   `alist-delete`; `string-prefix?`; `parameterize`; ISO dates; and lisp-expert
   moved onto them, with its bugs fixed.
+- [**Common Lisp issues**](specs/cl-issues.md) (done): #2, #3, #4, #6; #1
+  documented and deferred.
+- [**cog-lisp's names in the spell checker**](specs/vscode-spelling.md) (done,
+  issue #7): a word list for Code Spell Checker, registered by the extension.
+- [**A source formatter**](specs/formatter.md) (accepted, issue #8).
 - [**HTTP(S) and JSON**](specs/https-and-json.md) (done): `json-read` and
   `json-write`; `http-request` and `http-get` over the system's curl, with
   certificates always checked: an early slice of Phase 11.6.

@@ -1,0 +1,22 @@
+{
+    "id": "cog-lisp",
+    "version": "0.2",
+    "readonly": true,
+    "name": "cog-lisp",
+    "description": "The names of cog-lisp's built-ins and of the libraries it ships (specs/vscode-spelling.md)",
+    "dictionaryDefinitions": [
+        {
+            "name": "cog-lisp",
+            "path": "./cog-lisp-words.txt",
+            "description": "cog-lisp's built-in and library names, generated from the image"
+        }
+    ],
+    "dictionaries": [],
+    "languageSettings": [
+        {
+            "languageId": "cog-lisp,markdown",
+            "locale": "*",
+            "dictionaries": ["cog-lisp"]
+        }
+    ]
+}

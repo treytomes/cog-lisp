@@ -25,7 +25,8 @@ check('the extension activates on a cog-lisp file', manifest.activationEvents.in
 // the files vsce packages, as it lists them
 const listed = cp.execSync('npx --no-install vsce ls', { cwd: path.join(__dirname, '..'), encoding: 'utf8' })
   .split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-for (const f of ['builtins.json', 'src/builtins.js', 'src/extension.js', 'package.json', 'THIRD-PARTY-NOTICES.md']) {
+for (const f of ['builtins.json', 'src/builtins.js', 'src/extension.js', 'src/spelling.js', 'cspell/cspell-ext.json',
+                 'cspell/cog-lisp-words.txt', 'package.json', 'THIRD-PARTY-NOTICES.md']) {
   check('the package holds ' + f, listed.includes(f));
 }
 

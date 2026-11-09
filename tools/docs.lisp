@@ -493,3 +493,50 @@
   (let ((names (docs-example-names)))
     (docs-filter (lambda (name) (not (member name names)))
                  (apply append (map (lambda (c) (vector-ref c 3)) (manual-chapters))))))
+
+;;; The spell checker's word list (specs/vscode-spelling.md R-1): the names of
+;;; the built-ins and of the libraries a program requires, split as cSpell
+;;; splits them, into runs of letters; a run of one or two letters is left out.
+;;; The libraries' names are read from their files, not by requiring them, so
+;;; that a library's names (cl's remove, say) never change the built-ins'.
+
+(define spelling-libraries '("cl" "test" "datetime" "pretty"))
+
+;; the names a library file defines at its top level, as strings
+(define (library-defined-names library)
+  (call-with-input-file (docs-path (string-append "lib/" library ".lisp"))
+    (lambda (port)
+      (let loop ((names '()))
+        (let ((form (read port)))
+          (if (eof-object? form)
+              names
+              (loop (if (and (pair? form) (memq (car form) '(define define-macro define-syntax))
+                             (pair? (cdr form)))
+                        (let ((target (car (cdr form))))
+                          (cond ((symbol? target) (cons (symbol->string target) names))
+                                ((and (pair? target) (symbol? (car target)))
+                                 (cons (symbol->string (car target)) names))
+                                (else names)))
+                        names))))))))
+
+;; the runs of letters in s, lower case, of three letters or more
+(define (spelling-runs s)
+  (let loop ((cs (string->list s)) (run '()) (runs '()))
+    (let ((done (lambda () (if (>= (length run) 3) (cons (list->string (reverse run)) runs) runs))))
+      (cond ((null? cs) (done))
+            ((char-alphabetic? (car cs)) (loop (cdr cs) (cons (char-downcase (car cs)) run) runs))
+            (else (loop (cdr cs) '() (done)))))))
+
+(define (spelling-words)
+  (let ((names (append (map docs-entry-name (builtin-entries))
+                       (apply append (map library-defined-names spelling-libraries))))
+        (seen (make-hash-table equal?)))
+    (for-each (lambda (name)
+                (unless (char=? (string-ref name 0) #\%)
+                  (for-each (lambda (w) (hash-table-set! seen w #t)) (spelling-runs name))))
+              names)
+    (apply string-append
+           (map (lambda (w) (string-append w (string #\newline)))
+                (docs-sort-strings (hash-table-keys seen))))))
+
+(define spelling-words-file "vscode/cspell/cog-lisp-words.txt")

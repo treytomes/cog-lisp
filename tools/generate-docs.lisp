@@ -25,6 +25,7 @@
 
 (docs-write! "docs/builtins.md" (builtins-markdown))
 (docs-write! "vscode/builtins.json" (builtins-json))
+(docs-write! spelling-words-file (spelling-words))
 (for-each (lambda (f) (docs-write! (car f) (cdr f))) (manual-files))
 (for-each (lambda (f) (docs-write! (car f) (cdr f))) (site-files))
 (for-each (lambda (f) (docs-write! (car f) (cdr f))) (skill-files))

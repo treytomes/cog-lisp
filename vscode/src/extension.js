@@ -15,6 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const { topLevelFormAt } = require('./forms');
 const { loadBuiltins, symbolAt, hoverMarkdown, completions } = require('./builtins');
+const { registerSpelling } = require('./spelling');
 const cp = require('child_process');
 const os = require('os');
 const lc = require('vscode-languageclient/node');
@@ -149,6 +150,9 @@ function sendToRepl() {
 
 /** The newest of src\*.st, lib\core.lisp, libormat.lisp and lib\compiler\*.lisp (all built
  * into the image), if newer than the built image. */
+// the lib/ files the build compiles into the image (src/coglisp-compiler.st)
+const BUILT_IN_LIBRARIES = ['core.lisp', 'format.lisp', 'json.lisp', 'http.lisp', 'coverage.lisp'];
+
 function staleSource(root) {
   const image = path.join(root, 'pharo', 'cog-lisp.image');
   if (!fs.existsSync(image)) return { file: null, missing: true };
@@ -158,8 +162,7 @@ function staleSource(root) {
   if (fs.existsSync(src)) {
     for (const name of fs.readdirSync(src)) if (name.endsWith('.st')) sources.push(path.join(src, name));
   }
-  sources.push(path.join(root, 'lib', 'core.lisp'));
-  sources.push(path.join(root, 'lib', 'format.lisp'));
+  for (const name of BUILT_IN_LIBRARIES) sources.push(path.join(root, 'lib', name));
   const compiler = path.join(root, 'lib', 'compiler');
   if (fs.existsSync(compiler)) {
     for (const name of fs.readdirSync(compiler)) if (name.endsWith('.lisp')) sources.push(path.join(compiler, name));
@@ -357,8 +360,17 @@ async function expandMacro() {
   await vscode.window.showTextDocument(doc, { preview: true, viewColumn: vscode.ViewColumn.Beside });
 }
 
+// a log for failures that need no dialog, made the first time one happens
+let outputChannel = null;
+function logLine(text) {
+  if (!outputChannel) outputChannel = vscode.window.createOutputChannel('cog-lisp');
+  outputChannel.appendLine(text);
+}
+
 function activate(context) {
   registerBuiltins(context);
+  // cog-lisp's names in Code Spell Checker, when it is installed (specs/vscode-spelling.md)
+  registerSpelling(context, vscode, logLine);
   context.subscriptions.push(vscode.commands.registerCommand('cog-lisp.expandMacro', expandMacro));
   startLanguageServer(context);
   context.subscriptions.push(
@@ -377,7 +389,7 @@ function activate(context) {
       const root = cogLispRoot();
       if (!root) return;
       const rel = path.relative(root, doc.uri.fsPath).toLowerCase();
-      if ((rel.startsWith('src' + path.sep) && rel.endsWith('.st')) || rel === path.join('lib', 'core.lisp') || rel === path.join('lib', 'format.lisp')
+      if ((rel.startsWith('src' + path.sep) && rel.endsWith('.st')) || BUILT_IN_LIBRARIES.some((f) => rel === path.join('lib', f))
           || (rel.startsWith(path.join('lib', 'compiler') + path.sep) && rel.endsWith('.lisp'))) checkStale();
     }),
     vscode.tasks.onDidEndTask((e) => {
