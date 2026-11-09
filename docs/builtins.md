@@ -18,7 +18,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Strings](#strings) (29)
 - [Vectors](#vectors) (14)
 - [Hash tables](#hash-tables) (19)
-- [Control](#control) (4)
+- [Control](#control) (5)
 - [Conditions and restarts](#conditions-and-restarts) (19)
 - [Evaluation and macros](#evaluation-and-macros) (5)
 - [Output](#output) (3)
@@ -281,7 +281,8 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 |---|---|---|---|
 | `apply` | `(apply proc list)` | procedure | Calls proc with the elements of list as its arguments. |
 | `call-with-values` | `(call-with-values producer consumer)` | procedure | Calls consumer with the values producer answers. |
-| `setter` | `(setter proc)` | procedure | The procedure (set! (proc arg ...) value) calls, as (s arg ... value): set-car! for car, set-cdr! for cdr, vector-set! for vector-ref, string-set! for string-ref, hash-table-set! for hash-table-ref and for hash-table-ref/default, and any a program adds with (set! (setter proc) s). Signals an error if proc has none. |
+| `getter-with-setter` | `(getter-with-setter get set)` | procedure | A procedure that does what get does and whose setter is set, as SRFI 17 specifies: (set! ((getter-with-setter get set) x) v) calls (set x v). get itself is left as it is. |
+| `setter` | `(setter proc)` | procedure | The procedure (set! (proc arg ...) value) calls, as (s arg ... value): set-car! for car, set-cdr! for cdr, vector-set! for vector-ref, string-set! for string-ref, hash-table-set! for hash-table-ref and for hash-table-ref/default, and any a program adds with (set! (setter proc) s). Signals an error if proc has none. The setters of the built-in getters cannot be changed. |
 | `values` | `(values x ...)` | procedure | Answers its arguments as several values; one value is just itself. |
 
 ## Conditions and restarts

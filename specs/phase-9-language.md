@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | 9.1–9.3 implemented (2026-11-05); accepted 2026-11-04. 9.4 appended from issue #5 and accepted (2026-11-09) |
+| **Status** | Implemented: 9.1–9.3 (2026-11-05), 9.4 (2026-11-09). Accepted 2026-11-04; 9.4 appended from issue #5 and accepted 2026-11-09 |
 | **Depends on** | Phase 8 (complete), Phase 8.9 (CI, pinned Pharo) |
 | **Feeds** | Phase 11 (the pure LISP image) |
 | **Review items** | R-11 (reading rationals), R-21 (infinity and NaN), C-14 (shadowing and capture) |
@@ -603,8 +603,15 @@ through `(set! (setter access) ...)`:
     `vector-set!`.
   - `(gethash key table [default])`: the value, or `default` (else `nil`, which
     is `()` here). The argument order is Common Lisp's, key first. Its setter
-    sets the key, ignoring any default. Common Lisp's second value, whether the
-    key was there, is answered as a second value: `values` exists.
+    sets the key, ignoring any default.
+    - **Only the value is answered** (changed while building, 2026-11-09).
+      Common Lisp also answers whether the key was there, as a second value,
+      which a caller wanting one value never sees.
+    - cog-lisp's multiple values do not collapse to the first value where one
+      is expected: `(+ 1 (values 2 3))` fails with `+: not a number: 2 3`. So a
+      second value would break `(+ 1 (gethash k h 0))`, the commonest use.
+    - Presence is tested with `hash-table-contains?`, and `lib/cl.lisp`'s known
+      gaps say so.
   - `(remhash key table)`, so that a table written with `gethash` can lose a
     key.
 - They are documented, and `lib/cl.lisp`'s list of known gaps changes to
@@ -632,11 +639,62 @@ through `(set! (setter access) ...)`:
 - `getter-with-setter`;
 - both forms of `defsetf`, with `&rest`;
 - each Common Lisp accessor and its `setf`;
-- `aref` with two indexes, and `gethash`'s default and its second value;
+- `aref` with two indexes, and `gethash`'s default and its use in arithmetic;
 - if the shortcut is built: a redefined `car`, and the refused
   `(set! (setter car) g)`.
 
 The examples in `examples/` that use `lib/cl.lisp` gain a `setf` of a place.
+
+#### 9.4b as built (2026-11-09)
+
+- **The benchmark decided it.** In `bench/results.md`, before the shortcut:
+
+  | Loop of 1,000,000 | direct | `set!` of the place | ratio |
+  |---|---:|---:|---:|
+  | `(car p)` | 33.8 ms | 703.0 ms | 20.8x |
+  | `(vector-ref v 0)` | 75.0 ms | 734.0 ms | 9.8x |
+
+  Both are far past 1.5 times, so the shortcut was built. After it, two runs:
+  - 32.8 against 37.3 ms (1.1x), and 73.0 against 83.0 ms (1.1x);
+  - 27.5 against 41.8 ms (1.5x), and 80.0 against 97.0 ms (1.2x). This run is
+    the one committed in `bench/results.md`.
+
+  Timings on this machine vary that much between runs. The shortcut's gain
+  does not: from about 10 to 20 times slower, to within about 1.5 times.
+- **How the shortcut recognizes a built-in getter.** The compiler recognizes it
+  by identity, not by name.
+  - `lib/core.lisp` keeps the built-in getters in a second table,
+    `%builtin-setters`.
+  - The shortcut is compiled only when the global's value, as the form is
+    compiled, is in that table. A program that had already redefined `car`
+    gets the plain `(setter car)` call.
+  - The compiled test is
+    `[car == <the built-in car>] ifTrue: [<set-car!>] ifFalse: [(setter car)]`.
+    It chooses only the setter, which is then called once, with the arguments
+    and the value. So nothing is compiled twice, and the order of evaluation
+    stays SRFI 17's.
+  - Both tables compare keys with `eq?`. The `equal?` table of 9.4a was slower
+    than an identity table needs to be; the generic path's speed was not
+    measured again.
+- **Found on the way: the setters are keyed by procedure objects.**
+  `bench/bench.st` reinstalls the primitives (`LispPrimitives installDefault`),
+  which makes new procedure objects, and then `(setter car)` found nothing.
+  - Anything that reinstalls the primitives must load `lib/core.lisp` again,
+    and the benchmark now does.
+  - Normal runs never reinstall them: every suite passed.
+- **`gethash` answers only the value.** See above: cog-lisp's multiple values do
+  not collapse to the first value where one is expected.
+- **`defsetf`'s long form** passes the new value last, after any `&rest`
+  arguments, so its setter takes all its arguments and splits off the last.
+- **Checks:** `tests/lisp/phase-9.4-generalized-set.lisp`, 66/66, covering
+  9.4a and 9.4b. Among them:
+  - a `set!` compiled while `car` was the built-in one, run after `car` was
+    redefined (it reaches the program's setter), and again after `car` was
+    restored;
+  - `(set! (setter car) g)` refused with
+    `setter: the setter of car is built in`.
+
+  `examples/cl-style.lisp` gains `setf` of `second`, `nth` and `gethash`.
 
 ## 5. Acceptance criteria
 
@@ -711,4 +769,4 @@ The examples in `examples/` that use `lib/cl.lisp` gain a `setf` of a place.
 | 9.2 Numeric tower | done (2026-11-05): read, print, predicates, exactness, IEEE division, type errors (9.2a; R-11, R-21 closed); multiple values and the numeric procedures (9.2b); dual numbers added from outside the core, with their read syntax (9.2c) |
 | 9.3 Hygienic macros | done (2026-11-05): aliases and resolution, shadowable special forms, syntax-rules, define-syntax, let-syntax, letrec-syntax, syntax-error (9.3a); the derived forms hygienic, in lib/core-syntax.lisp (9.3b); C-14 closed |
 | 9.4a Generalized set! and setf | done (2026-11-09): set! of a call through (setter proc), setters for car, cdr, vector-ref, string-ref, hash-table-ref and hash-table-ref/default, (set! (setter f) g); setf in lib/cl.lisp; examples/places.lisp; issue #5 closed |
-| 9.4b getter-with-setter, defsetf, the CL accessors' setters, the shortcut | accepted (2026-11-09) |
+| 9.4b getter-with-setter, defsetf, the CL accessors' setters, the shortcut | done (2026-11-09): all four; the benchmark found set! of a place 20.8x slower, so the shortcut was built (1.1x to 1.5x after); gethash answers one value |

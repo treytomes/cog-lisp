@@ -41,9 +41,13 @@ benchDir := Smalltalk imageDirectory parent / 'bench'.
 !
 
 "--- Chunk 2: run, report, check -------------------------------------------"
-| out benches configs median compiledRun walkerRun stRun rows report checks pass total check fmt ratio file sizeNote sendTimes compileForms compileMs readText readMs |
+| out benches configs median compiledRun walkerRun stRun rows report checks pass total check fmt ratio file sizeNote sendTimes placeTimes compileForms compileMs readText readMs |
 out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
 LispPrimitives installDefault.
+"Reinstalling the primitives makes new procedure objects, and the setters of
+ generalized set (Phase 9 step 9.4) are keyed by the old ones: load lib/core.lisp
+ again so (setter car) knows the car in use."
+LispCompiler new evalFile: (Smalltalk imageDirectory parent / 'lib' / 'core.lisp') fullName.
 
 benches := {
 	{ 'fib 22'. '(define (fib n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))'. '(fib 22)'. 17711.
@@ -132,6 +136,16 @@ sendTimes := {
 check value: 'Phase 7.6 AC-20 (send acc + 1) within 1.5x of (+ acc 1) (' , (ratio value: sendTimes first value: sendTimes last) , ')'
 	value: sendTimes first <= (1.5 * sendTimes last).
 
+"Phase 9 step 9.4b: generalized set!! against the setter it calls. (setter car) is
+ looked up on every assignment; a compile-time shortcut is built only if this is
+ more than 1.5 times slower. Each loop ends having stored 1."
+out value: '  running set!! of a place ...'.
+placeTimes := {
+	compiledRun value: { 'set-car!! 1000000'. '(define bp (list 0)) (define (sc-loop n) (if (= n 0) (car bp) (begin (set-car!! bp n) (sc-loop (- n 1)))))'. '(begin (sc-loop 1000000) (car bp))'. 1 } value: #().
+	compiledRun value: { 'set!! (car) 1000000'. '(define bq (list 0)) (define (sp-loop n) (if (= n 0) (car bq) (begin (set!! (car bq) n) (sp-loop (- n 1)))))'. '(begin (sp-loop 1000000) (car bq))'. 1 } value: #().
+	compiledRun value: { 'vector-set!! 1000000'. '(define bv (vector 0)) (define (vs-loop n) (if (= n 0) (vector-ref bv 0) (begin (vector-set!! bv 0 n) (vs-loop (- n 1)))))'. '(begin (vs-loop 1000000) (vector-ref bv 0))'. 1 } value: #().
+	compiledRun value: { 'set!! (vector-ref) 1000000'. '(define bw (vector 0)) (define (vp-loop n) (if (= n 0) (vector-ref bw 0) (begin (set!! (vector-ref bw 0) n) (vp-loop (- n 1)))))'. '(begin (vp-loop 1000000) (vector-ref bw 0))'. 1 } value: #() }.
+
 "Phase 7.9: how long compiling takes. The forms of lib/core.lisp and
  examples/tiny-reader.lisp (expanders and procedures), compiled 20 times."
 out value: '  timing compilation ...'.
@@ -189,6 +203,12 @@ report := String streamContents: [:s |
 	s lf; nextPutAll: '## Smalltalk interop'; lf; lf.
 	s nextPutAll: 'A loop of 1,000,000 `(send acc + 1)`: ' , (fmt value: sendTimes first) , ' ms; the same loop with `(+ acc 1)`: '
 		, (fmt value: sendTimes last) , ' ms (' , (ratio value: sendTimes first value: sendTimes last) , ').'; lf.
+		s lf; nextPutAll: '## Assignment to a place'; lf; lf.
+		s nextPutAll: 'Generalized `set!!` (Phase 9 step 9.4) against the setter it calls, in a loop of 1,000,000:'; lf; lf.
+		s nextPutAll: '| Loop | direct | `set!!` of the place | ratio |'; lf.
+		s nextPutAll: '|---|---:|---:|---:|'; lf.
+		s nextPutAll: '| `(car p)` | ' , (fmt value: (placeTimes at: 1)) , ' | ' , (fmt value: (placeTimes at: 2)) , ' | ' , (ratio value: (placeTimes at: 2) value: (placeTimes at: 1)) , ' |'; lf.
+		s nextPutAll: '| `(vector-ref v 0)` | ' , (fmt value: (placeTimes at: 3)) , ' | ' , (fmt value: (placeTimes at: 4)) , ' | ' , (ratio value: (placeTimes at: 4) value: (placeTimes at: 3)) , ' |'; lf.
 	s lf; nextPutAll: '## Checks'; lf; lf.
 	checks do: [:c | s nextPutAll: '- ' , c; lf]].
 out value: ''.

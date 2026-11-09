@@ -14,7 +14,10 @@
 ;;;   - defvar always assigns (no "only if unbound" rule).
 ;;;   - setq on a name that was never defined is an error; defvar it first.
 ;;;   - setf assigns variables and places through set!'s setters (SRFI 17), found
-;;;     at run time; push and pop evaluate a place's arguments twice.
+;;;     at run time; push and pop evaluate a place's arguments twice. defsetf
+;;;     gives a function a setter; define-setf-expander is not provided.
+;;;   - gethash answers only the value, not whether the key was there (use
+;;;     hash-table-contains?); aref takes one index.
 ;;;   - Not provided: loop, format, keywords, multiple values, &optional, &key.
 
 (define t #t)
@@ -64,6 +67,29 @@ Assigns each value to its place, in turn: a variable, or a call such as (car x) 
         `(let ((,g #f))
            (set! ,(car pairs) (begin (set! ,g ,(car (cdr pairs))) ,g))
            ,(if (null? (cdr (cdr pairs))) g `(setf ,@(cdr (cdr pairs))))))))
+
+;; (defsetf access update) -- (setf (access arg ...) v) calls (update arg ... v)
+;; (defsetf access (param ...) (store) body ...) -- runs body with the params bound
+;; to the arguments and store to the value; params take &rest
+;; Both define access's setter (specs/phase-9-language.md step 9.4b).
+(define (%cl-last-of lst) (if (null? (cdr lst)) (car lst) (%cl-last-of (cdr lst))))
+(define (%cl-all-but-last lst) (if (null? (cdr lst)) '() (cons (car lst) (%cl-all-but-last (cdr lst)))))
+
+(define-macro (defsetf access . spec)
+  "(defsetf access update), (defsetf access (param ...) (store) body ...)
+Gives access a setter, so (setf (access arg ...) v) works: the short form calls (update arg ... v); the long form runs the body with each param bound to its argument and store to v. Answers the name access."
+  (if (null? (cdr spec))
+      `(begin (set! (setter ,access) ,(car spec)) ',access)
+      (let ((params (car spec))
+            (store (car (car (cdr spec))))
+            (body (cdr (cdr spec)))
+            (args (gensym)))
+        `(begin
+           (set! (setter ,access)
+                 (lambda ,args
+                   (let ((,store (%cl-last-of ,args)))
+                     (apply (lambda ,(%cl-params params) ,@body) (%cl-all-but-last ,args)))))
+           ',access))))
 
 (define-macro (progn . body)
   `(begin ,@body))
@@ -122,6 +148,37 @@ Assigns each value to its place, in turn: a variable, or a call such as (car x) 
 (define (nthcdr n lst) (if (= n 0) lst (nthcdr (- n 1) (cdr lst))))
 (define (nth n lst) (car (nthcdr n lst)))
 (define (last lst) (if (null? (cdr lst)) lst (last (cdr lst))))   ; the last cons
+
+;; the accessors' setters, for setf (specs/phase-9-language.md step 9.4b)
+(set! (setter first) (lambda (x v) (set-car! x v)))
+(set! (setter second) (lambda (x v) (set-car! (cdr x) v)))
+(set! (setter third) (lambda (x v) (set-car! (cdr (cdr x)) v)))
+(set! (setter rest) (lambda (x v) (set-cdr! x v)))
+(set! (setter nth) (lambda (n lst v) (set-car! (nthcdr n lst) v)))
+
+;; (aref vector index): cog-lisp's vectors have one dimension
+(define (aref v . indexes)
+  (if (and (pair? indexes) (null? (cdr indexes)))
+      (vector-ref v (car indexes))
+      (error "aref: cog-lisp's vectors have one dimension: give one index")))
+(set! (setter aref)
+      (lambda (v . indexes-and-value)
+        (if (= (length indexes-and-value) 2)
+            (vector-set! v (car indexes-and-value) (car (cdr indexes-and-value)))
+            (error "aref: cog-lisp's vectors have one dimension: give one index"))))
+
+;; (gethash key table [default]): the value, or default (else nil). Only the value:
+;; cog-lisp's multiple values do not shrink to one, so a second value would break
+;; (+ 1 (gethash k h 0)). Test for a key with (hash-table-contains? table key).
+(define (gethash key table . default)
+  (hash-table-ref/default table key (if (null? default) '() (car default))))
+(set! (setter gethash)
+      (lambda (key table . default-and-value)
+        (hash-table-set! table key (%cl-last-of default-and-value))))
+(define (remhash key table)
+  (let ((had (hash-table-contains? table key)))
+    (hash-table-delete! table key)
+    had))
 (define (consp x) (pair? x))
 (define (listp x) (or (pair? x) (null? x)))
 (define (atom x) (not (pair? x)))

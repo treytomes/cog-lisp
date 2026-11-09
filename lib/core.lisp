@@ -158,11 +158,14 @@ Evaluates form with named restarts; invoking one leaves form and evaluates its b
 ;;; compiled by the seed, which has no generalized set!, so it is plain code: a
 ;;; table from each getter to its setter, keyed by the procedure itself.
 
-(define %setters (make-hash-table))
+(define %setters (make-hash-table eq?))
+;; the built-in getters and their setters: the compiler calls these directly when
+;; the getter is still the built-in one (step 9.4b), so they cannot be changed
+(define %builtin-setters (make-hash-table eq?))
 
 (define (setter proc)
   "(setter proc)
-The procedure (set! (proc arg ...) value) calls, as (s arg ... value): set-car! for car, set-cdr! for cdr, vector-set! for vector-ref, string-set! for string-ref, hash-table-set! for hash-table-ref and for hash-table-ref/default, and any a program adds with (set! (setter proc) s). Signals an error if proc has none."
+The procedure (set! (proc arg ...) value) calls, as (s arg ... value): set-car! for car, set-cdr! for cdr, vector-set! for vector-ref, string-set! for string-ref, hash-table-set! for hash-table-ref and for hash-table-ref/default, and any a program adds with (set! (setter proc) s). Signals an error if proc has none. The setters of the built-in getters cannot be changed."
   (let ((s (hash-table-ref/default %setters proc #f)))
     (if s
         s
@@ -170,12 +173,28 @@ The procedure (set! (proc arg ...) value) calls, as (s arg ... value): set-car! 
                               (with-output-to-string (lambda () (display proc))))))))
 [setter category: "Control"]
 
-(hash-table-set! %setters car set-car!)
-(hash-table-set! %setters cdr set-cdr!)
-(hash-table-set! %setters vector-ref vector-set!)
-(hash-table-set! %setters string-ref string-set!)
-(hash-table-set! %setters hash-table-ref hash-table-set!)
-(hash-table-set! %setters hash-table-ref/default
-                 (lambda (table key default value) (hash-table-set! table key value)))
+(define (%builtin-setter! get set)
+  (hash-table-set! %setters get set)
+  (hash-table-set! %builtin-setters get set))
+(%builtin-setter! car set-car!)
+(%builtin-setter! cdr set-cdr!)
+(%builtin-setter! vector-ref vector-set!)
+(%builtin-setter! string-ref string-set!)
+(%builtin-setter! hash-table-ref hash-table-set!)
+(%builtin-setter! hash-table-ref/default
+                  (lambda (table key default value) (hash-table-set! table key value)))
 ;; (set! (setter proc) s) is generalized set! too: setter's own setter adds one
-(hash-table-set! %setters setter (lambda (proc s) (hash-table-set! %setters proc s)))
+(hash-table-set! %setters setter
+                 (lambda (proc s)
+                   (if (hash-table-contains? %builtin-setters proc)
+                       (error (string-append "setter: the setter of " [proc name] " is built in"))
+                       (hash-table-set! %setters proc s))))
+
+(define (getter-with-setter get set)
+  "(getter-with-setter get set)
+A procedure that does what get does and whose setter is set, as SRFI 17 specifies: (set! ((getter-with-setter get set) x) v) calls (set x v). get itself is left as it is."
+  (let ((proc (lambda args (apply get args))))
+    [proc documentation: [get lispDocumentation]]
+    (hash-table-set! %setters proc set)
+    proc))
+[getter-with-setter category: "Control"]

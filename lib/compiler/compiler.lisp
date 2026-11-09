@@ -1157,10 +1157,38 @@ Stops compilation with message and the forms, for a macro to report a misuse."
 ;; step 9.4). The setter is the global one, read from its cell, so a local named
 ;; setter cannot capture it; proc, the arguments and the value are evaluated in
 ;; order, in the scope of the set!.
+;;
+;; The shortcut (step 9.4b; bench/results.md measured (setter car) at 20x the
+;; cost of set-car!): when the getter is a global name whose value, as this form
+;; is compiled, is a built-in getter (lib/core.lisp's %builtin-setters), the
+;; setter is chosen by an identity test instead of a lookup:
+;;   [car == <the built-in car>] ifTrue: [<set-car!>] ifFalse: [(setter car)]
+;; A program that redefines car still reaches its own setter, and the built-in
+;; getters' setters cannot be changed, so the test is all that is needed.
+
+;; the built-in getter object head names here, or #f
+(define (lc-builtin-getter head scope)
+  (let ((b (and (lc-identifier? head) (lc-binding head scope))))
+    (and (symbol? b)
+         (let ((table (lc-cell '%builtin-setters)) (cell (lc-cell b)))
+           (and [table isBound] [cell isBound]
+                (let ((v [cell value]))
+                  (and (hash-table-contains? [table value] v) v)))))))
+
+(define (lc-setter-node c head scope)
+  (let ((builtin (lc-builtin-getter head scope)))
+    (if builtin
+        (let ((current (lc-global-read-symbol c (lc-binding head scope))))
+          (opal-send (opal-send current "==" (vector (opal-literal builtin)))
+                     "ifTrue:ifFalse:"
+                     (vector (opal-thunk (opal-literal (hash-table-ref [(lc-cell '%builtin-setters) value] builtin)))
+                             (opal-thunk (lc-call-node c (lc-global-read-symbol c 'setter)
+                                                       (list (lc-global-read-symbol c (lc-binding head scope))))))))
+        (lc-call-node c (lc-global-read-symbol c 'setter) (list (lc-translate c head scope #f))))))
+
 (define (lc-translate-set-place c form scope)
   (let* ((target (car (cdr form)))
-         (proc-node (lc-translate c (car target) scope #f))
-         (setter-node (lc-call-node c (lc-global-read-symbol c 'setter) (list proc-node)))
+         (setter-node (lc-setter-node c (car target) scope))
          (arg-nodes (lc-map (lambda (a) (lc-translate c a scope #f)) (cdr target)))
          (value-node (lc-translate c (car (cdr (cdr form))) scope #f)))
     (lc-and-unspecified (lc-call-node c setter-node (append arg-nodes (list value-node))))))

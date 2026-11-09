@@ -236,7 +236,8 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 
 - `(apply proc list)`: Calls proc with the elements of list as its arguments.
 - `(call-with-values producer consumer)`: Calls consumer with the values producer answers.
-- `(setter proc)`: The procedure (set! (proc arg ...) value) calls, as (s arg ... value): set-car! for car, set-cdr! for cdr, vector-set! for vector-ref, string-set! for string-ref, hash-table-set! for hash-table-ref and for hash-table-ref/default, and any a program adds with (set! (setter proc) s). Signals an error if proc has none.
+- `(getter-with-setter get set)`: A procedure that does what get does and whose setter is set, as SRFI 17 specifies: (set! ((getter-with-setter get set) x) v) calls (set x v). get itself is left as it is.
+- `(setter proc)`: The procedure (set! (proc arg ...) value) calls, as (s arg ... value): set-car! for car, set-cdr! for cdr, vector-set! for vector-ref, string-set! for string-ref, hash-table-set! for hash-table-ref and for hash-table-ref/default, and any a program adds with (set! (setter proc) s). Signals an error if proc has none. The setters of the built-in getters cannot be changed.
 - `(values x ...)`: Answers its arguments as several values; one value is just itself.
 
 ## Conditions and restarts

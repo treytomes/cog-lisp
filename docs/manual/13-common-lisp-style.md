@@ -68,6 +68,16 @@ cog-lisp. Remember: nil is true here, so test lists with null or consp.
 (display (my-unless (> 1 2) 'ran))
 (newline)
 
+; setf of places: a list's elements, and a hash table used as a counter
+(let ((cells (list 'a 'b 'c))
+      (counts (make-hash-table)))
+  (setf (second cells) 'x
+        (nth 2 cells) 'y)
+  (dolist (w '(to be or not to be))
+    (setf (gethash w counts) (+ 1 (gethash w counts 0))))
+  (display (list cells (gethash 'to counts) (gethash 'or counts)))
+  (newline))
+
 ; the procedure keeps the text it was written as
 (display (procedure-source our-length))
 (newline)
@@ -84,6 +94,7 @@ Its output:
 42
 (10 20 30)
 ran
+((a x y) 2 1)
 (defun our-length (lst)
   (if (null lst)
       0

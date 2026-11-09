@@ -6,6 +6,7 @@
 42
 (10 20 30)
 ran
+((a x y) 2 1)
 (defun our-length (lst)
   (if (null lst)
       0
