@@ -406,6 +406,22 @@ image on 2026-11-05):
   generated; rebuilt by each release and attached as `cog-lisp-skill-VERSION.zip`.
   `tools/skill-eval.js` measures it against a model.
 
+### Next: from reviewing a real project (2026-11-09)
+Reviewing `lisp-expert`, a separate project of cog-lisp programs (an expert
+system, `format`, a weather REPL), found bugs and gaps that are not its own:
+- [**Starting anywhere**](specs/startup-anywhere.md) (accepted): a second run
+  on the same image, a read-only install, or a read-only current folder each
+  fail at start-up today.
+- [**`require` and `*env*`**](specs/library-path.md) (accepted): load cog-lisp's
+  own libraries from any folder, through a library path kept in a global
+  environment.
+- [**`format`**](specs/format.md) (accepted): `lisp-expert`'s version, finished
+  and built in.
+- [**Code coverage**](specs/coverage.md) (accepted): a compiler option that
+  reports the procedures and branches a test run never reached.
+- [**HTTP(S) and JSON**](specs/https-and-json.md) (proposed; a spike first): an
+  early slice of Phase 11.6.
+
 ### Phase 11 — A world of its own
 [Spec](specs/phase-11-pure-image.md), accepted in outline; a long phase, each
 step specified in detail before it starts (owner, 2026-11-04). The VM always
