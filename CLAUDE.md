@@ -501,6 +501,18 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **`parameterize` and `make-parameter`** (R7RS) are built in, over
   `dynamic-wind`: one binding per image. cog-lisp has no `call/cc`; its
   non-local exits are errors and restarts.
+- **HTTP(S) is the system's curl, hidden in cog-lisp** (specs/https-and-json.md):
+  `lib/http.lisp` (`http-request`, `http-get`, `url-encode`, built in) over
+  `LispProcess` (`src/coglisp-runtime.st`), which runs a program from an
+  argument list, never a shell (`CreateProcessW` / `posix_spawnp`), and polls
+  its exit with a `Delay`, so a `ZnServer` in the same image keeps answering
+  (`tests/lisp/http.lisp` serves itself that way). **Never fetch `https://`
+  with `ZnClient`:** Pharo's `SqueakSSL` accepts expired, self-signed,
+  wrong-host and revoked certificates. Live checks need `COGLISP_LIVE_HTTPS=1`
+  (the suite and `release/smoke-test.sh`). Linux needs curl; the Docker
+  container got it with `apt-get install -y curl`.
+- **`apply` takes exactly two arguments** (`(apply proc list)`): cons any
+  leading arguments onto the list.
 - **Libraries to `require`:** `cl`, `test`, `datetime` and `pretty`
   (`lib/*.lisp`); `format`, `json-read`/`json-write` and `coverage-*` are built in.
 - **The LISP compiler's errors hide its own bugs.** As in `LispCompiler>>compile:`,

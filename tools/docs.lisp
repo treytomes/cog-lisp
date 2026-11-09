@@ -10,7 +10,7 @@
 (define docs-categories
   '("Special forms" "Derived forms" "Equality and types" "Numbers" "Lists"
     "Characters" "Strings" "Vectors" "Hash tables" "Control"
-    "Conditions and restarts" "Evaluation and macros" "Output" "Ports" "Files"
+    "Conditions and restarts" "Evaluation and macros" "Output" "Ports" "Files" "Network"
     "The system" "Smalltalk interop" "Language server" "The compiler and reader"))
 
 ;; an entry: #(name kind category call description)

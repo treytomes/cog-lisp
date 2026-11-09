@@ -24,6 +24,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Output](#output) (4)
 - [Ports](#ports) (16)
 - [Files](#files) (20)
+- [Network](#network) (8)
 - [The system](#the-system) (7)
 - [Smalltalk interop](#smalltalk-interop) (11)
 - [Language server](#language-server) (2)
@@ -424,6 +425,19 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `with-input-from-file` | `(with-input-from-file path thunk)` | procedure | Calls thunk with the current input read from the file. |
 | `with-output-to-file` | `(with-output-to-file path thunk)` | procedure | Calls thunk with the current output written to the file. |
 | `write-shared` | `(write-shared x [port])` | procedure | Writes x with a datum label for every part it shares, so the sharing reads back. |
+
+## Network
+
+| Name | Call | Kind | What it does |
+|---|---|---|---|
+| `http-body` | `(http-body response)` | procedure | The response's body, a string decoded by the charset of its Content-Type (UTF-8 when it names none). |
+| `http-get` | `(http-get url [headers] [timeout])` | procedure | A GET request: (http-request 'GET url headers #f timeout). |
+| `http-header` | `(http-header response name)` | procedure | The value of the response's first header called name (in any case), or #f. |
+| `http-headers` | `(http-headers response)` | procedure | The response's headers, an alist of (name . value) strings with the names in lower case, in the order the server sent them. After a redirect they are the last response's. |
+| `http-request` | `(http-request method url [headers] [body] [timeout])` | procedure | Makes an HTTP or HTTPS request and answers its response, read with http-status, http-headers, http-header and http-body. method is a symbol or string (GET, POST, ...); headers an alist of (name . value) strings; body a string, sent as UTF-8 (as text/plain; charset=utf-8 unless headers give a Content-Type), or #f; timeout in seconds, 30 by default. Redirects are followed, up to 10. A 4xx or 5xx status is a response; a failure to connect, a timeout or a rejected certificate is an error whose message starts with http:. |
+| `http-response?` | `(http-response? x)` | procedure | #t if x is a response from http-request. |
+| `http-status` | `(http-status response)` | procedure | The response's status code, an integer such as 200 or 404. |
+| `url-encode` | `(url-encode string)` | procedure | string percent-encoded for a URL's query or path (RFC 3986): letters, digits and - . _ ~ stay as they are, and every other byte of its UTF-8 is %XX. (string-append url "?q=" (url-encode "café au lait")) asks for café au lait. |
 
 ## The system
 

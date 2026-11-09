@@ -83,6 +83,19 @@ printf "(require 'cl)\n(defun twice (x) (* 2 x))\n(display (twice 21))\n(newline
 ok=0; [ "$(cat "$OUT/else.out")" = 42 ] && ok=1
 check "require finds the bundle's libraries from a program in another folder" $ok
 [ "$ok" = 1 ] || head -3 "$OUT/else.out"
+
+# Live HTTPS from the bundle (specs/https-and-json.md AC-4), only with
+# COGLISP_LIVE_HTTPS=1: a good certificate is accepted, an expired one refused.
+if [ "${COGLISP_LIVE_HTTPS:-}" = 1 ]; then
+  printf '%s\n' '(display (http-status (http-get "https://example.com/" (quote ()) 20)))' '(newline)' \
+    '(display (guard (e (#t (error-object-message e))) (http-get "https://expired.badssl.com/" (quote ()) 20)))' \
+    '(newline)' > "$ELSE/https.lisp"
+  (cd "$ELSE" && "$B/cog-lisp.sh" https.lisp) </dev/null >"$OUT/https.out" 2>&1
+  ok=0; head -1 "$OUT/https.out" | tr -d '\r' | grep -qx 200 &&
+    grep -q "http: certificate rejected by expired.badssl.com" "$OUT/https.out" && ok=1
+  check "live: the bundle fetches over HTTPS and refuses an expired certificate" $ok
+  [ "$ok" = 1 ] || head -3 "$OUT/https.out"
+fi
 rm -rf "$ELSE"
 
 # Starting anywhere (specs/startup-anywhere.md AC-5): the bundle made read-only,

@@ -370,6 +370,17 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 - `(with-output-to-file path thunk)`: Calls thunk with the current output written to the file.
 - `(write-shared x [port])`: Writes x with a datum label for every part it shares, so the sharing reads back.
 
+## Network
+
+- `(http-body response)`: The response's body, a string decoded by the charset of its Content-Type (UTF-8 when it names none).
+- `(http-get url [headers] [timeout])`: A GET request: (http-request 'GET url headers #f timeout).
+- `(http-header response name)`: The value of the response's first header called name (in any case), or #f.
+- `(http-headers response)`: The response's headers, an alist of (name . value) strings with the names in lower case, in the order the server sent them. After a redirect they are the last response's.
+- `(http-request method url [headers] [body] [timeout])`: Makes an HTTP or HTTPS request and answers its response, read with http-status, http-headers, http-header and http-body. method is a symbol or string (GET, POST, ...); headers an alist of (name . value) strings; body a string, sent as UTF-8 (as text/plain; charset=utf-8 unless headers give a Content-Type), or #f; timeout in seconds, 30 by default. Redirects are followed, up to 10. A 4xx or 5xx status is a response; a failure to connect, a timeout or a rejected certificate is an error whose message starts with http:.
+- `(http-response? x)`: #t if x is a response from http-request.
+- `(http-status response)`: The response's status code, an integer such as 200 or 404.
+- `(url-encode string)`: string percent-encoded for a URL's query or path (RFC 3986): letters, digits and - . _ ~ stay as they are, and every other byte of its UTF-8 is %XX. (string-append url "?q=" (url-encode "café au lait")) asks for café au lait.
+
 ## The system
 
 - `(disassemble proc)`: Writes the bytecode of the procedure proc.

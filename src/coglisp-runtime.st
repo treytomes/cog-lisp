@@ -7,9 +7,9 @@
  chunk reader keeps it.
 
  Classes: LispError, LispArityError, LispProcedure, LispTailCall, LispPrimitives,
- LispTextOutput.
+ LispTextOutput, LispProcess, LispHttpResponse.
  ============================================================================"
-| failures cm lerr aerr proc tcall prims tout facade htab hkey iport oport lines vals |
+| failures cm lerr aerr proc tcall prims tout facade htab hkey iport oport lines vals procx hresp |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -34,6 +34,8 @@ oport := (Object << #LispOutputPort) slots: { #stream }; package: 'CogLisp-Runti
 "Characters from a line source (stdin, the REPL) with the stream protocol the reader needs (Phase 7.9 section 5.2)."
 lines := (Object << #LispLineStream) slots: { #source. #text. #pos }; package: 'CogLisp-Runtime'; install.
 tout  := (Object << #LispTextOutput) slots: { #kind. #handle. #stream. #buffer. #midLine }; sharedVariables: { #Session. #Stdout. #Stderr }; package: 'CogLisp-Runtime'; install.
+procx := (Object << #LispProcess) package: 'CogLisp-Runtime'; install.
+hresp := (Object << #LispHttpResponse) slots: { #status. #headers. #body }; package: 'CogLisp-Runtime'; install.
 
 
 "=== LispHashTable, LispHashKey (Phase 7.8 section 7) ======================="
@@ -2065,6 +2067,156 @@ cm value: prims class value: 'installing' value: 'installControlInto: anEnv
 	self document: anEnv category: ''Control'' with: #(
 		''apply'' ''(apply proc list)''
 			''Calls proc with the elements of list as its arguments.'')'.
+
+"=== LispProcess (specs/https-and-json.md R-6, R-10) =========================
+ Runs a program from a list of arguments, never through a shell, and answers
+ its exit code, or nil when the program cannot be started. Windows:
+ CreateProcessW with one command line, each argument quoted by the rules
+ CommandLineToArgvW reads, so it arrives exactly. POSIX: posix_spawnp with an
+ argv array. The wait polls (a zero timeout, or WNOHANG) with a 10 ms Delay, so
+ other Smalltalk processes keep running, such as a test's local server.
+ curl:body: runs the system's curl for http-request: the response comes back
+ through files in a private temporary folder, deleted afterwards."
+cm value: procx class value: 'running' value: 'run: args
+	"args: an Array of Strings, the program first. Answers its exit code, or nil if it could not be started."
+	^ OSPlatform current isWindows
+		ifTrue: [self runWindows: args]
+		ifFalse: [self runPosix: args]'.
+cm value: procx class value: 'windows' value: 'windowsQuote: s
+	"One argument as CommandLineToArgvW reads it: quoted when it holds a space, a tab or a quote, or is empty; backslashes doubled only before a quote."
+	| out slashes |
+	(s notEmpty and: [(s anySatisfy: [:c | c = Character space or: [c = Character tab or: [c = $"]]]) not])
+		ifTrue: [^ s].
+	out := WriteStream on: String new.
+	out nextPut: $".
+	slashes := 0.
+	s do: [:c |
+		c = $\
+			ifTrue: [slashes := slashes + 1]
+			ifFalse: [
+				c = $"
+					ifTrue: [out nextPutAll: (String new: slashes * 2 + 1 withAll: $\); nextPut: $"]
+					ifFalse: [out nextPutAll: (String new: slashes withAll: $\); nextPut: c].
+				slashes := 0]].
+	out nextPutAll: (String new: slashes * 2 withAll: $\); nextPut: $".
+	^ out contents'.
+cm value: procx class value: 'windows' value: 'windowsCommandLine: args
+	^ String streamContents: [:out |
+		args doWithIndex: [:a :i |
+			i > 1 ifTrue: [out nextPut: Character space].
+			out nextPutAll: (self windowsQuote: a)]]'.
+cm value: procx class value: 'windows' value: 'createProcess: cmd startup: si info: pi
+	"CREATE_NO_WINDOW (16r08000000); no handles inherited"
+	^ self ffiCall: #(int CreateProcessW(void* 0, void* cmd, void* 0, void* 0, int 0, uint32 134217728, void* 0, void* 0, void* si, void* pi)) module: ''kernel32.dll'''.
+cm value: procx class value: 'windows' value: 'waitFor: h milliseconds: ms
+	^ self ffiCall: #(uint32 WaitForSingleObject(void* h, uint32 ms)) module: ''kernel32.dll'''.
+cm value: procx class value: 'windows' value: 'exitCodeOf: h into: buf
+	^ self ffiCall: #(int GetExitCodeProcess(void* h, void* buf)) module: ''kernel32.dll'''.
+cm value: procx class value: 'windows' value: 'closeHandle: h
+	^ self ffiCall: #(int CloseHandle(void* h)) module: ''kernel32.dll'''.
+cm value: procx class value: 'windows' value: 'handleAt: offset in: bytes
+	| h |
+	h := ExternalAddress new.
+	1 to: 8 do: [:i | h at: i put: (bytes at: offset + i - 1)].
+	^ h'.
+cm value: procx class value: 'windows' value: 'runWindows: args
+	| wide si pi process thread code result |
+	wide := ((ZnCharacterEncoder newForEncoding: ''utf-16le'') encodeString: (self windowsCommandLine: args)) , #[0 0].
+	si := ByteArray new: 104.
+	si unsignedLongAt: 1 put: 104.
+	pi := ByteArray new: 24.
+	(self createProcess: wide startup: si info: pi) = 0 ifTrue: [^ nil].
+	process := self handleAt: 1 in: pi.
+	thread := self handleAt: 9 in: pi.
+	self closeHandle: thread.
+	[[(result := self waitFor: process milliseconds: 0) = 258] whileTrue: [(Delay forMilliseconds: 10) wait].
+	 result = 0 ifFalse: [^ nil].
+	 code := ByteArray new: 4.
+	 self exitCodeOf: process into: code.
+	 ^ code unsignedLongAt: 1]
+		ensure: [self closeHandle: process]'.
+cm value: procx class value: 'posix' value: 'spawn: pid file: f argv: a envp: e
+	^ self ffiCall: #(int posix_spawnp(void* pid, void* f, void* 0, void* 0, void* a, void* e)) module: ''libc.so.6'''.
+cm value: procx class value: 'posix' value: 'waitpid: pid status: buf options: o
+	^ self ffiCall: #(int waitpid(int pid, void* buf, int o)) module: ''libc.so.6'''.
+cm value: procx class value: 'posix' value: 'cString: s
+	| bytes a |
+	bytes := (ZnUTF8Encoder new encodeString: s) , #[0].
+	a := ExternalAddress allocate: bytes size.
+	bytes doWithIndex: [:b :i | a byteAt: i put: b].
+	^ a'.
+cm value: procx class value: 'posix' value: 'runPosix: args
+	| strings argv pid env status r |
+	strings := args collect: [:s | self cString: s].
+	argv := ExternalAddress allocate: 8 * (args size + 1).
+	[strings doWithIndex: [:s :i | argv pointerAt: (i - 1) * 8 + 1 put: s].
+	 argv pointerAt: args size * 8 + 1 put: ExternalAddress null.
+	 env := (ExternalAddress loadSymbol: ''environ'' module: ''libc.so.6'') pointerAt: 1.
+	 pid := ByteArray new: 4.
+	 r := self spawn: pid file: strings first argv: argv envp: env]
+		ensure: [strings do: [:s | s free]. argv free].
+	r = 0 ifFalse: [^ nil].
+	status := ByteArray new: 4.
+	[(r := self waitpid: (pid signedLongAt: 1) status: status options: 1) = 0]
+		whileTrue: [(Delay forMilliseconds: 10) wait].
+	r < 0 ifTrue: [^ nil].
+	"a normal exit: WEXITSTATUS; killed by a signal: 128 plus the signal, as a shell reports it"
+	^ ((status unsignedLongAt: 1) bitAnd: 16r7F) = 0
+		ifTrue: [((status unsignedLongAt: 1) bitShift: -8) bitAnd: 255]
+		ifFalse: [128 + ((status unsignedLongAt: 1) bitAnd: 16r7F)]'.
+cm value: procx class value: 'curl' value: 'curlProgram
+	"COGLISP_CURL, else Windows'' own curl.exe, else curl on the PATH"
+	| given root ref |
+	given := OSEnvironment current at: ''COGLISP_CURL'' ifAbsent: [nil].
+	(given notNil and: [given notEmpty]) ifTrue: [^ given].
+	OSPlatform current isWindows ifTrue: [
+		root := OSEnvironment current at: ''SystemRoot'' ifAbsent: [''C:\Windows''].
+		ref := (root , ''\System32\curl.exe'') asFileReference.
+		ref exists ifTrue: [^ ref fullName]].
+	^ ''curl'''.
+cm value: procx class value: 'curl' value: 'bytesOf: ref
+	ref exists ifFalse: [^ ByteArray new].
+	^ ref binaryReadStreamDo: [:s | s upToEnd]'.
+cm value: procx class value: 'curl' value: 'curl: args body: aStringOrNil
+	"Runs curl with args (an Array of Strings) and the files it writes to. Answers an Array: the exit code (nil when curl could not be started), the header bytes, the body bytes and curl''s message."
+	| dir bodyFile headerFile errorFile uploadFile all code answer |
+	dir := FileLocator temp / (''cog-lisp-http-'' , UUID new asString).
+	dir ensureCreateDirectory.
+	bodyFile := dir / ''body''. headerFile := dir / ''headers''. errorFile := dir / ''error''.
+	[all := OrderedCollection new.
+	 all add: self curlProgram; addAll: args.
+	 aStringOrNil ifNotNil: [:text |
+		uploadFile := dir / ''upload''.
+		uploadFile binaryWriteStreamDo: [:s | s nextPutAll: (ZnUTF8Encoder new encodeString: text)].
+		all add: ''--data-binary''; add: ''@'' , uploadFile fullName].
+	 all add: ''-o''; add: bodyFile fullName; add: ''-D''; add: headerFile fullName; add: ''--stderr''; add: errorFile fullName.
+	 code := self run: all asArray.
+	 answer := { code. self bytesOf: headerFile. self bytesOf: bodyFile.
+		(ZnUTF8Encoder new decodeBytes: (self bytesOf: errorFile)) }]
+		ensure: [dir ensureDeleteAll].
+	^ answer'.
+cm value: procx class value: 'curl' value: 'decode: bytes charset: aNameOrNil
+	"bytes as text in charset aNameOrNil, UTF-8 when it is nil or unknown"
+	| encoder |
+	encoder := [aNameOrNil ifNil: [ZnUTF8Encoder new] ifNotNil: [:n | ZnCharacterEncoder newForEncoding: n]]
+		on: Error do: [:e | ZnUTF8Encoder new].
+	^ [encoder decodeBytes: bytes] on: Error do: [:e | ZnUTF8Encoder new decodeBytes: bytes]'.
+
+"=== LispHttpResponse (specs/https-and-json.md R-7) ==========================
+ What http-request answers: the status, the headers as an alist of
+ (lower-case-name . value), and the body as a string."
+cm value: hresp class value: 'instance creation' value: 'status: s headers: h body: b
+	^ self new setStatus: s headers: h body: b'.
+cm value: hresp value: 'private' value: 'setStatus: s headers: h body: b
+	status := s. headers := h. body := b'.
+cm value: hresp value: 'accessing' value: 'status
+	^ status'.
+cm value: hresp value: 'accessing' value: 'headers
+	^ headers'.
+cm value: hresp value: 'accessing' value: 'body
+	^ body'.
+cm value: hresp value: 'printing' value: 'printOn: aStream
+	aStream nextPutAll: ''#<http-response ''; print: status; nextPut: $>'.
 
 "=== load report ==========================================================="
 Stdio stdout

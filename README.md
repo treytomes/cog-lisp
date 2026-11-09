@@ -425,8 +425,9 @@ system, `format`, a weather REPL), found bugs and gaps that are not its own:
   (done): SRFI 1's `any`, `every`, `find`, `filter-map`, `append-map`,
   `alist-delete`; `string-prefix?`; `parameterize`; ISO dates; and lisp-expert
   moved onto them, with its bugs fixed.
-- [**HTTP(S) and JSON**](specs/https-and-json.md): JSON done (`json-read`,
-  `json-write`); HTTP(S) proposed, an early slice of Phase 11.6, a spike first.
+- [**HTTP(S) and JSON**](specs/https-and-json.md) (done): `json-read` and
+  `json-write`; `http-request` and `http-get` over the system's curl, with
+  certificates always checked: an early slice of Phase 11.6.
 
 ### Phase 11 — A world of its own
 [Spec](specs/phase-11-pure-image.md), accepted in outline; a long phase, each
