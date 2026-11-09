@@ -24,7 +24,7 @@ rm -f "$PHARO/cog-lisp.image" "$PHARO/cog-lisp.changes"
 
 echo "=== cog-lisp : building image ==="
 echo "    from : $SEED"
-if ! "$VM" --headless "$SEED" st "$ROOT/build/build.st" || [ ! -f "$PHARO/cog-lisp.image" ]; then
+if ! "$VM" --headless "$SEED" --no-default-preferences st "$ROOT/build/build.st" || [ ! -f "$PHARO/cog-lisp.image" ]; then
   echo "build-image: build failed - see messages above" >&2
   exit 1
 fi

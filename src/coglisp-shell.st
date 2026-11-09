@@ -24,6 +24,19 @@ stdin := (Object << #LispStdin) slots: { #kind. #handle. #pending. #eof }; packa
 repl  := (Object << #LispRepl) slots: { #in. #out. #err. #compiler. #interactive. #level }; package: 'CogLisp-Shell'; install.
 shell := (ClapApplication << #LispShellCommand) sharedVariables: { #BuildTime }; package: 'CogLisp-Shell'; install.
 
+"=== Starting anywhere (specs/startup-anywhere.md R-1, R-2) ==================
+ Pharo looks for the changes file in the image folder and then the working
+ folder, and tries every place for writing before any for reading. When the
+ image's changes file cannot be written (another VM holds it, or the install is
+ read-only), opening one in the working folder succeeded by creating it empty,
+ and Pharo then refused an empty source file: start-up failed, and left that
+ file behind. Looking only in the image folder, a changes file that cannot be
+ written opens read-only (it can, even while another VM holds it), and one
+ that cannot be opened at all is left out. Neither says anything on stdout."
+cm value: PharoFilesOpener value: '*CogLisp-Shell' value: 'locateSources: fullSourcesName forImage: imagePath
+	"Only the image folder: see the comment above this method in src/coglisp-shell.st."
+	^ SourceFile lookupFileNamed: fullSourcesName potentialLocations: { FileLocator imageDirectory }'.
+
 "=== LispStdin ============================================================
  A line reader over the process stdin that WAITS for input. Pharo's stdin never
  blocks: with nothing buffered, reads answer 0 bytes and atEnd answers true, the

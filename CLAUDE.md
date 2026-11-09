@@ -425,10 +425,9 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   rebuild it (`npm run package`) before installing it. A new npm dependency
   shipped in the `.vsix` needs a row in `vscode/THIRD-PARTY-NOTICES.md`.
   The extension runs the server on a copy of the image in the temporary folder
-  (`cog-lisp-server-*`). If the user's own VS Code holds this checkout's image
-  (an old extension), run `npm run test:vscode` with `COGLISP_TEST_ROOT` set to
-  a throwaway copy of the checkout, and run headless work with `COGLISP_IMAGE`
-  set to a copy of the image. Never kill the user's server.
+  (`cog-lisp-server-*`), which also survives a rebuild. Never kill the user's
+  server; an orphaned one (no parent process left) holding nothing unsaved may
+  be stopped by PID.
 - **The site is GitHub Pages** (Phase 10 step 10.6): GitHub's own Jekyll build of
   `docs/` (`.github/actions/build-site`), checked by `tools/check-site.js`,
   built by CI on every push and published by each release (`pages.yml`). Every
@@ -562,14 +561,26 @@ This project follows spec-driven development: **write the spec before the code.*
   exits 0 or 1, so a new suite is picked up by `run-all.bat` with no other change.
 - **An unhandled error in a `st` chunk prints its stack and exits 1**; it does
   not hang (unlike an unhandled error inside a Clap command).
-- **Two VMs running on one image file collide**, even when neither files
-  anything in: the first holds the image's `.changes` open for writing, and the
-  second fails at start-up with "Cannot open non source file" (checked
-  2026-11-06). A long-running VM (a REPL, the language server) therefore blocks
-  every other run of that image; give it a copy (`COGLISP_IMAGE`), as the
-  extension does for the language server. For concurrent runs (e.g. several reviewers), use a copy of the stock
-  image per run. Kill a stray VM by PID, not by `taskkill /IM`, when other runs
-  may be live.
+- **Two VMs on one cog-lisp image no longer collide** (specs/startup-anywhere.md,
+  2026-11-09).
+  - **The old failure:** Pharo looked for the changes file beside the image *and
+    in the current folder*, and tried every place for writing before any for
+    reading. When the first VM held the image's changes file, the second created
+    an empty `cog-lisp.changes` in its current folder, then refused it ("Cannot
+    open non source file"), leaving that file and a `PharoDebug.log` behind.
+  - **The fix:** cog-lisp's image overrides
+    `PharoFilesOpener>>locateSources:forImage:` to look beside the image only. A
+    changes file it cannot write opens read-only, which works even while
+    another VM holds it.
+  - **The stock and seed images still have the old behavior**, until a release
+    with the fix becomes the seed. A build fails if another VM holds
+    `pharo/seed.image`.
+  - Kill a stray VM by PID, not by `taskkill /IM`, when other runs may be live.
+- **Every VM start passes `--no-default-preferences`** after the image name.
+  Without it, start-up resumes stored settings, and the Playground's settings
+  create `pharo-local/play-cache` in the current folder, which crashes a run in
+  a read-only folder. The build also turns Epicea off: it created
+  `pharo-local/ombu-sessions` beside the image at every start-up.
 - **`--maxOldSpaceSize=<bytes>` caps the VM heap**, but at the cap the VM logs
   "MaxOldSpaceSize reached", aborts, writes `crash.dmp` (~75 MB) in the working
   directory, and then hangs instead of exiting. A cap is only a backstop.

@@ -52,6 +52,31 @@ set OK=0
 fc /b "tests\runner\delayed\late.expected" "%TMPD%\late.out" >nul 2>&1 && set OK=1
 call :check "REPL waits for input that arrives late" !OK!
 
+rem --- Starting anywhere (specs/startup-anywhere.md AC-2, AC-3) ---------------------
+rem  Two runs at once on one image. In A ^| B both sides run at the same time: hold.lisp
+rem  keeps the image for six seconds, and beside.lisp starts on it after about three.
+"%CL%" "tests\runner\together\hold.lisp" <nul >"%TMPD%\hold.out" 2>&1 | (ping -n 4 127.0.0.1 >nul & "%CL%" "tests\runner\together\beside.lisp" <nul >"%TMPD%\beside.out" 2>"%TMPD%\beside.err")
+set OK=0
+fc /b "tests\runner\together\beside.expected" "%TMPD%\beside.out" >nul 2>&1 && set OK=1
+for %%F in ("%TMPD%\beside.err") do if %%~zF GTR 0 set OK=0
+call :check "two runs at once on one image: the second runs beside the first" !OK!
+set OK=0
+fc /b "tests\runner\together\hold.expected" "%TMPD%\hold.out" >nul 2>&1 && set OK=1
+call :check "... and the first finishes undisturbed" !OK!
+rem  A run writes nothing to the current folder (no cog-lisp.changes, pharo-local or
+rem  PharoDebug.log).
+set "CWDCHECK=%TMPD%\cwd-check"
+if exist "%CWDCHECK%" rd /s /q "%CWDCHECK%"
+mkdir "%CWDCHECK%"
+set "HERE=%CD%"
+pushd "%CWDCHECK%"
+call "%HERE%\cog-lisp.bat" "%HERE%\examples\hello.lisp" <nul >"%TMPD%\cwd.out" 2>&1
+popd
+set OK=0
+fc /b "examples\hello.expected" "%TMPD%\cwd.out" >nul 2>&1 && set OK=1
+for /f %%F in ('dir /b /a "%CWDCHECK%" 2^>nul') do set OK=0
+call :check "a run writes nothing to the current folder" !OK!
+
 rem --- AC-13 / AC-21: persistence across save-image and a new process -------------
 copy /y "pharo\cog-lisp.image" "pharo\cog-lisp-test.image" >nul
 copy /y "pharo\cog-lisp.changes" "pharo\cog-lisp-test.changes" >nul

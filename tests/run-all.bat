@@ -59,7 +59,7 @@ rem ---------------------------------------------------------------------------
 rem  %1 = full path of a suite, %2 = its name; each runs on a fresh copy of the built image
 copy /y "pharo\cog-lisp.image" "pharo\suite.image" >nul
 copy /y "pharo\cog-lisp.changes" "pharo\suite.changes" >nul
-"%VM%" --headless "%CD%\pharo\suite.image" st "%~1" <"%TMPD%\empty-input.txt" >"%TMPD%\%~2.out" 2>&1
+"%VM%" --headless "%CD%\pharo\suite.image" --no-default-preferences st "%~1" <"%TMPD%\empty-input.txt" >"%TMPD%\%~2.out" 2>&1
 set RC=!ERRORLEVEL!
 call :tally "%~2" "%TMPD%\%~2.out" !RC!
 exit /b 0

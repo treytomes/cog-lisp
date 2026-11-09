@@ -17,6 +17,12 @@ out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
 ((Smalltalk includesKey: #LispCompiler) and: [(Smalltalk at: #LispCompiler) hasLispCompiler])
 	ifFalse: [out value: 'BUILD FAILED: this is not a cog-lisp image with a LISP compiler; build from pharo/seed.image'.
 		Smalltalk exit: 1].
+"The build records every method source in the changes file: a read-only one
+ (another VM holds the seed, or the folder cannot be written) would lose them
+ (specs/startup-anywhere.md R-6)."
+(SourceFiles changesFileStream isNil or: [SourceFiles changesFileStream isReadOnly])
+	ifTrue: [out value: 'BUILD FAILED: pharo/seed.changes cannot be written: is another cog-lisp running on pharo/seed.image, or is pharo/ read-only?'.
+		Smalltalk exit: 1].
 seedPackages := (PackageOrganizer default packages select: [:p | p name beginsWith: 'CogLisp-'])
 	collect: [:p | p name asString].
 Smalltalk at: #CogLispBuild put: (Dictionary new
@@ -77,6 +83,13 @@ ok := [| diffs |
 		do: [:e | out value: 'BUILD ERROR: ' , e messageText printString. false].
 ok ifFalse: [out value: 'BUILD FAILED: smoke test did not pass; image not saved'. Smalltalk exit: 1].
 Smalltalk globals removeKey: #CogLispBuild.
+"No Epicea (Pharo's log of code changes): at every start-up it created
+ pharo-local/ombu-sessions beside the image, so an install the user cannot write
+ failed to start (specs/startup-anywhere.md R-4). cog-lisp keeps its own source."
+(Smalltalk hasClassNamed: #EpMonitor) ifTrue: [
+	EpMonitor hasCurrent ifTrue: [EpMonitor current disable].
+	EpMonitor reset.
+	SessionManager default unregisterClassNamed: #EpMonitor; unregisterClassNamed: #EpLostChangesDetector].
 LispShellCommand markBuilt.
 out value: 'BUILD OK: built from the seed; packages, primitives, lib/core.lisp and lib/compiler installed, smoke test passed'.
 !

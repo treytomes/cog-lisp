@@ -14,5 +14,5 @@ if not exist "%IMG%" (
   echo run-benchmarks: no image at %IMG% - run build-image.bat first 1>&2
   exit /b 2
 )
-"%VM%" --headless "%IMG%" st "%ROOT%\bench\bench.st"
+"%VM%" --headless "%IMG%" --no-default-preferences st "%ROOT%\bench\bench.st"
 exit /b %ERRORLEVEL%

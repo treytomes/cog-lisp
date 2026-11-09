@@ -34,7 +34,7 @@ if [ ! -f "$IMG" ]; then
 fi
 
 if [ $# -eq 0 ]; then
-  "$VM" --headless "$CAP" "$IMG" lisp repl
+  "$VM" --headless "$CAP" "$IMG" --no-default-preferences lisp repl
   exit $?
 fi
 
@@ -45,5 +45,5 @@ case "$1" in
 esac
 command -v cygpath >/dev/null 2>&1 && PROG="$(cygpath -w "$PROG")"
 shift
-"$VM" --headless "$CAP" "$IMG" lisp run "$PROG" "$@"
+"$VM" --headless "$CAP" "$IMG" --no-default-preferences lisp run "$PROG" "$@"
 exit $?

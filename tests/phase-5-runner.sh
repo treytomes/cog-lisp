@@ -100,6 +100,41 @@ if [ "$(uname -s)" = Linux ] && command -v script >/dev/null 2>&1; then
     "$(same tests/runner/terminal/session.expected "$TMPD/terminal.out")"
 fi
 
+# --- Starting anywhere (specs/startup-anywhere.md AC-2, AC-3) ------------------
+# Two runs at once on one image: hold.lisp keeps it for six seconds, and
+# beside.lisp starts on it after three; then a REPL holds it while a program runs.
+"$CL" tests/runner/together/hold.lisp </dev/null >"$TMPD/hold.out" 2>&1 &
+HOLD=$!
+sleep 3
+"$CL" tests/runner/together/beside.lisp </dev/null >"$TMPD/beside.out" 2>"$TMPD/beside.err"
+RC=$?
+wait $HOLD
+RCH=$?
+OK=0; [ "$RC" = 0 ] && [ ! -s "$TMPD/beside.err" ] && [ "$(same tests/runner/together/beside.expected "$TMPD/beside.out")" = 1 ] && OK=1
+check "two runs at once on one image: the second runs beside the first (exit $RC)" $OK
+OK=0; [ "$RCH" = 0 ] && [ "$(same tests/runner/together/hold.expected "$TMPD/hold.out")" = 1 ] && OK=1
+check "... and the first finishes undisturbed (exit $RCH)" $OK
+(printf '(display (+ 40 2))\n'; sleep 6; printf '(display "still here")\n') | "$CL" >"$TMPD/holder-repl.out" 2>&1 &
+HOLD=$!
+sleep 3
+"$CL" tests/runner/together/beside.lisp </dev/null >"$TMPD/beside2.out" 2>&1
+RC=$?
+wait $HOLD
+OK=0; [ "$RC" = 0 ] && [ "$(same tests/runner/together/beside.expected "$TMPD/beside2.out")" = 1 ] && grep -q "still here" "$TMPD/holder-repl.out" && OK=1
+check "a program runs while a REPL holds the image, and the REPL still answers" $OK
+# A run writes nothing to the current folder (no cog-lisp.changes, pharo-local or
+# PharoDebug.log); on Linux, a read-only one works too.
+CWD="$TMPD/cwd-check"; rm -rf "$CWD"; mkdir -p "$CWD"
+(cd "$CWD" && "$CL" "$ROOT/examples/hello.lisp" </dev/null >"$TMPD/cwd.out" 2>&1)
+OK=0; [ -z "$(ls -A "$CWD")" ] && [ "$(same examples/hello.expected "$TMPD/cwd.out")" = 1 ] && OK=1
+check "a run writes nothing to the current folder" $OK
+if [ "$(uname -s)" = Linux ] && [ "$(id -u)" != 0 ]; then
+  chmod 555 "$CWD"
+  (cd "$CWD" && "$CL" "$ROOT/examples/hello.lisp" </dev/null >"$TMPD/cwd-ro.out" 2>&1)
+  chmod 755 "$CWD"
+  check "a run from a read-only folder works" "$(same examples/hello.expected "$TMPD/cwd-ro.out")"
+fi
+
 # --- AC-13 / AC-21: persistence across save-image and a new process ----------
 cp pharo/cog-lisp.image pharo/cog-lisp-test.image
 cp pharo/cog-lisp.changes pharo/cog-lisp-test.changes

@@ -69,6 +69,10 @@ the current folder's changes file *is* the real one, and it opens read-only.
     settings.
 - **R-4. Nothing is written to the current folder** by a run that succeeds: no
   `cog-lisp.changes`, no `pharo-local/`, no `PharoDebug.log`.
+  - Nor beside the image: Epicea (Pharo's log of code changes) created
+    `pharo-local/ombu-sessions` there at every start-up (found while building,
+    2026-11-09). The build turns Epicea off and takes it off the start-up list;
+    cog-lisp keeps its own source.
 - **R-5. Two runs at once on one image work**: a REPL left open, and a program,
   or the language server, started beside it.
   - The extension's server keeps its private copy of the image (10.5), because
@@ -98,10 +102,16 @@ built:
   - the current folder read-only;
   - the home folder read-only;
   - all three read-only.
-- **AC-2:** on Windows and on Linux, with a REPL holding the image (a pipe left
-  open), a program run from the same checkout succeeds, with exact output. The
-  REPL still answers afterwards.
-- **AC-3:** a run in a read-only folder works on Windows too.
+- **AC-2:** on Windows and on Linux, while another run holds the image, a program
+  run from the same checkout succeeds, with exact output, and the first run
+  finishes undisturbed.
+  - The holder is a program that waits six seconds, so the `.bat` runner can run
+    both at once in a pipe (`A | B`).
+  - On Linux a REPL holds it too, and still answers afterwards.
+- **AC-3:** a run writes nothing to its current folder, on both platforms. On
+  Linux, as a user other than root, a run from a read-only folder works. (A
+  Windows folder cannot simply be made read-only, so there the check that
+  nothing is written stands for it.)
 - **AC-4:** every suite passes. `build-image` still records method sources: a
   method filed in from `src/` shows its source, not a decompilation.
 - **AC-5:** `release/smoke-test.sh` runs a bundle that is made read-only
@@ -111,7 +121,41 @@ The checks go in `tests/phase-5-runner.bat` and `.sh`, which already run
 programs and REPL sessions. The cases in Docker run in `release/smoke-test.sh`
 on CI's Linux runner.
 
-## 5. Risks
+## 5. As built (2026-11-09)
+
+- **The spike's answers:**
+  - **Windows:** a second VM opens the changes file read-only while the first
+    holds it for writing. It read 2,095,431 bytes; only opening it for writing
+    failed. So two runs both keep their method sources.
+  - **The notice:** with the changes file opened read-only, stdout was exactly
+    the program's output and stderr was empty. `informProblemInChanges:` says
+    nothing headless, so nothing needs silencing.
+- **The changes:**
+  - R-1: `PharoFilesOpener>>locateSources:forImage:` is overridden in
+    `src/coglisp-shell.st`, to look in the image's folder only.
+  - R-3: `--no-default-preferences` is passed after the image name by
+    `cog-lisp.bat`/`.sh`, `build-image.bat`/`.sh`, `tests/run-all.bat`/`.sh` and
+    `bench/run-benchmarks.bat`/`.sh`.
+  - R-4: `build/build.st` disables Epicea, resets it, and unregisters
+    `EpMonitor` and `EpLostChangesDetector` from start-up.
+  - R-6: `build/build.st` stops if the seed's changes file is read-only.
+- **R-6 cannot show its message until the seed has this fix.** The VM running the
+  build *is* the seed, so a seed of v0.2.2 or earlier, held by another VM, still
+  fails at start-up with the old error before `build.st` runs. Either way the
+  build fails cleanly.
+  - Found on the way: `build-image` deletes the old `pharo/cog-lisp.image` before
+    building, so a failed build leaves none. That was so before, and is left for
+    another change.
+- **Checks:**
+  - Linux, in Docker, as a user who does not own the bundle: all four cases of
+    AC-1 pass, with exact output, empty stderr, and the current folder
+    unchanged.
+  - Windows: `tests/phase-5-runner.bat` passes 132/132, with AC-2 and AC-3.
+  - `tests/phase-5-runner.sh` gains AC-2 (including the REPL case) and AC-3.
+  - `release/smoke-test.sh` gains AC-5: a read-only bundle, run from a read-only
+    folder, as a user other than root (CI's runner).
+
+## 6. Risks
 
 - **Pharo's start-up order.** The changes file is opened by a start-up handler
   that runs before cog-lisp's code. The override must be installed in the saved
@@ -121,7 +165,7 @@ on CI's Linux runner.
   compiler for one build. An override of a Pharo method does not touch the
   compiler.
 
-## 6. Decisions (owner, 2026-11-09: as proposed)
+## 7. Decisions (owner, 2026-11-09: as proposed)
 
 1. **Where this sits in the plan.** Proposed: now, before Phase 11, as a small
    step of its own. It hurts every user who keeps a REPL open.

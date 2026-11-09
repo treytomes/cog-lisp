@@ -22,7 +22,7 @@ if exist "%PHARO%\cog-lisp.changes" del /q "%PHARO%\cog-lisp.changes"
 
 echo === cog-lisp : building image ===
 echo     from : %SEED%
-"%VM%" --headless "%SEED%" st "%ROOT%build\build.st"
+"%VM%" --headless "%SEED%" --no-default-preferences st "%ROOT%build\build.st"
 if errorlevel 1 goto :failed
 if not exist "%PHARO%\cog-lisp.image" goto :failed
 

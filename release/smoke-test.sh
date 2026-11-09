@@ -75,6 +75,20 @@ if [ -f cog-lisp.bat ]; then
   check "cog-lisp.bat runs a program" $ok
 fi
 
+# Starting anywhere (specs/startup-anywhere.md AC-5): the bundle made read-only,
+# run from a read-only folder. Root ignores permissions, so only as another user.
+if [ "$(uname -s)" = Linux ] && [ "$(id -u)" != 0 ]; then
+  RO="$(mktemp -d)"
+  chmod -R a-w "$B"; chmod 555 "$RO"
+  (cd "$RO" && "$B/cog-lisp.sh" "$B/examples/hello.lisp") </dev/null >"$OUT/ro.out" 2>"$OUT/ro.err"
+  rc=$?
+  chmod -R u+w "$B"; chmod 755 "$RO"
+  ok=0; [ "$rc" = 0 ] && cmp -s examples/hello.expected "$OUT/ro.out" && [ ! -s "$OUT/ro.err" ] && [ -z "$(ls -A "$RO")" ] && ok=1
+  check "a read-only bundle runs from a read-only folder, writing nothing there" $ok
+  [ "$ok" = 1 ] || head -3 "$OUT/ro.err"
+  rm -rf "$RO"
+fi
+
 rm -rf "$OUT"
 echo
 echo "== RESULT: $PASS/$TOTAL checks passed =="

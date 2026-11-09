@@ -15,4 +15,4 @@ if [ -z "$VM" ] || [ ! -f "$IMG" ]; then
   echo "run-benchmarks: no VM or image in pharo/ - run bootstrap-pharo.sh and build-image.sh first" >&2
   exit 2
 fi
-"$VM" --headless "$IMG" st "$ROOT/bench/bench.st" </dev/null
+"$VM" --headless "$IMG" --no-default-preferences st "$ROOT/bench/bench.st" </dev/null

@@ -64,7 +64,7 @@ echo "  ok    build-image (from the seed)"
 for t in tests/phase-*.st; do
   name="$(basename "$t" .st)"
   cp -f pharo/cog-lisp.image pharo/suite.image && cp -f pharo/cog-lisp.changes pharo/suite.changes
-  "$VM" --headless "$ROOT/pharo/suite.image" st "$ROOT/$t" </dev/null >"$TMPD/$name.out" 2>&1
+  "$VM" --headless "$ROOT/pharo/suite.image" --no-default-preferences st "$ROOT/$t" </dev/null >"$TMPD/$name.out" 2>&1
   tally "$name" "$TMPD/$name.out" $?
 done
 rm -f pharo/suite.image pharo/suite.changes

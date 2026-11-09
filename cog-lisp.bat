@@ -29,11 +29,11 @@ if "%~1"=="" goto :run
 set ARGS=%ARGS% "%~1"
 goto :collect
 :run
-"%VM%" --headless %CAP% "%IMG%" lisp run "%PROG%"%ARGS%
+"%VM%" --headless %CAP% "%IMG%" --no-default-preferences lisp run "%PROG%"%ARGS%
 exit /b %ERRORLEVEL%
 
 :repl
-"%VM%" --headless %CAP% "%IMG%" lisp repl
+"%VM%" --headless %CAP% "%IMG%" --no-default-preferences lisp repl
 exit /b %ERRORLEVEL%
 
 :noimage
