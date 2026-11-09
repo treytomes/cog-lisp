@@ -23,7 +23,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Evaluation and macros](#evaluation-and-macros) (5)
 - [Output](#output) (3)
 - [Ports](#ports) (14)
-- [Files](#files) (17)
+- [Files](#files) (20)
 - [The system](#the-system) (7)
 - [Smalltalk interop](#smalltalk-interop) (11)
 - [Language server](#language-server) (2)
@@ -362,8 +362,11 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `current-output-port` | `(current-output-port)` | procedure | The port display and write write to by default. |
 | `delete-file` | `(delete-file path)` | procedure | Deletes the file at path. |
 | `file-exists?` | `(file-exists? path)` | procedure | True if there is a file at path. |
+| `get-environment-variable` | `(get-environment-variable name)` | procedure | The value of the environment variable name, a string, or #f if it is not set. |
 | `open-input-file` | `(open-input-file path)` | procedure | An input port reading the file at path. |
 | `open-output-file` | `(open-output-file path)` | procedure | An output port writing the file at path, which is replaced. |
+| `require` | `(require 'name)` | procedure | Loads the library name.lisp from the first folder of (hash-table-ref *env* 'library-path) that has it, once, and answers its full path; a name with slashes names a subfolder. The library path is the folders of COGLISP_PATH, then cog-lisp's own lib folder: (require 'cl) loads the Common Lisp names, (require 'test) the test library. |
+| `require-path` | `(require-path 'name)` | procedure | The full path of the file (require 'name) would load: name.lisp in the first folder of (hash-table-ref *env* 'library-path) that has it, or #f. Loads nothing. |
 | `with-input-from-file` | `(with-input-from-file path thunk)` | procedure | Calls thunk with the current input read from the file. |
 | `with-output-to-file` | `(with-output-to-file path thunk)` | procedure | Calls thunk with the current output written to the file. |
 | `write-shared` | `(write-shared x [port])` | procedure | Writes x with a datum label for every part it shares, so the sharing reads back. |
@@ -374,7 +377,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 |---|---|---|---|
 | `disassemble` | `(disassemble proc)` | procedure | Writes the bytecode of the procedure proc. |
 | `exit` | `(exit [code])` | procedure | Ends the program: (exit) and (exit #t) succeed, (exit #f) fails, (exit n) exits with n. |
-| `load` | `(load path)` | procedure | Reads and evaluates every form of the file at path, relative to the file being loaded. |
+| `load` | `(load path)` | procedure | Reads and evaluates every form of the file at path, relative to the file being loaded, and answers the full path of that file. |
 | `procedure-documentation` | `(procedure-documentation proc)` | procedure | The documentation of proc, or #f: the call form on its first line, then what it does. |
 | `procedure-source` | `(procedure-source proc)` | procedure | The text proc was compiled from, or #f for a primitive. |
 | `save-image` | `(save-image)` | procedure | Saves the running image, so its definitions are there when it next starts. |

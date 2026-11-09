@@ -1,6 +1,6 @@
 ; conditions-cl.lisp -- the same ideas in Common Lisp style (lib/cl.lisp; Phase 7.7)
 
-(load "lib/cl.lisp")
+(require 'cl)
 
 ; handler-case: unwind, then run the clause for the condition's type.
 (defun safe-divide (a b)

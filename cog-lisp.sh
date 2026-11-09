@@ -14,6 +14,8 @@
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# the cog-lisp folder, for *env* and require (specs/library-path.md R-4)
+export COGLISP_HOME="$ROOT"
 . "$ROOT/scripts/pharo-vm.sh"
 VM="$(pharo_vm "$ROOT/pharo")"
 IMG="${COGLISP_IMAGE:-$ROOT/pharo/cog-lisp.image}"

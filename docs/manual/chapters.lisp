@@ -34,8 +34,8 @@ indexed sequences of anything."
 
 (chapter "input-and-output" "Input and output"
   "Ports read and write strings, files, and the standard streams; a program can be
-spread over several files."
-  "string-ports" "files" "echo" "program")
+spread over several files, and can load cog-lisp's own libraries from anywhere."
+  "string-ports" "files" "echo" "program" "libraries")
 
 (chapter "errors" "Errors, conditions and restarts"
   "Errors are conditions that handlers catch; restarts let a handler choose how to

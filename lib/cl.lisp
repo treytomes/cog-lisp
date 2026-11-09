@@ -1,6 +1,7 @@
 ;;; cl.lisp -- Common Lisp names for cog-lisp (specs/phase-7-macros.md section 8)
 ;;;
-;;; Load with (load "lib/cl.lisp"), for working through ANSI Common Lisp.
+;;; Load with (require 'cl), from any folder (specs/library-path.md), for
+;;; working through ANSI Common Lisp.
 ;;; cog-lisp stays a Scheme-like LISP underneath; this file adds CL names as
 ;;; macros and procedures on top of it.
 ;;;

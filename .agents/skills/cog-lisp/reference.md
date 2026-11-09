@@ -307,8 +307,11 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 - `(current-output-port)`: The port display and write write to by default.
 - `(delete-file path)`: Deletes the file at path.
 - `(file-exists? path)`: True if there is a file at path.
+- `(get-environment-variable name)`: The value of the environment variable name, a string, or #f if it is not set.
 - `(open-input-file path)`: An input port reading the file at path.
 - `(open-output-file path)`: An output port writing the file at path, which is replaced.
+- `(require 'name)`: Loads the library name.lisp from the first folder of (hash-table-ref *env* 'library-path) that has it, once, and answers its full path; a name with slashes names a subfolder. The library path is the folders of COGLISP_PATH, then cog-lisp's own lib folder: (require 'cl) loads the Common Lisp names, (require 'test) the test library.
+- `(require-path 'name)`: The full path of the file (require 'name) would load: name.lisp in the first folder of (hash-table-ref *env* 'library-path) that has it, or #f. Loads nothing.
 - `(with-input-from-file path thunk)`: Calls thunk with the current input read from the file.
 - `(with-output-to-file path thunk)`: Calls thunk with the current output written to the file.
 - `(write-shared x [port])`: Writes x with a datum label for every part it shares, so the sharing reads back.
@@ -317,7 +320,7 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 
 - `(disassemble proc)`: Writes the bytecode of the procedure proc.
 - `(exit [code])`: Ends the program: (exit) and (exit #t) succeed, (exit #f) fails, (exit n) exits with n.
-- `(load path)`: Reads and evaluates every form of the file at path, relative to the file being loaded.
+- `(load path)`: Reads and evaluates every form of the file at path, relative to the file being loaded, and answers the full path of that file.
 - `(procedure-documentation proc)`: The documentation of proc, or #f: the call form on its first line, then what it does.
 - `(procedure-source proc)`: The text proc was compiled from, or #f for a primitive.
 - `(save-image)`: Saves the running image, so its definitions are there when it next starts.

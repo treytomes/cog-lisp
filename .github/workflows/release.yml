@@ -42,7 +42,8 @@ jobs:
       - name: Bootstrap Pharo
         run: ./bootstrap-pharo.sh
       - name: Build the image
-        run: ./build-image.sh
+        # *env*'s version (specs/library-path.md R-1): the release, not "dev"
+        run: COGLISP_VERSION="${VERSION#v}" ./build-image.sh
       # the reference, the editor's data, the manual, the site's home page and the
       # agent skill, generated again from this image: the release ships only what
       # matches it (Phase 10 steps 10.6 and 10.7)

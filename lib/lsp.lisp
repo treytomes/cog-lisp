@@ -10,9 +10,9 @@
 ;;;
 ;;; It serves hover, completion, go to definition, diagnostics and macro
 ;;; expansion (the cog-lisp/expand request). It reads the workspace's .lisp files
-;;; but never runs them, except a document's top-level define-syntax and
-;;; define-macro forms, so later forms expand as they will when the file runs
-;;; (the owner's decision 4).
+;;; but never runs them, except a document's top-level define-syntax,
+;;; define-macro and require forms, so later forms expand as they will when the
+;;; file runs (the owner's decision 4; require, specs/library-path.md AC-5).
 
 ;;; ---------------------------------------------------------------------------
 ;;; JSON
@@ -367,7 +367,10 @@
              => (lambda (range) (cons (- (car range) 1) (cdr range))))
             (else (loop (cdr fs)))))))
 
-(define (lsp-syntax-definition? d) (or (lsp-head-is? d 'define-syntax) (lsp-head-is? d 'define-macro)))
+;; the forms a document's diagnostics run: syntax definitions, and require, whose
+;; library defines macros later forms use ((require 'cl) and defun, say)
+(define (lsp-syntax-definition? d)
+  (or (lsp-head-is? d 'define-syntax) (lsp-head-is? d 'define-macro) (lsp-head-is? d 'require)))
 
 (define (lsp-diagnostics text)
   (let ((r (make-reader text)) (starts (lsp-line-starts text)))

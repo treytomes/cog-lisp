@@ -76,6 +76,16 @@ set OK=0
 fc /b "examples\hello.expected" "%TMPD%\cwd.out" >nul 2>&1 && set OK=1
 for /f %%F in ('dir /b /a "%CWDCHECK%" 2^>nul') do set OK=0
 call :check "a run writes nothing to the current folder" !OK!
+rem  require finds cog-lisp's own libraries from a program in another folder
+rem  (specs/library-path.md AC-1)
+copy /y "tests\runner\elsewhere\uses-libs.lisp" "%CWDCHECK%\" >nul
+pushd "%CWDCHECK%"
+call "%HERE%\cog-lisp.bat" uses-libs.lisp <nul >"%TMPD%\uses-libs.out" 2>&1
+popd
+set OK=0
+fc /b "tests\runner\elsewhere\uses-libs.expected" "%TMPD%\uses-libs.out" >nul 2>&1 && set OK=1
+call :check "require finds cog-lisp's libraries from a program in another folder" !OK!
+del "%CWDCHECK%\uses-libs.lisp" 2>nul
 
 rem --- AC-13 / AC-21: persistence across save-image and a new process -------------
 copy /y "pharo\cog-lisp.image" "pharo\cog-lisp-test.image" >nul

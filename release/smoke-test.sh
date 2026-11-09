@@ -75,6 +75,16 @@ if [ -f cog-lisp.bat ]; then
   check "cog-lisp.bat runs a program" $ok
 fi
 
+# require finds the bundle's own libraries from a program in another folder
+# (specs/library-path.md AC-1)
+ELSE="$(mktemp -d)"
+printf "(require 'cl)\n(defun twice (x) (* 2 x))\n(display (twice 21))\n(newline)\n" > "$ELSE/p.lisp"
+(cd "$ELSE" && "$B/cog-lisp.sh" p.lisp) </dev/null >"$OUT/else.out" 2>&1
+ok=0; [ "$(cat "$OUT/else.out")" = 42 ] && ok=1
+check "require finds the bundle's libraries from a program in another folder" $ok
+[ "$ok" = 1 ] || head -3 "$OUT/else.out"
+rm -rf "$ELSE"
+
 # Starting anywhere (specs/startup-anywhere.md AC-5): the bundle made read-only,
 # run from a read-only folder. Root ignores permissions, so only as another user.
 if [ "$(uname -s)" = Linux ] && [ "$(id -u)" != 0 ]; then

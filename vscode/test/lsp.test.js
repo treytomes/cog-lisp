@@ -29,6 +29,9 @@ const files = {
   'main.lisp': '(define-syntax twice (syntax-rules () ((_ e) (begin e e))))\n' +
     '(display (area 2 3))\n(twice (display "x"))\n(define (f x) (if))\n; 😀 (string-ref "s" 0)\n(string-ref "s" 0)\n',
   'broken.lisp': '(define ok 1)\n(display "unterminated\n',
+  // specs/library-path.md AC-5: a required library's macros are known to diagnostics.
+  // (defun broken) is an error only as cl.lisp's macro: as a call it compiles quietly.
+  'cl-user.lisp': "(require 'cl)\n(defun square (x) (* x x))\n(defun broken)\n",
 };
 for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(workspace, name), text);
 const uri = (name) => pathToFileURL(path.join(workspace, name)).href;
@@ -81,6 +84,7 @@ async function main() {
   await open('main.lisp');
   const diagnoseTime = Date.now() - t;
   await open('broken.lisp');
+  await open('cl-user.lisp');
   const at = (name, line, character) => ({ textDocument: { uri: uri(name) }, position: { line, character } });
   const hover = async (name, line, character) => {
     const h = await connection.sendRequest('textDocument/hover', at(name, line, character));
@@ -117,6 +121,9 @@ async function main() {
   check("the document's own macro (twice) is known: no error at its use",
     !mainDiags.some((d) => d.range.start.line === 2));
   const brokenDiags = diagnostics[uri('broken.lisp')] || [];
+  const clDiags = diagnostics[uri('cl-user.lisp')] || [];
+  check("a document's (require 'cl) is run, so its defun is a macro: only the misused one is reported (library-path AC-5)",
+    clDiags.length === 1 && clDiags[0].range.start.line === 2 && clDiags[0].message.includes('defun'));
   check('a read error is reported where reading stopped', brokenDiags.length === 1 && brokenDiags[0].message.includes('string'));
   let seen = nextDiagnostics();
   connection.sendNotification('textDocument/didChange',

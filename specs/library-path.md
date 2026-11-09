@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-11-09), with the owner's changes: a global `*env*`, `require` of a symbol, and `load` free to answer more |
+| **Status** | Done (2026-11-09). Accepted with the owner's changes: a global `*env*`, `require` of a symbol, and `load` free to answer more |
 | **Found by** | Reviewing `~/projects/lisp-expert` (2026-11-09) |
 
 ## 1. The gap
@@ -93,7 +93,46 @@ with each release.
 - Checked by a LISP test (`tests/lisp/`), and by the runner suite for running
   from another folder.
 
-## 5. Decisions
+## 5. As built (2026-11-09)
+
+- **New primitive, `get-environment-variable`** (R7RS), through `OSEnvironment`.
+  cog-lisp had no way to read the environment.
+- **`*env*`, `require` and `require-path` live in `lib/core.lisp`**, as plain
+  code, since the seed compiles it.
+  - At build time, `*env*` gets `version` (from `COGLISP_VERSION`, which
+    `release.yml` sets for its build) and an empty `libraries`.
+  - At the start of every run, the shell command (`LispShellCommand>>execute`)
+    calls `%env-start!`, which reads `home`, `platform` and `library-path` from
+    that run's environment. One image serves every platform and folder.
+  - `require` records a library before loading it, so a library that requires
+    itself does not loop.
+- **`load` answers the full path** of the file it loaded.
+- **The launchers set `COGLISP_HOME`** to their own folder (`cog-lisp.bat` keeps
+  it local, with its `setlocal`).
+- **The language server runs a document's top-level `require` forms**, as it
+  runs its syntax definitions. So `(require 'cl)` makes `defun` a macro for
+  that document's diagnostics.
+  - The check in `vscode/test/lsp.test.js` uses `(defun broken)`, an error only
+    once `defun` is a macro. It fails with the server unchanged (18/19), and
+    passes with it (19/19).
+  - Found while writing that check: `lib/cl.lisp`'s `defun` does not take a
+    dotted parameter list (`%cl-params` calls `car` on the rest symbol). Not
+    fixed here.
+- **`*env*` is described in `require`'s documentation and in
+  `examples/libraries.lisp`**, not in the reference: the reference lists
+  procedures and forms, and `*env*` is a table.
+- **The skill is unchanged.** It does not teach `lib/cl.lisp`.
+- **The examples now use `(require 'cl)`:** `cl-style` and `conditions-cl`, with
+  their output unchanged. `examples/libraries.lisp` joins the "Input and
+  output" chapter.
+- **Checks:**
+  - `tests/lisp/library-path.lisp`, 26/26;
+  - the runner suites run a program that requires `cl` and `test` from a
+    temporary folder;
+  - `release/smoke-test.sh` runs one from outside the bundle;
+  - the language-server check above.
+
+## 6. Decisions
 
 1. **`require` of a symbol, `load` of a path** (owner, 2026-11-09). R7RS's
    `define-library` and `import` bring a module system (separate namespaces,

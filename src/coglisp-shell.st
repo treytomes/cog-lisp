@@ -352,6 +352,7 @@ cm value: shell value: 'running' value: 'execute
 	| args text |
 	args := (self positional: #args) asArray.
 	[[self warnIfStale.
+	  self startEnvironment.
 	  (args isEmpty or: [args first = ''repl'']) ifTrue: [^ self runRepl].
 	  args first = ''run'' ifTrue: [
 		"(command-line): the program, then its arguments (Phase 7.9 section 5.3)"
@@ -363,6 +364,14 @@ cm value: shell value: 'running' value: 'execute
 			"path:line:col: error: message, for an error while running a file (review R-1)"
 			(e isKindOf: LispLocatedError) ifTrue: [^ self failReport: e reportText].
 			self fail: (LispError describe: e)]'.
+
+cm value: shell value: 'running' value: 'startEnvironment
+	"*env*: the cog-lisp folder, the library path and the platform, read from the
+	 environment of this run (specs/library-path.md). An image without the
+	 %env-start!! of lib/core.lisp (a stock image with src/ filed in) has none."
+	| name |
+	name := LispSymbol named: ''%env-start!!''.
+	(LispEnvironment default isBound: name) ifTrue: [(LispEnvironment default lookup: name) value]'.
 
 "=== load report ==========================================================="
 Stdio stdout

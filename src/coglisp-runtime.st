@@ -1472,6 +1472,9 @@ cm value: prims class value: 'installing' value: 'installFilesInto: anEnv
 	def value: ''current-output-port'' value: (LispProcedure fixed: [LispOutputPort on: self output] arity: 0).
 	def value: ''current-error-port'' value: (LispProcedure fixed: [LispOutputPort on: LispTextOutput stderr] arity: 0).
 	def value: ''command-line'' value: (LispProcedure fixed: [LispCons fromArray: (CommandLine ifNil: [#()])] arity: 0).
+	"R7RS 6.14; specs/library-path.md: *env* reads COGLISP_HOME and COGLISP_PATH through it"
+	def value: ''get-environment-variable'' value: (LispProcedure fixed: [:name |
+		OSEnvironment current at: (self string: name for: ''get-environment-variable'') asString ifAbsent: [false]] arity: 1).
 	def value: ''current-load-path'' value: (LispProcedure fixed: [LispLoadPath value ifNil: [false]] arity: 0).
 	def value: ''write-shared'' value: (LispProcedure variadic: [:x :rest |
 		((opt value: rest) ifEmpty: [self output] ifNotEmpty: [:r | self outPort: r first for: ''write-shared''])
@@ -1511,6 +1514,8 @@ cm value: prims class value: 'installing' value: 'installFilesInto: anEnv
 			''The full path of the file being loaded or run, or #f.''
 		''command-line'' ''(command-line)''
 			''A list of the program name and its arguments, as strings.''
+		''get-environment-variable'' ''(get-environment-variable name)''
+			''The value of the environment variable name, a string, or #f if it is not set.''
 		''write-shared'' ''(write-shared x [port])''
 			''Writes x with a datum label for every part it shares, so the sharing reads back.'')'.
 cm value: prims class value: 'output' value: 'withOutput: aStream do: aBlock
@@ -2003,7 +2008,10 @@ cm value: prims class value: 'installing' value: 'installIOInto: anEnv
 	anEnv define: (LispSymbol named: ''write'') value: (LispProcedure fixed: [:x | self output nextPutAll: (LispPrinter writeString: x); flush. LispUnspecified default] arity: 1).
 	anEnv define: (LispSymbol named: ''newline'') value: (LispProcedure fixed: [self output nextPut: Character lf; flush. LispUnspecified default] arity: 0)'.
 cm value: prims class value: 'installing' value: 'installSystemInto: anEnv
-	anEnv define: (LispSymbol named: ''load'') value: (LispProcedure fixed: [:path | LispCompiler new evalFile: path. LispUnspecified default] arity: 1).
+	"load answers the full path of the file it loaded (specs/library-path.md R-5), which require records"
+	anEnv define: (LispSymbol named: ''load'') value: (LispProcedure fixed: [:path |
+		LispCompiler new evalFile: path.
+		(LispCompiler resolveInput: path) fullName] arity: 1).
 	"(exit) and (exit #t) succeed, (exit #f) fails, (exit n) for n in 0..255 (R7RS; review R-10)"
 	anEnv define: (LispSymbol named: ''exit'') value: (LispProcedure variadic: [:codes | | c |
 		c := codes lispElements ifEmpty: [0] ifNotEmpty: [:cs | cs first].
@@ -2026,7 +2034,7 @@ cm value: prims class value: 'installing' value: 'installSystemInto: anEnv
 	"its documentation (Phase 10 step 10.1): name, call form, description"
 	self document: anEnv category: ''The system'' with: #(
 		''load'' ''(load path)''
-			''Reads and evaluates every form of the file at path, relative to the file being loaded.''
+			''Reads and evaluates every form of the file at path, relative to the file being loaded, and answers the full path of that file.''
 		''exit'' ''(exit [code])''
 			''Ends the program: (exit) and (exit #t) succeed, (exit #f) fails, (exit n) exits with n.''
 		''save-image'' ''(save-image)''

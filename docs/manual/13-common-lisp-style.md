@@ -14,7 +14,7 @@ cog-lisp. Remember: nil is true here, so test lists with null or consp.
 `examples/cl-style.lisp`:
 
 ```scheme
-(load "lib/cl.lisp")
+(require 'cl)
 
 (defun our-length (lst)
   (if (null lst)
@@ -106,7 +106,7 @@ ran
 `examples/conditions-cl.lisp`:
 
 ```scheme
-(load "lib/cl.lisp")
+(require 'cl)
 
 ; handler-case: unwind, then run the clause for the condition's type.
 (defun safe-divide (a b)

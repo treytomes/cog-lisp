@@ -198,3 +198,67 @@ A procedure that does what get does and whose setter is set, as SRFI 17 specifie
     (hash-table-set! %setters proc set)
     proc))
 [getter-with-setter category: "Control"]
+
+;;; The environment, and require (specs/library-path.md)
+;;;
+;;; *env* holds what the running world knows about itself: cog-lisp's folder, the
+;;; library path, the libraries required so far, the platform and the version.
+;;; The build sets version (from COGLISP_VERSION, else "dev"); the shell command
+;;; calls %env-start! at the start of every run, which reads the rest from that
+;;; run's environment, since one image serves every platform and every folder.
+
+(define *env* (make-hash-table eq?))
+(hash-table-set! *env* 'version
+                 (let ((v (get-environment-variable "COGLISP_VERSION"))) (if v v "dev")))
+(hash-table-set! *env* 'libraries '())
+
+;; the non-empty parts of s between the separator character
+(define (%env-parts s separator)
+  (let loop ((parts (string-split s separator)) (acc '()))
+    (cond ((null? parts) (reverse acc))
+          ((string=? (car parts) "") (loop (cdr parts) acc))
+          (else (loop (cdr parts) (cons (car parts) acc))))))
+
+(define (%env-start!)
+  (let* ((windows [[(smalltalk OSPlatform) current] isWindows])
+         (given (get-environment-variable "COGLISP_HOME"))
+         (home (if (and given (not (string=? given "")))
+                   [[given asFileReference] fullName]
+                   [[[(smalltalk Smalltalk) imageDirectory] parent] fullName]))
+         (path (get-environment-variable "COGLISP_PATH")))
+    (hash-table-set! *env* 'home home)
+    (hash-table-set! *env* 'platform (if windows 'windows 'linux))
+    (hash-table-set! *env* 'library-path
+                     (append (if path (%env-parts path (if windows #\; #\:)) '())
+                             (list [[[home asFileReference] / "lib"] fullName])))))
+
+;; the full path of name.lisp in the first folder of the library path that has it, or #f
+(define (require-path name)
+  "(require-path 'name)
+The full path of the file (require 'name) would load: name.lisp in the first folder of (hash-table-ref *env* 'library-path) that has it, or #f. Loads nothing."
+  (let ((relative (string-append (symbol->string name) ".lisp")))
+    (let loop ((folders (hash-table-ref/default *env* 'library-path '())))
+      (if (null? folders)
+          #f
+          (let ((file [[(car folders) asFileReference] resolveString: relative]))
+            (if [file exists] [file fullName] (loop (cdr folders))))))))
+[require-path category: "Files"]
+
+(define (require name)
+  "(require 'name)
+Loads the library name.lisp from the first folder of (hash-table-ref *env* 'library-path) that has it, once, and answers its full path; a name with slashes names a subfolder. The library path is the folders of COGLISP_PATH, then cog-lisp's own lib folder: (require 'cl) loads the Common Lisp names, (require 'test) the test library."
+  (if (not (symbol? name))
+      (error (string-append "require: not a symbol: " (with-output-to-string (lambda () (write name))))))
+  (let ((seen (assq name (hash-table-ref *env* 'libraries))))
+    (if seen
+        (cdr seen)
+        (let ((file (require-path name)))
+          (if (not file)
+              (error (string-append "require: no library named " (symbol->string name) " in "
+                                    (with-output-to-string
+                                      (lambda () (display (hash-table-ref/default *env* 'library-path '())))))))
+          ;; recorded before it loads, so a library that requires itself does not loop
+          (hash-table-set! *env* 'libraries (cons (cons name file) (hash-table-ref *env* 'libraries)))
+          (load file)
+          file))))
+[require category: "Files"]

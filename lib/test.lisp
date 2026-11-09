@@ -1,6 +1,6 @@
 ;;; test.lisp -- unit tests written in cog-lisp (specs/phase-7.9-self-hosting-groundwork.md section 8a)
 ;;;
-;;;   (load "lib/test.lisp")
+;;;   (require 'test)               ; or (load "lib/test.lisp") from cog-lisp's folder
 ;;;   (define-test arithmetic
 ;;;     (check (+ 1 2) 3)
 ;;;     (check-true (< 1 2))

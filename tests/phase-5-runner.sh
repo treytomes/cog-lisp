@@ -128,6 +128,13 @@ CWD="$TMPD/cwd-check"; rm -rf "$CWD"; mkdir -p "$CWD"
 (cd "$CWD" && "$CL" "$ROOT/examples/hello.lisp" </dev/null >"$TMPD/cwd.out" 2>&1)
 OK=0; [ -z "$(ls -A "$CWD")" ] && [ "$(same examples/hello.expected "$TMPD/cwd.out")" = 1 ] && OK=1
 check "a run writes nothing to the current folder" $OK
+# require finds cog-lisp's own libraries from a program in another folder
+# (specs/library-path.md AC-1)
+cp tests/runner/elsewhere/uses-libs.lisp "$CWD/"
+(cd "$CWD" && "$CL" uses-libs.lisp </dev/null >"$TMPD/uses-libs.out" 2>&1)
+check "require finds cog-lisp's libraries from a program in another folder" \
+  "$(same tests/runner/elsewhere/uses-libs.expected "$TMPD/uses-libs.out")"
+rm -f "$CWD/uses-libs.lisp"
 if [ "$(uname -s)" = Linux ] && [ "$(id -u)" != 0 ]; then
   chmod 555 "$CWD"
   (cd "$CWD" && "$CL" "$ROOT/examples/hello.lisp" </dev/null >"$TMPD/cwd-ro.out" 2>&1)

@@ -9,6 +9,8 @@ rem  (exit n). Set COGLISP_IMAGE to use an image other than pharo\cog-lisp.image
 rem ===========================================================================
 
 set "ROOT=%~dp0"
+rem  the cog-lisp folder, for *env* and require (specs/library-path.md R-4)
+set "COGLISP_HOME=%~dp0"
 set "VM=%ROOT%pharo\PharoConsole.exe"
 if defined COGLISP_IMAGE (set "IMG=%COGLISP_IMAGE%") else (set "IMG=%ROOT%pharo\cog-lisp.image")
 

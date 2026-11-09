@@ -2,7 +2,7 @@
 ; In the manner of an introductory CL text's early chapters; written for
 ; cog-lisp. Remember: nil is true here, so test lists with null or consp.
 
-(load "lib/cl.lisp")
+(require 'cl)
 
 (defun our-length (lst)
   (if (null lst)
