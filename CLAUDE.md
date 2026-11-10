@@ -614,6 +614,13 @@ This project follows spec-driven development: **write the spec before the code.*
     with the fix becomes the seed. A build fails if another VM holds
     `pharo/seed.image`.
   - Kill a stray VM by PID, not by `taskkill /IM`, when other runs may be live.
+- **`build-image` saves `pharo/cog-lisp-new.image` and only then swaps it in**
+  for `cog-lisp.image`, moving the old files aside first. On Windows a running
+  cog-lisp (a REPL, the user's) holds `cog-lisp.changes`, which then cannot
+  move: the build says so, exits 1 and replaces nothing, leaving the new image
+  as `cog-lisp-new.image`. (It used to delete the old image before building, so
+  a held file left no image at all.) The suites build too: close a REPL on the
+  checkout's image before `tests/run-all`.
 - **Every VM start passes `--no-default-preferences`** after the image name.
   Without it, start-up resumes stored settings, and the Playground's settings
   create `pharo-local/play-cache` in the current folder, which crashes a run in

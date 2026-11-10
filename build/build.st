@@ -94,9 +94,11 @@ LispShellCommand markBuilt.
 out value: 'BUILD OK: built from the seed; packages, primitives, lib/core.lisp and lib/compiler installed, smoke test passed'.
 !
 
-"--- Chunk 5: save as cog-lisp. When the saved image later starts, this process
-     resumes here; it must stop rather than run on in the new session. ---------"
-(Smalltalk saveAs: 'cog-lisp') isImageStarting
+"--- Chunk 5: save as cog-lisp-new; build-image puts it in place of cog-lisp only
+     once it is saved, so a failed build, or a cog-lisp.changes another VM holds,
+     never leaves the old image deleted. When the saved image later starts, this
+     process resumes here; it must stop rather than run on in the new session. --"
+(Smalltalk saveAs: 'cog-lisp-new') isImageStarting
 	ifTrue: [Processor activeProcess terminate]
 	ifFalse: [Smalltalk exit: 0].
 !
