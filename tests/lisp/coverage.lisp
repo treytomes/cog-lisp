@@ -127,4 +127,11 @@
     (let ((report (with-output-to-string (lambda () (coverage-report both)))))
       (check-true (string-search report "coverage: 3 of 3 probes reached")))))
 
+(define-test "R-12 an if on a constant has no probes: unless and a cond with no else count only their own branches"
+  (let ((counts (covered "(define (u x)\n  (unless x\n    'body))\n(define (k x)\n  (cond ((= x 1) 'one)))\n"
+                         (lambda () (u #t) (u #f) (k 1) (k 2)))))
+    ;; each: an entry, and the two sides of its own test; no side "never taken"
+    (check (length counts) 6)
+    (check (filter (lambda (c) (= (vector-ref c 4) 0)) counts) '())))
+
 (run-tests)

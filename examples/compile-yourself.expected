@@ -20,5 +20,5 @@ how the compiler translates if:
                           (lc-unspecified-node)))
            (truthy (opal-send (opal-var "LispCore") "isTruthy:" (vector test-node))))
       (opal-send truthy "ifTrue:ifFalse:"
-                 (vector (lc-probed-thunk c 'true (list (car args) form) then-node)
-                         (lc-probed-thunk c 'false (list (car args) form) else-node))))))
+                 (vector (lc-if-branch c 'true args form then-node)
+                         (lc-if-branch c 'false args form else-node))))))

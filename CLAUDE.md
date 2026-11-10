@@ -582,7 +582,9 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   `COGLISP_COVERAGE_DATA=file` writes a run's counts as data, and
   `coverage-merge` adds runs up; records name files by full canonical path, and
   a file loaded twice counts once per place. `lisp-expert`'s `run-tests` uses
-  both for its coverage check.
+  both for its coverage check. An `if` whose test is the constant `#t` or `#f`
+  has no probes (R-12): `unless` and a `cond` with no `else` make one, and it
+  showed a side "never taken" at the macro's use that no test could take.
 - **A name in `lib/compiler/` must be new:** defining a compiler helper under a
   name it already has (`lc-check` was taken) replaces the old one, and the build
   fails with "bad syntax" on the first form the seed compiles. `grep` first.

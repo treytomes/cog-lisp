@@ -925,8 +925,17 @@ Stops compilation with message and the forms, for a macro to report a misuse."
                           (lc-unspecified-node)))
            (truthy (opal-send (opal-var "LispCore") "isTruthy:" (vector test-node))))
       (opal-send truthy "ifTrue:ifFalse:"
-                 (vector (lc-probed-thunk c 'true (list (car args) form) then-node)
-                         (lc-probed-thunk c 'false (list (car args) form) else-node))))))
+                 (vector (lc-if-branch c 'true args form then-node)
+                         (lc-if-branch c 'false args form else-node))))))
+
+;; one side of an if, probed unless the test is the constant #t or #f: then one
+;; side can never run, and the if is a macro's way to an unspecified value
+;; (unless, a cond with no else), not a branch of the program's
+;; (specs/20-coverage.md R-12)
+(define (lc-if-branch c kind args form node)
+  (if (boolean? (car args))
+      (opal-thunk node)
+      (lc-probed-thunk c kind (list (car args) form) node)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Coverage (specs/20-coverage.md): with the coverage option on, each procedure

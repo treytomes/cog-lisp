@@ -168,7 +168,13 @@ Requirements:
   `write` writes them, so `read` reads them back.
 - **R-11. `(coverage-merge counts ...)`** adds up several runs' counts by R-8's
   rule, for `coverage-report`.
+- **R-12. An `if` whose test is the constant `#t` or `#f` has no probes**
+  (found 2026-11-10, raising `lisp-expert`'s coverage). One of its sides can
+  never run: it is a macro's way to an unspecified value, `unless`'s
+  `(if x (if #f #f) ...)` and a `cond` with no `else`. Its probes, with no
+  position of their own, were reported at the macro's use, so every `unless`
+  showed a side "never taken" that no test could take.
 
 Acceptance: `tests/lisp/coverage.lisp` checks R-8 (a file loaded twice), R-9,
-R-10 and R-11; `lisp-expert`'s `run-tests` reports its coverage across its
+R-10, R-11 and R-12; `lisp-expert`'s `run-tests` reports its coverage across its
 suites.
