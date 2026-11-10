@@ -313,9 +313,10 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 
 ## Evaluation and macros
 
+- `(coverage-merge counts ...)`: Adds up the counts of several runs (each from coverage-stop, or read back from the file COGLISP_COVERAGE_DATA names), and answers one list for coverage-report: a record for each place (file, line, column and kind), in the order first seen, its count the sum.
 - `(coverage-report counts [port])`: Writes what counts (from coverage-stop) never reached, by file and line: the procedures never called and the sides of an if never taken, after a summary line. Writes to port, or the current output.
 - `(coverage-start [files])`: Starts a coverage session: code compiled from now on counts each procedure entry and each side of every if, so start before loading the program. files, a list of paths, limits it to those files; by default every file but cog-lisp's own lib folder. Answers #t.
-- `(coverage-stop)`: Ends the coverage session, and answers its counts: a list, in the order the code was compiled, of #(file line column kind count text). kind is procedure (an entry), true or false (a side of an if); file is #f for a form typed at the REPL, and line and column #f where no position is known.
+- `(coverage-stop)`: Ends the coverage session, and answers its counts: a list, in the order the code was compiled, of #(file line column kind count text). kind is procedure (an entry), true or false (a side of an if); file is the full path, or #f for a form typed at the REPL, and line and column #f where no position is known. A file loaded more than once counts once per place, its copies added up.
 - `(eval form)`: Compiles and runs form at top level, and answers its value.
 - `(gensym [prefix])`: A new uninterned symbol, unlike any other, for a name a macro makes up.
 - `(image-build-info)`: How this image was built: an association list of its seed, the bootstrap and its fixpoint, and its version, commit and build time (version, commit, built).
@@ -424,6 +425,7 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 - `(define-special-form name [documentation] translator)`: Makes name a special form of the running compiler: translator, called with the compiler's state, the form, the scope and whether the form is in tail position, answers its code. The documentation is what (documentation name) answers.
 - `(documentation name)`: The documentation of what the symbol name means: a special form, a macro or a procedure; #f if it has none. Its first line is the call form.
 - `(documentation-category name)`: The section of the reference of the built-ins that name belongs in, or #f.
+- `(lisp-check datum [reader])`: Compiles datum as eval would, signalling the error eval would, but runs only the macro definitions in it (define-macro, define-syntax, also inside a top-level begin or a macro's expansion), so the forms after it can use them. For checking a file without running it.
 - `(lisp-eval datum [reader])`: Compiles and runs datum with the compiler in use, as eval does.
 - `(lisp-eval-string string)`: Reads and evaluates every datum of string in turn, so procedures keep their text; answers the last value.
 - `(make-reader string)`: A reader over string: reader-next reads its datums one at a time.

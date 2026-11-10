@@ -32,6 +32,8 @@ const files = {
   // specs/18-library-path.md AC-5: a required library's macros are known to diagnostics.
   // (defun broken) is an error only as cl.lisp's macro: as a call it compiles quietly.
   'cl-user.lisp': "(require 'cl)\n(defun square (x) (* x x))\n(defun broken)\n",
+  // cl's defmacro is a begin around a define-macro: a top-level form, as when the file runs
+  'cl-macro.lisp': "(require 'cl)\n(defmacro twice (x) (list 'begin x x))\n(twice (display 1))\n",
   // specs/27-namespaces.md R-13: a library, a document importing it under a prefix,
   // and one defining a name it imported
   'geo.lisp': '(library geo (export rule))\n(define (rule n)\n  "(rule n)\nA line of n dashes."\n  (make-string n #\\-))\n',
@@ -140,6 +142,10 @@ async function main() {
   const clDiags = (diagnostics[uri('cl-user.lisp')] || []).filter((d) => d.severity === 1);
   check("a document's (require 'cl) is run, so its defun is a macro: only the misused one is reported (library-path AC-5)",
     clDiags.length === 1 && clDiags[0].range.start.line === 2 && clDiags[0].message.includes('defun'));
+  await open('cl-macro.lisp');
+  const clMacroDiags = (diagnostics[uri('cl-macro.lisp')] || []).filter((d) => d.severity === 1);
+  check("cl's defmacro, and a use of the macro it defines, are no errors (" + clMacroDiags.map((d) => d.message).join('; ') + ')',
+    clMacroDiags.length === 0);
   check('a read error is reported where reading stopped', brokenDiags.length === 1 && brokenDiags[0].message.includes('string'));
   let seen = nextDiagnostics();
   connection.sendNotification('textDocument/didChange',

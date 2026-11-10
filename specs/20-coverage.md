@@ -144,3 +144,31 @@ correctly noted that its test library cannot do it alone.
    both. `if` is a single place in the compiler.
 2. **The report's form:** proposed text, by file, uncovered lines first. A
    machine-readable form (LCOV) is for later, if an editor or CI wants it.
+
+## 8. Across runs (2026-11-10)
+
+Asked for by the owner (2026-11-10): `lisp-expert`'s `run-tests` checks its
+coverage over all its suites. A suite is a process of its own, so one run's
+report cannot speak for the others, and three things got in the way:
+
+- the report was text, which cannot be added up;
+- a file loaded twice in one run (a test reloading a module to reset it) made a
+  second set of probes, and the copy that ran was reported beside the copy that
+  did not;
+- paths were as the program wrote them (`..\knowledge-base.lisp`,
+  `..\..\expert\knowledge-base.lisp`), so one file had several names.
+
+Requirements:
+
+- **R-8. One probe per place:** `coverage-stop` answers one record for each
+  file, line, column and kind, its count the sum of every copy's.
+- **R-9. Full paths:** a record's file is its full, canonical path.
+- **R-10. The counts as data:** with `COGLISP_COVERAGE_DATA` set to a file, a
+  whole run (R-6) also writes its counts there, one record per line, as
+  `write` writes them, so `read` reads them back.
+- **R-11. `(coverage-merge counts ...)`** adds up several runs' counts by R-8's
+  rule, for `coverage-report`.
+
+Acceptance: `tests/lisp/coverage.lisp` checks R-8 (a file loaded twice), R-9,
+R-10 and R-11; `lisp-expert`'s `run-tests` reports its coverage across its
+suites.

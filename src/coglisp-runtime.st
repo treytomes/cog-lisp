@@ -2157,16 +2157,37 @@ cm value: procx class value: 'posix' value: 'cString: s
 	a := ExternalAddress allocate: bytes size.
 	bytes doWithIndex: [:b :i | a byteAt: i put: b].
 	^ a'.
+cm value: procx class value: 'posix' value: 'childEnvironment
+	"The environment a program is started with: the VM''s own, but with the VM''s
+	 library folder taken out of LD_LIBRARY_PATH. The VM''s launcher puts it first,
+	 and the VM ships libraries of its own (an old libcrypto.so.1.1): a system
+	 curl linked against the system''s OpenSSL 1.1.1 then fails to load (exit 127,
+	 seen on AlmaLinux 8, 2026-11-10). The variable is dropped if nothing is left."
+	| vmDir pairs |
+	vmDir := Smalltalk vm directory asString.
+	(vmDir notEmpty and: [vmDir last = $/]) ifTrue: [vmDir := vmDir allButLast].
+	pairs := OrderedCollection new.
+	OSEnvironment current asDictionary keysAndValuesDo: [:k :v |
+		k = ''LD_LIBRARY_PATH''
+			ifTrue: [ | kept |
+				kept := (v substrings: '':'') reject: [:p |
+					p = vmDir or: [p beginsWith: vmDir , ''/'']].
+				kept isEmpty ifFalse: [pairs add: k , ''='' , ('':'' join: kept)]]
+			ifFalse: [pairs add: k , ''='' , v]].
+	^ pairs asArray'.
 cm value: procx class value: 'posix' value: 'runPosix: args
-	| strings argv pid env status r |
+	| strings argv pid env envStrings status r |
 	strings := args collect: [:s | self cString: s].
+	envStrings := self childEnvironment collect: [:s | self cString: s].
 	argv := ExternalAddress allocate: 8 * (args size + 1).
+	env := ExternalAddress allocate: 8 * (envStrings size + 1).
 	[strings doWithIndex: [:s :i | argv pointerAt: (i - 1) * 8 + 1 put: s].
 	 argv pointerAt: args size * 8 + 1 put: ExternalAddress null.
-	 env := (ExternalAddress loadSymbol: ''environ'' module: ''libc.so.6'') pointerAt: 1.
+	 envStrings doWithIndex: [:s :i | env pointerAt: (i - 1) * 8 + 1 put: s].
+	 env pointerAt: envStrings size * 8 + 1 put: ExternalAddress null.
 	 pid := ByteArray new: 4.
 	 r := self spawn: pid file: strings first argv: argv envp: env]
-		ensure: [strings do: [:s | s free]. argv free].
+		ensure: [strings do: [:s | s free]. envStrings do: [:s | s free]. argv free. env free].
 	r = 0 ifFalse: [^ nil].
 	status := ByteArray new: 4.
 	[(r := self waitpid: (pid signedLongAt: 1) status: status options: 1) = 0]

@@ -8,6 +8,5 @@
 ran
 ((a x y) 2 1)
 (defun our-length (lst)
-  (if (null lst)
-      0
-      (+ (our-length (cdr lst)) 1)))
+	(if (null lst) 0 (+ (our-length (cdr lst)) 1))
+)

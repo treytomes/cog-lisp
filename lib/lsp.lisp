@@ -467,7 +467,7 @@
                       (problem
                        (guard (e (#t (let ((place (lsp-error-place r e from to)))
                                        (lsp-diagnostic text starts (car place) (cdr place) (condition-report e)))))
-                         (if (lsp-syntax-definition? d) (lisp-eval d r) (compile-form d r))
+                         (if (lsp-syntax-definition? d) (lisp-eval d r) (lisp-check d r))
                          #f))
                       (warnings (lsp-form-warnings text starts from to)))
                  (loop (append (reverse warnings) (if problem (cons problem acc) acc))))))))))

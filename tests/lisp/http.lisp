@@ -153,4 +153,15 @@
               '("expired.badssl.com" "self-signed.badssl.com" "untrusted-root.badssl.com"
                 "wrong.host.badssl.com"))))
 
+;; The VM's launcher puts its own library folder first on LD_LIBRARY_PATH, and
+;; the VM's old libcrypto then broke the system's curl (AlmaLinux 8, 2026-11-10):
+;; a program is started without that folder, and with the rest of the environment.
+(define-test "a program is started without the VM's library folder in LD_LIBRARY_PATH"
+  (let* ((env (vector->list [(smalltalk LispProcess) childEnvironment]))
+         (vm-dir (let ((d [[[(smalltalk Smalltalk) vm] directory] asString]))
+                   (if (string-suffix? "/" d) (substring d 0 (- (string-length d) 1)) d)))
+         (ld (find (lambda (s) (string-prefix? "LD_LIBRARY_PATH=" s)) env)))
+    (check-false (and ld (string-search ld vm-dir)))
+    (check-true (any (lambda (s) (string-prefix? "path=" (string-downcase s))) env))))   ; Path on Windows
+
 (run-tests)

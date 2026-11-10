@@ -93,17 +93,22 @@ cm value: comp value: 'evaluating' value: 'evalAll: aString named: aName
 	 LispLocatedError saying where it happened: the start of the top-level form, or
 	 the offending character for a read error (review R-1). An error that is already
 	 located, from a nested load, keeps its own (innermost) location."
-	| r d result |
+	| r d result reading |
 	r := LispReader on: aString.
 	result := LispUnspecified default.
-	[[(d := r next) == LispReader eofObject] whileFalse: [
+	reading := false.
+	[[reading := true. (d := r next) == LispReader eofObject] whileFalse: [
+		reading := false.
 		"where the form is, for a warning (specs/27-namespaces.md R-10)"
 		LispCurrentUnit value ifNotNil: [:u | u source: aString offset: (r datumStart ifNil: [0])].
 		result := self eval: d from: r]]
 		on: Error
 		do: [:e | | offset |
 			(e isKindOf: LispLocatedError) ifTrue: [e pass].
-			offset := (e isKindOf: LispReadError)
+			"a read error of this file is at its own character; one from a read the
+			 program ran (of another file, or a string) is at the running form, since
+			 its position is in that other text"
+			offset := (reading and: [e isKindOf: LispReadError])
 				ifTrue: [e position ifNil: [r datumStart]]
 				ifFalse: [r datumStart].
 			^ (LispLocatedError cause: e file: aName source: aString offset: (offset ifNil: [0])) signal].

@@ -20,7 +20,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Hash tables](#hash-tables) (19)
 - [Control](#control) (6)
 - [Conditions and restarts](#conditions-and-restarts) (19)
-- [Evaluation and macros](#evaluation-and-macros) (8)
+- [Evaluation and macros](#evaluation-and-macros) (9)
 - [Output](#output) (4)
 - [Ports](#ports) (16)
 - [Files](#files) (21)
@@ -28,7 +28,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [The system](#the-system) (7)
 - [Smalltalk interop](#smalltalk-interop) (11)
 - [Language server](#language-server) (2)
-- [The compiler and reader](#the-compiler-and-reader) (23)
+- [The compiler and reader](#the-compiler-and-reader) (24)
 - [Libraries](#libraries): cl, test, datetime, pretty, format-source
 
 ## Special forms
@@ -364,9 +364,10 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 
 | Name | Call | Kind | What it does |
 |---|---|---|---|
+| `coverage-merge` | `(coverage-merge counts ...)` | procedure | Adds up the counts of several runs (each from coverage-stop, or read back from the file COGLISP_COVERAGE_DATA names), and answers one list for coverage-report: a record for each place (file, line, column and kind), in the order first seen, its count the sum. |
 | `coverage-report` | `(coverage-report counts [port])` | procedure | Writes what counts (from coverage-stop) never reached, by file and line: the procedures never called and the sides of an if never taken, after a summary line. Writes to port, or the current output. |
 | `coverage-start` | `(coverage-start [files])` | procedure | Starts a coverage session: code compiled from now on counts each procedure entry and each side of every if, so start before loading the program. files, a list of paths, limits it to those files; by default every file but cog-lisp's own lib folder. Answers #t. |
-| `coverage-stop` | `(coverage-stop)` | procedure | Ends the coverage session, and answers its counts: a list, in the order the code was compiled, of #(file line column kind count text). kind is procedure (an entry), true or false (a side of an if); file is #f for a form typed at the REPL, and line and column #f where no position is known. |
+| `coverage-stop` | `(coverage-stop)` | procedure | Ends the coverage session, and answers its counts: a list, in the order the code was compiled, of #(file line column kind count text). kind is procedure (an entry), true or false (a side of an if); file is the full path, or #f for a form typed at the REPL, and line and column #f where no position is known. A file loaded more than once counts once per place, its copies added up. |
 | `eval` | `(eval form)` | procedure | Compiles and runs form at top level, and answers its value. |
 | `gensym` | `(gensym [prefix])` | procedure | A new uninterned symbol, unlike any other, for a name a macro makes up. |
 | `image-build-info` | `(image-build-info)` | procedure | How this image was built: an association list of its seed, the bootstrap and its fixpoint, and its version, commit and build time (version, commit, built). |
@@ -491,6 +492,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `define-special-form` | `(define-special-form name [documentation] translator)` | procedure | Makes name a special form of the running compiler: translator, called with the compiler's state, the form, the scope and whether the form is in tail position, answers its code. The documentation is what (documentation name) answers. |
 | `documentation` | `(documentation name)` | procedure | The documentation of what the symbol name means: a special form, a macro or a procedure; #f if it has none. Its first line is the call form. |
 | `documentation-category` | `(documentation-category name)` | procedure | The section of the reference of the built-ins that name belongs in, or #f. |
+| `lisp-check` | `(lisp-check datum [reader])` | procedure | Compiles datum as eval would, signalling the error eval would, but runs only the macro definitions in it (define-macro, define-syntax, also inside a top-level begin or a macro's expansion), so the forms after it can use them. For checking a file without running it. |
 | `lisp-eval` | `(lisp-eval datum [reader])` | procedure | Compiles and runs datum with the compiler in use, as eval does. |
 | `lisp-eval-string` | `(lisp-eval-string string)` | procedure | Reads and evaluates every datum of string in turn, so procedures keep their text; answers the last value. |
 | `make-reader` | `(make-reader string)` | procedure | A reader over string: reader-next reads its datums one at a time. |

@@ -1376,6 +1376,32 @@ Compiles and runs datum with the compiler in use, as eval does."
     (when (pair? source-map) (c-source-map! c (car source-map)))
     (lc-eval c datum #f 0)))
 
+;; lc-check-top: what eval does with a top-level form, short of running it, for the
+;; language server's diagnostics. The forms of a top-level begin and the
+;; expansion of a top-level macro call are top-level forms, as in lc-eval, so
+;; cl's defmacro (a begin around a define-macro) is one; each is compiled, and
+;; only a define-macro or define-syntax runs, so the forms after it can use it.
+(define (lc-check-top c datum text n)
+  (when (> n lc-max-expansions) (lc-expansion-too-deep datum))
+  (if (and (pair? datum) (eq? (lc-special (car datum) (scope-new)) 'begin))
+      (let loop ((forms (lc-items (cdr datum))))
+        (if (pair? forms) (begin (lc-check-top c (car forms) text n) (loop (cdr forms)))))
+      (let ((m (and (pair? datum) (lc-macro-for (car datum) (scope-new)))))
+        (if m
+            (lc-check-top c (lc-expand datum m (scope-new) c) (or (lc-recorded-source-of c datum) text) (+ n 1))
+            (let ((method (lc-compile c datum text))
+                  (head (and (pair? datum) (lc-special (car datum) (scope-new)))))
+              (if (or (eq? head 'define-macro) (eq? head 'define-syntax)) (opal-run method))
+              method)))))
+
+(define (lisp-check datum . source-map)
+  "(lisp-check datum [reader])
+Compiles datum as eval would, signalling the error eval would, but runs only the macro definitions in it (define-macro, define-syntax, also inside a top-level begin or a macro's expansion), so the forms after it can use them. For checking a file without running it."
+  (let ((c (make-lisp-compiler)))
+    (when (pair? source-map) (c-source-map! c (car source-map)))
+    (lc-check-top c datum #f 0)
+    #t))
+
 ;; What LispCompiler>>compile:context: and eval:context:steps: call (step 8.5; the
 ;; entry points in LispCompiler entries): map is a reader or #f, text a string or #f.
 (define (lisp-compile-from datum map text)

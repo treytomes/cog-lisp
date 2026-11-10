@@ -475,6 +475,11 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   rebuild it (`build-ext.bat`/`.sh`, which runs `npm run package`) before
   installing it (`load-ext.bat`/`.sh`). A new npm dependency
   shipped in the `.vsix` needs a row in `vscode/THIRD-PARTY-NOTICES.md`.
+  Its diagnostics check each top-level form with `lisp-check`, which treats a
+  top-level `begin` and a top-level macro's expansion as top-level forms, as
+  `eval` does (so `cl`'s `defmacro`, a `begin` around a `define-macro`, is no
+  error), compiles them, and runs only the macro definitions. Never check a
+  form with plain `compile-form` there.
   The extension runs the server on a copy of the image in the temporary folder
   (`cog-lisp-server-*`), which also survives a rebuild. Never kill the user's
   server; an orphaned one (no parent process left) holding nothing unsaved may
@@ -560,7 +565,10 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   with `ZnClient`:** Pharo's `SqueakSSL` accepts expired, self-signed,
   wrong-host and revoked certificates. Live checks need `COGLISP_LIVE_HTTPS=1`
   (the suite and `release/smoke-test.sh`). Linux needs curl; the Docker
-  container got it with `apt-get install -y curl`.
+  container got it with `apt-get install -y curl`. A program is started without
+  the VM's library folder on `LD_LIBRARY_PATH` (`LispProcess childEnvironment`):
+  the VM's launcher puts it first, and its old `libcrypto.so.1.1` made the
+  system's curl fail to load (exit 127) on AlmaLinux 8, though not on Ubuntu 24.
 - **A program's arguments go through Pharo's command-line parser (Clap)**, which
   refuses any word starting with `-` as an unknown option. The launchers
   (`cog-lisp.bat`/`.sh`) therefore send each argument after the program with a
@@ -570,6 +578,14 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   `(integer->char 12)`.
 - **`apply` takes exactly two arguments** (`(apply proc list)`): cons any
   leading arguments onto the list.
+- **Coverage across runs** (specs/20-coverage.md section 8):
+  `COGLISP_COVERAGE_DATA=file` writes a run's counts as data, and
+  `coverage-merge` adds runs up; records name files by full canonical path, and
+  a file loaded twice counts once per place. `lisp-expert`'s `run-tests` uses
+  both for its coverage check.
+- **A name in `lib/compiler/` must be new:** defining a compiler helper under a
+  name it already has (`lc-check` was taken) replaces the old one, and the build
+  fails with "bad syntax" on the first form the seed compiles. `grep` first.
 - **Libraries to `require`:** `cl`, `test`, `datetime`, `pretty` and
   `format-source` (the source formatter, also `tools/format.lisp` and the
   language server's formatting; specs/26-formatter.md) (`lib/*.lisp`); `format`, `json-read`/`json-write` and `coverage-*` are built in.
