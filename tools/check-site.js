@@ -89,7 +89,9 @@ check('every link within the site reaches a page, and every anchor is on it (' +
 // paragraph of | text (its |---| row turned into dashes)
 const rawTables = pages.filter((p) => /^\s*\|.*\|\s*$/m.test(text[p].replace(/<pre[\s\S]*?<\/pre>/g, '')));
 check('every table is rendered as a table, none left as | text', rawTables.length === 0, rawTables.join(', '));
-const refSections = [...(text['builtins.html'] || '').matchAll(/<h2 /g)].length;
+// a section is an h2, or under Libraries (which has none of its own) an h3
+const refHtml = text['builtins.html'] || '';
+const refSections = [...refHtml.matchAll(/<h[23] /g)].length - (/<h2 id="libraries"/.test(refHtml) ? 1 : 0);
 const refTables = [...(text['builtins.html'] || '').matchAll(/<table/g)].length;
 check('each of the reference\'s ' + refSections + ' sections has its table (' + refTables + ')', refSections > 0 && refTables === refSections);
 
