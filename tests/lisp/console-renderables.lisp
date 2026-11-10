@@ -1,7 +1,7 @@
 ;;; console-renderables.lisp -- the console library's renderables, step 2 of
 ;;; specs/29-console.md (R-7 to R-9): rule, panel, table, grid, columns, tree,
 ;;; padded and aligned, their golden output at several widths, with and without
-;;; Unicode (AC-2).
+;;; Unicode (AC-2); and a box as wide as its words (R-24, AC-24).
 (load "../../lib/test.lisp")
 (require 'console)
 
@@ -147,6 +147,52 @@
   (let ((bar (make-renderable (lambda (w) (list (list (segment (make-string w #\#))))) (lambda () (cons 3 3)))))
     (check (at 40 (table 'columns '("Bar") 'rows (list (list bar))))
            (lines "┌─────┐" "│ Bar │" "├─────┤" "│ ### │" "└─────┘"))))
+
+;;; --- a box as wide as its words (R-24, specs/29-console.md section 13) -------------
+
+(define small (table 'columns '("a" "b") 'rows '((1 2)) 'title "A rather long title for a small table"))
+
+(define-test "AC-24a a table as wide as its title, and as its caption"
+  (check (at 60 small)
+         (lines "A rather long title for a small table"
+                "┌─────────────────┬─────────────────┐"
+                "│ a               │ b               │"
+                "├─────────────────┼─────────────────┤"
+                "│ 1               │ 2               │"
+                "└─────────────────┴─────────────────┘"))
+  (check (at 60 (table 'columns '("a") 'rows '((1)) 'caption "a caption wider than it"))
+         (lines "┌─────────────────────┐" "│ a                   │" "├─────────────────────┤" "│ 1                   │"
+                "└─────────────────────┘" "a caption wider than it")))
+
+(define-test "AC-24b a width too narrow for the title wraps it, as before"
+  (check (at 20 small)
+         (lines "A rather long title" " for a small table"
+                "┌─────────┬────────┐" "│ a       │ b      │" "├─────────┼────────┤" "│ 1       │ 2      │"
+                "└─────────┴────────┘")))
+
+(define-test "AC-24c a panel as wide as its header; too narrow, the header ends in an ellipsis"
+  (define p (panel "x" 'header "A rather long header for a panel"))
+  (check (at 60 p) (lines "┌─ A rather long header for a panel ┐" "│ x                                 │"
+                          "└───────────────────────────────────┘"))
+  (check (at 20 p) (lines "┌─ A rather long … ┐" "│ x                │" "└──────────────────┘"))
+  (check (at 20 p 'unicode? #f) (lines "+- A rather lon... +" "| x                |" "+------------------+"))
+  ;; centered and right, the header still fits the border
+  (check (at 20 (panel "x" 'header "Hi" 'header-align 'right 'width 10)) (lines "┌─── Hi ─┐" "│ x      │" "└────────┘")))
+
+(define-test "AC-24c' a rule's title too long ends in an ellipsis"
+  (check (at 20 (rule "A rather long title for a rule")) "─ A rather long t… ─")
+  (check (at 20 (rule "A rather long title for a rule") 'unicode? #f) "- A rather long... -")
+  (check (at 6 (rule "Hello")) "─ H… ─"))
+
+(define-test "AC-24d a titled table in columns keeps its title on one line"
+  (check (at 40 (columns (list (table 'columns '("a") 'rows '((1)) 'title "Wide title here") "next")))
+         (lines "Wide title here  next" "┌─────────────┐" "│ a           │" "├─────────────┤" "│ 1           │"
+                "└─────────────┘")))
+
+(define-test "AC-24e a table wider than its title is drawn as before"
+  (check (at 40 (table 'columns '("Name" "Value") 'rows '(("alpha" 1)) 'title "T"))
+         (lines "        T" "┌───────┬───────┐" "│ Name  │ Value │" "├───────┼───────┤" "│ alpha │ 1     │"
+                "└───────┴───────┘")))
 
 (define-test "render leaves no trailing spaces on a line"
   (check (with-console '(width 8) (lambda () (with-output-to-string (lambda () (render (aligned "x" 'left))))))

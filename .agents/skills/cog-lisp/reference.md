@@ -597,7 +597,7 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(markup text)`: The styled text that markup text describes, "[bold red]done[/] in 3 s": a value to render, or to put in a table. [[ and ]] are [ and ]; an error names the position.
 - `(markup-escape text)`: text with [ and ] doubled, so markup shows them as they are.
 - `(padded content padding)`: content with space around it: padding is a number for all four sides, (vertical horizontal), or (top right bottom left).
-- `(panel content option ...)`: content in a box. Options: header (text or styled text, in the top border), header-align (left, center, right), border (square, rounded, heavy, double, ascii, none; square), border-style, padding (a number, (vertical horizontal), or (top right bottom left); (0 1)), expand (#t: the full width), width.
+- `(panel content option ...)`: content in a box, as wide as its header if the width allows (else the header is shortened with an ellipsis). Options: header (text or styled text, in the top border), header-align (left, center, right), border (square, rounded, heavy, double, ascii, none; square), border-style, padding (a number, (vertical horizontal), or (top right bottom left); (0 1)), expand (#t: the full width), width.
 - `(print-markup text)`: Writes markup text, "[bold green]done[/] in [blue]3 s[/]", in its styles, with the colors the console has (none to a pipe or a file).
 - `(print-markup-line text)`: As print-markup, then a newline.
 - `(prompt-cancelled? condition)`: True if condition is the one a prompt raises when Ctrl+C or Escape ends it, for guard.
@@ -605,7 +605,7 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(render x)`: Writes x, a renderable, styled text or any value, at the console's width, a line at a time.
 - `(render-lines x width)`: x's lines at width cells: a list of lines, each a list of segments. x is a renderable, styled text (from styled or markup), a string, or any value (as display writes it); text is wrapped at spaces.
 - `(renderable? x)`: True if x is a renderable made by make-renderable.
-- `(rule [title] option ...)`: A line across the width, with title (text or markup's styled text) in it. Options: style (the line's), align (left, center or right; center), character (the line's, else ─, or - without Unicode).
+- `(rule [title] option ...)`: A line across the width, with title (text or markup's styled text) in it, shortened with an ellipsis when the width is too narrow for it. Options: style (the line's), align (left, center or right; center), character (the line's, else ─, or - without Unicode).
 - `(screen-cell screen column row)`: One cell of the screen (from 1): (character . style); the character is #f in the second cell of a wide one.
 - `(screen-cursor screen)`: Where the cursor ended: (column . row), from 1.
 - `(screen-line screen row)`: The text of one row of the screen (from 1), trailing spaces gone.
@@ -621,7 +621,7 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(style-link style)`: The URL it links to, or #f.
 - `(style? x)`: True if x is a style.
 - `(styled text style-part ...)`: text in the style the parts make (as style takes them): a value to render, or to put in a table or a panel.
-- `(table option ...)`: A table: columns (a list of headers, text or styled text, or table-column values), rows (a list of lists of cells, each any renderable), border (square, rounded, heavy, double, ascii, none; square), border-style, title and caption (above and below it), show-header (#t), expand (#f: as wide as its content). Too wide for the console, it shrinks, wrapping its cells. Add rows and columns with table-add-row! and table-add-column!.
+- `(table option ...)`: A table: columns (a list of headers, text or styled text, or table-column values), rows (a list of lists of cells, each any renderable), border (square, rounded, heavy, double, ascii, none; square), border-style, title and caption (above and below it; the table is at least as wide as each, if the width allows), show-header (#t), expand (#f: as wide as its content). Too wide for the console, it shrinks, wrapping its cells. Add rows and columns with table-add-row! and table-add-column!.
 - `(table-add-column! table header option ...)`: Adds a column to table, as table-column makes it; answers table.
 - `(table-add-row! table cell ...)`: Adds a row to table, a cell for each column; answers table.
 - `(table-column header option ...)`: A column of a table, for its columns option. Options: align (left, center, right; left), width (fixed, in cells).

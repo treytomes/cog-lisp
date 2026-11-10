@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Steps 1 to 3 done (2026-11-10; §10 to §12); step 4 (live displays) to come. Accepted (owner, 2026-11-09) with the leanings of §8, and its amendment (§4.8, §9) with the leanings of §9 (owner, 2026-11-10). Decision 5 (names) is settled by `specs/27-namespaces.md`: the library keeps its short names, and a program that wants them apart writes `(require 'console 'prefix 'con:)`. A spike first (§3). Amendment proposed 2026-11-10, for a later full-screen library: §4.8, spike items 6 and 7, AC-8, §9 |
+| **Status** | Steps 1 to 3 done (2026-11-10; §10 to §12); step 4 (live displays) to come. Accepted (owner, 2026-11-09) with the leanings of §8, and its amendment (§4.8, §9) with the leanings of §9 (owner, 2026-11-10). Decision 5 (names) is settled by `specs/27-namespaces.md`: the library keeps its short names, and a program that wants them apart writes `(require 'console 'prefix 'con:)`. A spike first (§3). Amendment proposed 2026-11-10, for a later full-screen library: §4.8, spike items 6 and 7, AC-8, §9. A second amendment, from lisp-expert's use of the renderables (R-24, §13), accepted with its leanings and built (owner, 2026-11-10) |
 | **Asked for by** | The owner (2026-11-09): "I'm used to writing C# console programs with the help of Spectre.Console. How do we provide cog-lisp with similar console I/O capabilities? I think this one needs a specification document." |
 | **Relates to** | `LispTextOutput` and `LispStdin` (Phase 5; `src/coglisp-runtime.st`, `src/coglisp-shell.st`); the HTTP design (`specs/21-https-and-json.md`), whose rule it follows: the operating system's details stay inside cog-lisp |
 
@@ -202,6 +202,14 @@ in a pseudo-terminal from `script`, with keys piped in.
 - **R-9. Borders** come in Spectre's familiar sets: `square`, `rounded`,
   `heavy`, `double`, `ascii` and `none`. A console without Unicode uses
   `ascii`.
+- **R-24. A box is as wide as its words** (second amendment, §13). A table is
+  at least as wide as its title and its caption, and a panel as its header,
+  up to the width it is given; the cells it gains go where `expand` puts them.
+  Only a width too narrow for them makes a title or a caption wrap, at its
+  spaces, and a header or a rule's title shorten, ending in `…` (`...`
+  without Unicode). Nothing is cut without a mark. The measure (`make-renderable`'s) answers the same
+  widths, so a table in a grid, a column or another table's cell keeps its
+  title on one line when there is room.
 
 ### 4.5 Prompts
 
@@ -495,3 +503,73 @@ The spike (§3.1), then step 1 of §5 with the core §4.8 asks of it.
   test reading the screen back reads from the window's top
   (`srWindow.Top`), not from row 0.
 
+## 13. Second amendment: a box as wide as its words (accepted and built 2026-11-10)
+
+**Found by** lisp-expert's views (its `specs/01-console-views.md`), which put a
+query's goal in a table's title. At 60 cells:
+
+- **A title or a caption wider than its table wraps** into the table's width,
+  however much room the console has: `A rather long title for a small table`
+  over a two-column table became five lines of two words. lisp-expert moved its
+  goals out of the titles, into a `rule` above each table.
+- **A panel's header wider than its content is cut, without a mark:**
+  `(panel "x" 'header "A rather long header for a panel")` drew `┌─ A ┐`. That
+  is a bug: text is lost and nothing shows it.
+- **So is a rule's title wider than the width:** at 20 cells, `(rule "A rather
+  long title for a rule")` drew `── A rather long ───`.
+
+Spectre.Console and Python's Rich both lay a title out at the table's width, so
+the first is their behavior too. R-24 changes it here: a title, a caption or a
+header is part of what the box must hold.
+
+**The change** (R-24):
+
+- `%table-measure` answers at least the title's and the caption's widest
+  line, plus nothing for borders (a title sits outside them); `%table-lines`
+  fits the columns to that width as `expand` does, when the content alone is
+  narrower. Given less room than the title, the title wraps as now.
+- A panel's measure answers at least the header's width plus its border's
+  corners and gaps, and the panel widens its content to it. Given less room,
+  the header shortens with `…` (`...` without Unicode).
+- A rule already spans the width; a title too long for it shortens with `…`
+  (`...` without Unicode), keeping at least one line cell at each side.
+
+**Acceptance criteria** (in `tests/lisp/console-renderables.lisp`):
+
+- **AC-24a.** At 60 cells, a two-column table titled `A rather long title for
+  a small table` draws its title on one line, centered over a table as wide
+  as it; the same with a long caption.
+- **AC-24b.** At 20 cells the same table wraps its title at spaces within 20
+  cells, as now.
+- **AC-24c.** A panel headed `A rather long header for a panel` around `x` is
+  as wide as its header at 60 cells; at 20 cells its header ends in `…`, and
+  in `...` without Unicode.
+- **AC-24c'.** At 20 cells, `(rule "A rather long title for a rule")` ends its
+  title in `…`.
+- **AC-24d.** `(columns (list t "next"))` with a titled table `t` keeps the
+  title on one line when the columns fit.
+- **AC-24e.** A table whose content is wider than its title draws exactly as
+  before (the existing golden outputs do not change).
+
+**Decisions for the owner:**
+
+1. **Widen to the title, or wrap as Spectre does?** Leaning: widen. A wrapped
+   title over a narrow table reads as broken, and a program that wants it
+   narrow can wrap the title itself.
+2. **Where the gained cells go.** Leaning: as `expand` spreads them, a cell to
+   each column in turn, so a table looks the same whether it was widened by its
+   title or by `expand`. The other choice, all of them to the last column,
+   keeps narrow columns narrow (a `CF` column of `1.0`).
+3. **A panel's header: shorten, or widen the panel as far as the console?**
+   Leaning: both, as R-24 says: widen first, shorten only when the width runs
+   out.
+
+**As built (2026-11-10).** `%one-line` gives a title one line of at most the
+cells it has, ended with `…` when cut, and `%cut-line` takes a line's first
+cells; `rule` and `panel` draw their titles with them. A table fits its
+columns to its title or caption by `%fit` with `expand`; its measure, and a
+panel's, include them. A panel's header has five cells less than the panel
+(a corner, a line and a space each side): it had four, so a header as wide as
+that drew a top border one cell wider than the box. Checks: AC-24a to AC-24e in
+`tests/lisp/console-renderables.lisp` (12 checks); every earlier golden output
+is unchanged.

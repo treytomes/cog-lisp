@@ -687,6 +687,35 @@ The next event: a key, a paste or a resize; eof at the end of the input; or #f w
           ((eq? align 'center) (append (%spaces (quotient gap 2)) line (%spaces (- gap (quotient gap 2)))))
           (else (append line (%spaces gap))))))
 
+;; the first n cells of line (a character too wide for what is left is left out)
+(define (%cut-line line n)
+  (let loop ((segs line) (room n) (acc '()))
+    (if (or (null? segs) (<= room 0))
+        (reverse acc)
+        (let* ((s (car segs)) (text (segment-text s)) (w (text-width text)))
+          (if (<= w room)
+              (loop (cdr segs) (- room w) (cons s acc))
+              (let take ((i 0) (cells 0))
+                (let ((cw (if (< i (string-length text)) (%char-width (string-ref text i)) 0)))
+                  (if (or (>= i (string-length text)) (> (+ cells cw) room))
+                      (reverse (cons (segment (substring text 0 i) (segment-style s)) acc))
+                      (take (+ i 1) (+ cells cw))))))))))
+
+;; x as one line of at most width cells: whole if it fits, else cut and ended
+;; with an ellipsis, ... without Unicode, so nothing is cut without a mark (R-24)
+(define (%one-line x width)
+  (let* ((lines (render-lines x 100000))
+         (line (fold (lambda (l acc) (if (null? acc) l (append acc (list (segment " ")) l))) '() lines)))
+    (if (<= (%line-width line) width)
+        line
+        (let* ((mark (if (%cap 'unicode?) (string (integer->char 8230)) "...")) (mw (text-width mark)))
+          (if (< width mw)
+              (%cut-line line width)
+              (append (%cut-line line (- width mw)) (list (segment mark))))))))
+
+;; the widest line of x, a title or a caption: the cells it takes on one line
+(define (%widest x) (if x (cdr (%measure x)) 0))
+
 ;; options, as (name value ...): the value of name, or default
 (define (%opt options name default)
   (let ((m (memq name options))) (if (and m (pair? (cdr m))) (cadr m) default)))
@@ -733,7 +762,7 @@ The next event: a key, a paste or a resize; eof at the end of the input; or #f w
 
 (define (rule . args)
   "(rule [title] option ...)
-A line across the width, with title (text or markup's styled text) in it. Options: style (the line's), align (left, center or right; center), character (the line's, else ─, or - without Unicode)."
+A line across the width, with title (text or markup's styled text) in it, shortened with an ellipsis when the width is too narrow for it. Options: style (the line's), align (left, center or right; center), character (the line's, else ─, or - without Unicode)."
   (let* ((title (and (pair? args) (not (symbol? (car args))) (car args)))
          (options (if title (cdr args) args)))
     (%check-options "rule" options '(style align character))
@@ -744,7 +773,7 @@ A line across the width, with title (text or markup's styled text) in it. Option
               (line (lambda (n) (if (> n 0) (list (segment (%repeat ch n) s)) '()))))
          (if (not title)
              (list (line width))
-             (let* ((t (car (render-lines title (max 1 (- width 4)))))
+             (let* ((t (%one-line title (max 1 (- width 4))))
                     (tw (%line-width t))
                     (rest (max 0 (- width tw 2)))
                     (align (%opt options 'align 'center))
@@ -764,7 +793,7 @@ A line across the width, with title (text or markup's styled text) in it. Option
 
 (define (panel content . options)
   "(panel content option ...)
-content in a box. Options: header (text or styled text, in the top border), header-align (left, center, right), border (square, rounded, heavy, double, ascii, none; square), border-style, padding (a number, (vertical horizontal), or (top right bottom left); (0 1)), expand (#t: the full width), width."
+content in a box, as wide as its header if the width allows (else the header is shortened with an ellipsis). Options: header (text or styled text, in the top border), header-align (left, center, right), border (square, rounded, heavy, double, ascii, none; square), border-style, padding (a number, (vertical horizontal), or (top right bottom left); (0 1)), expand (#t: the full width), width."
   (%check-options "panel" options '(header header-align border border-style padding expand width))
   (%check-border (%opt options 'border 'square))
   (let ((pad (%padding (%opt options 'padding '(0 1)))))
@@ -773,7 +802,9 @@ content in a box. Options: header (text or styled text, in the top border), head
        (let* ((b (%border (%opt options 'border 'square)))
               (bs (%style-of (%opt options 'border-style #f)))
               (hpad (+ (cadr pad) (cadddr pad)))
-              (natural (+ 2 hpad (cdr (%measure content))))
+              (header (%opt options 'header #f))
+              ;; as wide as its header too (R-24)
+              (natural (max (+ 2 hpad (cdr (%measure content))) (if header (+ 5 (%widest header)) 0)))
               (outer (min width (cond ((%opt options 'width #f) => (lambda (w) w))
                                       ((%opt options 'expand #f) width)
                                       (else natural))))
@@ -783,10 +814,10 @@ content in a box. Options: header (text or styled text, in the top border), head
               (row (lambda (line) (append (list (edge (%b b 3))) (%spaces (cadddr pad)) (%align line inner 'left)
                                           (%spaces (cadr pad)) (list (edge (%b b 3))))))
               (blank (row '()))
-              (header (%opt options 'header #f))
               (top (if (not header)
                        (list (edge (string-append (%b b 0) (%repeat (%b b 1) (- outer 2)) (%b b 2))))
-                       (let* ((h (car (render-lines header (max 1 (- outer 4)))))
+                       ;; a corner, a line and a space at each side: the header has 5 cells less
+                       (let* ((h (%one-line header (max 1 (- outer 5))))
                               (rest (max 0 (- outer 4 (%line-width h))))
                               (align (%opt options 'header-align 'left))
                               (left (cond ((eq? align 'center) (quotient rest 2)) ((eq? align 'right) (- rest 1)) (else 1))))
@@ -800,7 +831,7 @@ content in a box. Options: header (text or styled text, in the top border), head
                  (map (lambda (i) blank) (iota (caddr pad)))
                  (list bottom))))
      (lambda () (let ((m (%measure content)) (extra (+ 2 (cadr pad) (cadddr pad))))
-                  (cons (+ extra (car m)) (+ extra (cdr m))))))))
+                  (cons (+ extra (car m)) (max (+ extra (cdr m)) (let ((h (%opt options 'header #f))) (if h (+ 5 (%widest h)) 0)))))))))
 
 ;;; ===========================================================================
 ;;; The cell layout of tables, grids and columns
@@ -866,7 +897,7 @@ A column of a table, for its columns option. Options: align (left, center, right
 
 (define (table . options)
   "(table option ...)
-A table: columns (a list of headers, text or styled text, or table-column values), rows (a list of lists of cells, each any renderable), border (square, rounded, heavy, double, ascii, none; square), border-style, title and caption (above and below it), show-header (#t), expand (#f: as wide as its content). Too wide for the console, it shrinks, wrapping its cells. Add rows and columns with table-add-row! and table-add-column!."
+A table: columns (a list of headers, text or styled text, or table-column values), rows (a list of lists of cells, each any renderable), border (square, rounded, heavy, double, ascii, none; square), border-style, title and caption (above and below it; the table is at least as wide as each, if the width allows), show-header (#t), expand (#f: as wide as its content). Too wide for the console, it shrinks, wrapping its cells. Add rows and columns with table-add-row! and table-add-column!."
   (%check-options "table" options '(columns rows border border-style title caption show-header expand))
   (%check-border (%opt options 'border 'square))
   (let ((state (vector (map %as-column (%opt options 'columns '())) (%opt options 'rows '()) options)))
@@ -905,8 +936,11 @@ Adds a column to table, as table-column makes it; answers table."
             (loop (cdr cols) (+ i 1) (cons (cons (fold max 0 (map car ms)) (fold max 0 (map cdr ms))) acc)))))))
 
 (define (%table-measure s)
-  (let* ((ms (%table-columns-measure s)) (extra (+ 1 (* 3 (length ms)))))
-    (cons (+ extra (fold + 0 (map car ms))) (+ extra (fold + 0 (map cdr ms))))))
+  (let* ((ms (%table-columns-measure s)) (extra (+ 1 (* 3 (length ms)))) (options (vector-ref s 2)))
+    (cons (+ extra (fold + 0 (map car ms)))
+          ;; at its widest, as wide as its title and its caption too (R-24)
+          (max (+ extra (fold + 0 (map cdr ms)))
+               (%widest (%opt options 'title #f)) (%widest (%opt options 'caption #f))))))
 
 (define (%table-lines s width)
   (let* ((cols (vector-ref s 0)) (options (vector-ref s 2)) (n (length cols)))
@@ -915,8 +949,16 @@ Adds a column to table, as table-column makes it; answers table."
         (let* ((b (%border (%opt options 'border 'square)))
                (bs (%style-of (%opt options 'border-style #f)))
                (edge (lambda (str) (list (segment str bs))))
-               (widths (%fit (%table-columns-measure s) (map (lambda (c) (vector-ref c 3)) cols)
-                             (max n (- width 1 (* 3 n))) (%opt options 'expand #f)))
+               (title (%opt options 'title #f))
+               (caption (%opt options 'caption #f))
+               (measures (%table-columns-measure s))
+               (fixed (map (lambda (c) (vector-ref c 3)) cols))
+               (fitted (%fit measures fixed (max n (- width 1 (* 3 n))) (%opt options 'expand #f)))
+               ;; narrower than its title or caption: widened to them, as far as the width goes (R-24)
+               (words (min width (max (%widest title) (%widest caption))))
+               (widths (if (< (+ 1 (* 3 n) (fold + 0 fitted)) words)
+                           (%fit measures fixed (max n (- words 1 (* 3 n))) #t)
+                           fitted))
                (aligns (map (lambda (c) (vector-ref c 2)) cols))
                (outer (+ 1 (* 3 n) (fold + 0 widths)))
                (rule-line (lambda (l m r) (edge (string-append l (string-join (map (lambda (w) (%repeat (%b b 1) (+ w 2))) widths) m) r))))
@@ -924,9 +966,7 @@ Adds a column to table, as table-column makes it; answers table."
                       (%row-lines cells widths aligns
                                   (edge (string-append (%b b 3) " "))
                                   (map (lambda (i) (edge (string-append " " (%b b 3) " "))) (iota (- n 1)))
-                                  (edge (string-append " " (%b b 3))))))
-               (title (%opt options 'title #f))
-               (caption (%opt options 'caption #f)))
+                                  (edge (string-append " " (%b b 3)))))))
           (append
            (if title (map (lambda (l) (%align l outer 'center)) (render-lines title outer)) '())
            (list (rule-line (%b b 0) (%b b 8) (%b b 2)))

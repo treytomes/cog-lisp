@@ -691,7 +691,7 @@ the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and
 | `markup` | `(markup text)` | procedure | The styled text that markup text describes, "[bold red]done[/] in 3 s": a value to render, or to put in a table. [[ and ]] are [ and ]; an error names the position. |
 | `markup-escape` | `(markup-escape text)` | procedure | text with [ and ] doubled, so markup shows them as they are. |
 | `padded` | `(padded content padding)` | procedure | content with space around it: padding is a number for all four sides, (vertical horizontal), or (top right bottom left). |
-| `panel` | `(panel content option ...)` | procedure | content in a box. Options: header (text or styled text, in the top border), header-align (left, center, right), border (square, rounded, heavy, double, ascii, none; square), border-style, padding (a number, (vertical horizontal), or (top right bottom left); (0 1)), expand (#t: the full width), width. |
+| `panel` | `(panel content option ...)` | procedure | content in a box, as wide as its header if the width allows (else the header is shortened with an ellipsis). Options: header (text or styled text, in the top border), header-align (left, center, right), border (square, rounded, heavy, double, ascii, none; square), border-style, padding (a number, (vertical horizontal), or (top right bottom left); (0 1)), expand (#t: the full width), width. |
 | `print-markup` | `(print-markup text)` | procedure | Writes markup text, "[bold green]done[/] in [blue]3 s[/]", in its styles, with the colors the console has (none to a pipe or a file). |
 | `print-markup-line` | `(print-markup-line text)` | procedure | As print-markup, then a newline. |
 | `prompt-cancelled?` | `(prompt-cancelled? condition)` | procedure | True if condition is the one a prompt raises when Ctrl+C or Escape ends it, for guard. |
@@ -699,7 +699,7 @@ the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and
 | `render` | `(render x)` | procedure | Writes x, a renderable, styled text or any value, at the console's width, a line at a time. |
 | `render-lines` | `(render-lines x width)` | procedure | x's lines at width cells: a list of lines, each a list of segments. x is a renderable, styled text (from styled or markup), a string, or any value (as display writes it); text is wrapped at spaces. |
 | `renderable?` | `(renderable? x)` | procedure | True if x is a renderable made by make-renderable. |
-| `rule` | `(rule [title] option ...)` | procedure | A line across the width, with title (text or markup's styled text) in it. Options: style (the line's), align (left, center or right; center), character (the line's, else ─, or - without Unicode). |
+| `rule` | `(rule [title] option ...)` | procedure | A line across the width, with title (text or markup's styled text) in it, shortened with an ellipsis when the width is too narrow for it. Options: style (the line's), align (left, center or right; center), character (the line's, else ─, or - without Unicode). |
 | `screen-cell` | `(screen-cell screen column row)` | procedure | One cell of the screen (from 1): (character . style); the character is #f in the second cell of a wide one. |
 | `screen-cursor` | `(screen-cursor screen)` | procedure | Where the cursor ended: (column . row), from 1. |
 | `screen-line` | `(screen-line screen row)` | procedure | The text of one row of the screen (from 1), trailing spaces gone. |
@@ -715,7 +715,7 @@ the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and
 | `style-link` | `(style-link style)` | procedure | The URL it links to, or #f. |
 | `style?` | `(style? x)` | procedure | True if x is a style. |
 | `styled` | `(styled text style-part ...)` | procedure | text in the style the parts make (as style takes them): a value to render, or to put in a table or a panel. |
-| `table` | `(table option ...)` | procedure | A table: columns (a list of headers, text or styled text, or table-column values), rows (a list of lists of cells, each any renderable), border (square, rounded, heavy, double, ascii, none; square), border-style, title and caption (above and below it), show-header (#t), expand (#f: as wide as its content). Too wide for the console, it shrinks, wrapping its cells. Add rows and columns with table-add-row! and table-add-column!. |
+| `table` | `(table option ...)` | procedure | A table: columns (a list of headers, text or styled text, or table-column values), rows (a list of lists of cells, each any renderable), border (square, rounded, heavy, double, ascii, none; square), border-style, title and caption (above and below it; the table is at least as wide as each, if the width allows), show-header (#t), expand (#f: as wide as its content). Too wide for the console, it shrinks, wrapping its cells. Add rows and columns with table-add-row! and table-add-column!. |
 | `table-add-column!` | `(table-add-column! table header option ...)` | procedure | Adds a column to table, as table-column makes it; answers table. |
 | `table-add-row!` | `(table-add-row! table cell ...)` | procedure | Adds a row to table, a cell for each column; answers table. |
 | `table-column` | `(table-column header option ...)` | procedure | A column of a table, for its columns option. Options: align (left, center, right; left), width (fixed, in cells). |
