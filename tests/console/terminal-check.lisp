@@ -1,7 +1,7 @@
 ;;; terminal-check.lisp -- the console library on a real Unix terminal
 ;;; (specs/29-console.md AC-4, AC-5), run by tests/console/linux-check.sh inside
 ;;; script(1), which pipes in: down, x, Ctrl+Left, then (after a pause) Escape,
-;;; then Enter. Its own output is the terminal, so it writes its checks to the
+;;; then Enter; then a, b, backspace, c, Enter; down, Enter; Ctrl+C. Its own output is the terminal, so it writes its checks to the
 ;;; file CHECK_LOG names.
 (require 'console)
 
@@ -30,6 +30,11 @@
 (check "AC-5 raw mode is left after read-event" (not (%terminal-raw?)))
 (guard (e (#t #f)) (with-raw-mode (lambda () (with-raw-mode (lambda () (error "stop"))))))
 (check "AC-5 and after an error in nested raw mode" (not (%terminal-raw?)))
+;; step 3, the prompts: a, b, backspace, c, Enter; down, Enter; Ctrl+C
+(check "R-10 ask answers what was typed, with a backspace" (equal? (ask "Name?") "ac"))
+(check "R-10 choose answers the item the arrows reached" (eq? (choose "Pick" '(red green blue)) 'green))
+(check "R-12 Ctrl+C in a prompt is a condition" (guard (e ((prompt-cancelled? e) #t)) (ask "Again?") #f))
+(check "AC-5 raw mode is left after the prompts, Ctrl+C included" (not (%terminal-raw?)))
 (display "== RESULT: " check-log) (display pass check-log) (display "/" check-log) (display total check-log) (display " checks passed ==" check-log)
 (newline check-log)
 (close-port check-log)

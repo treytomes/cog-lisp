@@ -14,7 +14,8 @@ OUT="$(mktemp)"
 trap 'rm -f "$CHECK_LOG" "$OUT"' EXIT
 ESC=$'\033'
 # the keys: down, x, Ctrl+Left; Escape alone; Enter
-(sleep 2; printf '%s' "${ESC}[Bx${ESC}[1;5D"; sleep 1; printf '%s' "$ESC"; sleep 1; printf '\r'; sleep 2) |
+(sleep 2; printf '%s' "${ESC}[Bx${ESC}[1;5D"; sleep 1; printf '%s' "$ESC"; sleep 1; printf '\r'; sleep 1
+ printf 'ab\177c\r'; sleep 1; printf '%s' "${ESC}[B"; sleep 0.5; printf '\r'; sleep 1; printf '\003'; sleep 2) |
   TERM=xterm-256color COLORTERM= timeout 60 script -qfec \
     "stty cols 100 rows 30; '$ROOT/cog-lisp.sh' '$ROOT/tests/console/terminal-check.lisp'" /dev/null >"$OUT" 2>&1
 cat "$CHECK_LOG"

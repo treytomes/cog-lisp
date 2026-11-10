@@ -476,7 +476,13 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   `tests/console/linux-check.sh` (`script`). `start "" /wait conhost.exe ...`
   gives a real console; `conhost.exe` run from a pipe becomes a pseudo-console
   on that pipe instead. A `st` script must call `(%env-start!!)` before
-  `require`: only a program run sets the library path.
+  `require`: only a program run sets the library path. Read the screen back
+  from the window's top (`GetConsoleScreenBufferInfo`'s `srWindow.Top`): a
+  clear (`ESC[2J`) on a console with content scrolls the window down its
+  buffer, so row 0 of the buffer is old text.
+- **Prompts without a console read lines** (R-11); a test gives them lines with
+  `with-test-console`'s `input`. Never test a prompt reading the real current
+  input: a suite run by hand in a terminal waits there for a person.
 
 ## Documentation and the generated files (Phase 10)
 

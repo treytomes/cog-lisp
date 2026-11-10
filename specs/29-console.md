@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Steps 1 and 2 done (2026-11-10; §10, §11); steps 3 (prompts) and 4 (live displays) to come. Accepted (owner, 2026-11-09) with the leanings of §8, and its amendment (§4.8, §9) with the leanings of §9 (owner, 2026-11-10). Decision 5 (names) is settled by `specs/27-namespaces.md`: the library keeps its short names, and a program that wants them apart writes `(require 'console 'prefix 'con:)`. A spike first (§3). Amendment proposed 2026-11-10, for a later full-screen library: §4.8, spike items 6 and 7, AC-8, §9 |
+| **Status** | Steps 1 to 3 done (2026-11-10; §10 to §12); step 4 (live displays) to come. Accepted (owner, 2026-11-09) with the leanings of §8, and its amendment (§4.8, §9) with the leanings of §9 (owner, 2026-11-10). Decision 5 (names) is settled by `specs/27-namespaces.md`: the library keeps its short names, and a program that wants them apart writes `(require 'console 'prefix 'con:)`. A spike first (§3). Amendment proposed 2026-11-10, for a later full-screen library: §4.8, spike items 6 and 7, AC-8, §9 |
 | **Asked for by** | The owner (2026-11-09): "I'm used to writing C# console programs with the help of Spectre.Console. How do we provide cog-lisp with similar console I/O capabilities? I think this one needs a specification document." |
 | **Relates to** | `LispTextOutput` and `LispStdin` (Phase 5; `src/coglisp-runtime.st`, `src/coglisp-shell.st`); the HTTP design (`specs/21-https-and-json.md`), whose rule it follows: the operating system's details stay inside cog-lisp |
 
@@ -457,4 +457,41 @@ The spike (§3.1), then step 1 of §5 with the core §4.8 asks of it.
 - **Checks:** `tests/lisp/console-renderables.lisp` (52 checks: golden output
   at several widths, with and without Unicode, styles kept in cells and
   borders); `examples/console-renderables.lisp`, in the chapter "The console".
+
+## 12. As built: step 3, the prompts (2026-11-10)
+
+- **`ask`** (R-10): what is typed, with Backspace; `default` (shown, and
+  answered for an empty answer), `validate` (a procedure answering `#t` or a
+  message, shown before asking again; `#f` gets a message of its own),
+  `secret` (typed as `*`), and `allow-empty`. A key with a modifier types
+  nothing, and a paste types its text.
+- **`confirm`**: `y` or `n` answers at once, Enter the `default`, which the hint
+  shows (`[Y/n]`, `[y/N]`, or `[y/n]` with none).
+- **`choose` and `choose-many`**: the arrow keys, Page Up and Down, Home and End;
+  Space marks in `choose-many`. The list is drawn in place under the title,
+  a page at a time (`page-size`, 10) with where it is (`(3 of 6)`), the
+  current item in `highlight` (bold cyan), each shown by `display`. Each redraw
+  goes back up over the last one, clearing its lines, so nothing doubles. On
+  Enter the list goes and the title and the answer stay. The cursor is hidden
+  while the list is shown (R-21), raw mode held for the whole prompt.
+- **Without a console** (R-11): `ask` and `confirm` read a line; `choose` lists
+  the items numbered and reads a number or a name, `choose-many` several,
+  separated by spaces or commas. A wrong answer says why and asks again; the end
+  of the input is an error. The line read ends the prompt's line, as an echo
+  would, so a program's output stays in lines.
+- **Cancelling** (R-12): Ctrl+C or Escape is an error, `prompt: cancelled`,
+  which `prompt-cancelled?` tells; raw mode and the cursor are restored on the
+  way out, as on every other way out.
+- **The test console** takes `input`, a string of lines: then it is not
+  interactive, and the prompts read those lines, as from a pipe. Its screen now
+  takes a backspace back a cell, as a terminal does.
+- **Checks:** `tests/lisp/console-prompts.lisp` (62 checks); on real terminals
+  (AC-4, AC-5), `windows-check` 20/20 and `linux-check` 14/14, typing with a
+  backspace into `ask`, choosing with the arrows, and cancelling with Ctrl+C,
+  the terminal mode as it was after each; `examples/console-prompts.lisp`, in
+  the chapter "The console".
+- **Learned on the Windows console:** a clear (`ESC[2J`) on a screen with
+  content scrolls the window down its buffer instead of erasing in place, so a
+  test reading the screen back reads from the window's top
+  (`srWindow.Top`), not from row 0.
 

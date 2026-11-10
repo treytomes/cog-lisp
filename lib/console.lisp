@@ -26,6 +26,7 @@
           segment segment-text segment-style
           text-width make-renderable renderable? render-lines render
           rule panel table table-column table-add-row! table-add-column! grid columns tree padded aligned
+          ask confirm choose choose-many prompt-cancelled?
           make-region draw-region
           read-event event? event-kind event-key event-char event-modifiers event-text key-event?
           with-raw-mode with-alternate-screen with-hidden-cursor
@@ -86,6 +87,7 @@
                                         ((and (%env "LINES") (string->number (%env "LINES"))) (string->number (%env "LINES")))
                                         (else 24)))
     (hash-table-set! caps 'events #f)
+    (hash-table-set! caps 'input #f)
     caps))
 
 (define (%caps)
@@ -1040,17 +1042,256 @@ content's lines placed in the full width: left, center or right."
    (lambda () (%measure content))))
 
 ;;; ===========================================================================
+;;; Prompts (R-10 to R-12)
+
+;; Ctrl+C or Escape in a prompt: an error a program can catch (R-12)
+(define %cancel-message "prompt: cancelled")
+(define (%cancel) (error %cancel-message))
+
+(define (prompt-cancelled? e)
+  "(prompt-cancelled? condition)
+True if condition is the one a prompt raises when Ctrl+C or Escape ends it, for guard."
+  (and (error-object? e) (string? (error-object-message e))
+       (string-prefix? %cancel-message (error-object-message e))))
+
+(define (%interactive?) (%cap 'interactive?))
+
+;; a line of input for a prompt without a console (R-11): from the test
+;; console's input, else the current input; the end of it is an error
+(define (%read-answer-line)
+  (%terminal-flush)
+  (let ((line (read-line (or (%cap 'input) (current-input-port)))))
+    (if (eof-object? line) (error "prompt: no answer: the input ended"))
+    ;; the answer is not echoed: the prompt's line ends here, as if it were
+    (newline)
+    line))
+
+(define (%show x) (if (string? x) x (with-output-to-string (lambda () (display x)))))
+
+;; an event, in raw mode; Ctrl+C and Escape cancel
+(define (%prompt-event)
+  (let ((e (read-event)))
+    (cond ((or (key-event? e #\c 'ctrl) (key-event? e 'escape)) (%cancel))
+          ((eq? (event-kind e) 'eof) (error "prompt: no answer: the input ended"))
+          (else e))))
+
+(define (%dim text) (segment text (style 'dim)))
+
+;;; --- ask ---------------------------------------------------------------------
+
+(define (ask question . options)
+  "(ask question option ...)
+Asks question (markup), and answers the text typed. Options: default (answered for an empty answer, and shown), validate (a procedure of the answer answering #t, or a message to show before asking again), secret (#t: typed as *), allow-empty (#t: an empty answer, with no default, is the empty string). Without a console it reads a line (R-11). Ctrl+C or Escape is a condition prompt-cancelled? tells."
+  (%check-options "ask" options '(default validate secret allow-empty))
+  (let ((default (%opt options 'default #f))
+        (validate (%opt options 'validate #f))
+        (secret (%opt options 'secret #f))
+        (allow-empty (%opt options 'allow-empty #f)))
+    ;; the answer, or a message for why it is not one
+    (define (judge text)
+      (let ((answer (if (and (string=? text "") default) (%show default) text)))
+        (cond ((and (string=? answer "") (not allow-empty)) (cons #f "an answer is needed"))
+              (validate (let ((v (validate answer))) (if (eq? v #t) (cons #t answer) (cons #f (if (string? v) v "not a valid answer")))))
+              (else (cons #t answer)))))
+    (define (show-question)
+      (print-markup question)
+      (if default (begin (%write " ") (%write-segments (list (%dim (string-append "(" (%show default) ")"))))))
+      (%write " "))
+    (define (show-problem message)
+      (%write-segments (list (segment message (style 'red))))
+      (newline))
+    (if (%interactive?)
+        (with-raw-mode
+         (lambda ()
+           (let ask-again ()
+             (show-question)
+             (%terminal-flush)
+             (let typing ((chars '()))
+               (let ((e (%prompt-event)))
+                 (cond ((key-event? e 'enter)
+                        (newline)
+                        (let ((j (judge (list->string (reverse chars)))))
+                          (if (car j) (cdr j) (begin (show-problem (cdr j)) (ask-again)))))
+                       ((key-event? e 'backspace)
+                        (if (pair? chars) (%write (string (integer->char 8) #\space (integer->char 8))))
+                        (%terminal-flush)
+                        (typing (if (pair? chars) (cdr chars) chars)))
+                       ((eq? (event-kind e) 'paste)
+                        (%write (if secret (make-string (string-length (event-text e)) #\*) (event-text e)))
+                        (%terminal-flush)
+                        (typing (append (reverse (string->list (event-text e))) chars)))
+                       ((and (event-char e) (null? (event-modifiers e)))
+                        (%write (if secret "*" (string (event-char e))))
+                        (%terminal-flush)
+                        (typing (cons (event-char e) chars)))
+                       (else (typing chars))))))))
+        (let ask-again ()
+          (show-question)
+          (let ((j (judge (%read-answer-line))))
+            (if (car j) (cdr j) (begin (show-problem (cdr j)) (ask-again))))))))
+
+;;; --- confirm -------------------------------------------------------------------
+
+(define (confirm question . options)
+  "(confirm question option ...)
+Asks a yes or no question (markup), and answers #t or #f: y or n answers it, and Enter the default. Options: default (#t or #f; none: an answer is needed)."
+  (%check-options "confirm" options '(default))
+  (let* ((m (memq 'default options))
+         (has-default (and m #t))
+         (default (and m (cadr m)))
+         (hint (cond ((not has-default) "[y/n]") (default "[Y/n]") (else "[y/N]"))))
+    (define (show-question)
+      (print-markup question) (%write " ") (%write-segments (list (%dim hint))) (%write " "))
+    (if (%interactive?)
+        (with-raw-mode
+         (lambda ()
+           (show-question)
+           (%terminal-flush)
+           (let loop ()
+             (let ((e (%prompt-event)))
+               (cond ((or (key-event? e #\y) (key-event? e #\Y)) (%write "y") (newline) #t)
+                     ((or (key-event? e #\n) (key-event? e #\N)) (%write "n") (newline) #f)
+                     ((and (key-event? e 'enter) has-default) (%write (if default "y" "n")) (newline) default)
+                     (else (loop)))))))
+        (let loop ()
+          (show-question)
+          (let ((answer (string-downcase (string-trim (%read-answer-line)))))
+            (cond ((member answer '("y" "yes")) #t)
+                  ((member answer '("n" "no")) #f)
+                  ((and (string=? answer "") has-default) default)
+                  (else (%write-segments (list (segment "answer y or n" (style 'red)))) (newline) (loop))))))))
+
+;;; --- choose and choose-many ------------------------------------------------------
+
+;; the list a chooser shows: the title, then a page of items, the current one
+;; marked, with a hint when there are more above or below
+(define (%chooser-lines title items labels current page marks highlight)
+  (let* ((n (length items))
+         (top (max 0 (min (- current (quotient page 2)) (- n page))))
+         (shown (iota (min page n) top))
+         (width (console-width)))
+    (append
+     (render-lines (markup title) width)
+     (map (lambda (i)
+            (let* ((here (= i current))
+                   (mark (if marks (if (list-ref marks i) "[x] " "[ ] ") ""))
+                   (text (string-append (if here "> " "  ") mark (list-ref labels i))))
+              (car (%clip (list (segment text (if here highlight %plain))) width))))
+          shown)
+     (if (> n page)
+         (list (list (%dim (string-append "  (" (number->string (+ current 1)) " of " (number->string n) ")"))))
+         '()))))
+
+;; draw lines where the last draw was: up over its lines, each cleared and redrawn
+(define (%redraw lines before)
+  (if (> before 0) (%write (csi (number->string before) "A")))
+  (for-each (lambda (line) (%write (string #\return)) (%write (csi "2K")) (%write-segments line) (newline)) lines)
+  ;; a shorter list leaves no stale lines below it
+  (let clear ((extra (- before (length lines))))
+    (if (> extra 0) (begin (%write (csi "2K")) (newline) (clear (- extra 1)))))
+  (if (> before (length lines)) (%write (csi (number->string (- before (length lines))) "A")))
+  (%terminal-flush)
+  (length lines))
+
+;; the shared loop of choose and choose-many: answers the current index and the marks
+(define (%choose-interactive title items labels page many? marks highlight)
+  (let ((n (length items)))
+    (with-hidden-cursor
+     (lambda ()
+       (with-raw-mode
+        (lambda ()
+          (let loop ((current 0) (marks marks) (drawn 0))
+            (let* ((drawn (%redraw (%chooser-lines title items labels current page (and many? marks) highlight) drawn))
+                   (e (%prompt-event)))
+              (cond ((key-event? e 'up) (loop (max 0 (- current 1)) marks drawn))
+                    ((key-event? e 'down) (loop (min (- n 1) (+ current 1)) marks drawn))
+                    ((key-event? e 'page-up) (loop (max 0 (- current page)) marks drawn))
+                    ((key-event? e 'page-down) (loop (min (- n 1) (+ current page)) marks drawn))
+                    ((key-event? e 'home) (loop 0 marks drawn))
+                    ((key-event? e 'end) (loop (- n 1) marks drawn))
+                    ((and many? (key-event? e #\space)) (loop current (%list-set marks current (not (list-ref marks current))) drawn))
+                    ((key-event? e 'enter)
+                     ;; the list goes; the question and its answer stay
+                     (%redraw '() drawn)
+                     (cons current marks))
+                    (else (loop current marks drawn)))))))))))
+
+(define (%chooser-setup who items options)
+  (%check-options who options '(page-size display highlight selected))
+  (if (null? items) (error (string-append who ": no items to choose from")))
+  (list (map (lambda (x) ((%opt options 'display %show) x)) items)
+        (%opt options 'page-size 10)
+        (%style-of (%opt options 'highlight "bold cyan"))))
+
+;; without a console: an item's number (from 1) or its label, or #f
+(define (%item-for answer items labels)
+  (let ((n (string->number answer)))
+    (cond ((and n (exact-integer? n) (<= 1 n (length items))) (list-ref items (- n 1)))
+          ((let find ((is items) (ls labels)) (cond ((null? is) #f) ((string=? (car ls) answer) is) (else (find (cdr is) (cdr ls)))))
+           => car)
+          (else #f))))
+
+(define (%list-numbered items labels)
+  (let loop ((ls labels) (i 1))
+    (if (pair? ls)
+        (begin (%write (string-append "  " (number->string i) ". " (car ls))) (newline) (loop (cdr ls) (+ i 1))))))
+
+(define (choose title items . options)
+  "(choose title items option ...)
+Shows title (markup) and items, and answers the item chosen: the arrow keys (and Page Up, Page Down, Home, End) move, Enter chooses. Options: page-size (items shown at once; 10), display (a procedure from an item to its text), highlight (the style of the current item). Without a console it lists them numbered and reads a number or a name (R-11). Ctrl+C or Escape is a condition prompt-cancelled? tells."
+  (let* ((setup (%chooser-setup "choose" items options)) (labels (car setup)))
+    (if (%interactive?)
+        (let* ((r (%choose-interactive title items labels (cadr setup) #f #f (caddr setup)))
+               (item (list-ref items (car r))))
+          (print-markup title) (%write " ") (%write-segments (list (segment (list-ref labels (car r)) (caddr setup)))) (newline)
+          item)
+        (begin
+          (print-markup-line title)
+          (%list-numbered items labels)
+          (let again ()
+            (%write "? ")
+            (let ((item (%item-for (string-trim (%read-answer-line)) items labels)))
+              (or item (begin (%write-segments (list (segment "choose a number or a name from the list" (style 'red)))) (newline) (again)))))))))
+
+(define (choose-many title items . options)
+  "(choose-many title items option ...)
+As choose, but Space marks and unmarks items, and Enter answers the marked ones, in their order. Options: those of choose, and selected (a list of the items marked at first). Without a console it reads numbers or names, separated by spaces or commas."
+  (let* ((setup (%chooser-setup "choose-many" items options))
+         (labels (car setup))
+         (selected (%opt options 'selected '()))
+         (marks (map (lambda (x) (and (member x selected) #t)) items)))
+    (if (%interactive?)
+        (let* ((r (%choose-interactive title items labels (cadr setup) #t marks (caddr setup)))
+               (chosen (let pick ((is items) (ms (cdr r))) (cond ((null? is) '()) ((car ms) (cons (car is) (pick (cdr is) (cdr ms)))) (else (pick (cdr is) (cdr ms)))))))
+          (print-markup title) (%write " ")
+          (%write-segments (list (segment (string-join (map (lambda (x) ((%opt options 'display %show) x)) chosen) ", ") (caddr setup))))
+          (newline)
+          chosen)
+        (begin
+          (print-markup-line title)
+          (%list-numbered items labels)
+          (let again ()
+            (%write "? ")
+            (let* ((words (filter (lambda (w) (not (string=? w "")))
+                                  (append-map (lambda (part) (string-split part #\space)) (string-split (%read-answer-line) #\,))))
+                   (chosen (map (lambda (w) (%item-for w items labels)) words)))
+              (if (every (lambda (x) x) chosen)
+                  (filter (lambda (x) (member x chosen)) items)
+                  (begin (%write-segments (list (segment "choose numbers or names from the list" (style 'red)))) (newline) (again)))))))))
+
+;;; ===========================================================================
 ;;; The test console (R-15, R-23)
 
 ;; #(screen width height cells log cursor-col cursor-row)
 (define (with-test-console options thunk)
   "(with-test-console options thunk)
-Runs thunk against a test console, and answers its screen: options is a list of names and values, width (80), height (24), colors (truecolor), unicode? (#t) and events (a list of key names, characters, strings, lists such as (ctrl #\\c), or events, for read-event). The screen is what was written, as a terminal shows it: screen-text, screen-cell and the rest read it."
+Runs thunk against a test console, and answers its screen: options is a list of names and values, width (80), height (24), colors (truecolor), unicode? (#t), events (a list of key names, characters, strings, lists such as (ctrl #\\c), or events, for read-event and the prompts), and input (a string of lines: then the console reads no keys, and the prompts read these lines, as with piped input). The screen is what was written, as a terminal shows it: screen-text, screen-cell and the rest read it."
   (let* ((get (lambda (name default) (let ((m (memq name options))) (if m (cadr m) default))))
          (width (get 'width 80)) (height (get 'height 24))
          (caps (make-hash-table)))
     (hash-table-set! caps 'terminal? #t)
-    (hash-table-set! caps 'interactive? #t)
+    (hash-table-set! caps 'interactive? (not (get 'input #f)))
+    (hash-table-set! caps 'input (and (get 'input #f) (open-input-string (get 'input #f))))
     (hash-table-set! caps 'colors (get 'colors 'truecolor))
     (hash-table-set! caps 'unicode? (get 'unicode? #t))
     (hash-table-set! caps 'width width)
@@ -1127,6 +1368,7 @@ Runs thunk against a test console, and answers its screen: options is a list of 
             (cond ((eq? c esc) (loop (sequence i)))
                   ((eq? c #\newline) (newline!) (loop (+ i 1)))
                   ((eq? c #\return) (set! col 0) (loop (+ i 1)))
+                  ((eq? c (integer->char 8)) (set! col (max 0 (- col 1))) (loop (+ i 1)))
                   ((eq? c #\tab) (set! col (min (- width 1) (* 8 (+ 1 (quotient col 8))))) (loop (+ i 1)))
                   (else (put! c) (loop (+ i 1)))))))
     (vector 'screen width height rows text col row)))

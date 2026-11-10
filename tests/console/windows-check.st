@@ -3,7 +3,7 @@
  prints its log. It writes through the console library, reads the screen back,
  injects keys for read-event, and checks the console modes are restored.
  Not part of run-all: it needs a console, which a suite run has not."
-| k log pass total check lisp out in omode imode buf rec inject readRow attrAt |
+| k log pass total check lisp out in omode imode buf rec inject readRow attrAt top |
 (Object << #ConsoleCheck) package: 'ConsoleCheck'; install.
 k := Smalltalk at: #ConsoleCheck.
 #(
@@ -12,6 +12,7 @@ k := Smalltalk at: #ConsoleCheck.
 'readChars: h buffer: b count: c at: xy into: r ^ self ffiCall: #(int ReadConsoleOutputCharacterW(void* h, void* b, uint32 c, uint32 xy, void* r)) module: ''kernel32.dll'''
 'readAttrs: h buffer: b count: c at: xy into: r ^ self ffiCall: #(int ReadConsoleOutputAttribute(void* h, void* b, uint32 c, uint32 xy, void* r)) module: ''kernel32.dll'''
 'writeInput: h records: b count: c into: w ^ self ffiCall: #(int WriteConsoleInputW(void* h, void* b, uint32 c, void* w)) module: ''kernel32.dll'''
+'info: h into: b ^ self ffiCall: #(int GetConsoleScreenBufferInfo(void* h, void* b)) module: ''kernel32.dll'''
 ) do: [:src | k class compile: src].
 log := WriteStream on: String new.
 pass := 0. total := 0.
@@ -20,11 +21,14 @@ check := [:name :ok | total := total + 1. ok == true ifTrue: [pass := pass + 1].
 lisp := [:source | LispCompiler new evalAll: source].
 out := k getStdHandle: -11.
 in := k getStdHandle: -10.
+"rows are the window's, from its top: a clear (ESC[2J) on a console with content
+ scrolls the window down its buffer, rather than erasing in place"
+top := [| b | b := ByteArray new: 22. k info: out into: b. b signedShortAt: 13].
 readRow := [:row :len | | b rd | b := ByteArray new: len * 2. rd := ByteArray new: 4.
-	k readChars: out buffer: b count: len at: (row bitShift: 16) into: rd.
+	k readChars: out buffer: b count: len at: ((row + top value) bitShift: 16) into: rd.
 	(ZnCharacterEncoder newForEncoding: 'utf-16le') decodeBytes: b].
 attrAt := [:col :row | | b rd | b := ByteArray new: 2. rd := ByteArray new: 4.
-	k readAttrs: out buffer: b count: 1 at: (row bitShift: 16) + col into: rd. b unsignedShortAt: 1].
+	k readAttrs: out buffer: b count: 1 at: ((row + top value) bitShift: 16) + col into: rd. b unsignedShortAt: 1].
 inject := [:vk :ch :ctrl | | b | b := ByteArray new: 20.
 	b unsignedShortAt: 1 put: 1. b unsignedLongAt: 5 put: 1. b unsignedShortAt: 9 put: 1.
 	b unsignedShortAt: 11 put: vk. b unsignedShortAt: 15 put: ch. b unsignedLongAt: 17 put: ctrl.
@@ -65,7 +69,27 @@ log nextPutAll: '== cog-lisp : the console library on a Windows console (specs/2
 	lisp value: '(guard (e (#t #f)) (with-raw-mode (lambda () (with-raw-mode (lambda () (error "stop"))))))'.
 	buf := ByteArray new: 4. k getMode: in into: buf.
 	check value: 'AC-5 after an error in nested raw mode, the input mode is as it was' value: (buf unsignedLongAt: 1) = imode.
+	"step 3, the prompts: typed with a backspace, chosen with the arrows, cancelled"
+	lisp value: '(display (string (integer->char 27) #\[ #\2 #\J (integer->char 27) #\[ #\H)) (%terminal-flush)'.
+	inject value: 16r41 value: 97 value: 0.
+	inject value: 16r42 value: 98 value: 0.
+	inject value: 16r08 value: 8 value: 0.
+	inject value: 16r43 value: 99 value: 0.
+	inject value: 16r0D value: 13 value: 0.
+	check value: 'R-10 ask answers what was typed, with a backspace' value: (lisp value: '(equal? (ask "Name?") "ac")').
+	lisp value: '(%terminal-flush)'.
+	check value: 'R-10 the screen shows the answer' value: ((readRow value: 0 value: 8) = 'Name? ac').
+	inject value: 16r28 value: 0 value: 0.
+	inject value: 16r0D value: 13 value: 0.
+	check value: 'R-10 choose answers the item the arrows reached' value: (lisp value: '(eq? (choose "Pick" (list ''red ''green ''blue)) ''green)').
+	lisp value: '(%terminal-flush)'.
+	check value: 'R-10 the list goes, and the answer stays' value: ((readRow value: 1 value: 10) = 'Pick green').
+	inject value: 16r43 value: 3 value: 8.
+	check value: 'R-12 Ctrl+C in a prompt is a condition' value: (lisp value: '(guard (e ((prompt-cancelled? e) #t)) (ask "Again?") #f)').
+	buf := ByteArray new: 4. k getMode: in into: buf.
+	check value: 'AC-5 after the prompts, Ctrl+C included, the input mode is as it was' value: (buf unsignedLongAt: 1) = imode.
 	lisp value: '(display (string (integer->char 27) #\[ #\H)) (display "MAIN") (%terminal-flush) (with-alternate-screen (lambda () (display "OTHER") (%terminal-flush)))'.
+	lisp value: '(%terminal-flush)'.
 	check value: 'R-21 the alternate screen leaves the main one as it was' value: ((readRow value: 0 value: 4) = 'MAIN')]]
 	on: Error do: [:e | log nextPutAll: '  ERROR  '; nextPutAll: e messageText asString; lf].
 log nextPutAll: '== RESULT: '; print: pass; nextPut: $/; print: total; nextPutAll: ' checks passed =='; lf.

@@ -1,0 +1,13 @@
+("ac" blue)
+Your name? ac
+Favorite color blue
+
+("Bo" "Ann" #t medium)
+Your name? (Bo)
+Your name?
+Continue? [y/n]
+Size
+  1. small
+  2. medium
+  3. large
+?
