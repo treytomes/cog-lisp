@@ -25,6 +25,7 @@
           styled markup markup-escape print-markup print-markup-line
           segment segment-text segment-style
           text-width make-renderable renderable? render-lines render
+          rule panel table table-column table-add-row! table-add-column! grid columns tree padded aligned
           make-region draw-region
           read-event event? event-kind event-key event-char event-modifiers event-text key-event?
           with-raw-mode with-alternate-screen with-hidden-cursor
@@ -379,10 +380,10 @@ How many cells text takes on a terminal: a wide East Asian character two, a comb
 ;;; Renderables and lines (R-7, R-17)
 
 ;; a line is a list of segments; a renderable answers its lines at a width
-(define (make-renderable proc)
-  "(make-renderable proc)
-A renderable whose lines, at a width, are (proc width): a list of lines, each a list of segments (segment text style), at most width cells wide. The renderables the library makes are such; so can a program's."
-  (vector 'renderable proc))
+(define (make-renderable proc . measure)
+  "(make-renderable proc [measure])
+A renderable whose lines, at a width, are (proc width): a list of lines, each a list of segments (segment text style), at most width cells wide. measure, a procedure of no arguments, answers (narrowest . widest), the cells it needs without breaking a word and the most it takes, for a table or columns to lay it out; without one, both are its widest line at a large width. The renderables the library makes are such; so can a program's."
+  (vector 'renderable proc (if (pair? measure) (car measure) #f)))
 
 (define (renderable? x)
   "(renderable? x)
@@ -448,7 +449,18 @@ x's lines at width cells: a list of lines, each a list of segments. x is a rende
 (define (render x)
   "(render x)
 Writes x, a renderable, styled text or any value, at the console's width, a line at a time."
-  (for-each (lambda (line) (%write-segments line) (newline)) (render-lines x (console-width))))
+  (for-each (lambda (line) (%write-segments (%trim-line line)) (newline)) (render-lines x (console-width))))
+
+;; a line without its trailing plain spaces: they show as nothing, and a pipe's
+;; or a file's text keeps none (a styled space, a background, is kept)
+(define (%trim-line line)
+  (let loop ((rev (reverse line)))
+    (cond ((null? rev) '())
+          ((and (eq? (segment-style (car rev)) %plain) (string=? (%trim-right (segment-text (car rev))) ""))
+           (loop (cdr rev)))
+          ((eq? (segment-style (car rev)) %plain)
+           (reverse (cons (segment (%trim-right (segment-text (car rev)))) (cdr rev))))
+          (else (reverse rev)))))
 
 ;;; ===========================================================================
 ;;; Regions (R-18)
@@ -643,6 +655,389 @@ The next event: a key, a paste or a resize; eof at the end of the input; or #f w
         (begin
           (%terminal-flush)
           (with-raw-mode (lambda () (%decode (lambda (t) (%terminal-read t)) ms)))))))
+
+;;; ===========================================================================
+;;; Measuring renderables, and lines (for the layouts below)
+
+;; (narrowest . widest): the fewest cells x can be drawn in without breaking a
+;; word, and the most it takes
+(define (%measure x)
+  (cond ((and (renderable? x) (vector-ref x 2)) ((vector-ref x 2)))
+        ((renderable? x)
+         (let ((w (fold max 0 (map %line-width (render-lines x 1000))))) (cons w w)))
+        (else
+         (let* ((segs (cond ((tagged? x 'styled) (vector-ref x 1))
+                            ((string? x) (list (segment x)))
+                            (else (list (segment (with-output-to-string (lambda () (display x))))))))
+                (text (apply string-append (map segment-text segs)))
+                (lines (string-split text #\newline))
+                (words (append-map (lambda (l) (string-split l #\space)) lines)))
+           (cons (fold max 0 (map text-width words)) (fold max 0 (map text-width lines)))))))
+
+(define (%line-width line) (fold (lambda (seg w) (+ w (text-width (segment-text seg)))) 0 line))
+
+(define (%spaces n) (if (<= n 0) '() (list (segment (make-string n #\space)))))
+
+;; a line placed in width cells: left, center or right; never cut
+(define (%align line width align)
+  (let ((gap (max 0 (- width (%line-width line)))))
+    (cond ((eq? align 'right) (append (%spaces gap) line))
+          ((eq? align 'center) (append (%spaces (quotient gap 2)) line (%spaces (- gap (quotient gap 2)))))
+          (else (append line (%spaces gap))))))
+
+;; options, as (name value ...): the value of name, or default
+(define (%opt options name default)
+  (let ((m (memq name options))) (if (and m (pair? (cdr m))) (cadr m) default)))
+
+(define (%check-options who options names)
+  (let loop ((o options))
+    (cond ((null? o) #t)
+          ((not (memq (car o) names))
+           (error (string-append who ": unknown option " (with-output-to-string (lambda () (write (car o)))))))
+          ((null? (cdr o)) (error (string-append who ": the option " (symbol->string (car o)) " has no value")))
+          (else (loop (cddr o))))))
+
+(define (%style-of x) (cond ((not x) %plain) ((style? x) x) (else (style x))))
+
+;;; ===========================================================================
+;;; Borders (R-9)
+
+;; #(top-left horizontal top-right vertical bottom-left bottom-right
+;;   left-tee right-tee top-tee bottom-tee cross)
+(define %borders
+  '((square . #("┌" "─" "┐" "│" "└" "┘" "├" "┤" "┬" "┴" "┼"))
+    (rounded . #("╭" "─" "╮" "│" "╰" "╯" "├" "┤" "┬" "┴" "┼"))
+    (heavy . #("┏" "━" "┓" "┃" "┗" "┛" "┣" "┫" "┳" "┻" "╋"))
+    (double . #("╔" "═" "╗" "║" "╚" "╝" "╠" "╣" "╦" "╩" "╬"))
+    (ascii . #("+" "-" "+" "|" "+" "+" "+" "+" "+" "+" "+"))
+    (none . #(" " " " " " " " " " " " " " " " " " " " " "))))
+
+;; the border set named, as the console can show it: ascii without Unicode
+(define (%border name)
+  (let ((b (assq name %borders)))
+    (if (not b) (error "border: unknown border" name))
+    (if (and (not (%cap 'unicode?)) (not (memq name '(ascii none)))) (cdr (assq 'ascii %borders)) (cdr b))))
+
+(define (%check-border name)
+  (if (not (assq name %borders))
+      (error (string-append "border: unknown border " (with-output-to-string (lambda () (write name)))
+                            "; the borders are square, rounded, heavy, double, ascii and none"))))
+
+(define (%b border i) (vector-ref border i))
+(define (%repeat s n) (apply string-append (map (lambda (i) s) (iota (max 0 n)))))
+
+;;; ===========================================================================
+;;; rule (R-7)
+
+(define (rule . args)
+  "(rule [title] option ...)
+A line across the width, with title (text or markup's styled text) in it. Options: style (the line's), align (left, center or right; center), character (the line's, else ─, or - without Unicode)."
+  (let* ((title (and (pair? args) (not (symbol? (car args))) (car args)))
+         (options (if title (cdr args) args)))
+    (%check-options "rule" options '(style align character))
+    (make-renderable
+     (lambda (width)
+       (let* ((ch (%opt options 'character (if (%cap 'unicode?) "─" "-")))
+              (s (%style-of (%opt options 'style #f)))
+              (line (lambda (n) (if (> n 0) (list (segment (%repeat ch n) s)) '()))))
+         (if (not title)
+             (list (line width))
+             (let* ((t (car (render-lines title (max 1 (- width 4)))))
+                    (tw (%line-width t))
+                    (rest (max 0 (- width tw 2)))
+                    (align (%opt options 'align 'center))
+                    (left (cond ((eq? align 'left) 2) ((eq? align 'right) (- rest 2)) (else (quotient rest 2)))))
+               (list (append (line left) (list (segment " ")) t (list (segment " ")) (line (- rest left))))))))
+     (lambda () (cons 1 1)))))
+
+;;; ===========================================================================
+;;; panel (R-7)
+
+(define (%padding p)
+  ;; a number for all four, or (vertical horizontal), or (top right bottom left)
+  (cond ((number? p) (list p p p p))
+        ((and (list? p) (= (length p) 2)) (list (car p) (cadr p) (car p) (cadr p)))
+        ((and (list? p) (= (length p) 4)) p)
+        (else (error "padding: a number, (vertical horizontal), or (top right bottom left)" p))))
+
+(define (panel content . options)
+  "(panel content option ...)
+content in a box. Options: header (text or styled text, in the top border), header-align (left, center, right), border (square, rounded, heavy, double, ascii, none; square), border-style, padding (a number, (vertical horizontal), or (top right bottom left); (0 1)), expand (#t: the full width), width."
+  (%check-options "panel" options '(header header-align border border-style padding expand width))
+  (%check-border (%opt options 'border 'square))
+  (let ((pad (%padding (%opt options 'padding '(0 1)))))
+    (make-renderable
+     (lambda (width)
+       (let* ((b (%border (%opt options 'border 'square)))
+              (bs (%style-of (%opt options 'border-style #f)))
+              (hpad (+ (cadr pad) (cadddr pad)))
+              (natural (+ 2 hpad (cdr (%measure content))))
+              (outer (min width (cond ((%opt options 'width #f) => (lambda (w) w))
+                                      ((%opt options 'expand #f) width)
+                                      (else natural))))
+              (inner (max 1 (- outer 2 hpad)))
+              (body (render-lines content inner))
+              (edge (lambda (s) (segment s bs)))
+              (row (lambda (line) (append (list (edge (%b b 3))) (%spaces (cadddr pad)) (%align line inner 'left)
+                                          (%spaces (cadr pad)) (list (edge (%b b 3))))))
+              (blank (row '()))
+              (header (%opt options 'header #f))
+              (top (if (not header)
+                       (list (edge (string-append (%b b 0) (%repeat (%b b 1) (- outer 2)) (%b b 2))))
+                       (let* ((h (car (render-lines header (max 1 (- outer 4)))))
+                              (rest (max 0 (- outer 4 (%line-width h))))
+                              (align (%opt options 'header-align 'left))
+                              (left (cond ((eq? align 'center) (quotient rest 2)) ((eq? align 'right) (- rest 1)) (else 1))))
+                         (append (list (edge (string-append (%b b 0) (%repeat (%b b 1) left) " ")))
+                                 h
+                                 (list (edge (string-append " " (%repeat (%b b 1) (- rest left)) (%b b 2))))))))
+              (bottom (list (edge (string-append (%b b 4) (%repeat (%b b 1) (- outer 2)) (%b b 5))))))
+         (append (list top)
+                 (map (lambda (i) blank) (iota (car pad)))
+                 (map row body)
+                 (map (lambda (i) blank) (iota (caddr pad)))
+                 (list bottom))))
+     (lambda () (let ((m (%measure content)) (extra (+ 2 (cadr pad) (cadddr pad))))
+                  (cons (+ extra (car m)) (+ extra (cdr m))))))))
+
+;;; ===========================================================================
+;;; The cell layout of tables, grids and columns
+
+;; widths for columns, from their (narrowest . widest) and fixed widths (or #f),
+;; to fit available cells: each its widest if all fit; else the widest give up
+;; cells first, down to their narrowest, then below it (their words break)
+(define (%fit measures fixed available expand?)
+  (let* ((widths (%map2 (lambda (m f) (or f (cdr m))) measures fixed))
+         (mins (%map2 (lambda (m f) (or f (car m))) measures fixed)))
+    (define (total) (fold + 0 widths))
+    (define (shrink! below-min?)
+      ;; the column that can best give up a cell, or #f
+      (let loop ((i 0) (ws widths) (ms mins) (fs fixed) (best #f) (best-room 0))
+        (if (null? ws)
+            (and best (begin (set! widths (%list-set widths best (- (list-ref widths best) 1))) #t))
+            (let ((room (if below-min? (- (car ws) 1) (- (car ws) (car ms)))))
+              (if (and (not (car fs)) (> room best-room))
+                  (loop (+ i 1) (cdr ws) (cdr ms) (cdr fs) i room)
+                  (loop (+ i 1) (cdr ws) (cdr ms) (cdr fs) best best-room))))))
+    (let loop () (if (and (> (total) available) (shrink! #f)) (loop)))
+    (let loop () (if (and (> (total) available) (shrink! #t)) (loop)))
+    (if (and expand? (< (total) available) (pair? widths))
+        ;; the rest to the columns in turn
+        (let spread ((extra (- available (total))) (i 0))
+          (if (> extra 0)
+              (begin (set! widths (%list-set widths (remainder i (length widths)) (+ 1 (list-ref widths (remainder i (length widths))))))
+                     (spread (- extra 1) (+ i 1))))))
+    widths))
+
+;; map over two lists at once (map takes one)
+(define (%map2 f a b) (if (or (null? a) (null? b)) '() (cons (f (car a) (car b)) (%map2 f (cdr a) (cdr b)))))
+
+(define (%list-set l i v) (if (= i 0) (cons v (cdr l)) (cons (car l) (%list-set (cdr l) (- i 1) v))))
+
+;; one row of cells, at the widths: a list of lines, every cell as tall as the
+;; tallest, each aligned, joined by the strings between (a list, one shorter)
+(define (%row-lines cells widths aligns left between right)
+  (let* ((blocks (%map2 (lambda (c w) (render-lines c w)) cells widths))
+         (height (fold max 1 (map length blocks))))
+    (map (lambda (r)
+           (append left
+                   (let join ((bs blocks) (ws widths) (as aligns) (sep between))
+                     (if (null? bs)
+                         '()
+                         (append (%align (if (< r (length (car bs))) (list-ref (car bs) r) '()) (car ws) (car as))
+                                 (if (null? (cdr bs)) '() (car sep))
+                                 (join (cdr bs) (cdr ws) (cdr as) (if (null? (cdr bs)) sep (cdr sep))))))
+                   right))
+         (iota height))))
+
+;;; ===========================================================================
+;;; table (R-7; decision 2: values, and table-add-row!)
+
+;; a column: #(column header align width no-wrap)
+(define (table-column header . options)
+  "(table-column header option ...)
+A column of a table, for its columns option. Options: align (left, center, right; left), width (fixed, in cells)."
+  (%check-options "table-column" options '(align width))
+  (vector 'column header (%opt options 'align 'left) (%opt options 'width #f)))
+
+(define (%as-column c) (if (tagged? c 'column) c (table-column c)))
+
+(define (table . options)
+  "(table option ...)
+A table: columns (a list of headers, text or styled text, or table-column values), rows (a list of lists of cells, each any renderable), border (square, rounded, heavy, double, ascii, none; square), border-style, title and caption (above and below it), show-header (#t), expand (#f: as wide as its content). Too wide for the console, it shrinks, wrapping its cells. Add rows and columns with table-add-row! and table-add-column!."
+  (%check-options "table" options '(columns rows border border-style title caption show-header expand))
+  (%check-border (%opt options 'border 'square))
+  (let ((state (vector (map %as-column (%opt options 'columns '())) (%opt options 'rows '()) options)))
+    (vector 'renderable (lambda (width) (%table-lines state width)) (lambda () (%table-measure state)) state)))
+
+(define (%table-state t)
+  (if (and (renderable? t) (> (vector-length t) 3)) (vector-ref t 3) (error "table: not a table" t)))
+
+(define (table-add-row! t . cells)
+  "(table-add-row! table cell ...)
+Adds a row to table, a cell for each column; answers table."
+  (let ((s (%table-state t)))
+    (vector-set! s 1 (append (vector-ref s 1) (list cells)))
+    t))
+
+(define (table-add-column! t header . options)
+  "(table-add-column! table header option ...)
+Adds a column to table, as table-column makes it; answers table."
+  (let ((s (%table-state t)))
+    (vector-set! s 0 (append (vector-ref s 0) (list (apply table-column (cons header options)))))
+    t))
+
+;; every row, as many cells as there are columns ("" for the missing)
+(define (%table-rows s)
+  (let ((n (length (vector-ref s 0))))
+    (map (lambda (row) (let fill ((r row) (i 0)) (cond ((= i n) '()) ((pair? r) (cons (car r) (fill (cdr r) (+ i 1)))) (else (cons "" (fill r (+ i 1)))))))
+         (vector-ref s 1))))
+
+(define (%table-columns-measure s)
+  (let ((show-header (%opt (vector-ref s 2) 'show-header #t)) (rows (%table-rows s)))
+    (let loop ((cols (vector-ref s 0)) (i 0) (acc '()))
+      (if (null? cols)
+          (reverse acc)
+          (let* ((cells (append (if show-header (list (vector-ref (car cols) 1)) '()) (map (lambda (r) (list-ref r i)) rows)))
+                 (ms (map %measure cells)))
+            (loop (cdr cols) (+ i 1) (cons (cons (fold max 0 (map car ms)) (fold max 0 (map cdr ms))) acc)))))))
+
+(define (%table-measure s)
+  (let* ((ms (%table-columns-measure s)) (extra (+ 1 (* 3 (length ms)))))
+    (cons (+ extra (fold + 0 (map car ms))) (+ extra (fold + 0 (map cdr ms))))))
+
+(define (%table-lines s width)
+  (let* ((cols (vector-ref s 0)) (options (vector-ref s 2)) (n (length cols)))
+    (if (= n 0)
+        '()
+        (let* ((b (%border (%opt options 'border 'square)))
+               (bs (%style-of (%opt options 'border-style #f)))
+               (edge (lambda (str) (list (segment str bs))))
+               (widths (%fit (%table-columns-measure s) (map (lambda (c) (vector-ref c 3)) cols)
+                             (max n (- width 1 (* 3 n))) (%opt options 'expand #f)))
+               (aligns (map (lambda (c) (vector-ref c 2)) cols))
+               (outer (+ 1 (* 3 n) (fold + 0 widths)))
+               (rule-line (lambda (l m r) (edge (string-append l (string-join (map (lambda (w) (%repeat (%b b 1) (+ w 2))) widths) m) r))))
+               (row (lambda (cells)
+                      (%row-lines cells widths aligns
+                                  (edge (string-append (%b b 3) " "))
+                                  (map (lambda (i) (edge (string-append " " (%b b 3) " "))) (iota (- n 1)))
+                                  (edge (string-append " " (%b b 3))))))
+               (title (%opt options 'title #f))
+               (caption (%opt options 'caption #f)))
+          (append
+           (if title (map (lambda (l) (%align l outer 'center)) (render-lines title outer)) '())
+           (list (rule-line (%b b 0) (%b b 8) (%b b 2)))
+           (if (%opt options 'show-header #t)
+               (append (row (map (lambda (c) (vector-ref c 1)) cols)) (list (rule-line (%b b 6) (%b b 10) (%b b 7))))
+               '())
+           (append-map row (%table-rows s))
+           (list (rule-line (%b b 4) (%b b 9) (%b b 5)))
+           (if caption (map (lambda (l) (%align l outer 'center)) (render-lines caption outer)) '()))))))
+
+;;; ===========================================================================
+;;; grid and columns (R-7)
+
+(define (grid rows . options)
+  "(grid rows option ...)
+Cells side by side, without borders: rows is a list of lists of cells, each any renderable. Options: gap (cells between columns; 1), align (left, center, right, for every column), expand."
+  (%check-options "grid" options '(gap align expand))
+  (let* ((gap (%opt options 'gap 1)) (align (%opt options 'align 'left))
+         (n (fold max 0 (map length rows)))
+         (full (map (lambda (r) (append r (map (lambda (i) "") (iota (- n (length r)))))) rows))
+         (measures (lambda () (map (lambda (i) (let ((ms (map (lambda (r) (%measure (list-ref r i))) full)))
+                                                  (cons (fold max 0 (map car ms)) (fold max 0 (map cdr ms)))))
+                                   (iota n)))))
+    (make-renderable
+     (lambda (width)
+       (if (= n 0)
+           '()
+           (let ((widths (%fit (measures) (map (lambda (i) #f) (iota n)) (max n (- width (* gap (- n 1)))) (%opt options 'expand #f))))
+             (append-map (lambda (r) (%row-lines r widths (map (lambda (i) align) (iota n)) '()
+                                                 (map (lambda (i) (%spaces gap)) (iota (- n 1))) '()))
+                         full))))
+     (lambda () (let ((ms (measures)) (g (* gap (max 0 (- n 1)))))
+                  (cons (+ g (fold + 0 (map car ms))) (+ g (fold + 0 (map cdr ms)))))))))
+
+(define (columns items . options)
+  "(columns items option ...)
+items side by side, as many to a row as fit the width, the rest below: as a list wraps into columns. Options: gap (cells between columns; 2)."
+  (%check-options "columns" options '(gap))
+  (let ((gap (%opt options 'gap 2)))
+    (make-renderable
+     (lambda (width)
+       (let* ((widest (map (lambda (x) (cdr (%measure x))) items))
+              (count (let try ((k (max 1 (length items))))
+                       ;; the most per row whose columns, each as wide as its widest item, fit
+                       (if (= k 1)
+                           1
+                           (let ((ws (map (lambda (c) (fold max 0 (%every-nth widest c k))) (iota k))))
+                             (if (<= (+ (fold + 0 ws) (* gap (- k 1))) width) k (try (- k 1))))))))
+         (render-lines (grid (%chunk items count) 'gap gap) width)))
+     (lambda () (let ((ms (map %measure items)))
+                  (cons (fold max 0 (map car ms)) (+ (fold + 0 (map cdr ms)) (* gap (max 0 (- (length items) 1))))))))))
+
+(define (%every-nth l start k)
+  (let loop ((l (list-tail* l start)) (acc '()))
+    (if (null? l) (reverse acc) (loop (list-tail* l k) (cons (car l) acc)))))
+(define (list-tail* l k) (if (or (= k 0) (null? l)) l (list-tail* (cdr l) (- k 1))))
+(define (%chunk l k) (if (null? l) '() (cons (list-head l k) (%chunk (list-tail* l k) k))))
+
+;;; ===========================================================================
+;;; tree (R-7)
+
+(define (tree label . children)
+  "(tree label child ...)
+label, with children below it on guide lines; a child is a tree, or any renderable (a leaf). (tree \"root\" \"a\" (tree \"b\" \"c\"))."
+  (%make-tree
+   (lambda (width) (%tree-lines label children width))
+   (lambda ()
+     (let ((ms (map %measure (cons label children))))
+       (cons (+ 4 (fold max 0 (map car ms))) (+ 4 (fold max 0 (map cdr ms))))))))
+
+(define (%make-tree proc measure) (vector 'renderable proc measure 'tree))
+
+(define (%tree-lines label children width)
+  (let* ((u (%cap 'unicode?))
+         (branch (if u "├── " "+-- ")) (last (if u "└── " "`-- "))
+         (through (if u "│   " "|   ")) (after "    "))
+    (append (render-lines label width)
+            (let loop ((cs children))
+              (if (null? cs)
+                  '()
+                  (let* ((final? (null? (cdr cs)))
+                         (lines (render-lines (car cs) (max 1 (- width 4)))))
+                    (append (if (null? lines) '()
+                                (cons (cons (segment (if final? last branch)) (car lines))
+                                      (map (lambda (l) (cons (segment (if final? after through)) l)) (cdr lines))))
+                            (loop (cdr cs)))))))))
+
+;;; ===========================================================================
+;;; padded and aligned (R-7)
+
+(define (padded content padding)
+  "(padded content padding)
+content with space around it: padding is a number for all four sides, (vertical horizontal), or (top right bottom left)."
+  (let ((p (%padding padding)))
+    (make-renderable
+     (lambda (width)
+       (let* ((inner (max 1 (- width (cadr p) (cadddr p))))
+              (lines (render-lines content inner))
+              (w (fold max 0 (map %line-width lines)))
+              (blank (%spaces (+ w (cadr p) (cadddr p)))))
+         (append (map (lambda (i) blank) (iota (car p)))
+                 (map (lambda (l) (append (%spaces (cadddr p)) (%align l w 'left) (%spaces (cadr p)))) lines)
+                 (map (lambda (i) blank) (iota (caddr p))))))
+     (lambda () (let ((m (%measure content)) (h (+ (cadr p) (cadddr p))))
+                  (cons (+ h (car m)) (+ h (cdr m))))))))
+
+(define (aligned content align)
+  "(aligned content align)
+content's lines placed in the full width: left, center or right."
+  (if (not (memq align '(left center right))) (error "aligned: left, center or right" align))
+  (make-renderable
+   (lambda (width) (map (lambda (l) (%align l width align)) (render-lines content width)))
+   (lambda () (%measure content))))
 
 ;;; ===========================================================================
 ;;; The test console (R-15, R-23)

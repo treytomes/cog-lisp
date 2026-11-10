@@ -41,8 +41,9 @@ JSON is read and written, and pages fetched over HTTP and HTTPS."
 (chapter "console" "The console"
   "The console library, (require 'console), writes styled text with the colors a
 terminal has and none to a pipe, measures and wraps it in cells, reads keys as
-events, and tests what a program draws on a pretend terminal."
-  "console")
+events, lays text out in rules, panels, tables and trees, and tests what a
+program draws on a pretend terminal."
+  "console" "console-renderables")
 
 (chapter "namespaces" "Libraries and namespaces"
   "A library exports some of its names and keeps the rest; each file chooses how

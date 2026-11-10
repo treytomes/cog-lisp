@@ -2,6 +2,7 @@ abort
 abs
 acos
 add
+aligned
 alist
 all
 alphabetic
@@ -70,6 +71,8 @@ check
 class
 clear
 close
+column
+columns
 command
 compile
 compiler
@@ -168,6 +171,7 @@ get
 gethash
 getter
 global
+grid
 guard
 handler
 hash
@@ -259,7 +263,9 @@ oddp
 opal
 open
 output
+padded
 pair
+panel
 parameter
 parameterize
 parts
@@ -307,6 +313,8 @@ restart
 restarts
 reverse
 round
+row
+rule
 rules
 run
 save
@@ -359,6 +367,7 @@ test
 tests
 text
 third
+tree
 trim
 true
 truncate

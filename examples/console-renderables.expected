@@ -1,0 +1,22 @@
+──────────────── Inventory ─────────────────
+                   Stock
+┌────────┬─────┬───────────────────────────┐
+│ Item   │ Qty │ Note                      │
+├────────┼─────┼───────────────────────────┤
+│ apples │  12 │                           │
+│ figs   │   3 │ low: order more before    │
+│        │     │ the weekend               │
+└────────┴─────┴───────────────────────────┘
+╭─ Summary ──────────────────╮
+│ Two items, fifteen in all. │
+╰────────────────────────────╯
+warehouse
+├── shelf a
+│   └── apples
+└── shelf b
+    └── figs
+north  south  east  west
++----------------------------+
+| ASCII, for a console       |
+| without Unicode            |
++----------------------------+

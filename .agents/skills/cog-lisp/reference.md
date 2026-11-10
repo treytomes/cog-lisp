@@ -575,6 +575,8 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 
 ### console: `(require 'console)`
 
+- `(aligned content align)`: content's lines placed in the full width: left, center or right.
+- `(columns items option ...)`: items side by side, as many to a row as fit the width, the rest below: as a list wraps into columns. Options: gap (cells between columns; 2).
 - `(console-capabilities)`: What the console can do, a hash table: terminal? (a terminal, not a pipe or a file), colors (none, 16, 256 or truecolor), unicode? (box-drawing characters show), interactive? (keys can be read), width and height. Detected once, from the terminal and NO_COLOR, FORCE_COLOR, TERM, COLORTERM, COLUMNS and LINES; with-console overrides it.
 - `(console-width)`: The console's width in cells.
 - `(draw-region region lines)`: Draws lines (from render-lines) into region: each at its row, cut at the region's width and filled with spaces to it; lines past its height are not drawn, and rows past the lines are cleared.
@@ -584,17 +586,21 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(event-modifiers event)`: The modifiers held: a list of ctrl, alt and shift.
 - `(event-text event)`: The text of a paste, or #f.
 - `(event? x)`: True if x is an event (from read-event).
+- `(grid rows option ...)`: Cells side by side, without borders: rows is a list of lists of cells, each any renderable. Options: gap (cells between columns; 1), align (left, center, right, for every column), expand.
 - `(key-event? event key [modifier ...])`: True if event is that key (a key's name, or a character), with exactly those modifiers.
 - `(make-region column row width height)`: A rectangle of the screen, its top left at column and row (from 1), to draw lines into.
-- `(make-renderable proc)`: A renderable whose lines, at a width, are (proc width): a list of lines, each a list of segments (segment text style), at most width cells wide. The renderables the library makes are such; so can a program's.
+- `(make-renderable proc [measure])`: A renderable whose lines, at a width, are (proc width): a list of lines, each a list of segments (segment text style), at most width cells wide. measure, a procedure of no arguments, answers (narrowest . widest), the cells it needs without breaking a word and the most it takes, for a table or columns to lay it out; without one, both are its widest line at a large width. The renderables the library makes are such; so can a program's.
 - `(markup text)`: The styled text that markup text describes, "[bold red]done[/] in 3 s": a value to render, or to put in a table. [[ and ]] are [ and ]; an error names the position.
 - `(markup-escape text)`: text with [ and ] doubled, so markup shows them as they are.
+- `(padded content padding)`: content with space around it: padding is a number for all four sides, (vertical horizontal), or (top right bottom left).
+- `(panel content option ...)`: content in a box. Options: header (text or styled text, in the top border), header-align (left, center, right), border (square, rounded, heavy, double, ascii, none; square), border-style, padding (a number, (vertical horizontal), or (top right bottom left); (0 1)), expand (#t: the full width), width.
 - `(print-markup text)`: Writes markup text, "[bold green]done[/] in [blue]3 s[/]", in its styles, with the colors the console has (none to a pipe or a file).
 - `(print-markup-line text)`: As print-markup, then a newline.
 - `(read-event [timeout])`: The next event: a key, a paste or a resize; eof at the end of the input; or #f when timeout milliseconds pass first (none: wait as long as it takes). It waits without stopping other processes. On a terminal it reads in raw mode; on a test console, its events.
 - `(render x)`: Writes x, a renderable, styled text or any value, at the console's width, a line at a time.
 - `(render-lines x width)`: x's lines at width cells: a list of lines, each a list of segments. x is a renderable, styled text (from styled or markup), a string, or any value (as display writes it); text is wrapped at spaces.
 - `(renderable? x)`: True if x is a renderable made by make-renderable.
+- `(rule [title] option ...)`: A line across the width, with title (text or markup's styled text) in it. Options: style (the line's), align (left, center or right; center), character (the line's, else ─, or - without Unicode).
 - `(screen-cell screen column row)`: One cell of the screen (from 1): (character . style); the character is #f in the second cell of a wide one.
 - `(screen-cursor screen)`: Where the cursor ended: (column . row), from 1.
 - `(screen-line screen row)`: The text of one row of the screen (from 1), trailing spaces gone.
@@ -610,7 +616,12 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(style-link style)`: The URL it links to, or #f.
 - `(style? x)`: True if x is a style.
 - `(styled text style-part ...)`: text in the style the parts make (as style takes them): a value to render, or to put in a table or a panel.
+- `(table option ...)`: A table: columns (a list of headers, text or styled text, or table-column values), rows (a list of lists of cells, each any renderable), border (square, rounded, heavy, double, ascii, none; square), border-style, title and caption (above and below it), show-header (#t), expand (#f: as wide as its content). Too wide for the console, it shrinks, wrapping its cells. Add rows and columns with table-add-row! and table-add-column!.
+- `(table-add-column! table header option ...)`: Adds a column to table, as table-column makes it; answers table.
+- `(table-add-row! table cell ...)`: Adds a row to table, a cell for each column; answers table.
+- `(table-column header option ...)`: A column of a table, for its columns option. Options: align (left, center, right; left), width (fixed, in cells).
 - `(text-width text)`: How many cells text takes on a terminal: a wide East Asian character two, a combining mark or a control character none, any other one.
+- `(tree label child ...)`: label, with children below it on guide lines; a child is a tree, or any renderable (a leaf). (tree "root" "a" (tree "b" "c")).
 - `(with-alternate-screen thunk)`: Runs thunk on the terminal's alternate screen, and brings the main screen back, as it was, however thunk is left, and at exit.
 - `(with-console overrides thunk)`: Runs thunk with the console's capabilities changed as overrides says, a list of names and values: (with-console '(colors none width 40) thunk). Gives them back however thunk is left.
 - `(with-hidden-cursor thunk)`: Runs thunk with the cursor hidden, and shows it again however thunk is left, and at exit.

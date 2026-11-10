@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Step 1 done (2026-11-10; §10); steps 2 to 4 to come. Accepted (owner, 2026-11-09) with the leanings of §8, and its amendment (§4.8, §9) with the leanings of §9 (owner, 2026-11-10). Decision 5 (names) is settled by `specs/27-namespaces.md`: the library keeps its short names, and a program that wants them apart writes `(require 'console 'prefix 'con:)`. A spike first (§3). Amendment proposed 2026-11-10, for a later full-screen library: §4.8, spike items 6 and 7, AC-8, §9 |
+| **Status** | Steps 1 and 2 done (2026-11-10; §10, §11); steps 3 (prompts) and 4 (live displays) to come. Accepted (owner, 2026-11-09) with the leanings of §8, and its amendment (§4.8, §9) with the leanings of §9 (owner, 2026-11-10). Decision 5 (names) is settled by `specs/27-namespaces.md`: the library keeps its short names, and a program that wants them apart writes `(require 'console 'prefix 'con:)`. A spike first (§3). Amendment proposed 2026-11-10, for a later full-screen library: §4.8, spike items 6 and 7, AC-8, §9 |
 | **Asked for by** | The owner (2026-11-09): "I'm used to writing C# console programs with the help of Spectre.Console. How do we provide cog-lisp with similar console I/O capabilities? I think this one needs a specification document." |
 | **Relates to** | `LispTextOutput` and `LispStdin` (Phase 5; `src/coglisp-runtime.st`, `src/coglisp-shell.st`); the HTTP design (`specs/21-https-and-json.md`), whose rule it follows: the operating system's details stay inside cog-lisp |
 
@@ -432,4 +432,29 @@ The spike (§3.1), then step 1 of §5 with the core §4.8 asks of it.
   `script`, keys piped in). Those two need a terminal, so they are run by hand,
   not by `run-all`. Windows Terminal and VS Code's terminal are the owner's
   (AC-4).
+
+## 11. As built: step 2, the renderables (2026-11-10)
+
+- **`rule`, `panel`, `table`, `grid`, `columns`, `tree`, `padded` and
+  `aligned`** (R-7), each a renderable on step 1's `render-lines`, so each can
+  hold any other: a table's cell a panel, a tree's leaf a table.
+- **Options are names and values** (R-8); an unknown option, an option with no
+  value, or an unknown border is an error where the renderable is made.
+- **Borders** (R-9): `square`, `rounded`, `heavy`, `double`, `ascii` and `none`,
+  and `ascii` for the others on a console without Unicode.
+- **Tables** (decision 2): values, built with `table`'s `columns` and `rows`,
+  or a row at a time with `table-add-row!` (and `table-add-column!`).
+  Columns are text or `table-column`s, with `align` and a fixed `width`.
+- **Measuring** joins the renderable protocol: `make-renderable` takes an
+  optional measure, `(narrowest . widest)`, which text answers by its longest
+  word and its longest line. One layout, `%fit`, serves tables, grids and
+  columns: every column at its widest if they fit; else the widest give cells
+  up first, down to their narrowest, then below it, when their words break.
+  `expand` spreads what is left.
+- **`render` drops a line's trailing plain spaces**, which show as nothing, so
+  a program's plain output and its `.expected` file hold none; a styled space
+  (a background) is kept.
+- **Checks:** `tests/lisp/console-renderables.lisp` (52 checks: golden output
+  at several widths, with and without Unicode, styles kept in cells and
+  borders); `examples/console-renderables.lisp`, in the chapter "The console".
 
