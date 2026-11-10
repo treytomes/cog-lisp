@@ -1,5 +1,5 @@
 ;;; generate-docs.lisp -- write every file generated from the image's documentation
-;;; and the examples (specs/phase-10-documentation-and-editor.md, steps 10.2 to 10.4,
+;;; and the examples (specs/16-phase-10-documentation-and-editor.md, steps 10.2 to 10.4,
 ;;; and the site's home page, 10.6)
 ;;;
 ;;;   ./cog-lisp.sh tools/generate-docs.lisp      (cog-lisp.bat on Windows)

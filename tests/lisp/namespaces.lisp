@@ -1,4 +1,4 @@
-;;; namespaces.lisp -- libraries, exports and imports (specs/namespaces.md AC-2,
+;;; namespaces.lisp -- libraries, exports and imports (specs/27-namespaces.md AC-2,
 ;;; AC-3), with the fixture libraries in namespaces/. An import serves the forms
 ;;; compiled after its require: a require inside a test runs after the test's
 ;;; body was compiled, so the body reaches what it imported through eval.

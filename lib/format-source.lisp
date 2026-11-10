@@ -1,4 +1,4 @@
-;;; format-source.lisp -- lay out cog-lisp source (specs/formatter.md; issue #8)
+;;; format-source.lisp -- lay out cog-lisp source (specs/26-formatter.md; issue #8)
 ;;;
 ;;;   (require 'format-source)
 ;;;   (format-source text)                    ; tabs
@@ -24,7 +24,7 @@
 ;;; Tokens: #(kind text newlines-before line), kind one of
 ;;;   open close atom string comment prefix
 
-;;; A library (specs/namespaces.md): (require 'format-source) brings these names in; each
+;;; A library (specs/27-namespaces.md): (require 'format-source) brings these names in; each
 ;;; is also format-source:name everywhere, and the names not exported are private.
 
 (library format-source

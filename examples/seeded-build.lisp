@@ -1,5 +1,5 @@
 ;;; seeded-build.lisp -- how this image was built, read back from the image itself
-;;; (specs/phase-9-language.md step 9.1)
+;;; (specs/15-phase-9-language.md step 9.1)
 ;;;
 ;;; A cog-lisp image is built from an earlier one, the seed: a release pinned in
 ;;; pharo.pins by its tag and checksum. The seed's compiler compiles the new

@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : Phase 7 acceptance suite  (specs/phase-7-macros.md, AC-1..18)
+ cog-lisp : Phase 7 acceptance suite  (specs/06-phase-7-macros.md, AC-1..18)
  Quasiquote, define-macro, internal define, the derived forms of
  lib/core.lisp, source retention through macros, and lib/cl.lisp.
  AC-19 (earlier suites, benchmarks, examples) and AC-20 (the built image) are

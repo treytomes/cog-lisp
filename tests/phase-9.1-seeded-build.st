@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : Phase 9 step 9.1 acceptance suite  (specs/phase-9-language.md,
+ cog-lisp : Phase 9 step 9.1 acceptance suite  (specs/15-phase-9-language.md,
  9.1 in detail, AC-1): what LISP cannot check about itself. The build's
  sweep removes what a seed had and src/ no longer defines (whatever the file-in
  did not compile); the pins are read;

@@ -1,5 +1,5 @@
 ;;; phase-9.2-procedures.lisp -- the numeric procedures and multiple values
-;;; (specs/phase-9-language.md step 9.2b, AC-2; R7RS 6.2.6 and 6.10).
+;;; (specs/15-phase-9-language.md step 9.2b, AC-2; R7RS 6.2.6 and 6.10).
 (load "../../lib/test.lisp")
 
 (define (values->list thunk) (call-with-values thunk list))

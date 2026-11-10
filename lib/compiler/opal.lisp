@@ -1,5 +1,5 @@
 ;;; opal.lisp -- the nodes the compiler builds, and how they are compiled
-;;; (specs/phase-8-self-hosting.md steps 8.3 and 8.6; specs/phase-9-language.md 9.1)
+;;; (specs/13-phase-8-self-hosting.md steps 8.3 and 8.6; specs/15-phase-9-language.md 9.1)
 ;;;
 ;;; The translator (compiler.lisp) describes each form as a small Smalltalk-shaped
 ;;; tree, built here as light LISP vectors rather than Opal's AST:

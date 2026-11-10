@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : Phase 7.8 acceptance suite  (specs/phase-7.8-native-data.md,
+ cog-lisp : Phase 7.8 acceptance suite  (specs/11-phase-7.8-native-data.md,
  AC-1..11). AC-12 is every other suite; the examples (strings, vectors,
  hash-tables, string-ports, tiny-reader) run in the runner suite.
  Every bang in Lisp text is doubled for the chunk reader.

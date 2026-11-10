@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 rem ===========================================================================
-rem  cog-lisp : Phase 5 runner acceptance suite  (specs/phase-5-repl-runner.md)
+rem  cog-lisp : Phase 5 runner acceptance suite  (specs/04-phase-5-repl-runner.md)
 rem  Drives the real entry points: build-image.bat and cog-lisp.bat.
 rem    tests\runner\NAME.lisp    run as a program
 rem    tests\runner\NAME.stdin   piped into the REPL
@@ -52,7 +52,7 @@ set OK=0
 fc /b "tests\runner\delayed\late.expected" "%TMPD%\late.out" >nul 2>&1 && set OK=1
 call :check "REPL waits for input that arrives late" !OK!
 
-rem --- Starting anywhere (specs/startup-anywhere.md AC-2, AC-3) ---------------------
+rem --- Starting anywhere (specs/17-startup-anywhere.md AC-2, AC-3) ---------------------
 rem  Two runs at once on one image. In A ^| B both sides run at the same time: hold.lisp
 rem  keeps the image for six seconds, and beside.lisp starts on it after about three.
 "%CL%" "tests\runner\together\hold.lisp" <nul >"%TMPD%\hold.out" 2>"%TMPD%\hold.err" | (ping -n 4 127.0.0.1 >nul & "%CL%" "tests\runner\together\beside.lisp" <nul >"%TMPD%\beside.out" 2>"%TMPD%\beside.err")
@@ -76,7 +76,7 @@ fc /b "examples\hello.expected" "%TMPD%\cwd.out" >nul 2>&1 && set OK=1
 for /f %%F in ('dir /b /a "%CWDCHECK%" 2^>nul') do set OK=0
 call :check "a run writes nothing to the current folder" !OK!
 rem  require finds cog-lisp's own libraries from a program in another folder
-rem  (specs/library-path.md AC-1)
+rem  (specs/18-library-path.md AC-1)
 copy /y "tests\runner\elsewhere\uses-libs.lisp" "%CWDCHECK%\" >nul
 pushd "%CWDCHECK%"
 call "%HERE%\cog-lisp.bat" uses-libs.lisp <nul >"%TMPD%\uses-libs.out" 2>"%TMPD%\uses-libs.err"

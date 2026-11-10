@@ -1,5 +1,5 @@
 # Build the documentation site from docs/ with GitHub's own Jekyll, and check it
-# (specs/phase-10-documentation-and-editor.md step 10.6). CI runs it on every push;
+# (specs/16-phase-10-documentation-and-editor.md step 10.6). CI runs it on every push;
 # pages.yml runs it before it publishes. Needs the repository checked out.
 name: Build the documentation site
 description: GitHub's Jekyll build of docs/ into _site/, then tools/check-site.js on it

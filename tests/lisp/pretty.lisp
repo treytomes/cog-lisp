@@ -1,5 +1,5 @@
 ;;; pretty.lisp -- (pretty-string value [indent]) from lib/pretty.lisp
-;;; (specs/lisp-expert-libraries.md R-4, AC-1): lists, dotted pairs, hash tables,
+;;; (specs/22-lisp-expert-libraries.md R-4, AC-1): lists, dotted pairs, hash tables,
 ;;; vectors, strings, numbers, booleans and ()
 (load "../../lib/test.lisp")
 (require 'pretty)

@@ -1,7 +1,7 @@
 "============================================================================
  cog-lisp : Phase 1 implementation  (package CogLisp-Reader)
  The data the reader makes and the write-style printer, per
- specs/phase-1-reader-printer.md. The reader itself is written in LISP
+ specs/00-phase-1-reader-printer.md. The reader itself is written in LISP
  (lib/compiler/reader.lisp) since Phase 9 step 9.1; LispReader keeps its
  Smalltalk-side protocol.
 
@@ -30,7 +30,7 @@ alias := (Object << #LispAlias) slots: { #name. #env }; package: 'CogLisp-Reader
 empty := (Object << #LispEmptyList) sharedVariables: { #Default }; package: 'CogLisp-Reader'; install.
 unspec := (Object << #LispUnspecified) sharedVariables: { #Default }; package: 'CogLisp-Reader'; install.
 "LispError is the root of every cog-lisp error, so a handler can tell a LISP error
- from a host bug (specs/review-phases-1-7.md R-16). It lives here, in the first
+ from a host bug (specs/08-review-phases-1-7.md R-16). It lives here, in the first
  package, so every later package can subclass it."
 lerr  := (Error  << #LispError) slots: { #irritants }; package: 'CogLisp-Reader'; install.
 "A file that cannot be found or opened (R7RS file-error?; Phase 7.7)."

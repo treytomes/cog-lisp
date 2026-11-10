@@ -1,5 +1,5 @@
 ;;; strings-prefix.lisp -- string-prefix? and string-suffix?, SRFI 13's argument
-;;; order (specs/lisp-expert-review.md R-2, AC-1)
+;;; order (specs/23-lisp-expert-review.md R-2, AC-1)
 (load "../../lib/test.lisp")
 
 (define-test "string-prefix?"

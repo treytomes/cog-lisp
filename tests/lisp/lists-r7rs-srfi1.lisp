@@ -1,6 +1,6 @@
 ;;; lists-r7rs-srfi1.lisp -- R7RS's list-ref, list-tail and c[ad]r names, SRFI 1's
 ;;; filter, remove, delete, delete-duplicates, fold, reduce and iota, and sort
-;;; (specs/lisp-expert-libraries.md AC-2)
+;;; (specs/22-lisp-expert-libraries.md AC-2)
 (load "../../lib/test.lisp")
 
 (define-test "list-ref and list-tail (R7RS)"

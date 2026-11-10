@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : Phase 4 acceptance suite  (specs/phase-4-runtime-primitives.md, AC-1..20)
+ cog-lisp : Phase 4 acceptance suite  (specs/03-phase-4-runtime-primitives.md, AC-1..20)
  Headless; PASS/FAIL per check, final RESULT line, then quits.
  Bang-suffixed names are written with a doubled bang for the chunk reader.
  Run from the repo root:

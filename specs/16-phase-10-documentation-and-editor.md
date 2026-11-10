@@ -692,7 +692,7 @@ through the server at `http://localhost:1235/v1`. It ran 10 tasks, with up to
 | 2, 3 runs per task | + 3 traps, `iota` with a start | 1/30, 7/30 | 14/30, 16/30 |
 | 3, 3 runs per task | + the rule first, `first`/`second`/`last` named | 0/30, 4/30 | **17/30, 20/30** |
 | 4, 3 runs per task (2026-11-09) | `format` built in: its trap became an example; two sentences shortened | 0/30, 7/30 | 14/30, 15/30 |
-| 5, 3 runs per task (2026-11-09) | list built-ins (specs/lisp-expert-libraries.md): the helpers example became `list-tools`; the `second` trap names `cadr` and `list-ref` | 1/30, 9/30 | **17/30, 20/30** |
+| 5, 3 runs per task (2026-11-09) | list built-ins (specs/22-lisp-expert-libraries.md): the helpers example became `list-tools`; the `second` trap names `cadr` and `list-ref` | 1/30, 9/30 | **17/30, 20/30** |
 
 - **Without the skill** the model writes some other Lisp:
   - names that do not exist: `print`, `second`, `split`, `defun`, `format`;
@@ -725,7 +725,7 @@ through the server at `http://localhost:1235/v1`. It ran 10 tasks, with up to
   - `tools/skill-eval.js` now caps each answer (`--max-tokens`, 8192), records
     a refused request as a failed attempt, and saves its results as it goes.
   - For agent work, load the model with a larger context: it supports 262,144.
-- **Run 4** came after `format` was built in (specs/format.md). It failed the
+- **Run 4** came after `format` was built in (specs/19-format.md). It failed the
   same ways as run 3: the result instead of a program, `second`, an undefined
   `iota`, and the model's own bugs. None of its answers used `format`, which no
   task needs, and none of its failures came from the change. Its lower count

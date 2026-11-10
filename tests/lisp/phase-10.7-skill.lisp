@@ -1,6 +1,6 @@
 ;;; phase-10.7-skill.lisp -- the skill for agents is what docs/skill/ and the image
 ;;; generate, follows Bionic's rules, and says only what is true
-;;; (specs/phase-10-documentation-and-editor.md step 10.7, AC-7). After changing
+;;; (specs/16-phase-10-documentation-and-editor.md step 10.7, AC-7). After changing
 ;;; docs/skill/ or documentation, run ./cog-lisp.sh tools/generate-docs.lisp and
 ;;; commit what it writes. The examples' outputs are checked by the runner suite
 ;;; (tests/phase-5-runner), like examples/.

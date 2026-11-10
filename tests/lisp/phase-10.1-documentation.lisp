@@ -1,5 +1,5 @@
 ;;; phase-10.1-documentation.lisp -- documentation kept in the image
-;;; (specs/phase-10-documentation-and-editor.md step 10.1, AC-1)
+;;; (specs/16-phase-10-documentation-and-editor.md step 10.1, AC-1)
 (load "../../lib/test.lisp")
 
 ;; every bound global, as (name . value)
@@ -9,7 +9,7 @@
      cellsDo: (lambda (c) (when [c isBound] (set! acc (cons (cons [c symbol] [c value]) acc))))]
     acc))
 
-;; internal: %name, or a library's private lib:%name (specs/namespaces.md)
+;; internal: %name, or a library's private lib:%name (specs/27-namespaces.md)
 (define (internal-name? s)
   (let* ((n (symbol->string s)) (colon (string-index n #\:))
          (local (if colon (substring n (+ colon 1) (string-length n)) n)))
@@ -101,7 +101,7 @@ x times x."
   (check (first-line (documentation 'hash-table-contains?)) "(hash-table-contains? table key)")
   (check (hash-table-exists? (alist->hash-table '((a . 1))) 'a) #t))
 
-;; specs/namespaces.md AC-5, R-14: each shipped library exports what it documents,
+;; specs/27-namespaces.md AC-5, R-14: each shipped library exports what it documents,
 ;; and the reference lists them; a value (cl's t and nil) has no documentation
 (define-test "every procedure and macro a shipped library exports is documented"
   (let ((env [(smalltalk LispEnvironment) default]) (missing '()))

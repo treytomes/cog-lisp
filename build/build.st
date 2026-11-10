@@ -1,6 +1,6 @@
 "============================================================================
- cog-lisp : image build script  (specs/phase-9-language.md, 9.1 in detail;
- first written for specs/phase-5-repl-runner.md section 4.1)
+ cog-lisp : image build script  (specs/15-phase-9-language.md, 9.1 in detail;
+ first written for specs/04-phase-5-repl-runner.md section 4.1)
  Run by build-image.bat / build-image.sh on the SEED image, an earlier cog-lisp
  image pinned in pharo.pins:
    pharo\PharoConsole.exe --headless pharo\seed.image st build\build.st
@@ -19,7 +19,7 @@ out := [:s | Stdio stdout nextPutAll: s asString; nextPut: Character lf; flush].
 		Smalltalk exit: 1].
 "The build records every method source in the changes file: a read-only one
  (another VM holds the seed, or the folder cannot be written) would lose them
- (specs/startup-anywhere.md R-6)."
+ (specs/17-startup-anywhere.md R-6)."
 (SourceFiles changesFileStream isNil or: [SourceFiles changesFileStream isReadOnly])
 	ifTrue: [out value: 'BUILD FAILED: pharo/seed.changes cannot be written: is another cog-lisp running on pharo/seed.image, or is pharo/ read-only?'.
 		Smalltalk exit: 1].
@@ -85,7 +85,7 @@ ok ifFalse: [out value: 'BUILD FAILED: smoke test did not pass; image not saved'
 Smalltalk globals removeKey: #CogLispBuild.
 "No Epicea (Pharo's log of code changes): at every start-up it created
  pharo-local/ombu-sessions beside the image, so an install the user cannot write
- failed to start (specs/startup-anywhere.md R-4). cog-lisp keeps its own source."
+ failed to start (specs/17-startup-anywhere.md R-4). cog-lisp keeps its own source."
 (Smalltalk hasClassNamed: #EpMonitor) ifTrue: [
 	EpMonitor hasCurrent ifTrue: [EpMonitor current disable].
 	EpMonitor reset.

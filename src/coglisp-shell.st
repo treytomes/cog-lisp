@@ -1,6 +1,6 @@
 "============================================================================
  cog-lisp : Phase 5 implementation  (package CogLisp-Shell)
- The REPL and the command-line entry point, per specs/phase-5-repl-runner.md.
+ The REPL and the command-line entry point, per specs/04-phase-5-repl-runner.md.
 
  LOADER script. Must be filed in AFTER the reader, core, compiler and runtime
  packages.
@@ -24,7 +24,7 @@ stdin := (Object << #LispStdin) slots: { #kind. #handle. #pending. #eof }; packa
 repl  := (Object << #LispRepl) slots: { #in. #out. #err. #compiler. #interactive. #level }; package: 'CogLisp-Shell'; install.
 shell := (ClapApplication << #LispShellCommand) sharedVariables: { #BuildTime }; package: 'CogLisp-Shell'; install.
 
-"=== Starting anywhere (specs/startup-anywhere.md R-1, R-2) ==================
+"=== Starting anywhere (specs/17-startup-anywhere.md R-1, R-2) ==================
  Pharo looks for the changes file in the image folder and then the working
  folder, and tries every place for writing before any for reading. When the
  image's changes file cannot be written (another VM holds it, or the install is
@@ -247,7 +247,7 @@ cm value: repl value: 'running' value: 'process: buffer
 cm value: repl value: 'running' value: 'run
 	"Loop until end of input. Output from display/write goes to the same stream as results."
 	"read and read-char with no port read the lines typed after the form (Phase 7.9)"
-	"the session is a unit of its own: its imports last until it ends (specs/namespaces.md R-12)"
+	"the session is a unit of its own: its imports last until it ends (specs/27-namespaces.md R-12)"
 	LispCurrentUnit value: LispUnit session during: [
 		LispPrimitives withOutput: out do: [
 			LispPrimitives withInput: (LispInputPort onStream: (LispLineStream on: in)) do: [self loop]]].
@@ -361,7 +361,7 @@ cm value: shell value: 'running' value: 'execute
 		"(command-line): the program, then its arguments (Phase 7.9 section 5.3). The
 		 launchers send each argument after the program with a leading colon, so that
 		 the command-line parser never takes a program''s --flag for one of its own;
-		 one colon is removed (specs/formatter.md, as built)."
+		 one colon is removed (specs/26-formatter.md, as built)."
 		LispPrimitives commandLine: (args allButFirst withIndexCollect: [:a :i |
 			(i > 1 and: [a notEmpty and: [a first = $:]]) ifTrue: [a allButFirst asString] ifFalse: [a asString]]).
 		^ self runFile: (args at: 2 ifAbsent: [nil])].
@@ -374,12 +374,12 @@ cm value: shell value: 'running' value: 'execute
 
 cm value: shell value: 'running' value: 'startEnvironment
 	"*env*: the cog-lisp folder, the library path and the platform, read from the
-	 environment of this run (specs/library-path.md). An image without the
+	 environment of this run (specs/18-library-path.md). An image without the
 	 %env-start!! of lib/core.lisp (a stock image with src/ filed in) has none."
 	| name |
 	name := LispSymbol named: ''%env-start!!''.
 	(LispEnvironment default isBound: name) ifTrue: [(LispEnvironment default lookup: name) value].
-	"COGLISP_COVERAGE: a coverage session for the whole run (specs/coverage.md R-6)"
+	"COGLISP_COVERAGE: a coverage session for the whole run (specs/20-coverage.md R-6)"
 	name := LispSymbol named: ''%coverage-from-environment''.
 	(LispEnvironment default isBound: name) ifTrue: [(LispEnvironment default lookup: name) value]'.
 

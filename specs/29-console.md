@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (owner, 2026-11-09) with the leanings of §8. Decision 5 (names) is settled by `specs/namespaces.md`: the library keeps its short names, and a program that wants them apart writes `(require 'console 'prefix 'con:)`. A spike first (§3) |
+| **Status** | Accepted (owner, 2026-11-09) with the leanings of §8. Decision 5 (names) is settled by `specs/27-namespaces.md`: the library keeps its short names, and a program that wants them apart writes `(require 'console 'prefix 'con:)`. A spike first (§3) |
 | **Asked for by** | The owner (2026-11-09): "I'm used to writing C# console programs with the help of Spectre.Console. How do we provide cog-lisp with similar console I/O capabilities? I think this one needs a specification document." |
-| **Relates to** | `LispTextOutput` and `LispStdin` (Phase 5; `src/coglisp-runtime.st`, `src/coglisp-shell.st`); the HTTP design (`specs/https-and-json.md`), whose rule it follows: the operating system's details stay inside cog-lisp |
+| **Relates to** | `LispTextOutput` and `LispStdin` (Phase 5; `src/coglisp-runtime.st`, `src/coglisp-shell.st`); the HTTP design (`specs/21-https-and-json.md`), whose rule it follows: the operating system's details stay inside cog-lisp |
 
 ## 1. What Spectre.Console gives a C# program
 
@@ -243,6 +243,6 @@ operating system's.
    `(require 'console)` already says where they come from.
    **Owner (2026-11-09):** names like `rule` are generic and come up in
    `lisp-expert`; C# answers this with namespaces. So the names wait on
-   `specs/namespaces.md`, written first: with it, the library keeps its short
+   `specs/27-namespaces.md`, written first: with it, the library keeps its short
    names, and a program that wants them apart writes
    `(require 'console 'prefix 'con:)`.

@@ -1,6 +1,6 @@
 # Review of Phases 1–7
 
-Phase 7.5 (`specs/phase-7.5-review-and-tooling.md` §4). Each finding has evidence
+Phase 7.5 (`specs/07-phase-7.5-review-and-tooling.md` §4). Each finding has evidence
 (a check that was run, or a code reference where it is structural), a verdict,
 and, once fixed, the commit.
 
@@ -391,6 +391,6 @@ recovery after an error.
 | **Plan → conditions & restarts** | C-18 (`qqAppend`) · R-2 (host errors) |
 | **Plan → numeric tower** | R-11 (reading) · R-21: both closed in Phase 9 step 9.2 |
 | **Plan → hygienic macros** | C-14: closed in Phase 9 step 9.3 |
-| **Plan → language server** | C-18 (positions): Phase 10 step 10.5 (specs/phase-10-documentation-and-editor.md) · R-17: stays with the REPL (owner, 2026-11-05) |
+| **Plan → language server** | C-18 (positions): Phase 10 step 10.5 (specs/16-phase-10-documentation-and-editor.md) · R-17: stays with the REPL (owner, 2026-11-05) |
 | **Plan → 7.5 tooling** | T-3 |
 | **Keep** | D-2 · C-15 · R-19 (printing) · R-25 |

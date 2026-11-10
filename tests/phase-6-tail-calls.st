@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : Phase 6 acceptance suite  (specs/phase-6-optimization.md, AC-1..12)
+ cog-lisp : Phase 6 acceptance suite  (specs/05-phase-6-optimization.md, AC-1..12)
  Proper tail calls and the compiler optimizations, checked for correctness.
  Speed is measured separately by bench\run-benchmarks.bat.
  The set-bang form is written with a doubled bang for the chunk reader.

@@ -1,5 +1,5 @@
 ; uses-libs.lisp -- run from a folder outside cog-lisp's: require finds cog-lisp's
-; own libraries (specs/library-path.md AC-1)
+; own libraries (specs/18-library-path.md AC-1)
 (require 'cl)
 (require 'test)
 (defun twice (x) (* 2 x))

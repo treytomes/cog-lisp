@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ===========================================================================
-#  cog-lisp : test an unpacked release bundle  (specs/phase-8.9-ci-cd.md AC-6/7)
+#  cog-lisp : test an unpacked release bundle  (specs/14-phase-8.9-ci-cd.md AC-6/7)
 #    release/smoke-test.sh BUNDLE_DIR
 #  Runs every example in the bundle with the bundle's own launcher and compares
 #  its output with the example's .expected (as tests/phase-5-runner.sh does, with
@@ -76,7 +76,7 @@ if [ -f cog-lisp.bat ]; then
 fi
 
 # require finds the bundle's own libraries from a program in another folder
-# (specs/library-path.md AC-1)
+# (specs/18-library-path.md AC-1)
 ELSE="$(mktemp -d)"
 printf "(require 'cl)\n(defun twice (x) (* 2 x))\n(display (twice 21))\n(newline)\n" > "$ELSE/p.lisp"
 (cd "$ELSE" && "$B/cog-lisp.sh" p.lisp) </dev/null >"$OUT/else.out" 2>&1
@@ -84,7 +84,7 @@ ok=0; [ "$(cat "$OUT/else.out")" = 42 ] && ok=1
 check "require finds the bundle's libraries from a program in another folder" $ok
 [ "$ok" = 1 ] || head -3 "$OUT/else.out"
 
-# Live HTTPS from the bundle (specs/https-and-json.md AC-4), only with
+# Live HTTPS from the bundle (specs/21-https-and-json.md AC-4), only with
 # COGLISP_LIVE_HTTPS=1: a good certificate is accepted, an expired one refused.
 if [ "${COGLISP_LIVE_HTTPS:-}" = 1 ]; then
   printf '%s\n' '(display (http-status (http-get "https://example.com/" (quote ()) 20)))' '(newline)' \
@@ -98,7 +98,7 @@ if [ "${COGLISP_LIVE_HTTPS:-}" = 1 ]; then
 fi
 rm -rf "$ELSE"
 
-# Starting anywhere (specs/startup-anywhere.md AC-5): the bundle made read-only,
+# Starting anywhere (specs/17-startup-anywhere.md AC-5): the bundle made read-only,
 # run from a read-only folder. Root ignores permissions, so only as another user.
 if [ "$(uname -s)" = Linux ] && [ "$(id -u)" != 0 ]; then
   RO="$(mktemp -d)"

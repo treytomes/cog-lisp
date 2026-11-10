@@ -1,5 +1,5 @@
 ;;; lists-srfi1-more.lisp -- SRFI 1's any, every, find, filter-map, append-map and
-;;; alist-delete (specs/lisp-expert-review.md R-1, AC-1)
+;;; alist-delete (specs/23-lisp-expert-review.md R-1, AC-1)
 (load "../../lib/test.lisp")
 
 (define-test "any answers the predicate's value, not just #t"

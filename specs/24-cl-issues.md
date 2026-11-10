@@ -10,8 +10,8 @@
 
 | Issue | Today |
 |---|---|
-| #6 `boundp` | Done (specs/lisp-expert-libraries.md): `(require 'cl)` gives `(boundp symbol)`, documented. |
-| #2 `format` | Built in (specs/format.md); `(format t "~A plus ~A equals ~A.~%" 2 3 5)` works. With `cl` loaded, `(format nil ...)` fails ("write-string: not an output port: ()"): `cl`'s `nil` is `()`, and `format` takes only `#f` for "answer a string". |
+| #6 `boundp` | Done (specs/22-lisp-expert-libraries.md): `(require 'cl)` gives `(boundp symbol)`, documented. |
+| #2 `format` | Built in (specs/19-format.md); `(format t "~A plus ~A equals ~A.~%" 2 3 5)` works. With `cl` loaded, `(format nil ...)` fails ("write-string: not an output port: ()"): `cl`'s `nil` is `()`, and `format` takes only `#f` for "answer a string". |
 | #3 `defparameter` | Answers `#<unspecified>`, as do `defvar`, `defun` and `defmacro`; Common Lisp's answer the name. |
 | #4 `defconstant` | Missing. |
 | #1 `nil` | `cl` binds `nil` to `()`, which is true: `(if nil 'yes 'no)` is `yes`. |

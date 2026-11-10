@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ===========================================================================
-#  cog-lisp : package a release  (specs/phase-8.9-ci-cd.md section 4.2)
+#  cog-lisp : package a release  (specs/14-phase-8.9-ci-cd.md section 4.2)
 #    release/package.sh VERSION
 #  Run on Linux, after bootstrap-pharo.sh and build-image.sh. Writes to dist/:
 #    cog-lisp-VERSION-linux-x86_64.tar.gz    the Linux VM, image, launcher, lib, examples

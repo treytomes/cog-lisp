@@ -1,4 +1,4 @@
-;;; format.lisp -- lay out a cog-lisp source file (specs/formatter.md R-6)
+;;; format.lisp -- lay out a cog-lisp source file (specs/26-formatter.md R-6)
 ;;;
 ;;;   ./cog-lisp.sh tools/format.lisp FILE                 the formatted text on stdout
 ;;;   ./cog-lisp.sh tools/format.lisp FILE --write         FILE rewritten in place

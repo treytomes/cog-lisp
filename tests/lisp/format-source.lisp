@@ -1,4 +1,4 @@
-;;; format-source.lisp -- the source formatter (specs/formatter.md AC-1, AC-2)
+;;; format-source.lisp -- the source formatter (specs/26-formatter.md AC-1, AC-2)
 (load "../../lib/test.lisp")
 (require 'format-source)
 

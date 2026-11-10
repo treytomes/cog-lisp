@@ -1,4 +1,4 @@
-;;; format.lisp -- format, with Common Lisp's directives (specs/format.md)
+;;; format.lisp -- format, with Common Lisp's directives (specs/19-format.md)
 ;;;
 ;;; Begun in ~/projects/lisp-expert (its format.lisp, the owner's, written with
 ;;; Claude on the web): the parser and the directive records are kept, under

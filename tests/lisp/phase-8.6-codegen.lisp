@@ -1,5 +1,5 @@
 ;;; phase-8.6-codegen.lisp -- the direct code generator (lib/compiler/codegen.lisp;
-;;; specs/phase-8-self-hosting.md step 8.6, AC-8). Everything else runs on it too;
+;;; specs/13-phase-8-self-hosting.md step 8.6, AC-8). Everything else runs on it too;
 ;;; these check what it had to get right that Opal did before: closures and
 ;;; their variables, inlined control flow, globals read as literal variables,
 ;;; frame limits, literals. (Since step 9.1 it is the only generator.)

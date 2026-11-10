@@ -1,4 +1,4 @@
-;;; phase-9.3-syntax-rules.lisp -- hygienic macros (specs/phase-9-language.md
+;;; phase-9.3-syntax-rules.lisp -- hygienic macros (specs/15-phase-9-language.md
 ;;; step 9.3, AC-3; review C-14): syntax-rules patterns and templates, capture in
 ;;; both directions, let-syntax and letrec-syntax, shadowed special forms.
 (load "../../lib/test.lisp")

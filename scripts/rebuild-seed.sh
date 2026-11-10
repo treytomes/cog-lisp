@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ===========================================================================
-#  cog-lisp : rebuild the seed from its source  (specs/phase-9-language.md 9.1)
+#  cog-lisp : rebuild the seed from its source  (specs/15-phase-9-language.md 9.1)
 #    scripts/rebuild-seed.sh [TAG]
 #  The way back if a seed is lost (a release deleted, a download gone): build
 #  the seed's own source, at its tag (SEED_TAG in pharo.pins unless TAG is

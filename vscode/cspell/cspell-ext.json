@@ -3,7 +3,7 @@
     "version": "0.2",
     "readonly": true,
     "name": "cog-lisp",
-    "description": "The names of cog-lisp's built-ins and of the libraries it ships (specs/vscode-spelling.md)",
+    "description": "The names of cog-lisp's built-ins and of the libraries it ships (specs/25-vscode-spelling.md)",
     "dictionaryDefinitions": [
         {
             "name": "cog-lisp",

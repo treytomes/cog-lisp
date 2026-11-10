@@ -1,4 +1,4 @@
-;;; json.lisp -- json-read and json-write (specs/https-and-json.md R-3, AC-2):
+;;; json.lisp -- json-read and json-write (specs/21-https-and-json.md R-3, AC-2):
 ;;; the table of R-3 both ways, null kept apart from false and from an empty array,
 ;;; nesting, Unicode, numbers, and the errors.
 (load "../../lib/test.lisp")

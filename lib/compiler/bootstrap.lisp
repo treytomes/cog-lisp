@@ -1,5 +1,5 @@
 ;;; bootstrap.lisp -- the compiler compiles itself, to a fixpoint
-;;; (specs/phase-8-self-hosting.md step 8.4; specs/phase-9-language.md step 9.1)
+;;; (specs/13-phase-8-self-hosting.md step 8.4; specs/15-phase-9-language.md step 9.1)
 ;;;
 ;;; Stage 0 is the compiler that builds this one: a seed's, an earlier cog-lisp
 ;;; image's, reached through its entry points (LispCompiler entries). Compiling the

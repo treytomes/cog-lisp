@@ -1,5 +1,5 @@
 ;;; cl-common-names.lisp -- what lib/cl.lisp gained from lisp-expert's common.lisp
-;;; (specs/lisp-expert-libraries.md R-2): fourth to tenth with setters, boundp,
+;;; (specs/22-lisp-expert-libraries.md R-2): fourth to tenth with setters, boundp,
 ;;; Common Lisp's remove and delete of an item, remove-duplicates and
 ;;; string-capitalize
 (load "../../lib/test.lisp")

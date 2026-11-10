@@ -1,5 +1,5 @@
 ;;; phase-9.3-derived-forms.lisp -- the derived forms are hygienic
-;;; (specs/phase-9-language.md step 9.3b, AC-3; review C-14): lib/core.lisp
+;;; (specs/15-phase-9-language.md step 9.3b, AC-3; review C-14): lib/core.lisp
 ;;; defines them with syntax-rules, so the names they use mean the global ones,
 ;;; and the names they bind capture nothing. Their behavior is the same as the
 ;;; define-macro versions' (every older suite checks that).

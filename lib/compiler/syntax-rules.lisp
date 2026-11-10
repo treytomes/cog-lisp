@@ -1,4 +1,4 @@
-;;; syntax-rules.lisp -- hygienic macros, by renaming (specs/phase-9-language.md
+;;; syntax-rules.lisp -- hygienic macros, by renaming (specs/15-phase-9-language.md
 ;;; step 9.3; R7RS 4.3.2)
 ;;;
 ;;; (sr-make spec env name) turns (syntax-rules [ellipsis] (literal ...) rule ...)
@@ -70,7 +70,7 @@
 ;; the input identifier f means what the literal p means where the macro was defined:
 ;; the same binding, or (R7RS's free-identifier=?) both unbound and spelled alike.
 ;; In a library an unbound name resolves to the library's own (test:else), so
-;; cond's else, used in a library, needs the second case (specs/namespaces.md).
+;; cond's else, used in a library, needs the second case (specs/27-namespaces.md).
 (define (sr-same-binding? f p st)
   (let ((bf (lc-binding f (sr-use-scope st))) (bp (lc-binding p (sr-env st))))
     (or (eq? bf bp)

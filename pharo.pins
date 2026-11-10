@@ -1,4 +1,4 @@
-# The exact Pharo cog-lisp builds against (specs/phase-8.9-ci-cd.md, pinned
+# The exact Pharo cog-lisp builds against (specs/14-phase-8.9-ci-cd.md, pinned
 # 2026-11-04). Read by bootstrap-pharo.sh, bootstrap-pharo.bat and
 # release/package.sh; the CI caches are keyed on this file. Every download is
 # checked against its SHA-256, and a file that does not match is fetched again.
@@ -15,7 +15,7 @@ VM_LINUX_SHA256=69c93bb7db7d955f3f96a867d0bd7b8edea69f55451856eb897c3823b7b854ac
 VM_WINDOWS_URL=https://files.pharo.org/vm/pharo-spur64-headless/Windows-x86_64/PharoVM-v12.0.6-beta%2B0.bebdbaca8-Windows-x86_64-bin.zip
 VM_WINDOWS_SHA256=b48e7e4e7e385811b40e5f0f0db9a85bcff9c669b8481ad909dd3fdd05926113
 
-# The seed: the cog-lisp release an image is built from (specs/phase-9-language.md,
+# The seed: the cog-lisp release an image is built from (specs/15-phase-9-language.md,
 # step 9.1). Its Linux bundle holds the image (one image serves every platform).
 # To move the seed forward: release, then change all three together, rebuild, and
 # run every suite. scripts/rebuild-seed.sh rebuilds a lost seed from its tag.

@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : the shared acceptance-suite harness  (specs/review-phases-1-7.md T-2)
+ cog-lisp : the shared acceptance-suite harness  (specs/08-review-phases-1-7.md T-2)
  Filed in by every tests/phase-*.st after the packages it tests. Counts checks,
  prints PASS/FAIL per check and a final RESULT line, and exits with status 0
  when every check passed, 1 otherwise (so tests\run-all.bat can tell).

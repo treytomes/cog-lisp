@@ -1,6 +1,6 @@
-;;; cl.lisp -- Common Lisp names for cog-lisp (specs/phase-7-macros.md section 8)
+;;; cl.lisp -- Common Lisp names for cog-lisp (specs/06-phase-7-macros.md section 8)
 ;;;
-;;; Load with (require 'cl), from any folder (specs/library-path.md), for
+;;; Load with (require 'cl), from any folder (specs/18-library-path.md), for
 ;;; working through ANSI Common Lisp.
 ;;; cog-lisp stays a Scheme-like LISP underneath; this file adds CL names as
 ;;; macros and procedures on top of it.
@@ -31,7 +31,7 @@
 ;;;   - format is cog-lisp's own, built in, with Common Lisp's directives.
 ;;;   - Not provided: loop, keywords, Common Lisp's multiple values, &optional, &key.
 
-;;; A library (specs/namespaces.md): (require 'cl) brings these names in; each
+;;; A library (specs/27-namespaces.md): (require 'cl) brings these names in; each
 ;;; is also cl:name everywhere, and the names not exported are private.
 
 (library cl
@@ -97,7 +97,7 @@ Assigns each value to its name, in turn, and answers the last value. Each name m
                  (cl:setq ,@(cdr (cdr pairs)))))))
 
 ;; (setf place value ...) -- each place a variable or a call such as (car x),
-;; assigned with the generalized set! (specs/phase-9-language.md step 9.4); the
+;; assigned with the generalized set! (specs/15-phase-9-language.md step 9.4); the
 ;; place's arguments are evaluated before its value, each once, and setf
 ;; answers the last value
 (define-macro (setf . pairs)
@@ -113,7 +113,7 @@ Assigns each value to its place, in turn: a variable, or a call such as (car x) 
 ;; (defsetf access update) -- (setf (access arg ...) v) calls (update arg ... v)
 ;; (defsetf access (param ...) (store) body ...) -- runs body with the params bound
 ;; to the arguments and store to the value; params take &rest
-;; Both define access's setter (specs/phase-9-language.md step 9.4b).
+;; Both define access's setter (specs/15-phase-9-language.md step 9.4b).
 (define (%cl-last-of lst) (if (null? (cdr lst)) (car lst) (%cl-last-of (cdr lst))))
 (define (%cl-all-but-last lst) (if (null? (cdr lst)) '() (cons (car lst) (%cl-all-but-last (cdr lst)))))
 
@@ -217,14 +217,14 @@ Runs body with i bound to 0, 1, ... up to n - 1, then answers result, else ()."
   "(last lst)\nReturns the final cons cell of a non-empty list."
   (if (null? (cdr lst)) lst (last (cdr lst))))   ; the last cons
 
-;; the accessors' setters, for setf (specs/phase-9-language.md step 9.4b)
+;; the accessors' setters, for setf (specs/15-phase-9-language.md step 9.4b)
 (set! (setter first) (lambda (x v) (set-car! x v)))
 (set! (setter second) (lambda (x v) (set-car! (cdr x) v)))
 (set! (setter third) (lambda (x v) (set-car! (cdr (cdr x)) v)))
 (set! (setter rest) (lambda (x v) (set-cdr! x v)))
 (set! (setter nth) (lambda (n lst v) (set-car! (nthcdr n lst) v)))
 
-;; fourth to tenth, with their setters (specs/lisp-expert-libraries.md R-2)
+;; fourth to tenth, with their setters (specs/22-lisp-expert-libraries.md R-2)
 (define (fourth x) "(fourth list)\nThe fourth element of list." (nth 3 x))
 (define (fifth x) "(fifth list)\nThe fifth element of list." (nth 4 x))
 (define (sixth x) "(sixth list)\nThe sixth element of list." (nth 5 x))
@@ -372,7 +372,7 @@ Answers the first element of the list in place, a variable, and leaves the rest 
        (set! ,place (cdr ,place))
        ,g)))
 
-;;; conditions (specs/phase-7.7-conditions-restarts.md section 2)
+;;; conditions (specs/10-phase-7.7-conditions-restarts.md section 2)
 ;;; A condition type is error, condition or t, or the name of a Smalltalk
 ;;; exception class such as ZeroDivide. restart-case and invoke-restart are core.
 

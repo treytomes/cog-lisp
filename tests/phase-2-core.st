@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : Phase 2 acceptance suite  (specs/phase-2-core-data-model.md, AC-1..13)
+ cog-lisp : Phase 2 acceptance suite  (specs/01-phase-2-core-data-model.md, AC-1..13)
  Headless; PASS/FAIL per check, final RESULT line, then quits.
  Run from the repo root:
    pharo\PharoConsole.exe pharo\<image>.image st tests\phase-2-core.st

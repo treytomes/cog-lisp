@@ -1,4 +1,4 @@
-;;; json.lisp -- json-read and json-write, in LISP terms (specs/https-and-json.md R-3)
+;;; json.lisp -- json-read and json-write, in LISP terms (specs/21-https-and-json.md R-3)
 ;;;
 ;;;   JSON           cog-lisp
 ;;;   object         hash table, string keys

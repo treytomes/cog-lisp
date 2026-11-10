@@ -1,6 +1,6 @@
 ;;; Copied from ~/projects/lisp-expert/format-parse-test.lisp (the owner's), to check that
 ;;; cog-lisp's built-in format passes it with lisp-expert's format.lisp not loaded
-;;; (specs/format.md AC-2). Changed: the path to lib/test.lisp; no (load "format.lisp").
+;;; (specs/19-format.md AC-2). Changed: the path to lib/test.lisp; no (load "format.lisp").
 ;;; format-parse-test.lisp -- Task 1: parse the control string, then interpret it
 ;;;
 ;;; Written before the implementation, so on the first run these should FAIL.

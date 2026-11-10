@@ -1,5 +1,5 @@
 ;;; phase-9.2-new-number-type.lisp -- the tower is open to new kinds of number
-;;; (specs/phase-9-language.md step 9.2c, AC-2): a number type added through
+;;; (specs/15-phase-9-language.md step 9.2c, AC-2): a number type added through
 ;;; interop (examples/dual.lisp) works in arithmetic, comparison, predicates and
 ;;; printing, and define-number-syntax gives it a read syntax, in the sealed
 ;;; reader and in string->number alike.

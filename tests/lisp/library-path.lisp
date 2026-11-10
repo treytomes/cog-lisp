@@ -1,5 +1,5 @@
 ;;; library-path.lisp -- require, *env*, and what load answers
-;;; (specs/library-path.md). The fixtures are in tests/lisp/library/; running from
+;;; (specs/18-library-path.md). The fixtures are in tests/lisp/library/; running from
 ;;; another folder is checked by the runner suite (tests/phase-5-runner).
 (load "../../lib/test.lisp")
 
@@ -50,7 +50,7 @@
 (define-test "an unknown name, a file that is not there, and a name that is neither"
   (check (require-path 'no-such-library) #f)
   (check-error (require 'no-such-library) "require: no library named no-such-library in")
-;; a string names a file beside this one (specs/namespaces.md)
+;; a string names a file beside this one (specs/27-namespaces.md)
   (check-error (require "cl") "require: no such file: cl")
   (check-error (require 42) "require: not a symbol or a file name: 42"))
 

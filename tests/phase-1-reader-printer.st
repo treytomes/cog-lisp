@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : Phase 1 acceptance suite  (specs/phase-1-reader-printer.md, AC-1..23)
+ cog-lisp : Phase 1 acceptance suite  (specs/00-phase-1-reader-printer.md, AC-1..23)
  Headless; prints PASS/FAIL per check and a final RESULT line, then quits.
  Run from the repo root:
    pharo\PharoConsole.exe pharo\<image>.image st tests\phase-1-reader-printer.st

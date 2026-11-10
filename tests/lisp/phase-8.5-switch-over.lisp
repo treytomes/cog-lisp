@@ -1,5 +1,5 @@
 ;;; phase-8.5-switch-over.lisp -- the LISP reader and compiler are the ones in use
-;;; (specs/phase-8-self-hosting.md step 8.5, AC-5 and AC-6). Since step 9.1 they
+;;; (specs/13-phase-8-self-hosting.md step 8.5, AC-5 and AC-6). Since step 9.1 they
 ;;; are the only ones: the Smalltalk ones, and COGLISP_COMPILER, retired.
 (load "../../lib/test.lisp")
 

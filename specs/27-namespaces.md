@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **Status** | Done (2026-11-09). Accepted with the leanings in §9; built as §10 describes |
-| **Asked for by** | The owner (2026-11-09), on the console spec (`specs/console.md`): names like `rule` are generic and come up in `lisp-expert`; "C# handles this with namespaces. How do we handle it here?" Then: "Let's write the namespaces spec first. I want to do this right." |
-| **Before** | `specs/console.md`, whose short names (`rule`, `table`, `render`) depend on this |
+| **Asked for by** | The owner (2026-11-09), on the console spec (`specs/29-console.md`): names like `rule` are generic and come up in `lisp-expert`; "C# handles this with namespaces. How do we handle it here?" Then: "Let's write the namespaces spec first. I want to do this right." |
+| **Before** | `specs/29-console.md`, whose short names (`rule`, `table`, `render`) depend on this |
 
 ## 1. The problem, as it is today
 

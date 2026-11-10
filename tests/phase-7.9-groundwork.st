@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : Phase 7.9 acceptance suite (specs/phase-7.9-self-hosting-groundwork.md)
+ cog-lisp : Phase 7.9 acceptance suite (specs/12-phase-7.9-self-hosting-groundwork.md)
  AC-1..12. The runner suite covers (command-line) and stdin in programs
  (examples/program, examples/echo); run-all.bat runs tests/lisp (AC-13).
  Every bang in Lisp text is doubled for the chunk reader.
@@ -118,7 +118,7 @@ h check: 'AC-10 a bad \x escape' actual: ([LispReader read: '"\xZZ;"'. #none] on
  tests/lisp/phase-8.3-compiler.lisp tests the LISP compiler's table."
 
 "AC-12 the LISP test framework, run on tests with known failures. It is a library
- (specs/namespaces.md), so it is loaded, and used, in a unit, as a file uses it."
+ (specs/27-namespaces.md), so it is loaded, and used, in a unit, as a file uses it."
 LispCurrentUnit value: LispUnit session during: [ | ev |
 ev := [:s | LispCompiler new evalAll: s].
 ev value: '(load "' , ((root / 'lib' / 'test.lisp') fullName copyReplaceAll: '\' with: '/') , '")'.

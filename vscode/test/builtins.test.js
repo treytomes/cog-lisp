@@ -1,5 +1,5 @@
 // Unit checks for src/builtins.js and the generated builtins.json
-// (specs/phase-10-documentation-and-editor.md step 10.3, AC-3), in the repo's
+// (specs/16-phase-10-documentation-and-editor.md step 10.3, AC-3), in the repo's
 // PASS/FAIL + RESULT convention. That builtins.json matches the image is checked
 // by tests/lisp/phase-10.2-reference.lisp.
 'use strict';

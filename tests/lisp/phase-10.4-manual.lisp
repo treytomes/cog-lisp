@@ -1,5 +1,5 @@
 ;;; phase-10.4-manual.lisp -- the manual is what the examples generate
-;;; (specs/phase-10-documentation-and-editor.md step 10.4, AC-4). After changing an
+;;; (specs/16-phase-10-documentation-and-editor.md step 10.4, AC-4). After changing an
 ;;; example or docs/manual/chapters.lisp, run ./cog-lisp.sh tools/generate-docs.lisp
 ;;; and commit what it writes.
 (load "../../lib/test.lisp")

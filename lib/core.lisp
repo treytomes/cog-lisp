@@ -1,5 +1,5 @@
-;;; core.lisp -- cog-lisp's derived forms (specs/phase-7-macros.md section 7;
-;;; hygienic since specs/phase-9-language.md step 9.3)
+;;; core.lisp -- cog-lisp's derived forms (specs/06-phase-7-macros.md section 7;
+;;; hygienic since specs/15-phase-9-language.md step 9.3)
 ;;;
 ;;; Loaded into cog-lisp.image by the build, which compiles it with the seed's
 ;;; compiler (a seed has syntax-rules from v0.1.3). Each form is a syntax-rules
@@ -97,7 +97,7 @@ A loop: binds each var to its init, then until test is true runs the body and st
            (begin (if #f #f) result ...)
            (begin body ... (loop (do "step" var step ...) ...)))))))
 
-;;; Multiple values (specs/phase-9-language.md step 9.2; values and
+;;; Multiple values (specs/15-phase-9-language.md step 9.2; values and
 ;;; call-with-values are primitives)
 
 ;; (let-values (((a b) e) ((c . d) f) (g h)) body ...) -- each init is evaluated
@@ -131,7 +131,7 @@ As let-values, but each expr sees the bindings before it."
     ((_ () body ...) (let () body ...))
     ((_ (binding rest ...) body ...) (let-values (binding) (let*-values (rest ...) body ...)))))
 
-;;; Conditions and restarts (specs/phase-7.7-conditions-restarts.md)
+;;; Conditions and restarts (specs/10-phase-7.7-conditions-restarts.md)
 
 ;; (guard (var clause ...) body ...) -- cond-style clauses over what was raised;
 ;; with no matching clause it is raised again where it was first raised
@@ -152,7 +152,7 @@ Evaluates form with named restarts; invoking one leaves form and evaluates its b
      (%restart-case (lambda () form)
                     (list (cons 'name (lambda params body ...)) ...)))))
 
-;;; Generalized set! (SRFI 17; specs/phase-9-language.md step 9.4)
+;;; Generalized set! (SRFI 17; specs/15-phase-9-language.md step 9.4)
 ;;;
 ;;; (set! (proc arg ...) value) compiles to ((setter proc) arg ... value). This is
 ;;; compiled by the seed, which has no generalized set!, so it is plain code: a
@@ -199,7 +199,7 @@ A procedure that does what get does and whose setter is set, as SRFI 17 specifie
     proc))
 [getter-with-setter category: "Control"]
 
-;;; The environment, and require (specs/library-path.md)
+;;; The environment, and require (specs/18-library-path.md)
 ;;;
 ;;; *env* holds what the running world knows about itself: cog-lisp's folder, the
 ;;; library path, the libraries required so far, the platform and the version.
@@ -279,7 +279,7 @@ Loads a library once and brings its exported names into this file (or this REPL 
                                     (with-output-to-string (lambda () (write name))))))))
 
 ;; bring library's exports into unit, as options say: only, then except, then
-;; rename, then prefix (specs/namespaces.md R-5)
+;; rename, then prefix (specs/27-namespaces.md R-5)
 (define (%require-import unit library options)
   (let ((exports (vector->list [library exports]))
         (lib-name (symbol->string [library library])))
@@ -362,7 +362,7 @@ What this file, or this REPL session, has imported: a list of (name . full-name)
 
 ;;; Lists: R7RS's list-ref, list-tail and c[ad]r names, and SRFI 1's filter,
 ;;; remove, delete, delete-duplicates, fold, reduce and iota, with sort
-;;; (specs/lisp-expert-libraries.md). Compiled by the seed, so plain code.
+;;; (specs/22-lisp-expert-libraries.md). Compiled by the seed, so plain code.
 
 (define (list-tail lst k)
   "(list-tail list k)
@@ -482,7 +482,7 @@ A new list (or vector, for a vector) of the elements of sequence in order by les
       (%sort-list sequence less?)))
 
 ;;; More of SRFI 1: any, every, find, filter-map, append-map and alist-delete
-;;; (specs/lisp-expert-review.md R-1). Each takes one list, as map does.
+;;; (specs/23-lisp-expert-review.md R-1). Each takes one list, as map does.
 
 (define (%not-a-list who x)
   (error (string-append who ": not a list: " (with-output-to-string (lambda () (write x))))))

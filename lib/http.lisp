@@ -1,4 +1,4 @@
-;;; http.lisp -- http-request and http-get (specs/https-and-json.md R-6 to R-12)
+;;; http.lisp -- http-request and http-get (specs/21-https-and-json.md R-6 to R-12)
 ;;;
 ;;; A request is made by the system's curl, the same way on every platform: the
 ;;; runtime finds it (COGLISP_CURL, else Windows' own curl.exe, else curl on the

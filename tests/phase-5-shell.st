@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : Phase 5 in-image acceptance suite  (specs/phase-5-repl-runner.md)
+ cog-lisp : Phase 5 in-image acceptance suite  (specs/04-phase-5-repl-runner.md)
  Covers the language additions, source retention, and LispRepl driven by
  in-memory streams. The real entry points (build, runner, REPL over stdin,
  persistence) are covered by tests\phase-5-runner.bat.

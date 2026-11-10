@@ -1,5 +1,5 @@
 ;;; docs.lisp -- the documentation the image holds, as the files generated from it
-;;; (specs/phase-10-documentation-and-editor.md steps 10.2 and 10.3)
+;;; (specs/16-phase-10-documentation-and-editor.md steps 10.2 and 10.3)
 ;;;
 ;;; (builtins-markdown) is docs/builtins.md and (builtins-json) is
 ;;; vscode/builtins.json, each as a string. tools/generate-docs.lisp writes them;
@@ -56,7 +56,7 @@
                   (let* ((name [cell symbol])
                          (s (symbol->string name)))
                     (unless (or (char=? (string-ref s 0) #\%)
-                                (string-index s #\:)          ; a library's (specs/namespaces.md)
+                                (string-index s #\:)          ; a library's (specs/27-namespaces.md)
                                 (and (documentation-category name)
                                      (string=? (documentation-category name) "Special forms")))
                       (let ((e (docs-make-entry name (docs-kind [cell value]))))
@@ -74,7 +74,7 @@
                                                            entries)))))
                           acc)))))))
 
-;;; The libraries cog-lisp ships, which a program requires (specs/namespaces.md
+;;; The libraries cog-lisp ships, which a program requires (specs/27-namespaces.md
 ;;; R-14): each export, documented, under the library's name as its category
 
 (define docs-libraries '(cl test datetime pretty format-source))
@@ -135,7 +135,7 @@
         (display "# The built-ins of cog-lisp\n\n")
         (display "Every special form, derived form and built-in procedure, with its call form\n")
         (display "and what it does. Generated from the documentation kept in the image\n")
-        (display "(specs/phase-10-documentation-and-editor.md, step 10.2): do not edit by hand.\n")
+        (display "(specs/16-phase-10-documentation-and-editor.md, step 10.2): do not edit by hand.\n")
         (display "After changing documentation, rebuild the image and run\n")
         (display "`./cog-lisp.sh tools/generate-docs.lisp` (or `cog-lisp.bat`).\n\n")
         (display "In a call form, `[x]` is optional and `x ...` is any number of them.\n")
@@ -158,7 +158,7 @@
         (display "\n## Libraries\n\n")
         (display "Not built in: a program loads one with `(require 'name)`, which brings in\n")
         (display "the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and\n")
-        (display "`name:x` names each one from anywhere (specs/namespaces.md).\n")
+        (display "`name:x` names each one from anywhere (specs/27-namespaces.md).\n")
         (for-each (lambda (library)
                     (display "\n### ") (display library) (display "\n\n")
                     (display "`(require '") (display library) (display ")`\n\n")
@@ -550,7 +550,7 @@
     (docs-filter (lambda (name) (not (member name names)))
                  (apply append (map (lambda (c) (vector-ref c 3)) (manual-chapters))))))
 
-;;; The spell checker's word list (specs/vscode-spelling.md R-1): the names of
+;;; The spell checker's word list (specs/25-vscode-spelling.md R-1): the names of
 ;;; the built-ins and of the libraries a program requires, split as cSpell
 ;;; splits them, into runs of letters; a run of one or two letters is left out.
 ;;; The libraries' names are read from their files, not by requiring them, so

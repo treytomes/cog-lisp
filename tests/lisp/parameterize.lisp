@@ -1,5 +1,5 @@
 ;;; parameterize.lisp -- make-parameter and parameterize, R7RS 4.2.6
-;;; (specs/lisp-expert-review.md R-3, AC-2)
+;;; (specs/23-lisp-expert-review.md R-3, AC-2)
 (load "../../lib/test.lisp")
 
 (define-test "a parameter answers its value"

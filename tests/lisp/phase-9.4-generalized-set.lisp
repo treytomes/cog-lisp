@@ -1,5 +1,5 @@
 ;;; phase-9.4-generalized-set.lisp -- set! of a place, as SRFI 17 specifies, and
-;;; Common Lisp's setf (specs/phase-9-language.md step 9.4, AC-4; issue #5)
+;;; Common Lisp's setf (specs/15-phase-9-language.md step 9.4, AC-4; issue #5)
 (load "../../lib/test.lisp")
 
 ;;; 9.4a: generalized set!

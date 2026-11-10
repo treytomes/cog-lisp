@@ -1,5 +1,5 @@
 ;;; phase-10.2-reference.lisp -- the files generated from the image's documentation
-;;; match it (specs/phase-10-documentation-and-editor.md steps 10.2 and 10.3,
+;;; match it (specs/16-phase-10-documentation-and-editor.md steps 10.2 and 10.3,
 ;;; AC-2 and AC-3). After changing documentation: rebuild the image, then run
 ;;; ./cog-lisp.sh tools/generate-docs.lisp and commit what it writes.
 (load "../../lib/test.lisp")
@@ -14,7 +14,7 @@
 (define-test "AC-3 vscode/builtins.json is what the image's documentation generates"
   (check-true (string=? (builtins-json) (committed "vscode/builtins.json"))))
 
-(define-test "the spell checker's word list is what the image generates (specs/vscode-spelling.md AC-1)"
+(define-test "the spell checker's word list is what the image generates (specs/25-vscode-spelling.md AC-1)"
   (check-true (string=? (spelling-words) (committed spelling-words-file)))
   (for-each (lambda (w) (check-true (and (string-search (committed spelling-words-file) (string-append "
 " w "

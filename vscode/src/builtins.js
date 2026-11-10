@@ -1,5 +1,5 @@
 // Hover help and completion for cog-lisp's built-ins, offline
-// (specs/phase-10-documentation-and-editor.md step 10.3). The data is
+// (specs/16-phase-10-documentation-and-editor.md step 10.3). The data is
 // builtins.json, generated from the documentation kept in the image
 // (tools/generate-docs.lisp) and checked against it by the suites, so nothing
 // about the language is written here by hand.

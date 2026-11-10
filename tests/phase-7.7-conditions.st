@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : Phase 7.7 acceptance suite  (specs/phase-7.7-conditions-restarts.md,
+ cog-lisp : Phase 7.7 acceptance suite  (specs/10-phase-7.7-conditions-restarts.md,
  AC-1..16). AC-12 is tests/runner/abort.*; AC-17 is every other suite. The
  examples (examples/conditions-*.lisp, examples/restarts.lisp) run in the
  runner suite. Every bang in Lisp text is doubled for the chunk reader.

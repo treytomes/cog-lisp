@@ -1,7 +1,7 @@
 ;;; pretty.lisp -- data as a readable, indented string: (pretty-string value [indent])
 ;;;
 ;;; Load with (require 'pretty). From ~/projects/lisp-expert's pretty.lisp, where
-;;; it was lisp-pretty (specs/lisp-expert-libraries.md R-4). Changed: the name;
+;;; it was lisp-pretty (specs/22-lisp-expert-libraries.md R-4). Changed: the name;
 ;;; its own string-join and ->string are gone (string-join is built in, with the
 ;;; same arguments); a hash table's keys are printed sorted, so the same table
 ;;; always prints the same way; and a vector is printed too.
@@ -10,7 +10,7 @@
 ;;; #hash( key: value, ... ); a dotted pair as (a . b); strings as written, with
 ;;; their quotes; () as (); #t and #f as themselves.
 
-;;; A library (specs/namespaces.md): (require 'pretty) brings these names in; each
+;;; A library (specs/27-namespaces.md): (require 'pretty) brings these names in; each
 ;;; is also pretty:name everywhere, and the names not exported are private.
 
 (library pretty

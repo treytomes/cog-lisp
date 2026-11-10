@@ -1,5 +1,5 @@
 ;;; phase-8.2-reader.lisp -- unit tests of the reader written in LISP
-;;; (lib/compiler/reader.lisp; specs/phase-8-self-hosting.md step 8.2, AC-2).
+;;; (lib/compiler/reader.lisp; specs/13-phase-8-self-hosting.md step 8.2, AC-2).
 ;;; The comparison with the Smalltalk reader on the corpus and on every .lisp
 ;;; file is tests/phase-8.2-reader.st; these test the reader on its own terms.
 ;;; The built image loads lib/compiler/reader.lisp.

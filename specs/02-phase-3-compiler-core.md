@@ -8,14 +8,14 @@
 | **Feeds** | Phase 4 (runtime & primitives), Phase 5 (REPL), Phase 8 (self-hosting) |
 | **Codegen** | LISP → Smalltalk AST → Opal compiler → `CompiledMethod` |
 
-> **Partially superseded by [Phase 4](phase-4-runtime-primitives.md) (calling
+> **Partially superseded by [Phase 4](03-phase-4-runtime-primitives.md) (calling
 > convention only).** Since Phase 4, `lambda` compiles to a `LispProcedure`
 > (wrapping the block with arity metadata) rather than a bare `BlockClosure`, and
 > application compiles to `LispProcedure apply: f to: {args}` rather than
 > arity-selected `value:` sends. Everything else here stands. The Phase 3 suite
 > was updated accordingly (AC-11 now asserts `LispProcedure`) and still passes.
 >
-> **Also revised by [Phase 5](phase-5-repl-runner.md) (unspecified value).** The
+> **Also revised by [Phase 5](04-phase-5-repl-runner.md) (unspecified value).** The
 > "unspecified" placeholder is now `LispUnspecified default`, not the empty list:
 > it is what `define`, `set!`, and a one-armed `if` whose test is false evaluate
 > to. AC-7 was updated to match. Phase 5 also makes every compiled `lambda` keep

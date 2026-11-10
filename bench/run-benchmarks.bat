@@ -1,7 +1,7 @@
 @echo off
 setlocal
 rem ===========================================================================
-rem  cog-lisp : run the benchmarks  (specs/phase-6-optimization.md section 6)
+rem  cog-lisp : run the benchmarks  (specs/05-phase-6-optimization.md section 6)
 rem  Runs bench\bench.st against pharo\cog-lisp.image (which is not saved),
 rem  prints the report, and writes bench\results.md. Run build-image.bat first.
 rem  Exit code 0 when the benchmark checks (AC-15, AC-16) pass.

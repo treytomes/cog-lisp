@@ -1,5 +1,5 @@
 ;;; http.lisp -- http-request and http-get against a local server in this image
-;;; (specs/https-and-json.md R-7, R-8, R-12; AC-3). The server is Pharo's
+;;; (specs/21-https-and-json.md R-7, R-8, R-12; AC-3). The server is Pharo's
 ;;; ZnServer on 127.0.0.1, handled by a LISP procedure: the wait for curl polls,
 ;;; so the server runs while a request is made. No check needs the internet.
 (load "../../lib/test.lisp")

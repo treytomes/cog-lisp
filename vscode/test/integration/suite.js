@@ -76,7 +76,7 @@ async function run() {
     check('Expand Macro shows the expansion of the call at the cursor',
       expansion.includes('(twice (greet "b"))') && expansion.includes('(begin (greet "b") (greet "b"))'));
 
-    // Format Document, through the server (specs/formatter.md R-4, R-5, AC-4)
+    // Format Document, through the server (specs/26-formatter.md R-4, R-5, AC-4)
     const fmtPath = path.join(folder, 'to-format.lisp');
     fs.writeFileSync(fmtPath, '(define (f x) (* x x))\n');
     const fmtDoc = await vscode.workspace.openTextDocument(fmtPath);

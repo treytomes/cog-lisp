@@ -1,4 +1,4 @@
-;;; phase-9.2-numbers.lisp -- the numeric tower (specs/phase-9-language.md step
+;;; phase-9.2-numbers.lisp -- the numeric tower (specs/15-phase-9-language.md step
 ;;; 9.2, AC-2; review R-11 and R-21): reading, printing, the predicates,
 ;;; exactness, IEEE division, type errors.
 (load "../../lib/test.lisp")

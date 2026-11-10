@@ -14,24 +14,24 @@ first. See [`specs/README.md`](specs/README.md) for the workflow and index.
 | Phase | Name | State |
 |------:|------|-------|
 | 0 | Foundation & feasibility | ✅ **done** |
-| 1 | Reader & printer | ✅ **done** — [spec](specs/phase-1-reader-printer.md), 77/77 |
-| 2 | Core data model | ✅ **done** — [spec](specs/phase-2-core-data-model.md), 49/49 |
-| 3 | Compiler core | ✅ **done** — [spec](specs/phase-3-compiler-core.md), 31/31 |
-| 4 | Runtime & primitives | ✅ **done** — [spec](specs/phase-4-runtime-primitives.md), 44/44 |
-| 5 | REPL & image integration | ✅ **done** — [spec](specs/phase-5-repl-runner.md), 28/28 + 36/36 |
-| 6 | Tail calls & optimization | ✅ **done** — [spec](specs/phase-6-optimization.md), 127/127, [benchmarks](bench/results.md) |
-| 7 | Macros & derived forms | ✅ **done** — [spec](specs/phase-7-macros.md), 115/115 |
-| 7.5 | Review & tooling | ✅ **done** — [spec](specs/phase-7.5-review-and-tooling.md), [review](specs/review-phases-1-7.md), [VS Code](vscode/README.md) |
-| 7.6 | Smalltalk interop | ✅ **done** — [spec](specs/phase-7.6-smalltalk-interop.md), 82/82, [examples](examples/interop-send.lisp) |
-| 7.7 | Conditions & restarts | ✅ **done** — [spec](specs/phase-7.7-conditions-restarts.md), 54/54, [examples](examples/restarts.lisp) |
-| 7.8 | Strings, characters, vectors & hash tables | ✅ **done** — [spec](specs/phase-7.8-native-data.md), 58/58, [examples](examples/tiny-reader.lisp) |
-| 7.9 | Self-hosting groundwork | ✅ **done** — [spec](specs/phase-7.9-self-hosting-groundwork.md), 46/46, LISP unit tests ([`lib/test.lisp`](lib/test.lisp)); all suites 948/948 |
-| 8 | Self-hosting (meta-circular) | ✅ **done** — [spec](specs/phase-8-self-hosting.md); 8.1 tests in LISP, 8.2 reader and 8.3 compiler in LISP, 8.4 the compiler compiles itself to a fixpoint, 8.5 the LISP reader and compiler are the ones in use, 8.6 it writes bytecode itself, compiling 2.1× faster than Phase 7.9 ([`lib/compiler/`](lib/compiler/), examples [read-yourself](examples/read-yourself.lisp), [compile-yourself](examples/compile-yourself.lisp), [extend-the-compiler](examples/extend-the-compiler.lisp), [bootstrap](examples/bootstrap.lisp), [sealed-compiler](examples/sealed-compiler.lisp)) done; all suites 2506/2506, with either compiler |
-| 8.9 | CI/CD, and running on Linux | ✅ **done** — [spec](specs/phase-8.9-ci-cd.md); every push tested on Linux (both compilers) and Windows; a `v*` tag publishes Linux and Windows bundles and the `.vsix` |
-| 9 | Finishing the language: seeded builds, the numeric tower, hygienic macros | ✅ **done** — [spec](specs/phase-9-language.md); 9.1 seeded builds, 9.2 the numeric tower, 9.3 hygienic macros (examples [seeded-build](examples/seeded-build.lisp), [numbers](examples/numbers.lisp), [new-number-type](examples/new-number-type.lisp), [syntax-rules](examples/syntax-rules.lisp), [shadowing](examples/shadowing.lisp)) |
-| 10 | Knowing the language: documentation, the built-ins reference, hover help, the manual, a language server | ✅ **done** — [spec](specs/phase-10-documentation-and-editor.md); 10.1 documentation in the image, 10.2 [the reference](docs/builtins.md), 10.3 hover help offline, 10.4 [the manual](docs/manual/README.md), 10.5 a language server served by the image ([`lib/lsp.lisp`](lib/lsp.lisp)), 10.6 [the site](https://treytomes.github.io/cog-lisp/) on GitHub Pages, 10.7 [a skill for agents](.agents/skills/cog-lisp/SKILL.md); all suites 1875/1875 (Windows), 1878/1878 (Linux) |
+| 1 | Reader & printer | ✅ **done** — [spec](specs/00-phase-1-reader-printer.md), 77/77 |
+| 2 | Core data model | ✅ **done** — [spec](specs/01-phase-2-core-data-model.md), 49/49 |
+| 3 | Compiler core | ✅ **done** — [spec](specs/02-phase-3-compiler-core.md), 31/31 |
+| 4 | Runtime & primitives | ✅ **done** — [spec](specs/03-phase-4-runtime-primitives.md), 44/44 |
+| 5 | REPL & image integration | ✅ **done** — [spec](specs/04-phase-5-repl-runner.md), 28/28 + 36/36 |
+| 6 | Tail calls & optimization | ✅ **done** — [spec](specs/05-phase-6-optimization.md), 127/127, [benchmarks](bench/results.md) |
+| 7 | Macros & derived forms | ✅ **done** — [spec](specs/06-phase-7-macros.md), 115/115 |
+| 7.5 | Review & tooling | ✅ **done** — [spec](specs/07-phase-7.5-review-and-tooling.md), [review](specs/08-review-phases-1-7.md), [VS Code](vscode/README.md) |
+| 7.6 | Smalltalk interop | ✅ **done** — [spec](specs/09-phase-7.6-smalltalk-interop.md), 82/82, [examples](examples/interop-send.lisp) |
+| 7.7 | Conditions & restarts | ✅ **done** — [spec](specs/10-phase-7.7-conditions-restarts.md), 54/54, [examples](examples/restarts.lisp) |
+| 7.8 | Strings, characters, vectors & hash tables | ✅ **done** — [spec](specs/11-phase-7.8-native-data.md), 58/58, [examples](examples/tiny-reader.lisp) |
+| 7.9 | Self-hosting groundwork | ✅ **done** — [spec](specs/12-phase-7.9-self-hosting-groundwork.md), 46/46, LISP unit tests ([`lib/test.lisp`](lib/test.lisp)); all suites 948/948 |
+| 8 | Self-hosting (meta-circular) | ✅ **done** — [spec](specs/13-phase-8-self-hosting.md); 8.1 tests in LISP, 8.2 reader and 8.3 compiler in LISP, 8.4 the compiler compiles itself to a fixpoint, 8.5 the LISP reader and compiler are the ones in use, 8.6 it writes bytecode itself, compiling 2.1× faster than Phase 7.9 ([`lib/compiler/`](lib/compiler/), examples [read-yourself](examples/read-yourself.lisp), [compile-yourself](examples/compile-yourself.lisp), [extend-the-compiler](examples/extend-the-compiler.lisp), [bootstrap](examples/bootstrap.lisp), [sealed-compiler](examples/sealed-compiler.lisp)) done; all suites 2506/2506, with either compiler |
+| 8.9 | CI/CD, and running on Linux | ✅ **done** — [spec](specs/14-phase-8.9-ci-cd.md); every push tested on Linux (both compilers) and Windows; a `v*` tag publishes Linux and Windows bundles and the `.vsix` |
+| 9 | Finishing the language: seeded builds, the numeric tower, hygienic macros | ✅ **done** — [spec](specs/15-phase-9-language.md); 9.1 seeded builds, 9.2 the numeric tower, 9.3 hygienic macros (examples [seeded-build](examples/seeded-build.lisp), [numbers](examples/numbers.lisp), [new-number-type](examples/new-number-type.lisp), [syntax-rules](examples/syntax-rules.lisp), [shadowing](examples/shadowing.lisp)) |
+| 10 | Knowing the language: documentation, the built-ins reference, hover help, the manual, a language server | ✅ **done** — [spec](specs/16-phase-10-documentation-and-editor.md); 10.1 documentation in the image, 10.2 [the reference](docs/builtins.md), 10.3 hover help offline, 10.4 [the manual](docs/manual/README.md), 10.5 a language server served by the image ([`lib/lsp.lisp`](lib/lsp.lisp)), 10.6 [the site](https://treytomes.github.io/cog-lisp/) on GitHub Pages, 10.7 [a skill for agents](.agents/skills/cog-lisp/SKILL.md); all suites 1875/1875 (Windows), 1878/1878 (Linux) |
 | — | From reviewing a real project: start-up, `require`, `format`, coverage, JSON, HTTP(S), list built-ins, `parameterize`, the spell checker, the source formatter | ✅ **done** — [below](#next-from-reviewing-a-real-project-2026-11-09); released as v0.3.0 and v0.4.0; all suites 2917/2917 (Windows) |
-| 11 | A world of its own: the pure LISP image, then networking and graphics from LISP | ⬜ [spec](specs/phase-11-pure-image.md) accepted in outline |
+| 11 | A world of its own: the pure LISP image, then networking and graphics from LISP | ⬜ [spec](specs/30-phase-11-pure-image.md) accepted in outline |
 
 Phase 0 is proven, not just planned: [`poc/answer.st`](poc/answer.st) builds
 three `CompiledMethod`s directly from Opal IR — a constant, a two-argument add,
@@ -106,55 +106,55 @@ Go deeper into the VM where it pays.
   names for working through *ANSI Common Lisp*.
 - `lib/core.lisp` is loaded into `cog-lisp.image` by the build; the CL
   library was then loaded with `(load "lib/cl.lisp")` (today `(require 'cl)`,
-  from any folder: [specs/library-path.md](specs/library-path.md)). Its known
+  from any folder: [specs/18-library-path.md](specs/18-library-path.md)). Its known
   gaps: `nil` and `()` are **true** (only `#f` is false), so test a list with
   `null` or `consp`, not plain `if` (issue #1, deferred:
-  [specs/cl-issues.md](specs/cl-issues.md)); variables and functions share one
+  [specs/24-cl-issues.md](specs/24-cl-issues.md)); variables and functions share one
   namespace, and there is no `#'f` (write `f`); no `loop`, keywords, multiple values, `&optional` or
   `&key`. (`format` was missing then; it is built in since
-  [specs/format.md](specs/format.md).)
-- *Acceptance:* see the [Phase 7 spec](specs/phase-7-macros.md).
+  [specs/19-format.md](specs/19-format.md).)
+- *Acceptance:* see the [Phase 7 spec](specs/06-phase-7-macros.md).
 
 ### Phase 7.5 — Review & tooling
 A consolidation phase before self-hosting, with no new language features.
 - **Review of Phases 1–7:** a full review of the first seven phases (specs, code,
   tests, build, and the Pharo findings in CLAUDE.md) to see what we would do
   better with what we know now. Each finding is fixed now, planned for a named
-  phase, or kept with a reason, in `specs/review-phases-1-7.md`.
+  phase, or kept with a reason, in `specs/08-review-phases-1-7.md`.
 - **VS Code integration:** a local extension (`vscode/`, installed from a
   `.vsix`) with syntax highlighting, bracket handling, run file, a REPL in the
   integrated terminal, and send-form-to-REPL. Plus a plan for a language server
   served by the image itself: hover with procedure source, completion from the
   globals, diagnostics, macro expansion.
-- *Acceptance:* see the [Phase 7.5 spec](specs/phase-7.5-review-and-tooling.md).
+- *Acceptance:* see the [Phase 7.5 spec](specs/07-phase-7.5-review-and-tooling.md).
 
 ### Before Phase 8 (in this order; each numbered when specified)
 Phase 8 rewrites the reader and compiler in cog-lisp, and today that code could
 not be written: LISP cannot look inside a string, keep a table, build an Opal
 node, or raise and catch an error. These come first (decided 2026-11-03):
-- **Smalltalk interop** — ✅ done as Phase 7.6 ([spec](specs/phase-7.6-smalltalk-interop.md)): `[coll add: x]`, `(send d at:put: k v)`, `(smalltalk Dictionary)`. Call Smalltalk from LISP (send messages
+- **Smalltalk interop** — ✅ done as Phase 7.6 ([spec](specs/09-phase-7.6-smalltalk-interop.md)): `[coll add: x]`, `(send d at:put: k v)`, `(smalltalk Dictionary)`. Call Smalltalk from LISP (send messages
   to Smalltalk objects, reach classes and globals) and LISP from Smalltalk (a
   LISP procedure usable as a block, which must drive its own tail calls; review
   R-18). The way into the rest of the image, into the subsystems Phase 11 may keep
   or reimplement, and Phase 8's "LISP-level interface to the Opal IR".
-- **Conditions and restarts** — ✅ done as Phase 7.7 ([spec](specs/phase-7.7-conditions-restarts.md)): `guard`, `with-exception-handler`, `restart-case`, and a break loop at the console REPL. A LISP-level error system: `error`, condition
+- **Conditions and restarts** — ✅ done as Phase 7.7 ([spec](specs/10-phase-7.7-conditions-restarts.md)): `guard`, `with-exception-handler`, `restart-case`, and a break loop at the console REPL. A LISP-level error system: `error`, condition
   objects, handlers, and restarts, with host errors mapped to conditions (review
   R-2, C-18). Before the primitives below, so they signal proper conditions.
-- **Native strings, characters, vectors and hash tables** — ✅ done as Phase 7.8 ([spec](specs/phase-7.8-native-data.md)), with string ports and `read`: what a reader and a
+- **Native strings, characters, vectors and hash tables** — ✅ done as Phase 7.8 ([spec](specs/11-phase-7.8-native-data.md)), with string ports and `read`: what a reader and a
   compiler written in LISP need (`string-ref`, `substring`, `string->symbol`,
   `string->number`, `char->integer`, character predicates, string building,
   vectors, hash tables), as **native primitives** in cog-lisp's runtime rather
   than LISP names over Smalltalk objects: the world stays readable in LISP
   (Phase 11), and the fixpoint check is simpler without host objects in the loop.
-- **Self-hosting groundwork** — ✅ done as Phase 7.9 ([spec](specs/phase-7.9-self-hosting-groundwork.md)), with unit tests written in cog-lisp (`lib/test.lisp`, `tests/lisp/`): the review findings marked *plan → self-hosting*
-  (`specs/review-phases-1-7.md`): calls nested ~20 deep (C-5), lambdas with
+- **Self-hosting groundwork** — ✅ done as Phase 7.9 ([spec](specs/12-phase-7.9-self-hosting-groundwork.md)), with unit tests written in cog-lisp (`lib/test.lisp`, `tests/lisp/`): the review findings marked *plan → self-hosting*
+  (`specs/08-review-phases-1-7.md`): calls nested ~20 deep (C-5), lambdas with
   more than 15 parameters (C-4), cycle-safe `equal?` and printing (R-4), string
   escapes for control characters (R-20), `load` relative to the loading file and
   program arguments (R-22), and the compiler's special-form dispatch and
   template parsing (C-18).
 
 ### Phase 8 — Self-hosting (meta-circular)
-[Spec accepted](specs/phase-8-self-hosting.md). It starts by moving the
+[Spec accepted](specs/13-phase-8-self-hosting.md). It starts by moving the
 language-behavior tests from Smalltalk to LISP (owner, 2026-11-04), so the
 self-hosted reader and compiler are checked against the same tests. Step 8.1
 (tests in LISP) and step 8.2 (the reader in LISP, matching the Smalltalk reader
@@ -184,7 +184,7 @@ implementation of Phases 1–4 (and macros from Phase 7).
   output to the one built by stage 3).
 
 ### Phase 8.9 — CI/CD, and running on Linux ✅
-[Spec](specs/phase-8.9-ci-cd.md). cog-lisp runs on Linux as well as Windows (the
+[Spec](specs/14-phase-8.9-ci-cd.md). cog-lisp runs on Linux as well as Windows (the
 console and stdin layer reads through libc there), and GitHub Actions tests and
 releases it, on Linux runners with a Windows job beside them. The plan before the
 spec, for the record, was a pipeline on a Windows runner:
@@ -195,7 +195,7 @@ spec, for the record, was a pipeline on a Windows runner:
   can be tried without building anything.
 
 ### Phase 9 — Finishing the language
-[Spec](specs/phase-9-language.md), accepted. Three steps, each with LISP tests
+[Spec](specs/15-phase-9-language.md), accepted. Three steps, each with LISP tests
 and examples:
 - **9.1 Seeded builds** (done): an image is built from an earlier cog-lisp image
   (the v0.1.2 release, pinned like Pharo), not the stock Pharo image. The
@@ -218,7 +218,7 @@ and examples:
   (within 1.5x, down from 20x).
 
 ### Phase 10 — Knowing the language
-[Spec](specs/phase-10-documentation-and-editor.md), done (2026-11-06). Makes cog-lisp
+[Spec](specs/16-phase-10-documentation-and-editor.md), done (2026-11-06). Makes cog-lisp
 knowable, by a reader and by the editor, from documentation kept with each
 definition in the image (owner ideas of 2026-11-04, moved ahead of the pure
 image on 2026-11-05):
@@ -247,41 +247,41 @@ image on 2026-11-05):
 ### Next: from reviewing a real project (2026-11-09)
 Reviewing `lisp-expert`, a separate project of cog-lisp programs (an expert
 system, `format`, a weather REPL), found bugs and gaps that are not its own:
-- [**Starting anywhere**](specs/startup-anywhere.md) (done): a second run
+- [**Starting anywhere**](specs/17-startup-anywhere.md) (done): a second run
   on the same image, a read-only install, or a read-only current folder each
   fail at start-up today.
-- [**`require` and `*env*`**](specs/library-path.md) (done): load cog-lisp's
+- [**`require` and `*env*`**](specs/18-library-path.md) (done): load cog-lisp's
   own libraries from any folder, through a library path kept in a global
   environment.
-- [**`format`**](specs/format.md) (done): `lisp-expert`'s version, finished
+- [**`format`**](specs/19-format.md) (done): `lisp-expert`'s version, finished
   and built in.
-- [**Code coverage**](specs/coverage.md) (done): a compiler option that
+- [**Code coverage**](specs/20-coverage.md) (done): a compiler option that
   reports the procedures and branches a test run never reached.
-- [**lisp-expert's libraries**](specs/lisp-expert-libraries.md) (done): R7RS's
+- [**lisp-expert's libraries**](specs/22-lisp-expert-libraries.md) (done): R7RS's
   and SRFI 1's list procedures built in; `datetime` and `pretty` to `require`.
-- [**What reviewing lisp-expert's code found**](specs/lisp-expert-review.md)
+- [**What reviewing lisp-expert's code found**](specs/23-lisp-expert-review.md)
   (done): SRFI 1's `any`, `every`, `find`, `filter-map`, `append-map`,
   `alist-delete`; `string-prefix?`; `parameterize`; ISO dates; and lisp-expert
   moved onto them, with its bugs fixed.
-- [**Common Lisp issues**](specs/cl-issues.md) (done): #2, #3, #4, #6; #1
+- [**Common Lisp issues**](specs/24-cl-issues.md) (done): #2, #3, #4, #6; #1
   documented and deferred.
-- [**cog-lisp's names in the spell checker**](specs/vscode-spelling.md) (done,
+- [**cog-lisp's names in the spell checker**](specs/25-vscode-spelling.md) (done,
   issue #7): a word list for Code Spell Checker, registered by the extension.
-- [**A source formatter**](specs/formatter.md) (done, issue #8): `format-source`,
+- [**A source formatter**](specs/26-formatter.md) (done, issue #8): `format-source`,
   Format Document in VS Code, and `tools/format.lisp`.
-- [**HTTP(S) and JSON**](specs/https-and-json.md) (done): `json-read` and
+- [**HTTP(S) and JSON**](specs/21-https-and-json.md) (done): `json-read` and
   `json-write`; `http-request` and `http-get` over the system's curl, with
   certificates always checked: an early slice of Phase 11.6.
-- [**Libraries and namespaces**](specs/namespaces.md) (done): `(library name
+- [**Libraries and namespaces**](specs/27-namespaces.md) (done): `(library name
   (export ...))`; `require` with `only`, `except`, `rename` and `prefix`,
   imports per file; private names; full names (`cl:remove`) everywhere; the
   built-in libraries sealed, and a warning when a program redefines a built-in.
   Asked for by the console library's short names.
-- [**A console library**](specs/console.md) (accepted, next): styled text,
+- [**A console library**](specs/29-console.md) (accepted, next): styled text,
   rules, tables, panels and prompts, in the manner of Spectre.Console.
 
 ### Phase 11 — A world of its own
-[Spec](specs/phase-11-pure-image.md), accepted in outline; a long phase, each
+[Spec](specs/30-phase-11-pure-image.md), accepted in outline; a long phase, each
 step specified in detail before it starts (owner, 2026-11-04). The VM always
 needs a small Smalltalk-shaped kernel; "pure" means no stock image at run or
 build time, only the Pharo subsystems the world needs, and a world a user meets

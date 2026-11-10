@@ -1,5 +1,5 @@
 ;;; Moved from ~/projects/lisp-expert/expert/test/test-datetime.lisp with
-;;; lib/datetime.lisp (specs/lisp-expert-libraries.md). Changed: its load lines only.
+;;; lib/datetime.lisp (specs/22-lisp-expert-libraries.md). Changed: its load lines only.
 ;;; Unit tests for expert/datetime.lisp
 ;;;
 ;;; Run with:  ./cog-lisp.sh expert/test/test-datetime.lisp
@@ -61,7 +61,7 @@
     (check-true (string? (datetime->string dt)))
     (check-true (string? (interval->string (make-interval dt (datetime-add dt (duration-seconds 60))))))))
 
-;; datetime-from-string (specs/lisp-expert-review.md R-4, AC-3). 2026-11-09T13:00Z
+;; datetime-from-string (specs/23-lisp-expert-review.md R-4, AC-3). 2026-11-09T13:00Z
 ;; is Unix time 1794229200 wherever the machine is.
 (define-test "datetime-from-string reads every ISO 8601 form"
   (check (datetime->unix (datetime-from-string "2026-11-09")) 1794182400)

@@ -1,6 +1,6 @@
 "============================================================================
  cog-lisp : Phase 2 implementation  (package CogLisp-Core)
- Core data model per specs/phase-2-core-data-model.md: type predicates,
+ Core data model per specs/01-phase-2-core-data-model.md: type predicates,
  eq?/eqv?/equal?, truthiness, and the global environment.
 
  LOADER script (see coglisp-reader.st for the conventions). Must be filed in
@@ -242,7 +242,7 @@ cm value: cell value: 'accessing' value: 'key
 	^ symbol'.
 cm value: cell value: 'copying' value: 'frozenCopy
 	"A private cell with this one''s name and present value, in no environment: what
-	 sealed code reads instead (specs/phase-8-self-hosting.md step 8.5)."
+	 sealed code reads instead (specs/13-phase-8-self-hosting.md step 8.5)."
 	| copy |
 	copy := self class symbol: symbol.
 	bound ifTrue: [copy define: value].

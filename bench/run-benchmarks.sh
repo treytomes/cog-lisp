@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ===========================================================================
 #  cog-lisp : run the benchmarks  (bash equivalent of bench\run-benchmarks.bat;
-#  specs/phase-6-optimization.md section 6, Phase 8.9)
+#  specs/05-phase-6-optimization.md section 6, Phase 8.9)
 #  Runs bench/bench.st against pharo/cog-lisp.image (which is not saved), prints
 #  the report, and writes bench/results.md. Run build-image.sh first.
 #  Exit code 0 when the benchmark checks pass.

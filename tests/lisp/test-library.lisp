@@ -1,7 +1,7 @@
 ;;; Moved from ~/projects/lisp-expert (lib/test-test.lisp) with lib/cl.lisp and
-;;; lib/test.lisp, whose copies it tested (specs/lisp-expert-libraries.md).
+;;; lib/test.lisp, whose copies it tested (specs/22-lisp-expert-libraries.md).
 ;;; Changed: its load lines; and since lib/test.lisp became a library
-;;; (specs/namespaces.md), its private state is named in full: test:%pass.
+;;; (specs/27-namespaces.md), its private state is named in full: test:%pass.
 ;;; Tests for the Lisp test framework itself.
 (load "../../lib/test.lisp")
 

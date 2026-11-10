@@ -33,7 +33,7 @@ This phase takes them down, one at a time, each with an example.
 - Examples for every feature (§10).
 
 **Deferred**
-- Procedure documentation strings and hover help (now Phase 10, specs/phase-10-documentation-and-editor.md),
+- Procedure documentation strings and hover help (now Phase 10, specs/16-phase-10-documentation-and-editor.md),
   to be specified with the language server.
 - Binary ports and bytevectors.
 - Hygienic macros and the numeric tower (Phase 9).

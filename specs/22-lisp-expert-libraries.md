@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Done (2026-11-09); accepted with the owner's decisions (§5) |
 | **Asked for by** | The owner (2026-11-09): sort out the library functions and test files in `~/projects/lisp-expert`'s root and `lib/`, set them up with their tests in cog-lisp, and remove them from lisp-expert |
-| **Before** | HTTPS (specs/https-and-json.md), which comes next, before Phase 11 |
+| **Before** | HTTPS (specs/21-https-and-json.md), which comes next, before Phase 11 |
 
 ## 1. What is there (read 2026-11-09)
 
@@ -12,7 +12,7 @@
 |---|---:|---|
 | `lib/cl.lisp`, `lib/test.lisp` | 204, 149 | cog-lisp 0.2.1's own files, with a documentation string added to each definition |
 | `lib/cl-test.lisp`, `lib/test-test.lisp` | 61 and 19 checks | tests of those two files |
-| `format.lisp` and three `format-*-test.lisp` | 266; 81 checks | already in cog-lisp: `format` is built in, and the three suites run there (specs/format.md) |
+| `format.lisp` and three `format-*-test.lisp` | 266; 81 checks | already in cog-lisp: `format` is built in, and the three suites run there (specs/19-format.md) |
 | `common.lisp` | 128 | the hub every expert and weather file loads; it loads `lib/cl.lisp`, `datetime.lisp` and `format.lisp`, and defines the helpers below |
 | `common-test.lisp` | 26 checks | tests of `common.lisp` |
 | `datetime.lisp` | 156 | dates, durations and intervals over Pharo's `DateAndTime` and `Duration` |
@@ -73,7 +73,7 @@ What `common.lisp` defines:
 - **R-4. `lib/pretty.lisp`:**
   - `(pretty-string value [indent])`, lisp-expert's `lisp-pretty` under a
     cog-lisp name. It is new, so there is no alias (decision 3);
-  - JSON's `null`, now `()` (specs/https-and-json.md), prints as `()`;
+  - JSON's `null`, now `()` (specs/21-https-and-json.md), prints as `()`;
   - its own `string-join` and `->string` are dropped, since `string-join` is
     built in, with the same arguments.
 - **R-5. Tests:**

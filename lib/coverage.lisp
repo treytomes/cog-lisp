@@ -1,4 +1,4 @@
-;;; coverage.lisp -- which procedures and branches a run reached (specs/coverage.md)
+;;; coverage.lisp -- which procedures and branches a run reached (specs/20-coverage.md)
 ;;;
 ;;; With the compiler's coverage option on, each procedure entry and each side of
 ;;; an if gets a probe: a record made here, by %coverage-register, as the form is

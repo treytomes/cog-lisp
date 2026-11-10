@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : Phase 7.6 acceptance suite  (specs/phase-7.6-smalltalk-interop.md,
+ cog-lisp : Phase 7.6 acceptance suite  (specs/09-phase-7.6-smalltalk-interop.md,
  AC-1..19). AC-20 is a benchmark (bench\run-benchmarks.bat); AC-21 is every
  other suite. The examples (examples\interop-*.lisp) run in the runner suite.
  Every bang in Lisp text is doubled for the chunk reader.

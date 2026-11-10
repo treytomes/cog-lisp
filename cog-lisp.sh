@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ===========================================================================
 #  cog-lisp : run a program or start the REPL  (bash equivalent of
-#  cog-lisp.bat; specs/phase-5-repl-runner.md)
+#  cog-lisp.bat; specs/04-phase-5-repl-runner.md)
 #    ./cog-lisp.sh                 start the REPL
 #    ./cog-lisp.sh program.lisp [arg ...]   run a program, then exit
 #  Exit code: 0 on success, 1 on an uncaught LISP error, or the code given to
@@ -14,7 +14,7 @@
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# the cog-lisp folder, for *env* and require (specs/library-path.md R-4)
+# the cog-lisp folder, for *env* and require (specs/18-library-path.md R-4)
 export COGLISP_HOME="$ROOT"
 . "$ROOT/scripts/pharo-vm.sh"
 VM="$(pharo_vm "$ROOT/pharo")"

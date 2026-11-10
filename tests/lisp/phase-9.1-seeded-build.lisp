@@ -1,5 +1,5 @@
 ;;; phase-9.1-seeded-build.lisp -- the image is built from a seed
-;;; (specs/phase-9-language.md step 9.1, AC-1). The image records how it was
+;;; (specs/15-phase-9-language.md step 9.1, AC-1). The image records how it was
 ;;; built; and the bootstrap runs with any compiler's entry points as stage 0 --
 ;;; here the running one, standing in for a seed that makes the same code.
 (load "../../lib/test.lisp")

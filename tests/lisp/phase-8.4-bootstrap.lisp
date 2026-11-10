@@ -1,6 +1,6 @@
 ;;; phase-8.4-bootstrap.lisp -- the compiler compiles itself to a fixpoint
-;;; (lib/compiler/bootstrap.lisp; specs/phase-8-self-hosting.md steps 8.4 and 8.6,
-;;; AC-4 and AC-8; specs/phase-9-language.md step 9.1). The running compiler is
+;;; (lib/compiler/bootstrap.lisp; specs/13-phase-8-self-hosting.md steps 8.4 and 8.6,
+;;; AC-4 and AC-8; specs/15-phase-9-language.md step 9.1). The running compiler is
 ;;; the seed: stages 1, 2 and 3 rebuild it from its source and make the same
 ;;; methods. (Until step 9.1 a second bootstrap went through Opal and compared
 ;;; stage 1 with the Smalltalk compiler; both retired then.)

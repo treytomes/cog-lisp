@@ -392,11 +392,11 @@ and the AC-12 sweep with inlining off); `bench\run-benchmarks.bat` 12/12 (AC-24)
 The self-loop of §10 reused its parameter temporaries across iterations, so
 closures created inside the loop shared them and saw later values. Fixed in
 Phase 7 by copying the parameters into per-iteration temporaries declared in the
-loop block; see `specs/phase-7-macros.md` §11.
+loop block; see `specs/06-phase-7-macros.md` §11.
 
 ## 13. Changes from the Phase 7.5 review
 
-See `specs/review-phases-1-7.md` for the evidence behind each.
+See `specs/08-review-phases-1-7.md` for the evidence behind each.
 
 - **Fixed-arity entries are now 0–4 as §10 says** (O-1). `+` and `*` had 1–3 and
   the comparisons only 2, so `(+ acc g1 g2 g3)` took the variadic path, about 14×

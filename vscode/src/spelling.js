@@ -1,4 +1,4 @@
-// cog-lisp's names in Code Spell Checker (specs/vscode-spelling.md R-3).
+// cog-lisp's names in Code Spell Checker (specs/25-vscode-spelling.md R-3).
 // cSpell has no package.json contribution point for dictionaries: an extension
 // activates cSpell and hands its API the path of a cspell-ext.json, as cSpell's
 // own dictionary extensions do. cSpell is never required: if it is missing,

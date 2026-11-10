@@ -24,7 +24,7 @@ Phases 1–7 is the language that comes out of it.
 
 **In scope**
 - A written review of specs, code, tests, build, and the Pharo findings in
-  `CLAUDE.md`. It produces a findings document, `specs/review-phases-1-7.md`.
+  `CLAUDE.md`. It produces a findings document, `specs/08-review-phases-1-7.md`.
 - Fixes for the findings classified *fix now* (§4.3), each with a regression check.
 - A VS Code extension in `vscode/`, installed locally from a `.vsix` (§5).
 - A plan, in this spec, for an image-backed language server, built in a later
@@ -86,7 +86,7 @@ against the code before it becomes a finding.
 
 ### 4.3 The findings document
 
-`specs/review-phases-1-7.md` lists every finding with an id (R-1, R-2, …), the
+`specs/08-review-phases-1-7.md` lists every finding with an id (R-1, R-2, …), the
 area, the evidence (a check or measurement), the verdict (*fix now* / *plan →
 phase* / *keep*), and, once fixed, the commit. It is reviewed with the owner
 before the *fix now* list is implemented.
@@ -139,7 +139,7 @@ JSON, which Pharo has (STON/NeoJSON).
 ## 6. Acceptance criteria
 
 *Review*
-- AC-1 `specs/review-phases-1-7.md` exists and covers every area in §4.1, each
+- AC-1 `specs/08-review-phases-1-7.md` exists and covers every area in §4.1, each
   with at least one finding or a "no findings" note with what was checked.
 - AC-2 Every finding has evidence and a verdict; every *plan* names a phase.
 - AC-3 Every *fix now* finding is fixed, with a regression check in a suite.
@@ -176,7 +176,7 @@ Settled 2026-11-03 (owner sign-off); the spec is Accepted on these.
 
 ## 8. As implemented
 
-**Review (AC-1 to AC-5).** `specs/review-phases-1-7.md` has 61 findings across
+**Review (AC-1 to AC-5).** `specs/08-review-phases-1-7.md` has 61 findings across
 every area of §4.1 (7 from our own pass, 54 from the two independent
 reviewers, each re-run before being recorded). Every *fix now* finding was fixed
 in four commits; each has regression checks in `tests/phase-7.5-review.st` (114

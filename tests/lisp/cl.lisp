@@ -1,5 +1,5 @@
 ;;; Moved from ~/projects/lisp-expert (lib/cl-test.lisp) with lib/cl.lisp and
-;;; lib/test.lisp, whose copies it tested (specs/lisp-expert-libraries.md).
+;;; lib/test.lisp, whose copies it tested (specs/22-lisp-expert-libraries.md).
 ;;; Changed: its load lines only.
 ;;; Tests for the Common Lisp compatibility layer in cl.lisp.
 (load "../../lib/test.lisp")

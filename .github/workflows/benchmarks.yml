@@ -1,4 +1,4 @@
-# cog-lisp benchmarks, by hand (specs/phase-8.9-ci-cd.md section 4.3). Shared
+# cog-lisp benchmarks, by hand (specs/14-phase-8.9-ci-cd.md section 4.3). Shared
 # runners are too noisy to gate on timings, so nothing fails on a number; the
 # report is kept as an artifact to compare with bench/results.md.
 name: Benchmarks

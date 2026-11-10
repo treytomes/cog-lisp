@@ -1,6 +1,6 @@
 ;;; datetime.lisp -- dates, durations and intervals, over Pharo's DateAndTime and
 ;;; Duration. Load with (require 'datetime). From ~/projects/lisp-expert's
-;;; datetime.lisp (specs/lisp-expert-libraries.md R-3); changed: its Smalltalk
+;;; datetime.lisp (specs/22-lisp-expert-libraries.md R-3); changed: its Smalltalk
 ;;; names are written (smalltalk DateAndTime), (smalltalk Duration).
 ;;;
 ; datetime.lisp -- idiomatic Lisp layer over Pharo DateAndTime / Duration.
@@ -9,7 +9,7 @@
 
 ;;; --- Absolute datetimes ------------------------------------------------
 
-;;; A library (specs/namespaces.md): (require 'datetime) brings these names in; each
+;;; A library (specs/27-namespaces.md): (require 'datetime) brings these names in; each
 ;;; is also datetime:name everywhere, and the names not exported are private.
 
 (library datetime
@@ -54,7 +54,7 @@
 	[dt asString]
 )
 
-;; ISO 8601 (cog-lisp specs/lisp-expert-review.md R-4): YYYY-MM-DD, optionally
+;; ISO 8601 (cog-lisp specs/23-lisp-expert-review.md R-4): YYYY-MM-DD, optionally
 ;; THH:MM, :SS and .fraction, optionally Z or +HH:MM / -HH:MM. A string without
 ;; an offset is UTC: Pharo's own fromString: would read it as local time, which
 ;; makes an answer depend on the machine it runs on.

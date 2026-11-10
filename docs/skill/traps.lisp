@@ -1,5 +1,5 @@
 ;;; traps.lisp -- what a model used to other Lisps gets wrong in cog-lisp
-;;; (specs/phase-10-documentation-and-editor.md step 10.7). Each trap is
+;;; (specs/16-phase-10-documentation-and-editor.md step 10.7). Each trap is
 ;;;   (trap "what goes wrong" "the wrong code" outcome "the right code")
 ;;; where outcome is (error "text of the error") or (answers "what it prints").
 ;;; tests/lisp/phase-10.7-skill.lisp runs every wrong and every right piece of

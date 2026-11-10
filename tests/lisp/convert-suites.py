@@ -1,5 +1,5 @@
 """Phase 8 step 8.1: move language-behavior checks from the Smalltalk suites to
-LISP test files (specs/phase-8-self-hosting.md section 4.1).
+LISP test files (specs/13-phase-8-self-hosting.md section 4.1).
 
 A check moves only when it is exactly "evaluate this LISP source and compare the
 result with a plain value" (or "expect an error"); everything else stays in the

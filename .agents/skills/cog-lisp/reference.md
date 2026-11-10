@@ -318,7 +318,7 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 - `(coverage-stop)`: Ends the coverage session, and answers its counts: a list, in the order the code was compiled, of #(file line column kind count text). kind is procedure (an entry), true or false (a side of an if); file is #f for a form typed at the REPL, and line and column #f where no position is known.
 - `(eval form)`: Compiles and runs form at top level, and answers its value.
 - `(gensym [prefix])`: A new uninterned symbol, unlike any other, for a name a macro makes up.
-- `(image-build-info)`: How this image was built: an association list of its seed, the bootstrap and its fixpoint.
+- `(image-build-info)`: How this image was built: an association list of its seed, the bootstrap and its fixpoint, and its version, commit and build time (version, commit, built).
 - `(macroexpand form)`: form expanded until it is no longer a macro call.
 - `(macroexpand-1 form)`: form expanded once, if it is a macro call; else form itself.
 

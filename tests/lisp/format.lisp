@@ -1,4 +1,4 @@
-;;; format.lisp -- the built-in format (specs/format.md AC-1): both conventions,
+;;; format.lisp -- the built-in format (specs/19-format.md AC-1): both conventions,
 ;;; every parameter and flag, the directives with structure, and the errors.
 ;;; Where Common Lisp specifies the output, the expected text is Common Lisp's.
 ;;; lisp-expert's own suites run beside this one (format-*-lisp-expert.lisp).

@@ -1,5 +1,5 @@
 ;;; codegen.lisp -- bytecode straight from the compiler's trees
-;;; (specs/phase-8-self-hosting.md step 8.6)
+;;; (specs/13-phase-8-self-hosting.md step 8.6)
 ;;;
 ;;; Compiles a method tree of opal.lisp (#(method node)) to a CompiledMethod
 ;;; without Opal: no AST, no semantic analysis, no IR. It does Opal's work for the

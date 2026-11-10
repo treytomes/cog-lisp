@@ -1,5 +1,5 @@
 ;;; cl-issues.lisp -- GitHub issues #1, #2, #3, #4 and #6, each against its own
-;;; example (specs/cl-issues.md AC-1)
+;;; example (specs/24-cl-issues.md AC-1)
 (load "../../lib/test.lisp")
 (require 'cl)
 

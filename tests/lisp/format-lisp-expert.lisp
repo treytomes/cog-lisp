@@ -1,6 +1,6 @@
 ;;; Copied from ~/projects/lisp-expert/format-test.lisp (the owner's), to check that
 ;;; cog-lisp's built-in format passes it with lisp-expert's format.lisp not loaded
-;;; (specs/format.md AC-2). Changed: the path to lib/test.lisp; no (load "format.lisp"); t is defined, as lib/cl.lisp would.
+;;; (specs/19-format.md AC-2). Changed: the path to lib/test.lisp; no (load "format.lisp"); t is defined, as lib/cl.lisp would.
 ;;; format-test.lisp -- unit tests for the format procedure
 ;;;
 ;;; Adjust the load path to wherever this file lives relative to lib/test.lisp.

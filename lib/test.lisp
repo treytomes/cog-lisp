@@ -1,4 +1,4 @@
-;;; test.lisp -- unit tests written in cog-lisp (specs/phase-7.9-self-hosting-groundwork.md section 8a)
+;;; test.lisp -- unit tests written in cog-lisp (specs/12-phase-7.9-self-hosting-groundwork.md section 8a)
 ;;;
 ;;;   (require 'test)               ; or (load "lib/test.lisp") from cog-lisp's folder
 ;;;   (define-test arithmetic
@@ -15,7 +15,7 @@
 ; that redefines one (+, display, ...) cannot break the reporting. Its forms are
 ; syntax-rules macros (Phase 9 step 9.3), so a test may also bind lambda, if or
 ; let locally around a check.
-;;; A library (specs/namespaces.md): (require 'test) brings these names in; each
+;;; A library (specs/27-namespaces.md): (require 'test) brings these names in; each
 ;;; is also test:name everywhere, and the names not exported are private.
 
 (library test

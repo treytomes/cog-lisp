@@ -1,5 +1,5 @@
 ;;; reader.lisp -- cog-lisp's reader, written in cog-lisp
-;;; (specs/phase-8-self-hosting.md step 8.2)
+;;; (specs/13-phase-8-self-hosting.md step 8.2)
 ;;;
 ;;; Written as a function-for-function counterpart of the reader written in
 ;;; Smalltalk (LispReader in src/coglisp-reader.st up to release v0.1.2; it
@@ -324,7 +324,7 @@ The next datum, or the eof object at the end of the text."
 
 (define (rd-sign? c) (or (eq? c #\+) (eq? c #\-)))
 
-;;; Numbers: R7RS 7.1.1's real numbers (specs/phase-9-language.md step 9.2)
+;;; Numbers: R7RS 7.1.1's real numbers (specs/15-phase-9-language.md step 9.2)
 ;;;   integers and n/d in any radix, decimals in radix 10, +inf.0 -inf.0 +nan.0
 ;;;   -nan.0, and the prefixes #e #i #x #o #b #d. A parser answers the number,
 ;;;   #f when the text is not one, or rd-zero-denominator for n/0.

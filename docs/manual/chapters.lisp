@@ -1,5 +1,5 @@
 ;;; chapters.lisp -- the chapters of the cog-lisp manual, in order
-;;; (specs/phase-10-documentation-and-editor.md step 10.4)
+;;; (specs/16-phase-10-documentation-and-editor.md step 10.4)
 ;;;
 ;;; (chapter slug title introduction example ...): each example is a file of
 ;;; examples/ (without .lisp) or a folder of them, shown with its explanation, its

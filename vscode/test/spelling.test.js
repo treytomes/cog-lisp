@@ -1,4 +1,4 @@
-// cog-lisp's names in Code Spell Checker (specs/vscode-spelling.md AC-2):
+// cog-lisp's names in Code Spell Checker (specs/25-vscode-spelling.md AC-2):
 // registration against a stand-in for cSpell's API, the shipped configuration,
 // and the extension's list of the libraries the build compiles.
 // PASS/FAIL + RESULT convention.

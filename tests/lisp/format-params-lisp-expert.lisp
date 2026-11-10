@@ -1,6 +1,6 @@
 ;;; Copied from ~/projects/lisp-expert/format-params-test.lisp (the owner's), to check that
 ;;; cog-lisp's built-in format passes it with lisp-expert's format.lisp not loaded
-;;; (specs/format.md AC-2). Changed: the path to lib/test.lisp; no (load "format.lisp").
+;;; (specs/19-format.md AC-2). Changed: the path to lib/test.lisp; no (load "format.lisp").
 ;;; format-params-test.lisp -- Task 2a: parameters and modifiers in the parser
 ;;;
 ;;; A directive is ~ [parameters] [modifiers] character, as in Common Lisp:

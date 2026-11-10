@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : tree-walking interpreter  (specs/phase-6-optimization.md section 6)
+ cog-lisp : tree-walking interpreter  (specs/05-phase-6-optimization.md section 6)
  A BASELINE for the benchmarks only: it evaluates the same LISP data by walking
  it, with an environment of frames, instead of compiling it. It is loaded by
  bench/bench.st and is not part of the cog-lisp image.

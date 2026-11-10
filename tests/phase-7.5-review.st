@@ -1,6 +1,6 @@
 "============================================================================
- cog-lisp : Phase 7.5 regression suite  (specs/phase-7.5-review-and-tooling.md
- AC-3; specs/review-phases-1-7.md). One or more checks per fixed finding, named
+ cog-lisp : Phase 7.5 regression suite  (specs/07-phase-7.5-review-and-tooling.md
+ AC-3; specs/08-review-phases-1-7.md). One or more checks per fixed finding, named
  by its id. Runner-level fixes (R-1 located errors, the build refusing to save)
  are checked by tests\phase-5-runner.bat fixtures and by hand.
  Every bang in Lisp text is doubled for the chunk reader.

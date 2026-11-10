@@ -1,4 +1,4 @@
-;;; coverage.lisp -- which procedures and branches a run reached (specs/coverage.md
+;;; coverage.lisp -- which procedures and branches a run reached (specs/20-coverage.md
 ;;; AC-1 to AC-4). The code under test is compiled inside each test, from a string,
 ;;; while a session runs; its lines are the string's.
 (load "../../lib/test.lisp")

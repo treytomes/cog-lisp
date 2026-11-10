@@ -1,5 +1,5 @@
 ;;; phase-8.3-compiler.lisp -- unit tests of the compiler written in LISP
-;;; (lib/compiler/compiler.lisp; specs/phase-8-self-hosting.md step 8.3, AC-3).
+;;; (lib/compiler/compiler.lisp; specs/13-phase-8-self-hosting.md step 8.3, AC-3).
 ;;; Until step 9.1, tests/phase-8.3-compiler.st also compared it byte for byte with
 ;;; the Smalltalk compiler, which retired then; these test the compiler on its own
 ;;; terms. The built image loads lib/compiler/.

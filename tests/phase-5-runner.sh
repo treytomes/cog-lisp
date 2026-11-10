@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ===========================================================================
 #  cog-lisp : Phase 5 runner acceptance suite  (bash equivalent of
-#  tests\phase-5-runner.bat; specs/phase-5-repl-runner.md, Phase 8.9)
+#  tests\phase-5-runner.bat; specs/04-phase-5-repl-runner.md, Phase 8.9)
 #  Drives the real entry points: build-image.sh and cog-lisp.sh.
 #    tests/runner/NAME.lisp    run as a program
 #    tests/runner/NAME.stdin   piped into the REPL
@@ -100,7 +100,7 @@ if [ "$(uname -s)" = Linux ] && command -v script >/dev/null 2>&1; then
     "$(same tests/runner/terminal/session.expected "$TMPD/terminal.out")"
 fi
 
-# --- Starting anywhere (specs/startup-anywhere.md AC-2, AC-3) ------------------
+# --- Starting anywhere (specs/17-startup-anywhere.md AC-2, AC-3) ------------------
 # Two runs at once on one image: hold.lisp keeps it for six seconds, and
 # beside.lisp starts on it after three; then a REPL holds it while a program runs.
 "$CL" tests/runner/together/hold.lisp </dev/null >"$TMPD/hold.out" 2>"$TMPD/hold.err" &
@@ -129,7 +129,7 @@ CWD="$TMPD/cwd-check"; rm -rf "$CWD"; mkdir -p "$CWD"
 OK=0; [ -z "$(ls -A "$CWD")" ] && [ "$(same examples/hello.expected "$TMPD/cwd.out")" = 1 ] && OK=1
 check "a run writes nothing to the current folder" $OK
 # require finds cog-lisp's own libraries from a program in another folder
-# (specs/library-path.md AC-1)
+# (specs/18-library-path.md AC-1)
 cp tests/runner/elsewhere/uses-libs.lisp "$CWD/"
 (cd "$CWD" && "$CL" uses-libs.lisp </dev/null >"$TMPD/uses-libs.out" 2>"$TMPD/uses-libs.err")
 check "require finds cog-lisp's libraries from a program in another folder" \

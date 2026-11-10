@@ -1,5 +1,5 @@
 ;;; compiler.lisp -- cog-lisp's compiler, written in cog-lisp
-;;; (specs/phase-8-self-hosting.md step 8.3)
+;;; (specs/13-phase-8-self-hosting.md step 8.3)
 ;;;
 ;;; Written as a procedure-for-procedure counterpart of the compiler written in
 ;;; Smalltalk (LispCompiler in src/coglisp-compiler.st up to release v0.1.2; it
@@ -79,7 +79,7 @@
 (define (scope-has? s k) [s includesKey: k])
 (define (scope-set! s k v) [s at: k put: v])
 
-;;; Identifiers (specs/phase-9-language.md step 9.3): a symbol, or an alias that a
+;;; Identifiers (specs/15-phase-9-language.md step 9.3): a symbol, or an alias that a
 ;;; syntax-rules expansion made. A scope maps an identifier to its binding: a temp
 ;;; name (a string) or a local macro.
 
@@ -91,7 +91,7 @@
 ;; is x the identifier spelled name? (for keywords that are not bindings)
 (define (lc-id-is? x name) (or (eq? x name) (and [x isLispAlias] (eq? [x baseName] name))))
 
-;;; Units (specs/namespaces.md): what is being compiled, a file or the REPL
+;;; Units (specs/27-namespaces.md): what is being compiled, a file or the REPL
 ;;; session (LispUnit, src/coglisp-compiler.st). A free name means, in order:
 ;;; the library's own definition (when the unit is a library), the unit's import,
 ;;; or the global of that name. A library's own names are global cells under full
@@ -912,7 +912,7 @@ Stops compilation with message and the forms, for a macro to report a misuse."
         ((null? datum) (lc-empty-list-node))
         (else (opal-literal datum))))
 
-;; With coverage on, each side of an if is counted (specs/coverage.md), and placed
+;; With coverage on, each side of an if is counted (specs/20-coverage.md), and placed
 ;; at the test, which keeps its place in the source even when a macro (cond,
 ;; case, and, or) made the if.
 (define (lc-translate-if c form scope tail)
@@ -929,7 +929,7 @@ Stops compilation with message and the forms, for a macro to report a misuse."
                          (lc-probed-thunk c 'false (list (car args) form) else-node))))))
 
 ;;; ---------------------------------------------------------------------------
-;;; Coverage (specs/coverage.md): with the coverage option on, each procedure
+;;; Coverage (specs/20-coverage.md): with the coverage option on, each procedure
 ;;; entry and each side of an if counts into a record that lib/coverage.lisp's
 ;;; %coverage-register makes as the form is compiled. Off, nothing changes.
 
@@ -1410,7 +1410,7 @@ Compiles and runs datum with the compiler in use, as eval does."
 ;;; Documentation (Phase 10 step 10.1)
 
 ;; what holds name's documentation: its special form, else the value of what the
-;; name means here (an import, specs/namespaces.md R-14), or #f
+;; name means here (an import, specs/27-namespaces.md R-14), or #f
 (define (lc-documented name)
   (or (hash-table-ref/default lc-special-forms name #f)
       (let ((v (lc-global-value (lc-resolve-global name (lc-current-unit)))))

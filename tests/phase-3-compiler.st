@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : Phase 3 acceptance suite  (specs/phase-3-compiler-core.md, AC-1..20)
+ cog-lisp : Phase 3 acceptance suite  (specs/02-phase-3-compiler-core.md, AC-1..20)
  Headless; PASS/FAIL per check, final RESULT line, then quits.
  The set-bang form is written with a doubled bang so the chunk reader keeps it.
  Run from the repo root:

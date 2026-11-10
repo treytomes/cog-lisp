@@ -1,5 +1,5 @@
 "============================================================================
- cog-lisp : benchmarks  (specs/phase-6-optimization.md section 6, AC-14..17)
+ cog-lisp : benchmarks  (specs/05-phase-6-optimization.md section 6, AC-14..17)
  Run by bench\run-benchmarks.bat against pharo\cog-lisp.image (never saved).
  Each benchmark runs as compiled cog-lisp (all optimizations on, then with each
  one off), on the tree-walking interpreter, and as hand-written Smalltalk.
