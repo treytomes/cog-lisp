@@ -22,8 +22,13 @@ A thin extension for working on cog-lisp in VS Code
 - **cog-lisp: Send Selection or Form to REPL** (Ctrl+Enter): sends the selection,
   or else the top-level form at the cursor.
 - **cog-lisp: Rebuild Image**: runs `build-image.bat` or `build-image.sh` (in a checkout). The extension also warns
-  when `src\*.st`, `lib\core.lisp` or `lib\compiler\*.lisp` is newer than `pharo\cog-lisp.image` and
-  offers to rebuild (setting `cogLisp.warnStaleImage`).
+  when `src\*.st`, `lib\compiler\*.lisp` or a library the build compiles (`lib\core.lisp`, `format.lisp`,
+  `json.lisp`, `http.lisp`, `coverage.lisp`) is newer than `pharo\cog-lisp.image` and offers to rebuild
+  (setting `cogLisp.warnStaleImage`).
+- **cog-lisp's names in the spell checker** (`specs/vscode-spelling.md`): when
+  Code Spell Checker is installed, the extension gives it a dictionary of the
+  built-ins' names and the libraries' (`cspell/`, generated from the image), for
+  `.lisp` files and Markdown, so `nthcdr` and `letrec` are not flagged.
 
 - **The language server** (Phase 10 step 10.5): when the folder has a cog-lisp
   launcher (or `cogLisp.root` names one), the extension starts `lib/lsp.lisp`,
@@ -37,7 +42,12 @@ A thin extension for working on cog-lisp in VS Code
     runs only the file's `define-syntax` and `define-macro` forms, so the file's
     own macros expand as they will when it runs;
   - **cog-lisp: Expand Macro**, which opens the expansion of the macro call at
-    the cursor (the innermost one) beside the file.
+    the cursor (the innermost one) beside the file;
+  - **Format Document** (Shift+Alt+F), with `format-source`
+    (`specs/formatter.md`): a form with a body over lines, each argument on its
+    own line and the closing parenthesis on its own, everything else on one line;
+    comments and strings untouched. `cog-lisp` files indent with tabs by default
+    (`editor.insertSpaces` false for the language); your own settings win.
 
   The server runs on its own copy of the image, in the system's temporary
   folder, so *Run File*, the REPL and the terminal keep using the checkout's

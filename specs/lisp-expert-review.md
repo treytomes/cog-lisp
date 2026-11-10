@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Done (2026-11-09); accepted with the leanings of §7. lisp-expert's side awaits the owner's commit |
+| **Status** | Done (2026-11-09); accepted with the leanings of §7. lisp-expert's side committed with the owner's go-ahead (9e185ef) |
 | **Asked for by** | The owner (2026-11-09): review all of `~/projects/lisp-expert`'s LISP for what belongs in the common library and where the library could be better used; then "a spec to cover sections A, B, and C … resolve the entire set in one pass" |
 | **Follows** | specs/lisp-expert-libraries.md (done), which moved lisp-expert's general libraries here |
 | **Before** | HTTPS (specs/https-and-json.md); its AC-5 re-tests `weather/examples/fetch.lisp` |

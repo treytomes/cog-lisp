@@ -3,7 +3,9 @@
 cog-lisp is an image-based LISP that runs on the Pharo virtual machine. This
 bundle has everything it needs: the Pharo VM for your platform, the cog-lisp
 image, the LISP library (`lib/`) and the examples (`examples/`). Nothing else
-needs installing.
+needs installing, except for one thing on Linux: HTTP and HTTPS (`http-get`,
+`http-request`) use the system's `curl`, which most distributions include
+(`apt install curl` if yours does not). Windows has its own.
 
 ## Linux (x86-64)
 
@@ -33,7 +35,9 @@ uncaught error (reported as `path:line:col: error: message`), or the number give
 to `(exit n)`. `(command-line)` answers the program and its arguments.
 
 The `examples/` folder has one runnable example per feature, each with the
-output it prints (`.expected`).
+output it prints (`.expected`). The libraries in `lib/` load from any folder
+with `(require 'name)`: `cl` (Common Lisp names), `test`, `datetime`, `pretty`
+and `format-source`; `format`, JSON and HTTP are built in.
 
 ## VS Code
 
@@ -42,7 +46,8 @@ Install the extension from `cog-lisp-VERSION.vsix` (Extensions view, `...` menu,
 button) runs the file you are editing, errors show in *Problems*, and
 *cog-lisp: Start REPL* opens the REPL in a terminal. Hover over a name for its
 documentation; the image serves a language server for completion, *Go to
-Definition*, errors as you type and *cog-lisp: Expand Macro*.
+Definition*, errors as you type, *cog-lisp: Expand Macro* and *Format
+Document*.
 
 ## Documentation
 

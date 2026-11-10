@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-11-09), with the decisions as proposed |
+| **Status** | Done (2026-11-09), in 951c6fc; accepted with the decisions as proposed. As built: §5 |
 | **Found by** | Reviewing `~/projects/lisp-expert` (2026-11-09), whose runner works around both bugs |
 | **Fixes** | the collision of two VMs on one image (CLAUDE.md, 2026-11-06); a read-only install; a read-only current folder |
 

@@ -91,7 +91,7 @@ common() {   # $1 the bundle's folder
   mkdir -p "$d/pharo" "$d/scripts" "$d/licenses"
   cp pharo/cog-lisp.image pharo/cog-lisp.changes "$SOURCES" "$d/pharo/"
   cp -r lib examples docs "$d/"
-  cp LICENSE release/INSTALL.md release/THIRD-PARTY-NOTICES.md README.md "$d/"
+  cp LICENSE release/INSTALL.md release/THIRD-PARTY-NOTICES.md README.md PROJECT-PLAN.md "$d/"
   cp release/licenses/Pharo-LICENSE.txt release/licenses/pharo-vm-LICENSE.txt \
      release/licenses/Apache-2.0.txt release/licenses/OFL-1.1.txt \
      release/licenses/libffi-LICENSE.txt "$d/licenses/"

@@ -16,11 +16,12 @@ not an interpreter walking a tree.
 - **VM:** OpenSmalltalk-derived **Cog + Spur** (Pharo's own VM fork), reported as
   `v12.0.6-beta`.
 - **Architecture:** "Path A" — generate `CompiledMethod`s in the image and let
-  Cog JIT them. We do **not** modify the VM/Slang. Exact bytecode control
-  (`EncoderForSistaV1`) is a later option only if IRBuilder's abstraction gets in
-  the way.
+  Cog JIT them. We do **not** modify the VM/Slang. The compiler began on Opal's
+  IR; since Phase 8.6 it is written in cog-lisp and writes the bytecode itself,
+  through Pharo's `EncoderForSistaV1` (`lib/compiler/codegen.lisp`).
 
-See `README.md` for the phased plan.
+`README.md` describes the project for visitors; `PROJECT-PLAN.md` holds the
+phased plan and its status.
 
 ## Standing up the environment
 
