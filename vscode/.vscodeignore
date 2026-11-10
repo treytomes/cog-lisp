@@ -1,5 +1,11 @@
 test/**
 *.vsix
+*.vsix.version
 .vscodeignore
 package-lock.json
 .vscode-test/**
+# the bundle holds the code (specs/31-vsix-bundle.md R-3)
+node_modules/**
+src/**
+scripts/**
+dist/meta.json

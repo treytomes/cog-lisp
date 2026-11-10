@@ -76,4 +76,4 @@ GitHub issues and the owner's requests:
 | [28-versioning.md](28-versioning.md) | One version, from the git tag, for the image and the extension | Accepted |
 | [29-console.md](29-console.md) | Rich console output and input, in the manner of Spectre.Console | Accepted |
 | [30-site-theme.md](30-site-theme.md) | A theme of its own for the site: dark, typographic, a terminal's | Done |
-| [31-vsix-bundle.md](31-vsix-bundle.md) | The VS Code extension as one bundled file (esbuild), not 330 | Accepted |
+| [31-vsix-bundle.md](31-vsix-bundle.md) | The VS Code extension as one bundled file (esbuild), not 330 | Done (AC-6 for the owner) |

@@ -92,7 +92,10 @@ async function run() {
     check('Format Document lays the file out with tabs', fmtDoc.getText() === '(define (f x)\n\t(* x x)\n)\n');
 
     // the server must not hold the checkout's image: two VMs on one image collide
-    const ext = require(path.join(__dirname, '..', '..', 'src', 'extension.js'))._test;
+    // the module VS Code loaded, by package.json's main (the bundle, specs/31-vsix-bundle.md
+    // R-6): requiring src/ would load a second copy, with none of the running state
+    const extRoot = path.join(__dirname, '..', '..');
+    const ext = require(path.join(extRoot, require(path.join(extRoot, 'package.json')).main))._test;
     const root = vscode.workspace.getConfiguration('cogLisp').get('root');
     const firstCopy = ext.serverImageDir();
     check('the server runs on a private copy of the image',

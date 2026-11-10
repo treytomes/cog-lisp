@@ -2,9 +2,11 @@
 
 The cog-lisp extension is under the MIT license, like cog-lisp itself. To talk
 to cog-lisp's language server it redistributes, unchanged, the npm packages
-listed here (under `node_modules/`). Each package's own license file is beside
-it, in its folder. `test/package.test.js` fails if the extension packages one
-that is not listed here.
+listed here, bundled into the extension's one script, `dist/extension.js`
+(specs/31-vsix-bundle.md). Their license texts, as each package ships them, are
+in `dist/THIRD-PARTY-LICENSES.txt`. Building the bundle (`npm run bundle`, which
+packaging runs) fails if it holds a package that is not listed here at its
+version.
 
 | Package | Version | License | Source |
 | --- | --- | --- | --- |

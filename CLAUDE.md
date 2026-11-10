@@ -510,8 +510,14 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   `ELECTRON_RUN_AS_NODE=1`, which makes a test VS Code run as plain Node; the
   runner unsets it. The `.vsix` in `vscode/` is git-ignored and goes stale:
   rebuild it (`build-ext.bat`/`.sh`, which runs `npm run package`) before
-  installing it (`load-ext.bat`/`.sh`). A new npm dependency
-  shipped in the `.vsix` needs a row in `vscode/THIRD-PARTY-NOTICES.md`.
+  installing it (`load-ext.bat`/`.sh`).
+  The `.vsix`'s code is one file, `dist/extension.js` (`specs/31-vsix-bundle.md`):
+  `npm run bundle` builds it from `src/` with esbuild, and packaging does that
+  by itself (`vscode:prepublish`). `main` names the bundle, so the VS Code tests
+  run it; the unit tests `require` `src/`. Every npm package the bundle holds
+  needs a row at its version in `vscode/THIRD-PARTY-NOTICES.md`, or the bundle
+  step fails; it writes their license texts to `dist/THIRD-PARTY-LICENSES.txt`.
+  The extension's npm packages are all `devDependencies`, so vsce packages none.
   Its diagnostics check each top-level form with `lisp-check`, which treats a
   top-level `begin` and a top-level macro's expansion as top-level forms, as
   `eval` does (so `cl`'s `defmacro`, a `begin` around a `define-macro`, is no
