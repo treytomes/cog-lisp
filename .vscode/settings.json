@@ -76,6 +76,7 @@
         "setq",
         "Sexpr",
         "shadowable",
+        "SIGWINCH",
         "Sista",
         "SRFI",
         "stepless",
@@ -97,6 +98,8 @@
         "uninterned",
         "untaken",
         "variadics",
+        "VMIN",
+        "VTIME",
         "winpthreads",
         "zerop"
     ]

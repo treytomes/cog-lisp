@@ -9,7 +9,7 @@
  Classes: LispError, LispArityError, LispProcedure, LispTailCall, LispPrimitives,
  LispTextOutput, LispProcess, LispHttpResponse.
  ============================================================================"
-| failures cm lerr aerr proc tcall prims tout facade htab hkey iport oport lines vals procx hresp |
+| failures cm lerr aerr proc tcall prims tout facade htab hkey iport oport lines vals procx hresp term |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -35,6 +35,7 @@ oport := (Object << #LispOutputPort) slots: { #stream }; package: 'CogLisp-Runti
 lines := (Object << #LispLineStream) slots: { #source. #text. #pos }; package: 'CogLisp-Runtime'; install.
 tout  := (Object << #LispTextOutput) slots: { #kind. #handle. #stream. #buffer. #midLine }; sharedVariables: { #Session. #Stdout. #Stderr }; package: 'CogLisp-Runtime'; install.
 procx := (Object << #LispProcess) package: 'CogLisp-Runtime'; install.
+term := (Object << #LispTerminal) sharedVariables: { #Session. #Depth. #SavedInput. #SavedOutput. #RestoreText. #Pending }; package: 'CogLisp-Runtime'; install.
 hresp := (Object << #LispHttpResponse) slots: { #status. #headers. #body }; package: 'CogLisp-Runtime'; install.
 
 
@@ -1139,6 +1140,7 @@ cm value: prims class value: 'installing' value: 'installInto: anEnv
 	self installHashTablesInto: anEnv.
 	self installPortsInto: anEnv.
 	self installFilesInto: anEnv.
+	self installTerminalInto: anEnv.
 	self installLanguageServerInto: anEnv.
 	"every primitive knows its name, for printing and error messages (review R-7)"
 	anEnv cellsDo: [:c | | v |
@@ -1525,6 +1527,8 @@ cm value: prims class value: 'exiting' value: 'runAtExit
 	 library defined it: lib/coverage.lisp writes its report there (specs/20-coverage.md
 	 R-6). It runs once, and an error in it does not stop the exit."
 	| name hook |
+	"the terminal as it was, raw mode and escape codes (specs/29-console.md R-21)"
+	[LispTerminal restore] on: Error do: [:e | nil].
 	name := LispSymbol named: ''%at-exit''.
 	(LispEnvironment default isBound: name) ifFalse: [^ self].
 	hook := LispEnvironment default lookup: name.
@@ -2234,6 +2238,264 @@ cm value: procx class value: 'curl' value: 'decode: bytes charset: aNameOrNil
 	encoder := [aNameOrNil ifNil: [ZnUTF8Encoder new] ifNotNil: [:n | ZnCharacterEncoder newForEncoding: n]]
 		on: Error do: [:e | ZnUTF8Encoder new].
 	^ [encoder decodeBytes: bytes] on: Error do: [:e | ZnUTF8Encoder new decodeBytes: bytes]'.
+
+"=== LispTerminal (specs/29-console.md section 4.1; the spike, section 3.1) =======
+ Every operating-system call the console library needs, behind a few internal
+ primitives: what the output and the input are, escape codes turned on, the
+ size, raw mode (nested, always restored), and a read that waits with a
+ timeout and polls, so other Smalltalk processes run while it waits (R-20).
+ Windows: the console API, with virtual-terminal processing for output and
+ virtual-terminal input, so keys arrive as the escape sequences Unix sends.
+ Unix: libc (isatty, termios through cfmakeraw, poll, ioctl TIOCGWINSZ, read)."
+cm value: term class value: 'win32' value: 'getStdHandle: n
+	^ self ffiCall: #(void* GetStdHandle(long n)) module: ''kernel32.dll'''.
+cm value: term class value: 'win32' value: 'getFileType: h
+	^ self ffiCall: #(uint32 GetFileType(void* h)) module: ''kernel32.dll'''.
+cm value: term class value: 'win32' value: 'getMode: h into: b
+	^ self ffiCall: #(int GetConsoleMode(void* h, void* b)) module: ''kernel32.dll'''.
+cm value: term class value: 'win32' value: 'setMode: h to: m
+	^ self ffiCall: #(int SetConsoleMode(void* h, uint32 m)) module: ''kernel32.dll'''.
+cm value: term class value: 'win32' value: 'bufferInfo: h into: b
+	^ self ffiCall: #(int GetConsoleScreenBufferInfo(void* h, void* b)) module: ''kernel32.dll'''.
+cm value: term class value: 'win32' value: 'wait: h milliseconds: ms
+	^ self ffiCall: #(uint32 WaitForSingleObject(void* h, uint32 ms)) module: ''kernel32.dll'''.
+cm value: term class value: 'win32' value: 'readInput: h records: b count: c into: r
+	^ self ffiCall: #(int ReadConsoleInputW(void* h, void* b, uint32 c, void* r)) module: ''kernel32.dll'''.
+cm value: term class value: 'posix' value: 'isatty: fd
+	^ self ffiCall: #(int isatty(int fd)) module: ''libc.so.6'''.
+cm value: term class value: 'posix' value: 'tcget: fd into: b
+	^ self ffiCall: #(int tcgetattr(int fd, void* b)) module: ''libc.so.6'''.
+cm value: term class value: 'posix' value: 'tcset: fd from: b
+	"TCSANOW"
+	^ self ffiCall: #(int tcsetattr(int fd, int 0, void* b)) module: ''libc.so.6'''.
+cm value: term class value: 'posix' value: 'makeRaw: b
+	^ self ffiCall: #(void cfmakeraw(void* b)) module: ''libc.so.6'''.
+cm value: term class value: 'posix' value: 'poll: fds count: n timeout: ms
+	^ self ffiCall: #(int poll(void* fds, ulong n, int ms)) module: ''libc.so.6'''.
+cm value: term class value: 'posix' value: 'ioctl: fd request: r into: b
+	^ self ffiCall: #(int ioctl(int fd, ulong r, void* b)) module: ''libc.so.6'''.
+cm value: term class value: 'posix' value: 'read: fd into: b count: c
+	^ self ffiCall: #(long read(int fd, void* b, ulong c)) module: ''libc.so.6'''.
+cm value: term class value: 'private' value: 'ensureSession
+	"Handles and saved modes belong to one run of the image."
+	Session == Smalltalk session ifFalse: [
+		Session := Smalltalk session.
+		Depth := 0.
+		SavedInput := nil.
+		SavedOutput := nil.
+		RestoreText := nil.
+		Pending := OrderedCollection new]'.
+cm value: term class value: 'private' value: 'windows
+	^ OSPlatform current isWindows'.
+cm value: term class value: 'private' value: 'handle: n
+	^ self getStdHandle: n'.
+cm value: term class value: 'kinds' value: 'kindOf: n
+	"What standard handle n (-10 input, -11 output; 0 or 1 on Unix) is: #console
+	 (a Windows console), #terminal (a Unix terminal), or #other (a pipe, a file)."
+	^ [self windows
+		ifTrue: [((self getFileType: (self handle: n)) = 2
+				"NUL is a character device too: only a console has a console mode"
+				and: [(self getMode: (self handle: n) into: (ByteArray new: 4)) ~= 0])
+					ifTrue: [#console] ifFalse: [#other]]
+		ifFalse: [(self isatty: (n = -10 ifTrue: [0] ifFalse: [1])) = 1 ifTrue: [#terminal] ifFalse: [#other]]]
+			on: Error do: [:e | #other]'.
+cm value: term class value: 'kinds' value: 'outputKind
+	^ self kindOf: -11'.
+cm value: term class value: 'kinds' value: 'inputKind
+	^ self kindOf: -10'.
+cm value: term class value: 'output' value: 'enableEscapes
+	"Escape codes on: on a Windows console, ENABLE_VIRTUAL_TERMINAL_PROCESSING (4),
+	 whose mode at start is kept for restore; a Unix terminal obeys them already.
+	 Answers whether the output is a terminal that does."
+	| h b |
+	self ensureSession.
+	self outputKind = #terminal ifTrue: [^ true].
+	self outputKind = #console ifFalse: [^ false].
+	h := self handle: -11.
+	b := ByteArray new: 4.
+	(self getMode: h into: b) = 0 ifTrue: [^ false].
+	SavedOutput ifNil: [SavedOutput := b unsignedLongAt: 1].
+	^ (self setMode: h to: ((b unsignedLongAt: 1) bitOr: 4)) ~= 0'.
+cm value: term class value: 'output' value: 'size
+	"The terminal''s columns and rows, as an Array, or nil when the output is no terminal."
+	| b |
+	^ [self outputKind = #console
+		ifTrue: [b := ByteArray new: 22.
+			(self bufferInfo: (self handle: -11) into: b) = 0
+				ifTrue: [nil]
+				ifFalse: [{ (b signedShortAt: 15) - (b signedShortAt: 11) + 1. (b signedShortAt: 17) - (b signedShortAt: 13) + 1 }]]
+		ifFalse: [self outputKind = #terminal
+			ifTrue: [b := ByteArray new: 8.
+				"TIOCGWINSZ; struct winsize: rows, columns"
+				((self ioctl: 1 request: 16r5413 into: b) = 0 and: [(b unsignedShortAt: 3) > 0])
+					ifTrue: [{ b unsignedShortAt: 3. b unsignedShortAt: 1 }]
+					ifFalse: [nil]]
+			ifFalse: [nil]]]
+		on: Error do: [:e | nil]'.
+cm value: term class value: 'raw mode' value: 'rawOn
+	"Raw mode for the input, nested: the outermost call saves the mode and sets
+	 raw; inner ones only count (R-21). Answers whether the input is a terminal
+	 that is now raw. Windows: LINE_INPUT (2), ECHO_INPUT (4) and PROCESSED_INPUT (1)
+	 off, VIRTUAL_TERMINAL_INPUT (16r200) and WINDOW_INPUT (8) on."
+	| h b raw |
+	self ensureSession.
+	Depth > 0 ifTrue: [Depth := Depth + 1. ^ true].
+	self inputKind = #other ifTrue: [^ false].
+	self windows
+		ifTrue: [h := self handle: -10.
+			b := ByteArray new: 4.
+			(self getMode: h into: b) = 0 ifTrue: [^ false].
+			SavedInput := b unsignedLongAt: 1.
+			(self setMode: h to: ((SavedInput bitAnd: 7 bitInvert) bitOr: (16r200 bitOr: 8))) = 0
+				ifTrue: [SavedInput := nil. ^ false]]
+		ifFalse: [b := ByteArray new: 60.
+			(self tcget: 0 into: b) = 0 ifFalse: [^ false].
+			SavedInput := b.
+			raw := b copy.
+			self makeRaw: raw.
+			(self tcset: 0 from: raw) = 0 ifFalse: [SavedInput := nil. ^ false]].
+	Depth := 1.
+	^ true'.
+cm value: term class value: 'raw mode' value: 'rawOff
+	"Leave one level of raw mode; the outermost restores the saved mode."
+	self ensureSession.
+	Depth = 0 ifTrue: [^ self].
+	Depth := Depth - 1.
+	Depth = 0 ifTrue: [self restoreInput]'.
+cm value: term class value: 'raw mode' value: 'isRaw
+	self ensureSession.
+	^ Depth > 0'.
+cm value: term class value: 'raw mode' value: 'restoreInput
+	SavedInput ifNil: [^ self].
+	[self windows
+		ifTrue: [self setMode: (self handle: -10) to: SavedInput]
+		ifFalse: [self tcset: 0 from: SavedInput]] on: Error do: [:e | nil].
+	SavedInput := nil'.
+cm value: term class value: 'raw mode' value: 'restore
+	"The terminal as it was: at exit, and when a program stops on an error (R-21)."
+	self ensureSession.
+	Depth := 0.
+	"what the library wrote to change the screen, undone (the alternate screen, a hidden cursor)"
+	RestoreText ifNotNil: [:s |
+		[LispTextOutput stdout nextPutAll: s; flush] on: Error do: [:e | nil].
+		RestoreText := nil].
+	self restoreInput.
+	SavedOutput ifNotNil: [:m |
+		[self setMode: (self handle: -11) to: m] on: Error do: [:e | nil].
+		SavedOutput := nil]'.
+cm value: term class value: 'output' value: 'restoreText: aStringOrNil
+	"What restore writes, to undo what the library changed on the screen; it keeps
+	 this up to date as it enters and leaves its modes."
+	self ensureSession.
+	RestoreText := aStringOrNil'.
+cm value: term class value: 'input' value: 'read: milliseconds
+	"The next character typed, #resize when the window changed size, #eof at the end
+	 of the input, or nil when milliseconds pass first (nil: wait as long as it
+	 takes). It polls, with a Delay between, so the VM never stops (R-20)."
+	| deadline |
+	self ensureSession.
+	deadline := milliseconds ifNotNil: [Time millisecondClockValue + milliseconds].
+	[ | got |
+	  got := self windows ifTrue: [self pollWindows] ifFalse: [self pollUnix].
+	  got ifNotNil: [^ got].
+	  (deadline notNil and: [Time millisecondClockValue >= deadline]) ifTrue: [^ nil].
+	  (Delay forMilliseconds: 10) wait] repeat'.
+cm value: term class value: 'input' value: 'pollWindows
+	"One look at the console input: a key record gives its character, a resize
+	 record #resize; any other record (focus, menu, mouse) is passed over. A key
+	 with no character (an arrow, a function key) becomes the escape sequence a
+	 Unix terminal sends for it, a character at a time, so one decoder serves both."
+	| h rec n |
+	Pending isEmpty ifFalse: [^ Pending removeFirst].
+	h := self handle: -10.
+	[(self wait: h milliseconds: 0) = 0] whileTrue: [
+		rec := ByteArray new: 20.
+		n := ByteArray new: 4.
+		(self readInput: h records: rec count: 1 into: n) = 0 ifTrue: [^ #eof].
+		(n unsignedLongAt: 1) = 0 ifTrue: [^ nil].
+		((rec unsignedShortAt: 1) = 1 and: [(rec unsignedLongAt: 5) ~= 0])
+			ifTrue: [
+				(rec unsignedShortAt: 15) ~= 0 ifTrue: [^ Character value: (rec unsignedShortAt: 15)].
+				(self sequenceForKey: (rec unsignedShortAt: 11) state: (rec unsignedLongAt: 17)) ifNotNil: [:s |
+					Pending addAll: s allButFirst.
+					^ s first]].
+		(rec unsignedShortAt: 1) = 4 ifTrue: [^ #resize]].
+	^ nil'.
+cm value: term class value: 'input' value: 'sequenceForKey: vk state: state
+	"The escape sequence a terminal sends for the virtual key vk, with the
+	 modifiers of the control key state (shift 16r10, ctrl 16r4 or 16r8, alt 16r1 or
+	 16r2) as xterm writes them, or nil for a key that sends nothing (shift alone)."
+	| m esc finals tildes f |
+	m := 1.
+	(state bitAnd: 16r10) ~= 0 ifTrue: [m := m + 1].
+	(state bitAnd: 16r3) ~= 0 ifTrue: [m := m + 2].
+	(state bitAnd: 16rC) ~= 0 ifTrue: [m := m + 4].
+	esc := String with: Character escape.
+	finals := Dictionary new.
+	finals at: 16r26 put: $A; at: 16r28 put: $B; at: 16r27 put: $C; at: 16r25 put: $D; at: 16r24 put: $H; at: 16r23 put: $F;
+		at: 16r70 put: $P; at: 16r71 put: $Q; at: 16r72 put: $R; at: 16r73 put: $S.
+	tildes := Dictionary new.
+	tildes at: 16r2D put: 2; at: 16r2E put: 3; at: 16r21 put: 5; at: 16r22 put: 6;
+		at: 16r74 put: 15; at: 16r75 put: 17; at: 16r76 put: 18; at: 16r77 put: 19;
+		at: 16r78 put: 20; at: 16r79 put: 21; at: 16r7A put: 23; at: 16r7B put: 24.
+	f := finals at: vk ifAbsent: [nil].
+	f ifNotNil: [
+		^ m = 1
+			ifTrue: [(vk between: 16r70 and: 16r73) ifTrue: [esc , ''O'' , (String with: f)] ifFalse: [esc , ''['' , (String with: f)]]
+			ifFalse: [esc , ''[1;'' , m printString , (String with: f)]].
+	(tildes at: vk ifAbsent: [nil]) ifNotNil: [:code |
+		^ esc , ''['' , code printString , (m = 1 ifTrue: [''''] ifFalse: ['';'' , m printString]) , ''~''].
+	^ nil'.
+cm value: term class value: 'input' value: 'pollUnix
+	"One look at descriptor 0: a character, decoded from UTF-8 (its continuation
+	 bytes are read at once, being there), #eof, or nil."
+	| fds b n first count code |
+	fds := ByteArray new: 8.
+	fds signedLongAt: 1 put: 0.
+	fds signedShortAt: 5 put: 1.
+	(self poll: fds count: 1 timeout: 0) > 0 ifFalse: [^ nil].
+	b := ByteArray new: 1.
+	n := self read: 0 into: b count: 1.
+	n <= 0 ifTrue: [^ #eof].
+	first := b first.
+	first < 16r80 ifTrue: [^ Character value: first].
+	count := first >= 16rF0 ifTrue: [3] ifFalse: [first >= 16rE0 ifTrue: [2] ifFalse: [1]].
+	code := first bitAnd: (#(16r1F 16r0F 16r07) at: count).
+	count timesRepeat: [
+		(self read: 0 into: b count: 1) <= 0 ifTrue: [^ Character value: code].
+		code := (code bitShift: 6) bitOr: (b first bitAnd: 16r3F)].
+	^ Character value: code'.
+
+cm value: prims class value: 'installing' value: 'installTerminalInto: anEnv
+	"The console library''s runtime layer (specs/29-console.md section 4.1): internal
+	 primitives over LispTerminal, which lib/console.lisp alone calls."
+	| sym |
+	sym := [:s | LispSymbol named: s asString].
+	anEnv define: (LispSymbol named: ''%terminal-output-kind'') value: (LispProcedure fixed: [
+		sym value: LispTerminal outputKind] arity: 0).
+	anEnv define: (LispSymbol named: ''%terminal-input-kind'') value: (LispProcedure fixed: [
+		sym value: LispTerminal inputKind] arity: 0).
+	anEnv define: (LispSymbol named: ''%terminal-enable-escapes'') value: (LispProcedure fixed: [
+		LispTerminal enableEscapes] arity: 0).
+	anEnv define: (LispSymbol named: ''%terminal-size'') value: (LispProcedure fixed: [
+		LispTerminal size ifNil: [false] ifNotNil: [:s | LispCons fromArray: s]] arity: 0).
+	anEnv define: (LispSymbol named: ''%terminal-raw-on'') value: (LispProcedure fixed: [
+		LispTerminal rawOn] arity: 0).
+	anEnv define: (LispSymbol named: ''%terminal-raw-off'') value: (LispProcedure fixed: [
+		LispTerminal rawOff. LispUnspecified default] arity: 0).
+	anEnv define: (LispSymbol named: ''%terminal-raw?'') value: (LispProcedure fixed: [
+		LispTerminal isRaw] arity: 0).
+	anEnv define: (LispSymbol named: ''%terminal-flush'') value: (LispProcedure fixed: [
+		(self output respondsTo: #flush) ifTrue: [self output flush]. LispUnspecified default] arity: 0).
+	anEnv define: (LispSymbol named: ''%terminal-on-restore'') value: (LispProcedure fixed: [:s |
+		LispTerminal restoreText: (s == false ifTrue: [nil] ifFalse: [s]). LispUnspecified default] arity: 1).
+	anEnv define: (LispSymbol named: ''%terminal-restore'') value: (LispProcedure fixed: [
+		LispTerminal restore. LispUnspecified default] arity: 0).
+	"(%terminal-read ms): a character, resize, eof, or #f after ms (or never, for #f)"
+	anEnv define: (LispSymbol named: ''%terminal-read'') value: (LispProcedure fixed: [:ms |
+		| got |
+		got := LispTerminal read: (ms == false ifTrue: [nil] ifFalse: [ms]).
+		got ifNil: [false] ifNotNil: [got isSymbol ifTrue: [sym value: got] ifFalse: [got]]] arity: 1)'.
 
 "=== LispHttpResponse (specs/21-https-and-json.md R-7) ==========================
  What http-request answers: the status, the headers as an alist of

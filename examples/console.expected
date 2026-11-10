@@ -1,0 +1,13 @@
+done in 3 s, with [brackets] shown as they are
+Text is wrapped at the
+console's width, here thirty
+cells, at its spaces.
+(3 4)
+warning two
+wraps at
+twelve cells
+red
+(down ())
+(down ())
+(enter ())
+(#\c (ctrl))

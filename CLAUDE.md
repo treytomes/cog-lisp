@@ -447,6 +447,37 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   `format-source`) are, and every exported procedure or macro must be
   documented (the 10.1 suite); `docs/builtins.md` lists them under Libraries.
 
+## The console library (specs/29-console.md)
+
+- **Two parts:** `LispTerminal` (`src/coglisp-runtime.st`) holds every OS call,
+  behind `%terminal-` primitives; `lib/console.lisp`, `(require 'console)`, is
+  plain cog-lisp on top. A program, and a later full-screen library, never
+  reaches past the library's core to the primitives (R-16).
+- **Never block the VM on input.** A uFFI call stops every Smalltalk process
+  until it returns. `%terminal-read` polls with a timeout of 0 and a `Delay`, so
+  spinners and timers run while a program waits for a key (R-20).
+- **Windows: read key records, translate them.** `ReadConsoleInputW`, not
+  `ReadConsoleW` (which blocks on a record without a character). Keys without
+  one (arrows, F-keys) become xterm's escape sequences (`sequenceForKey:state:`),
+  so one decoder serves Windows and Unix.
+- **NUL looks like a console** to `GetFileType` (2): `</dev/null` from Git Bash
+  is NUL. Only a console also answers `GetConsoleMode`.
+- **The terminal is restored at exit and on an error exit** (`runAtExit`,
+  `failReport`): raw mode, the output mode, and what `%terminal-on-restore`
+  says (the alternate screen, a hidden cursor).
+- **Escape alone is ESC with nothing behind it within 50 ms.** Keys injected
+  together arrive together: Escape then Enter is Alt+Enter, as a terminal sends
+  it. Inject them apart.
+- **Test what draws with `with-test-console`**, an emulated screen
+  (`screen-text`, `screen-cell`); inside it, a program's output goes to the
+  screen, not stdout. Real terminals are checked by hand:
+  `tests\console\windows-check.bat` (a fresh `conhost`; keys injected with
+  `WriteConsoleInputW`, the screen read back) and
+  `tests/console/linux-check.sh` (`script`). `start "" /wait conhost.exe ...`
+  gives a real console; `conhost.exe` run from a pipe becomes a pseudo-console
+  on that pipe instead. A `st` script must call `(%env-start!!)` before
+  `require`: only a program run sets the library path.
+
 ## Documentation and the generated files (Phase 10)
 
 - **Every built-in is documented in the image.** A primitive by the table at the

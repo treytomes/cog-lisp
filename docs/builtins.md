@@ -29,7 +29,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Smalltalk interop](#smalltalk-interop) (11)
 - [Language server](#language-server) (2)
 - [The compiler and reader](#the-compiler-and-reader) (24)
-- [Libraries](#libraries): cl, test, datetime, pretty, format-source
+- [Libraries](#libraries): cl, test, datetime, pretty, format-source, console
 
 ## Special forms
 
@@ -660,3 +660,51 @@ the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and
 |---|---|---|---|
 | `format-source` | `(format-source text [style width])` | procedure | text, cog-lisp source, laid out: a form whose elements hold no list on one line; otherwise its head and header arguments (if's test, let's bindings, define's name) on the first line, each other argument on a line of its own one level deeper, and the closing parenthesis on its own line. Comments, strings and every other token come out exactly as they went in; only whitespace changes. Indents with tabs, or with (format-source text 'spaces 2) that many spaces a level. Text that does not read is an error naming the line. |
 | `format-source-headers` | `format-source-headers` | value | A value (a list): see the library's source. |
+
+### console
+
+`(require 'console)`
+
+| Name | Call | Kind | What it does |
+|---|---|---|---|
+| `console-capabilities` | `(console-capabilities)` | procedure | What the console can do, a hash table: terminal? (a terminal, not a pipe or a file), colors (none, 16, 256 or truecolor), unicode? (box-drawing characters show), interactive? (keys can be read), width and height. Detected once, from the terminal and NO_COLOR, FORCE_COLOR, TERM, COLORTERM, COLUMNS and LINES; with-console overrides it. |
+| `console-width` | `(console-width)` | procedure | The console's width in cells. |
+| `draw-region` | `(draw-region region lines)` | procedure | Draws lines (from render-lines) into region: each at its row, cut at the region's width and filled with spaces to it; lines past its height are not drawn, and rows past the lines are cleared. |
+| `event-char` | `(event-char event)` | procedure | The character a key typed, or #f. |
+| `event-key` | `(event-key event)` | procedure | A key's name (up, down, enter, escape, tab, backspace, f1, page-up and the like), or #f for a character. |
+| `event-kind` | `(event-kind event)` | procedure | key, paste, resize or eof. |
+| `event-modifiers` | `(event-modifiers event)` | procedure | The modifiers held: a list of ctrl, alt and shift. |
+| `event-text` | `(event-text event)` | procedure | The text of a paste, or #f. |
+| `event?` | `(event? x)` | procedure | True if x is an event (from read-event). |
+| `key-event?` | `(key-event? event key [modifier ...])` | procedure | True if event is that key (a key's name, or a character), with exactly those modifiers. |
+| `make-region` | `(make-region column row width height)` | procedure | A rectangle of the screen, its top left at column and row (from 1), to draw lines into. |
+| `make-renderable` | `(make-renderable proc)` | procedure | A renderable whose lines, at a width, are (proc width): a list of lines, each a list of segments (segment text style), at most width cells wide. The renderables the library makes are such; so can a program's. |
+| `markup` | `(markup text)` | procedure | The styled text that markup text describes, "[bold red]done[/] in 3 s": a value to render, or to put in a table. [[ and ]] are [ and ]; an error names the position. |
+| `markup-escape` | `(markup-escape text)` | procedure | text with [ and ] doubled, so markup shows them as they are. |
+| `print-markup` | `(print-markup text)` | procedure | Writes markup text, "[bold green]done[/] in [blue]3 s[/]", in its styles, with the colors the console has (none to a pipe or a file). |
+| `print-markup-line` | `(print-markup-line text)` | procedure | As print-markup, then a newline. |
+| `read-event` | `(read-event [timeout])` | procedure | The next event: a key, a paste or a resize; eof at the end of the input; or #f when timeout milliseconds pass first (none: wait as long as it takes). It waits without stopping other processes. On a terminal it reads in raw mode; on a test console, its events. |
+| `render` | `(render x)` | procedure | Writes x, a renderable, styled text or any value, at the console's width, a line at a time. |
+| `render-lines` | `(render-lines x width)` | procedure | x's lines at width cells: a list of lines, each a list of segments. x is a renderable, styled text (from styled or markup), a string, or any value (as display writes it); text is wrapped at spaces. |
+| `renderable?` | `(renderable? x)` | procedure | True if x is a renderable made by make-renderable. |
+| `screen-cell` | `(screen-cell screen column row)` | procedure | One cell of the screen (from 1): (character . style); the character is #f in the second cell of a wide one. |
+| `screen-cursor` | `(screen-cursor screen)` | procedure | Where the cursor ended: (column . row), from 1. |
+| `screen-line` | `(screen-line screen row)` | procedure | The text of one row of the screen (from 1), trailing spaces gone. |
+| `screen-output` | `(screen-output screen)` | procedure | Everything written to the test console, escape codes and all. |
+| `screen-text` | `(screen-text screen)` | procedure | The test console's screen as text: its rows, trailing spaces gone, joined by newlines, with the empty rows at the bottom left off. |
+| `segment` | `(segment text [style])` | procedure | A piece of text in one style, the unit renderables are made of. |
+| `segment-style` | `(segment-style segment)` | procedure | Its style. |
+| `segment-text` | `(segment-text segment)` | procedure | Its text. |
+| `style` | `(style part ...)` | procedure | A style, from parts: a color or an attribute as a symbol or a string (red, #ff8800, rgb(1,2,3), color(208), bold), a list (on color) for the background, or a string of several, as markup writes them ("bold red on blue"). Later parts win. |
+| `style-attributes` | `(style-attributes style)` | procedure | Its attributes, a list of bold, dim, italic, underline, invert and strikethrough. |
+| `style-background` | `(style-background style)` | procedure | Its background color, as style-foreground's, or #f. |
+| `style-foreground` | `(style-foreground style)` | procedure | Its foreground color: a color name, an index 0..255, (rgb r g b), or #f. |
+| `style-link` | `(style-link style)` | procedure | The URL it links to, or #f. |
+| `style?` | `(style? x)` | procedure | True if x is a style. |
+| `styled` | `(styled text style-part ...)` | procedure | text in the style the parts make (as style takes them): a value to render, or to put in a table or a panel. |
+| `text-width` | `(text-width text)` | procedure | How many cells text takes on a terminal: a wide East Asian character two, a combining mark or a control character none, any other one. |
+| `with-alternate-screen` | `(with-alternate-screen thunk)` | procedure | Runs thunk on the terminal's alternate screen, and brings the main screen back, as it was, however thunk is left, and at exit. |
+| `with-console` | `(with-console overrides thunk)` | procedure | Runs thunk with the console's capabilities changed as overrides says, a list of names and values: (with-console '(colors none width 40) thunk). Gives them back however thunk is left. |
+| `with-hidden-cursor` | `(with-hidden-cursor thunk)` | procedure | Runs thunk with the cursor hidden, and shows it again however thunk is left, and at exit. |
+| `with-raw-mode` | `(with-raw-mode thunk)` | procedure | Runs thunk with the terminal in raw mode (keys arrive one at a time, not echoed), and restores it however thunk is left, and at exit. Nested, the outermost restores. Without a terminal, it only runs thunk. |
+| `with-test-console` | `(with-test-console options thunk)` | procedure | Runs thunk against a test console, and answers its screen: options is a list of names and values, width (80), height (24), colors (truecolor), unicode? (#t) and events (a list of key names, characters, strings, lists such as (ctrl #\c), or events, for read-event). The screen is what was written, as a terminal shows it: screen-text, screen-cell and the rest read it. |

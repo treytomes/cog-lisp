@@ -572,3 +572,47 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 
 - `(format-source text [style width])`: text, cog-lisp source, laid out: a form whose elements hold no list on one line; otherwise its head and header arguments (if's test, let's bindings, define's name) on the first line, each other argument on a line of its own one level deeper, and the closing parenthesis on its own line. Comments, strings and every other token come out exactly as they went in; only whitespace changes. Indents with tabs, or with (format-source text 'spaces 2) that many spaces a level. Text that does not read is an error naming the line.
 - `format-source-headers`: A value (a list): see the library's source.
+
+### console: `(require 'console)`
+
+- `(console-capabilities)`: What the console can do, a hash table: terminal? (a terminal, not a pipe or a file), colors (none, 16, 256 or truecolor), unicode? (box-drawing characters show), interactive? (keys can be read), width and height. Detected once, from the terminal and NO_COLOR, FORCE_COLOR, TERM, COLORTERM, COLUMNS and LINES; with-console overrides it.
+- `(console-width)`: The console's width in cells.
+- `(draw-region region lines)`: Draws lines (from render-lines) into region: each at its row, cut at the region's width and filled with spaces to it; lines past its height are not drawn, and rows past the lines are cleared.
+- `(event-char event)`: The character a key typed, or #f.
+- `(event-key event)`: A key's name (up, down, enter, escape, tab, backspace, f1, page-up and the like), or #f for a character.
+- `(event-kind event)`: key, paste, resize or eof.
+- `(event-modifiers event)`: The modifiers held: a list of ctrl, alt and shift.
+- `(event-text event)`: The text of a paste, or #f.
+- `(event? x)`: True if x is an event (from read-event).
+- `(key-event? event key [modifier ...])`: True if event is that key (a key's name, or a character), with exactly those modifiers.
+- `(make-region column row width height)`: A rectangle of the screen, its top left at column and row (from 1), to draw lines into.
+- `(make-renderable proc)`: A renderable whose lines, at a width, are (proc width): a list of lines, each a list of segments (segment text style), at most width cells wide. The renderables the library makes are such; so can a program's.
+- `(markup text)`: The styled text that markup text describes, "[bold red]done[/] in 3 s": a value to render, or to put in a table. [[ and ]] are [ and ]; an error names the position.
+- `(markup-escape text)`: text with [ and ] doubled, so markup shows them as they are.
+- `(print-markup text)`: Writes markup text, "[bold green]done[/] in [blue]3 s[/]", in its styles, with the colors the console has (none to a pipe or a file).
+- `(print-markup-line text)`: As print-markup, then a newline.
+- `(read-event [timeout])`: The next event: a key, a paste or a resize; eof at the end of the input; or #f when timeout milliseconds pass first (none: wait as long as it takes). It waits without stopping other processes. On a terminal it reads in raw mode; on a test console, its events.
+- `(render x)`: Writes x, a renderable, styled text or any value, at the console's width, a line at a time.
+- `(render-lines x width)`: x's lines at width cells: a list of lines, each a list of segments. x is a renderable, styled text (from styled or markup), a string, or any value (as display writes it); text is wrapped at spaces.
+- `(renderable? x)`: True if x is a renderable made by make-renderable.
+- `(screen-cell screen column row)`: One cell of the screen (from 1): (character . style); the character is #f in the second cell of a wide one.
+- `(screen-cursor screen)`: Where the cursor ended: (column . row), from 1.
+- `(screen-line screen row)`: The text of one row of the screen (from 1), trailing spaces gone.
+- `(screen-output screen)`: Everything written to the test console, escape codes and all.
+- `(screen-text screen)`: The test console's screen as text: its rows, trailing spaces gone, joined by newlines, with the empty rows at the bottom left off.
+- `(segment text [style])`: A piece of text in one style, the unit renderables are made of.
+- `(segment-style segment)`: Its style.
+- `(segment-text segment)`: Its text.
+- `(style part ...)`: A style, from parts: a color or an attribute as a symbol or a string (red, #ff8800, rgb(1,2,3), color(208), bold), a list (on color) for the background, or a string of several, as markup writes them ("bold red on blue"). Later parts win.
+- `(style-attributes style)`: Its attributes, a list of bold, dim, italic, underline, invert and strikethrough.
+- `(style-background style)`: Its background color, as style-foreground's, or #f.
+- `(style-foreground style)`: Its foreground color: a color name, an index 0..255, (rgb r g b), or #f.
+- `(style-link style)`: The URL it links to, or #f.
+- `(style? x)`: True if x is a style.
+- `(styled text style-part ...)`: text in the style the parts make (as style takes them): a value to render, or to put in a table or a panel.
+- `(text-width text)`: How many cells text takes on a terminal: a wide East Asian character two, a combining mark or a control character none, any other one.
+- `(with-alternate-screen thunk)`: Runs thunk on the terminal's alternate screen, and brings the main screen back, as it was, however thunk is left, and at exit.
+- `(with-console overrides thunk)`: Runs thunk with the console's capabilities changed as overrides says, a list of names and values: (with-console '(colors none width 40) thunk). Gives them back however thunk is left.
+- `(with-hidden-cursor thunk)`: Runs thunk with the cursor hidden, and shows it again however thunk is left, and at exit.
+- `(with-raw-mode thunk)`: Runs thunk with the terminal in raw mode (keys arrive one at a time, not echoed), and restores it however thunk is left, and at exit. Nested, the outermost restores. Without a terminal, it only runs thunk.
+- `(with-test-console options thunk)`: Runs thunk against a test console, and answers its screen: options is a list of names and values, width (80), height (24), colors (truecolor), unicode? (#t) and events (a list of key names, characters, strings, lists such as (ctrl #\c), or events, for read-event). The screen is what was written, as a terminal shows it: screen-text, screen-cell and the rest read it.

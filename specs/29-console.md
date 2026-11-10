@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (owner, 2026-11-09) with the leanings of §8. Decision 5 (names) is settled by `specs/27-namespaces.md`: the library keeps its short names, and a program that wants them apart writes `(require 'console 'prefix 'con:)`. A spike first (§3) |
+| **Status** | Step 1 done (2026-11-10; §10); steps 2 to 4 to come. Accepted (owner, 2026-11-09) with the leanings of §8, and its amendment (§4.8, §9) with the leanings of §9 (owner, 2026-11-10). Decision 5 (names) is settled by `specs/27-namespaces.md`: the library keeps its short names, and a program that wants them apart writes `(require 'console 'prefix 'con:)`. A spike first (§3). Amendment proposed 2026-11-10, for a later full-screen library: §4.8, spike items 6 and 7, AC-8, §9 |
 | **Asked for by** | The owner (2026-11-09): "I'm used to writing C# console programs with the help of Spectre.Console. How do we provide cog-lisp with similar console I/O capabilities? I think this one needs a specification document." |
 | **Relates to** | `LispTextOutput` and `LispStdin` (Phase 5; `src/coglisp-runtime.st`, `src/coglisp-shell.st`); the HTTP design (`specs/21-https-and-json.md`), whose rule it follows: the operating system's details stay inside cog-lisp |
 
@@ -75,6 +75,63 @@ Each question is answered by an experiment and recorded here:
    included, after writing escape codes
    (`ReadConsoleOutputCharacterW` and `ReadConsoleOutputAttribute` on
    `CONOUT$`; on Linux a pseudo-terminal from `script`).
+6. **Waiting for a key without stopping the VM** (§9): a uFFI call blocks every
+   Smalltalk process until it returns, as `LispStdin`'s `ReadConsoleW` does
+   today. Does a wait with a timeout, polled with a `Delay` as `LispProcess`
+   polls a child, keep a spinner process turning while a prompt waits?
+   - On Windows: `WaitForSingleObject` on the input handle with a timeout, then
+     `ReadConsoleInputW`, or `PeekConsoleInputW`.
+   - On Linux: `poll` on descriptor 0 with a timeout, or raw mode with
+     `VMIN` 0 and `VTIME` set, then `read`.
+7. **The rest of a full-screen terminal** (§9), each tried once: the alternate
+   screen (`ESC [ ? 1049 h` and `l`), hiding the cursor, a resize noticed
+   (`WINDOW_BUFFER_SIZE_EVENT`; `SIGWINCH`, or the size polled), and mouse
+   reports (`ENABLE_MOUSE_INPUT`; `ESC [ ? 1006 h`).
+
+### 3.1 The answers (2026-11-10)
+
+Windows: a script in a fresh classic console (`start /wait conhost.exe
+PharoConsole.exe ... st spike-win.st`), which writes, injects keys with
+`WriteConsoleInputW` and reads the screen back. Linux: AlmaLinux 8 under WSL,
+in a pseudo-terminal from `script`, with keys piped in.
+
+1. **Escape codes on Windows work** once `ENABLE_VIRTUAL_TERMINAL_PROCESSING`
+   is set: `ESC[31m` gives the attribute red (4), bold and underline show, and
+   `ESC[5;10H` puts the next character at row 5, column 10. 24-bit color is
+   accepted and shown as the nearest of the console's 16 (attribute 10 for
+   `10;200;30`), so reading the screen back cannot check 24-bit color: R-23's
+   test console checks it instead. (Windows Terminal and VS Code's terminal,
+   both ConPTY, are left for AC-4 by the owner.) On Linux the terminal obeys
+   them; nothing is turned on.
+2. **Keys arrive as the same bytes on both.** With raw mode
+   (`LINE_INPUT`, `ECHO_INPUT` and `PROCESSED_INPUT` off) and
+   `ENABLE_VIRTUAL_TERMINAL_INPUT` on, Windows delivers injected keys as the
+   escape sequences a Unix terminal sends: down is `27 91 66`, Enter `13`,
+   Escape `27`, Ctrl+C `3`, and Alt+Up `27 91 49 59 51 65` (`ESC[1;3A`).
+   Linux, in `cfmakeraw`'s raw mode, gave `27 91 66 97 13 27 3` for the same
+   keys. So one decoder serves both. Ctrl+C is a byte, not a signal, in raw
+   mode, which R-12 turns into a condition. A lone ESC and the start of a
+   sequence are the same byte: the decoder reads ESC with nothing after it,
+   within a moment, as the Escape key.
+3. **Size:** `GetConsoleScreenBufferInfo`'s window was 120 by 30 (its buffer
+   9001 rows); `ioctl(1, TIOCGWINSZ)` answered 100 by 30, as `stty` set it.
+4. **Drawing while computing:** answered with item 6; the lock is step 4's.
+5. **Testing without a person:** on Windows the screen reads back
+   (`ReadConsoleOutputCharacterW`, `ReadConsoleOutputAttribute`) in a console
+   the test starts; on Linux, `script` records what was written.
+6. **Waiting without stopping the VM works:** polling with a timeout of 0
+   (`WaitForSingleObject(input, 0)`; `poll(fd 0, timeout 0)`) and a 20 ms `Delay`
+   between polls kept a higher-priority spinner process turning (18 turns in
+   400 ms on Windows, 375 in 6 s on Linux, where its own `Delay` is the limit),
+   and a key injected after 150 ms was read at 187 ms.
+7. **The rest:** the alternate screen works (`ESC[?1049h` shows a blank
+   screen, `ESC[?1049l` brings the main one back as it was); hiding the cursor
+   writes without error; with `ENABLE_WINDOW_INPUT` a resize record
+   (`WINDOW_BUFFER_SIZE_EVENT`, with the new size) is queued at once, ahead of an
+   injected mouse record. Mouse reports through VT input (`ESC[?1006h`) are the
+   full-screen spec's.
+- **Restoring:** both console modes on Windows, and the `termios` record on
+  Linux, read back the same as before the spike changed them.
 
 ## 4. The design (subject to the spike)
 
@@ -184,6 +241,45 @@ Each question is answered by an experiment and recorded here:
   (`'(down down enter)`). So every renderable and prompt is tested in LISP, at
   any width, with no terminal at all.
 
+### 4.8 Room for a full-screen library (§9)
+
+These shape what §4.2 to §4.7 build, so a later Terminal.Gui-style library
+builds on them rather than beside them. None of them is a full-screen feature.
+
+- **R-16. Three layers, not two:** the runtime (`LispTerminal`); a console core
+  in the library (capabilities, styles, segments, regions, input events); and
+  what is built on the core: renderables, prompts and live displays now, the
+  full-screen library later, which reuses the core and the renderables and does
+  not reach past them to the runtime.
+- **R-17. A renderable renders to lines, not to a port.** `(render-lines x
+  width)` answers its lines, each a list of segments (text and a style), at most
+  `width` cells wide; `(render x)` is that, written to the console. So anything
+  that can place lines can host a renderable: a panel's body, a table's cell, a
+  live region, and later a window.
+- **R-18. Drawing is to a region:** a rectangle of the screen (column, row,
+  width, height) that clips what is drawn into it. A live display (R-13) is a
+  region at the cursor, redrawn by writing only the cells that changed, and the
+  screen a full-screen program draws on is the same thing at the full size.
+- **R-19. Input is events, not symbols:** `(read-event [timeout])` answers an
+  event record, or `#f` after the timeout: a key (its name or character, and its
+  modifiers: ctrl, alt, shift), a paste, and later a mouse event or a resize. A
+  prompt reads events too. The key lists of R-15 are shorthand for key events.
+- **R-20. Waiting for input never stops the VM** (spike item 6): every
+  read waits with a timeout and polls, so a spinner turns while a prompt
+  waits, and a full-screen program can run timers while it waits for a key.
+- **R-21. Terminal modes are scoped and nest:** raw mode, the alternate
+  screen, a hidden cursor and mouse reporting are each entered by a `with-`
+  form and restored when it is left, however it is left, and again at exit
+  (`runAtExit`), so a program stopped by an error never leaves the terminal
+  raw. A prompt's raw mode inside a full-screen program's is not left early.
+- **R-22. One writer:** all drawing goes through the console core, under R-14's
+  lock, so a program's live displays now and its event loop later draw through
+  the same place.
+- **R-23. The test console is a screen:** a grid of cells (character and
+  style) that interprets the escape codes the library writes, at a fixed size,
+  fed a list of events. A test reads it back as plain text, or cell by cell
+  with styles; R-15's recorded output is its log.
+
 ## 5. Steps
 
 1. **The runtime layer and styles:** the spike, `LispTerminal`, capabilities,
@@ -216,6 +312,10 @@ R-3), a manual chapter ("The console"), and documentation in the image.
 - **AC-6:** a spinner keeps turning while a LISP loop computes, and the loop's
   own output is not torn.
 - **AC-7:** every suite passes on Windows and Linux.
+- **AC-8** (§4.8): a renderable renders to lines at a given width and into a
+  region of the test console, clipped (R-17, R-18); a spinner keeps turning
+  while a prompt waits for a key (R-20); and the terminal is restored after a
+  nested raw mode and after an error (R-21).
 
 ## 7. Licenses
 
@@ -246,3 +346,90 @@ operating system's.
    `specs/27-namespaces.md`, written first: with it, the library keeps its short
    names, and a program that wants them apart writes
    `(require 'console 'prefix 'con:)`.
+
+## 9. Later: a full-screen library (Terminal.Gui)
+
+Asked for by the owner (2026-11-10): "I'm later going to want us to capture
+`Terminal.Gui` style functionality. I want to make sure the development of
+this spec does not preclude the later expansion." Proposed as an amendment
+(§4.8, spike items 6 and 7, AC-8), for the owner to accept.
+
+[Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) (MIT) gives a .NET
+program full-screen applications in a terminal: windows and dialogs, views
+(labels, buttons, text fields, lists, menus, tabs) laid out relative to each
+other, keyboard focus and navigation, the mouse, color schemes, and a main
+loop with timers. That is its own spec, later. What it would need from this
+one, and would not get from §4.1 to §4.7 as they stood:
+
+- **Input that does not stop the VM.** A uFFI call blocks every Smalltalk
+  process until it returns; `LispStdin`'s `ReadConsoleW` does so today. A prompt
+  can live with that, but a main loop with timers, a spinner, or a redraw while
+  waiting for a key cannot (R-20, spike item 6).
+- **Drawing into a rectangle.** `(render x)` written straight to a port cannot
+  put a table in a window, clipped, at a position (R-17, R-18).
+- **Events with modifiers, and room for the mouse and resizes**, not key
+  symbols alone (R-19).
+- **Terminal modes held for a whole program**, nested and always restored, not
+  raw mode for one prompt (R-21).
+- **A test console that is a screen**, to test a layout cell by cell (R-23).
+
+Each is a choice about the shape of what §4 builds, not more to build: the
+first slice (§5 steps 1 and 2) builds the core of R-16 to R-19 and R-23 as it
+builds styles and renderables; R-20 and R-21 come with prompts (step 3), and
+R-22 with live displays (step 4). Mouse events, resizes and the alternate
+screen are only tried in the spike, and built by the full-screen spec.
+
+Decisions for the owner:
+
+9. **Accept §4.8** as requirements of this spec. Leaning: yes; each costs
+   little now and much later.
+10. **The later library's name and home:** a second library, `(require 'tui)`,
+    on this one's core (leaning), or more of `console`.
+
+## 10. As built: step 1 (2026-11-10)
+
+The spike (§3.1), then step 1 of §5 with the core §4.8 asks of it.
+
+- **The runtime layer** is `LispTerminal` (`src/coglisp-runtime.st`), behind
+  internal primitives (`%terminal-output-kind`, `-input-kind`,
+  `-enable-escapes`, `-size`, `-raw-on`, `-raw-off`, `-raw?`, `-read`,
+  `-flush`, `-on-restore`, `-restore`).
+  - **Raw mode nests** (a depth count; the outermost saves and restores), and
+    `LispTerminal restore` runs at exit (`runAtExit`) and when a program stops
+    on an error (`failReport`). It also writes what the library left to undo
+    (`%terminal-on-restore`: leaving the alternate screen, showing the cursor).
+  - **Reading polls** (R-20): `WaitForSingleObject` or `poll` with a timeout of
+    0, then a 10 ms `Delay`.
+  - **Windows reads key records** (`ReadConsoleInputW`), not `ReadConsoleW`,
+    which would block on a record with no character and pass over none. A key
+    with no character (an arrow, a function key) is turned into the sequence a
+    Unix terminal sends (xterm's, with its modifiers) by `LispTerminal
+    sequenceForKey:state:`, so one decoder serves both. (Found by the Windows
+    check: injected keys come as raw records even with VT input on.)
+  - **NUL is a character device** to `GetFileType`, as a console is: a console
+    is also one `GetConsoleMode` answers (found as `</dev/null` read as a
+    console).
+- **The library** is `lib/console.lisp`, `(require 'console)` (decision 3),
+  plain cog-lisp, its records tagged vectors (cog-lisp has no
+  `define-record-type`):
+  - capabilities and `with-console` (R-1, R-2); styles, markup and its errors
+    with their position, colors brought down to what the console has (R-3 to
+    R-5); `text-width` (R-6);
+  - `render-lines` and `make-renderable` (R-17), `render` (R-7, for text so
+    far), regions (R-18), and every write through one procedure, `%write`
+    (R-22, for step 4's lock);
+  - `read-event` and its decoder, with key names, modifiers and pastes
+    (R-19), `with-raw-mode`, `with-alternate-screen`, `with-hidden-cursor`
+    (R-21);
+  - the test console, an emulated screen (R-15, R-23).
+- **Escape alone** is ESC with nothing behind it within 50 ms; ESC with a key at
+  once behind it is Alt and that key, as terminals send it.
+- **Checks:** `tests/lisp/console-core.lisp` (105 checks, AC-2);
+  `examples/console.lisp`, plain text to a pipe (AC-3), in the manual's new
+  chapter "The console"; and on real terminals (AC-4, AC-5, as far as step 1
+  goes), `tests/console/windows-check.bat` (14/14: a fresh conhost, keys
+  injected, the screen read back) and `tests/console/linux-check.sh` (10/10:
+  `script`, keys piped in). Those two need a terminal, so they are run by hand,
+  not by `run-all`. Windows Terminal and VS Code's terminal are the owner's
+  (AC-4).
+

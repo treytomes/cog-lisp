@@ -38,6 +38,12 @@ spread over several files, and can load cog-lisp's own libraries from anywhere;
 JSON is read and written, and pages fetched over HTTP and HTTPS."
   "string-ports" "files" "echo" "program" "libraries" "json" "http")
 
+(chapter "console" "The console"
+  "The console library, (require 'console), writes styled text with the colors a
+terminal has and none to a pipe, measures and wraps it in cells, reads keys as
+events, and tests what a program draws on a pretend terminal."
+  "console")
+
 (chapter "namespaces" "Libraries and namespaces"
   "A library exports some of its names and keeps the rest; each file chooses how
 to bring them in: unqualified, under a prefix, or a few under other names. Names

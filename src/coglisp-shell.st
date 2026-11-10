@@ -287,6 +287,8 @@ cm value: shell value: 'running' value: 'failReport: aLine
 	 one: in a terminal stdout and stderr share lines, and an editor''s problem
 	 matcher reads path:line:col: error: from the start of a line."
 	LispTextOutput stdout flush.
+	"the terminal as it was (specs/29-console.md R-21)"
+	[LispTerminal restore] on: Error do: [:e | nil].
 	LispTextOutput stdout isMidLine ifTrue: [LispTextOutput stderr nextPut: Character lf].
 	LispTextOutput stderr nextPutAll: aLine; nextPut: Character lf; flush.
 	Smalltalk exit: 1'.
