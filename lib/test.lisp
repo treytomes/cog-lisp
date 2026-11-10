@@ -15,6 +15,13 @@
 ; that redefines one (+, display, ...) cannot break the reporting. Its forms are
 ; syntax-rules macros (Phase 9 step 9.3), so a test may also bind lambda, if or
 ; let locally around a check.
+;;; A library (specs/namespaces.md): (require 'test) brings these names in; each
+;;; is also test:name everywhere, and the names not exported are private.
+
+(library test
+  (export define-test check check-true check-false check-error check-written
+         check-error-class eval-all run-tests run-tests/report))
+
 (define %+ +) (define %= =) (define %> >) (define %display display) (define %newline newline)
 (define %string-append string-append) (define %equal? equal?) (define %not not)
 (define %write write) (define %number->string number->string)
@@ -28,6 +35,8 @@
 ;; The body is compiled when the test runs, not when the file loads, so a test
 ;; can use a macro or a library that an earlier test defined or loaded.
 (define-syntax define-test
+  "(define-test name body ...)
+Registers a test; run-tests runs its body, compiled when it runs, so a test can use what an earlier test defined or loaded."
   (syntax-rules ()
     ((_ name body ...)
      (set! %tests (append %tests (list (cons 'name (lambda () (eval '(let () body ...))))))))))
@@ -55,6 +64,8 @@
 
 ;; (check expr expected) -- passes when (%equal? expr expected)
 (define-syntax check
+  "(check expr expected)
+Passes when the value of expr is equal? to expected; a failure shows both."
   (syntax-rules ()
     ((_ expr expected) (%check 'expr (lambda () expr) expected))))
 
@@ -66,16 +77,22 @@
 
 ;; (check-true expr), (check-false expr)
 (define-syntax check-true
+  "(check-true expr)
+Passes when expr is true (anything but #f)."
   (syntax-rules ()
     ((_ expr) (let ((v expr)) (%report (if v #t #f) (%text 'expr) "  got=#f")))))
 
 (define-syntax check-false
+  "(check-false expr)
+Passes when expr is #f."
   (syntax-rules ()
     ((_ expr) (let ((v expr)) (%report (%not v) (%text 'expr) (%string-append "  got=" (%text v)))))))
 
 ;; (check-error expr), (check-error expr "text") -- passes when expr signals an
 ;; error (whose message contains text)
 (define-syntax check-error
+  "(check-error expr [text])
+Passes when expr signals an error, whose message contains text when text is given."
   (syntax-rules ()
     ((_ expr) (%check-error 'expr (lambda () expr) #f))
     ((_ expr text) (%check-error 'expr (lambda () expr) text))))
@@ -124,6 +141,8 @@
 
 ;; (check-written expr "text") -- passes when write prints expr's value as text
 (define-syntax check-written
+  "(check-written expr text)
+Passes when write prints the value of expr as text."
   (syntax-rules ()
     ((_ expr text) (%check-written 'expr (lambda () expr) text))))
 
@@ -136,6 +155,8 @@
 ;; (check-error-class expr ClassName) -- passes when expr signals an error of that
 ;; Smalltalk class (LispArityError, LispUnboundError, ...)
 (define-syntax check-error-class
+  "(check-error-class expr class)
+Passes when expr signals an error of the Smalltalk class named class, such as LispUnboundError."
   (syntax-rules ()
     ((_ expr class) (%check-error-class 'expr (lambda () expr) 'class))))
 

@@ -117,23 +117,26 @@ h check: 'AC-10 a bad \x escape' actual: ([LispReader read: '"\xZZ;"'. #none] on
  special-form table and template cache, which retired in Phase 9 step 9.1;
  tests/lisp/phase-8.3-compiler.lisp tests the LISP compiler's table."
 
-"AC-12 the LISP test framework, run on tests with known failures"
-LispCompiler new evalFile: (root / 'lib' / 'test.lisp') fullName.
+"AC-12 the LISP test framework, run on tests with known failures. It is a library
+ (specs/namespaces.md), so it is loaded, and used, in a unit, as a file uses it."
+LispCurrentUnit value: LispUnit session during: [ | ev |
+ev := [:s | LispCompiler new evalAll: s].
+ev value: '(load "' , ((root / 'lib' / 'test.lisp') fullName copyReplaceAll: '\' with: '/') , '")'.
 ev value: '(define-test passes (check (+ 1 2) 3) (check-true (< 1 2)) (check-error (car 5) "not a pair"))
 	(define-test fails (check (+ 1 2) 4) (check-false 1) (check-error 5) (check-error (car 5) "zzz"))
 	(define-test crashes (check 1 1) (car 5) (check 2 2))'.
 h check: 'AC-12 counts: 9 checks, 4 failures, 1 unexpected error'
 	actual: ([:out | (out includesSubstring: '== RESULT: 4/9 checks passed ==')] value: (captured value: [ev value: '(run-tests/report)']))
 	expected: true.
-captured value: [ev value: '(set!! %pass 0) (set!! %total 0)'].
+captured value: [ev value: '(set!! test:%pass 0) (set!! test:%total 0)'].
 h check: 'AC-12 a failing check shows what it got and wanted'
 	actual: ((captured value: [ev value: '(run-tests/report)']) includesSubstring: 'FAIL  fails: (+ 1 2)  got=3  want=4')
 	expected: true.
-captured value: [ev value: '(set!! %pass 0) (set!! %total 0)'].
+captured value: [ev value: '(set!! test:%pass 0) (set!! test:%total 0)'].
 h check: 'AC-12 an error inside a test fails that test only, with its message'
 	actual: ([:out | (out includesSubstring: 'FAIL  crashes: unexpected error  car: not a pair: 5') and: [out includesSubstring: 'PASS  passes']]
 		value: (captured value: [ev value: '(run-tests/report)']))
-	expected: true.
+	expected: true].
 h finish
 ] on: Error do: [:e | h harnessError: e].
 !

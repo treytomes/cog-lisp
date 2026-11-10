@@ -59,7 +59,7 @@
 
 ;; what running some code does: (error message) or (answers printed-text)
 (define (outcome-of source)
-  (guard (e (#t (list 'error (%message e))))
+  (guard (e (#t (list 'error (test:%message e))))  ; the test library's own, private
     (list 'answers (with-output-to-string (lambda () (eval-all source))))))
 
 (define-test "AC-7 each trap's wrong code does what SKILL.md says"

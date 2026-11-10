@@ -109,8 +109,8 @@ Go deeper into the VM where it pays.
   from any folder: [specs/library-path.md](specs/library-path.md)). Its known
   gaps: `nil` and `()` are **true** (only `#f` is false), so test a list with
   `null` or `consp`, not plain `if` (issue #1, deferred:
-  [specs/cl-issues.md](specs/cl-issues.md)); there is one namespace and no
-  `#'f` (write `f`); no `loop`, keywords, multiple values, `&optional` or
+  [specs/cl-issues.md](specs/cl-issues.md)); variables and functions share one
+  namespace, and there is no `#'f` (write `f`); no `loop`, keywords, multiple values, `&optional` or
   `&key`. (`format` was missing then; it is built in since
   [specs/format.md](specs/format.md).)
 - *Acceptance:* see the [Phase 7 spec](specs/phase-7-macros.md).
@@ -272,6 +272,13 @@ system, `format`, a weather REPL), found bugs and gaps that are not its own:
 - [**HTTP(S) and JSON**](specs/https-and-json.md) (done): `json-read` and
   `json-write`; `http-request` and `http-get` over the system's curl, with
   certificates always checked: an early slice of Phase 11.6.
+- [**Libraries and namespaces**](specs/namespaces.md) (done): `(library name
+  (export ...))`; `require` with `only`, `except`, `rename` and `prefix`,
+  imports per file; private names; full names (`cl:remove`) everywhere; the
+  built-in libraries sealed, and a warning when a program redefines a built-in.
+  Asked for by the console library's short names.
+- [**A console library**](specs/console.md) (accepted, next): styled text,
+  rules, tables, panels and prompts, in the manner of Spectre.Console.
 
 ### Phase 11 — A world of its own
 [Spec](specs/phase-11-pure-image.md), accepted in outline; a long phase, each

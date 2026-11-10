@@ -277,14 +277,43 @@
    (if (lsp-def-documentation d) (string-append (lsp-markdown-documentation (lsp-def-documentation d)) "\n\n---\n\n") "")
    "```cog-lisp\n" (lsp-lines-up-to (lsp-def-source d) 20) "\n```"))
 
+;;; Namespaces (specs/namespaces.md R-13): each document is compiled in a unit of
+;;; its own (lsp-diagnostics), kept here, so a name means what it means in that
+;;; document: an import (con:rule as engine:rule), or a library's full name.
+
+(define lsp-document-units (make-hash-table equal?))
+(define (lsp-unit-of uri) (hash-table-ref/default lsp-document-units (lsp-key (lsp-uri->path uri)) #f))
+
+;; the full symbol name means in the document at uri
+(define (lsp-resolve uri name)
+  (let* ((sym (string->symbol name))
+         (unit (lsp-unit-of uri))
+         (target (and unit [unit importAt: sym])))
+    (if (and target (not (smalltalk-nil? target))) target sym)))
+
+;; the definitions a name in the document at uri leads to: a library's full name
+;; leads to that library's file, anything else to its name across the workspace
+(define (lsp-definitions-for uri name)
+  (let* ((target (symbol->string (lsp-resolve uri name)))
+         (colon (string-index target #\:)))
+    (if (not colon)
+        (lsp-definitions-named target)
+        (let* ((library [(smalltalk LispUnit) libraryNamed: (string->symbol (substring target 0 colon))])
+               (local (substring target (+ colon 1) (string-length target))))
+          (if (smalltalk-nil? library)
+              (lsp-definitions-named target)
+              (filter (lambda (d) (string=? (lsp-def-name d) local))
+                      (hash-table-ref/default lsp-index (lsp-key [library path]) '())))))))
+
 (define (lsp-hover params)
   (let* ((place (lsp-request-place params))
+         (uri (lsp-path params "textDocument" "uri"))
          (found (and place (lsp-symbol-at (vector-ref place 0) (vector-ref place 2)))))
     (if (not found)
         lsp-null
         (let* ((name (car found))
-               (defs (lsp-definitions-named name))
-               (doc (documentation (string->symbol name)))
+               (defs (lsp-definitions-for uri name))
+               (doc (documentation (lsp-resolve uri name)))
                (value (cond ((pair? defs) (lsp-markdown-definition (car defs)))
                             (doc (lsp-markdown-documentation doc))
                             (else #f))))
@@ -315,7 +344,9 @@
      cellsDo: (lambda (cell)
                 (when [cell isBound]
                   (let* ((name [cell symbol]) (doc (documentation name)) (value [cell value]))
-                    (when (and doc (not (memq name (special-form-names))))
+                    ;; a library's names come with the document's imports, not here
+                    (when (and doc (not (memq name (special-form-names)))
+                               (not (string-index (symbol->string name) #\:)))
                       (set! items (cons (lsp-object "label" (symbol->string name)
                                                     "kind" (if [value isKindOf: (smalltalk LispMacro)] lsp-keyword-kind lsp-function-kind)
                                                     "detail" (lsp-first-line doc)
@@ -327,8 +358,19 @@
 
 (define (lsp-completion params)
   (unless lsp-builtins (set! lsp-builtins (lsp-builtin-items)))
-  (let ((seen (make-hash-table equal?)) (items '()))
+  (let ((seen (make-hash-table equal?)) (items '())
+        (unit (lsp-unit-of (lsp-path params "textDocument" "uri"))))
     (for-each (lambda (item) (hash-table-set! seen [item at: "label"] #t) (set! items (cons item items))) lsp-builtins)
+    ;; the document's imports, as it imported them (con:rule)
+    (when unit
+      (for-each (lambda (a)
+                  (let* ((label (symbol->string [a key])) (doc (documentation [a value])))
+                    (unless (hash-table-contains? seen label)
+                      (hash-table-set! seen label #t)
+                      (set! items (cons (lsp-object "label" label "kind" lsp-function-kind
+                                                    "detail" (if doc (lsp-first-line doc) (symbol->string [a value])))
+                                        items)))))
+                (vector->list [[[unit imports] associations] asArray])))
     (hash-table-walk lsp-index
                      (lambda (key defs)
                        (for-each (lambda (d)
@@ -349,13 +391,31 @@
     (if (not found)
         lsp-null
         (list->vector (map (lambda (d) (lsp-object "uri" (lsp-def-uri d) "range" (lsp-def-range d)))
-                           (lsp-definitions-named (car found)))))))
+                           (lsp-definitions-for (lsp-path params "textDocument" "uri") (car found)))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Diagnostics: read the document, run its syntax definitions, compile (never
 ;;; run) every other top-level form, and place each error
 
 (define lsp-error-severity 1)
+(define lsp-warning-severity 2)
+
+;; is path one of cog-lisp's own sources, whose definitions are the built-ins?
+(define (lsp-builtin-source? path)
+  (let ((home (hash-table-ref/default *env* 'home #f)))
+    (and home
+         (string-prefix? (lsp-key (string-append home "/lib/")) (lsp-key path)))))
+
+;; the warnings compiling a form made (a redefined built-in, specs/namespaces.md
+;; R-10), as diagnostics on that form
+(define (lsp-form-warnings text starts from to)
+  (let ((unit (%current-unit)))
+    (if (not unit)
+        '()
+        (map (lambda (w)
+               (lsp-object "range" (lsp-range text starts from (max to from)) "severity" lsp-warning-severity
+                           "source" "cog-lisp" "message" w))
+             (if (lsp-builtin-source? [unit path]) (begin [unit takeWarnings] '()) (vector->list [unit takeWarnings]))))))
 
 (define (lsp-diagnostic text starts from to message)
   (lsp-object "range" (lsp-range text starts from (max to from)) "severity" lsp-error-severity
@@ -370,10 +430,26 @@
              => (lambda (range) (cons (- (car range) 1) (cdr range))))
             (else (loop (cdr fs)))))))
 
-;; the forms a document's diagnostics run: syntax definitions, and require, whose
-;; library defines macros later forms use ((require 'cl) and defun, say)
+;; the forms a document's diagnostics run: syntax definitions; require, whose
+;; library defines macros later forms use ((require 'cl) and defun, say) and whose
+;; imports they compile with; and library, which says whose definitions they are
 (define (lsp-syntax-definition? d)
-  (or (lsp-head-is? d 'define-syntax) (lsp-head-is? d 'define-macro) (lsp-head-is? d 'require)))
+  (or (lsp-head-is? d 'define-syntax) (lsp-head-is? d 'define-macro) (lsp-head-is? d 'require)
+      (lsp-head-is? d 'library)))
+
+;; a document's diagnostics, compiled in a unit of its own that is then kept for
+;; hover, completion and definitions
+(define (lsp-diagnostics-in uri text)
+  (let* ((path (lsp-uri->path uri))
+         (unit [(smalltalk LispUnit) forFile: path inheriting: (smalltalk-nil)]))
+    ;; its warnings are shown in the editor, not written to stderr
+    [unit collectWarnings]
+    (hash-table-set! lsp-document-units (lsp-key path) unit)
+    [(smalltalk LispLoadPath) value: path
+     during: (procedure->block
+              (lambda ()
+                [(smalltalk LispCurrentUnit) value: unit
+                 during: (procedure->block (lambda () (lsp-diagnostics text)))]))]))
 
 (define (lsp-diagnostics text)
   (let ((r (make-reader text)) (starts (lsp-line-starts text)))
@@ -392,14 +468,15 @@
                        (guard (e (#t (let ((place (lsp-error-place r e from to)))
                                        (lsp-diagnostic text starts (car place) (cdr place) (condition-report e)))))
                          (if (lsp-syntax-definition? d) (lisp-eval d r) (compile-form d r))
-                         #f)))
-                 (loop (if problem (cons problem acc) acc)))))))))
+                         #f))
+                      (warnings (lsp-form-warnings text starts from to)))
+                 (loop (append (reverse warnings) (if problem (cons problem acc) acc))))))))))
 
 (define (lsp-publish-diagnostics! uri)
   (let ((doc (lsp-document uri)))
     (when doc
       (lsp-notify! "textDocument/publishDiagnostics"
-                   (lsp-object "uri" uri "diagnostics" (list->vector (lsp-diagnostics (vector-ref doc 1))))))))
+                   (lsp-object "uri" uri "diagnostics" (list->vector (lsp-diagnostics-in uri (vector-ref doc 1))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Expanding the macro call at the cursor (the cog-lisp/expand request)

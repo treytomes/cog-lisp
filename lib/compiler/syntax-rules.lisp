@@ -67,9 +67,18 @@
   (let ((e (sr-ellipsis st)))
     (and e (lc-identifier? x) (eq? (lc-id-symbol x) (lc-id-symbol e)) (not (sr-literal? x st)))))
 
-;; the input identifier f means what the literal p means where the macro was defined
+;; the input identifier f means what the literal p means where the macro was defined:
+;; the same binding, or (R7RS's free-identifier=?) both unbound and spelled alike.
+;; In a library an unbound name resolves to the library's own (test:else), so
+;; cond's else, used in a library, needs the second case (specs/namespaces.md).
 (define (sr-same-binding? f p st)
-  (eq? (lc-binding f (sr-use-scope st)) (lc-binding p (sr-env st))))
+  (let ((bf (lc-binding f (sr-use-scope st))) (bp (lc-binding p (sr-env st))))
+    (or (eq? bf bp)
+        (and (symbol? bf) (symbol? bp)
+             (eq? (lc-id-symbol f) (lc-id-symbol p))
+             (sr-unbound? bf) (sr-unbound? bp)))))
+
+(define (sr-unbound? sym) (not [[(smalltalk LispEnvironment) default] isBound: sym]))
 
 (define (sr-match p f st)
   (let ((m (sr-match* p f st)))

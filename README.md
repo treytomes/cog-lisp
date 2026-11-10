@@ -44,6 +44,10 @@ generated from the documentation each definition carries in the image.
 - **Smalltalk interop:** `[obj selector: arg]` sends a message, and
   `(smalltalk Dictionary)` reaches any class, so all of Pharo is within reach;
   a LISP procedure can stand in as a Smalltalk block.
+- **Libraries and namespaces:** `(library shapes (export area))` makes a file a
+  library, with private names; `(require 'shapes 'prefix 's:)` imports it into
+  one file only, and `only`, `except` and `rename` choose what comes in. Two
+  libraries can both have a `rule`.
 - **Batteries:** Common Lisp's `format`, JSON (`json-read`, `json-write`), HTTP
   and HTTPS (`http-get`, `http-request`, with certificates always checked), file
   and string ports, and libraries to `require`: `cl` (Common Lisp names),

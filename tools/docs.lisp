@@ -56,6 +56,7 @@
                   (let* ((name [cell symbol])
                          (s (symbol->string name)))
                     (unless (or (char=? (string-ref s 0) #\%)
+                                (string-index s #\:)          ; a library's (specs/namespaces.md)
                                 (and (documentation-category name)
                                      (string=? (documentation-category name) "Special forms")))
                       (let ((e (docs-make-entry name (docs-kind [cell value]))))
@@ -72,6 +73,33 @@
                                               (docs-filter (lambda (e) (string=? (docs-entry-category e) (car cats)))
                                                            entries)))))
                           acc)))))))
+
+;;; The libraries cog-lisp ships, which a program requires (specs/namespaces.md
+;;; R-14): each export, documented, under the library's name as its category
+
+(define docs-libraries '(cl test datetime pretty format-source))
+
+;; a value with no documentation (cl's t and nil): what it holds, when short
+(define (docs-value-description value)
+  (let ((text (with-output-to-string (lambda () (write value)))))
+    (if (<= (string-length text) 24)
+        (string-append "The value " text ".")
+        "A value (a list): see the library's source.")))
+
+(define (library-entries library)
+  (require library 'only '())                     ; loads it, imports nothing
+  (let ((unit [(smalltalk LispUnit) libraryNamed: library])
+        (env [(smalltalk LispEnvironment) default])
+        (category (symbol->string library)))
+    (map (lambda (name)
+           (let* ((full [unit qualify: (string->symbol name)])
+                  (doc (documentation full))
+                  (value [env at: full ifAbsent: (lambda () #f)]))
+             (if doc
+                 (let ((parts (docs-split doc)))
+                   (vector name (docs-kind value) category (car parts) (cdr parts)))
+                 (vector name "value" category name (docs-value-description value)))))
+         (docs-sort-strings (map symbol->string (vector->list [unit exports]))))))
 
 (define (docs-filter pred l)
   (cond ((null? l) '())
@@ -118,20 +146,35 @@
                         (display "- [") (display cat) (display "](#") (display (docs-anchor cat))
                         (display ") (") (display n) (display ")\n"))))
                   docs-categories)
+        (display "- [Libraries](#libraries): ")
+        (display (string-join (map symbol->string docs-libraries) ", "))
+        (newline)
         (for-each (lambda (cat)
                     (let ((es (docs-in-category entries cat)))
                       (when (pair? es)
                         (display "\n## ") (display cat) (display "\n\n")
-                        (display "| Name | Call | Kind | What it does |\n")
-                        (display "|---|---|---|---|\n")
-                        (for-each (lambda (e)
-                                    (display "| ") (display (docs-code-cell (docs-entry-name e)))
-                                    (display " | ") (display (docs-code-cell (docs-entry-call e)))
-                                    (display " | ") (display (docs-entry-kind e))
-                                    (display " | ") (display (docs-cell (docs-entry-description e)))
-                                    (display " |\n"))
-                                  es))))
-                  docs-categories)))))
+                        (docs-markdown-table es))))
+                  docs-categories)
+        (display "\n## Libraries\n\n")
+        (display "Not built in: a program loads one with `(require 'name)`, which brings in\n")
+        (display "the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and\n")
+        (display "`name:x` names each one from anywhere (specs/namespaces.md).\n")
+        (for-each (lambda (library)
+                    (display "\n### ") (display library) (display "\n\n")
+                    (display "`(require '") (display library) (display ")`\n\n")
+                    (docs-markdown-table (library-entries library)))
+                  docs-libraries)))))
+
+(define (docs-markdown-table es)
+  (display "| Name | Call | Kind | What it does |\n")
+  (display "|---|---|---|---|\n")
+  (for-each (lambda (e)
+              (display "| ") (display (docs-code-cell (docs-entry-name e)))
+              (display " | ") (display (docs-code-cell (docs-entry-call e)))
+              (display " | ") (display (docs-entry-kind e))
+              (display " | ") (display (docs-cell (docs-entry-description e)))
+              (display " |\n"))
+            es))
 
 ;;; vscode/builtins.json: what the editor shows on hover, and completes
 
@@ -406,7 +449,9 @@
     (string-append
      "### " (docs-example-title (if (pair? comment) (car comment) name)) "\n\n"
      "`" name ".lisp`:\n\n"
-     (docs-fence "scheme" (cdr parts)) "\n"
+     ;; a failing example is shown whole, comment included, so the line its error
+     ;; names is the line shown
+     (docs-fence "scheme" (if failing (docs-file-text (skill-example-path name ".lisp")) (cdr parts))) "\n"
      "It prints:\n\n"
      (docs-fence "text" (docs-file-text (skill-example-path name ".expected"))) "\n"
      (if failing
@@ -463,11 +508,22 @@
                     (let ((es (docs-in-category entries cat)))
                       (when (pair? es)
                         (display "\n## ") (display cat) (display "\n\n")
-                        (for-each (lambda (e)
-                                    (display "- ") (display (docs-code (docs-entry-call e))) (display ": ")
-                                    (display (docs-one-line (docs-entry-description e))) (newline))
-                                  es))))
-                  docs-categories)))))
+                        (skill-reference-lines es))))
+                  docs-categories)
+        (display "\n## Libraries\n\n")
+        (display "These exist only in a file that requires their library: `(require 'cl)`\n")
+        (display "brings in the names under cl. `cl:name` reaches one from anywhere.\n")
+        (for-each (lambda (library)
+                    (display "\n### ") (display library) (display ": `(require '")
+                    (display library) (display ")`\n\n")
+                    (skill-reference-lines (library-entries library)))
+                  docs-libraries)))))
+
+(define (skill-reference-lines es)
+  (for-each (lambda (e)
+              (display "- ") (display (docs-code (docs-entry-call e))) (display ": ")
+              (display (docs-one-line (docs-entry-description e))) (newline))
+            es))
 
 ;; every generated file of the skill: (relative-path . text)
 (define (skill-files)

@@ -91,13 +91,73 @@
 ;; is x the identifier spelled name? (for keywords that are not bindings)
 (define (lc-id-is? x name) (or (eq? x name) (and [x isLispAlias] (eq? [x baseName] name))))
 
+;;; Units (specs/namespaces.md): what is being compiled, a file or the REPL
+;;; session (LispUnit, src/coglisp-compiler.st). A free name means, in order:
+;;; the library's own definition (when the unit is a library), the unit's import,
+;;; or the global of that name. A library's own names are global cells under full
+;;; names (console:rule), and a full name always means itself. A define-syntax
+;;; stamps its scope with its unit, so its expansions mean what they meant where
+;;; the macro was defined.
+
+(define lc-unit-key (smalltalk-symbol "lispUnit"))
+(define (lc-current-unit) [(smalltalk LispCurrentUnit) value])
+(define (lc-scope-unit scope)
+  (let ((u (scope-ref scope lc-unit-key)))
+    (if u u (lc-current-unit))))
+
+;; scope, stamped with the current unit if it is not already
+(define (lc-scope-with-unit scope)
+  (let ((unit (lc-current-unit)))
+    (if (or (smalltalk-nil? unit) (scope-has? scope lc-unit-key))
+        scope
+        (let ((s (scope-copy scope)))
+          (scope-set! s lc-unit-key unit)
+          s))))
+
+;; a full name, such as console:rule, means itself everywhere
+(define (lc-qualified? sym) [[sym name] includes: #\:])
+
+;; the global symbol a free name means in unit. An import is looked at first,
+;; since a prefixed name (con:rule) is spelled like a full name.
+(define (lc-resolve-global sym unit)
+  (if (smalltalk-nil? unit)
+      sym
+      (let ((target [unit importAt: sym])
+            (library? [unit isLibrary]))
+        (cond ((not (smalltalk-nil? target)) target)
+              ((lc-qualified? sym) sym)
+              ((and library? [unit owns: sym]) [unit qualify: sym])
+              ((not library?) sym)
+              ((hash-table-ref/default lc-special-forms sym #f) sym)
+              ([[(smalltalk LispEnvironment) default] isBound: sym] sym)
+              ;; in a library, a name nothing else binds is the library's own,
+              ;; defined later in its file
+              (else [unit qualify: sym])))))
+
+;; the global symbol a top-level definition of id defines: a library's own full
+;; name; an error for a name the file imported (R-8); and a warning when a
+;; program redefines a built-in (R-10)
+(define (lc-define-target id)
+  (let* ((sym (lc-id-symbol id))
+         (unit (if (symbol? id) (lc-current-unit) (lc-scope-unit [id env]))))
+    (cond ((or (smalltalk-nil? unit) (lc-qualified? sym)) sym)
+          ((not (smalltalk-nil? [unit importAt: sym]))
+           (lc-error (string-append (symbol->string sym) " is imported (as "
+                                    [[unit importAt: sym] name]
+                                    "): choose another name, or import it with a prefix or under another name")))
+          ([unit isLibrary] [unit addOwned: sym] [unit qualify: sym])
+          (else
+           (when [(smalltalk LispUnit) isBuiltin: sym]
+             [unit warn: (string-append "define replaces the built-in " (symbol->string sym))])
+           sym))))
+
 ;; what id means in scope: a temp name (a string), a local macro, or the symbol of
 ;; a global (a special form, a global macro or a variable). An alias not bound
 ;; here means what its name means where its macro was defined.
 (define (lc-binding id scope)
   (let ((b (scope-ref scope id)))
     (cond (b b)
-          ((symbol? id) id)
+          ((symbol? id) (lc-resolve-global id (lc-scope-unit scope)))
           (else (lc-binding [id name] [id env])))))
 
 ;; the special form x names in scope, or #f
@@ -277,7 +337,7 @@
       (opal-send (lc-global-env-node) "lookup:" (vector (lc-symbol-node sym)))))
 
 (define (lc-global-define c id node)
-  (lc-global-define-symbol c (lc-id-symbol id) node))
+  (lc-global-define-symbol c (lc-define-target id) node))
 (define (lc-global-define-symbol c sym node)
   (if (lc-uses? c "globalCells")
       (opal-send (opal-literal (lc-cell sym)) "define:" (vector node))
@@ -321,7 +381,8 @@
   (let ((loop (c-self-loop c)))
     (if (loop-local loop)
         (opal-var (loop-local loop))
-        (lc-global-read c (loop-name loop)))))
+        ;; the procedure's own global, resolved as any name is (a library's own)
+        (lc-global-read-symbol c (lc-binding (loop-name loop) (scope-new))))))
 
 (define (lc-translate-self-tail-call c args scope)
   (let ((loop (c-self-loop c)))
@@ -414,9 +475,9 @@
                             (rest (lc-vmap arg-node (lc-iota 2 n))))
                        (opal-send receiver (vector-ref spec 2) rest))))
            (slow (if (and tail (lc-uses? c "tailCalls"))
-                     (let* ((fn (lc-global-read c op))) (lc-tail-call-node c fn (lc-map arg-node (lc-iota 1 n))))
-                     (let* ((fn (lc-global-read c op))) (lc-call-node c fn (lc-map arg-node (lc-iota 1 n))))))
-           (guard0 (opal-send (lc-global-read c op) "==" (vector (opal-literal prim))))
+                     (let* ((fn (lc-global-read-symbol c (lc-binding op scope)))) (lc-tail-call-node c fn (lc-map arg-node (lc-iota 1 n))))
+                     (let* ((fn (lc-global-read-symbol c (lc-binding op scope)))) (lc-call-node c fn (lc-map arg-node (lc-iota 1 n))))))
+           (guard0 (opal-send (lc-global-read-symbol c (lc-binding op scope)) "==" (vector (opal-literal prim))))
            (guard (opal-send guard0 "ifTrue:ifFalse:" (vector (opal-thunk fast) (opal-thunk slow)))))
       (if (null? temps)
           guard
@@ -639,7 +700,8 @@ Stops compilation with message and the forms, for a macro to report a misuse."
 (define (lc-translate-define-syntax c form scope)
   (unless (eq? form (c-top-form c))
     (lc-error "define-syntax is allowed only at top level or at the start of a body"))
-  (let ((name (car (cdr form))))
+  (let ((name (car (cdr form)))
+        (scope (lc-scope-with-unit scope)))
     (unless (lc-identifier? name) (lc-error (string-append "define-syntax: bad name: " (lc-show name))))
     (lc-and-unspecified
      (lc-global-define c name (opal-literal (lc-documented-syntax (lc-make-syntax c (lc-syntax-spec form) scope scope name (lc-source-of c form))
@@ -1347,10 +1409,12 @@ Compiles and runs datum with the compiler in use, as eval does."
 
 ;;; Documentation (Phase 10 step 10.1)
 
-;; what holds name's documentation: its special form, else its global value, or #f
+;; what holds name's documentation: its special form, else the value of what the
+;; name means here (an import, specs/namespaces.md R-14), or #f
 (define (lc-documented name)
   (or (hash-table-ref/default lc-special-forms name #f)
-      (let ((v (lc-global-value name))) (if (eq? v lc-unbound) #f v))))
+      (let ((v (lc-global-value (lc-resolve-global name (lc-current-unit)))))
+        (if (eq? v lc-unbound) #f v))))
 
 (define (documentation name)
   "(documentation name)

@@ -398,6 +398,32 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **A `define-syntax` macro keeps its source**: its expander's
   `procedure-source` is the `define-syntax` form's text.
 
+## Libraries and namespaces (specs/namespaces.md)
+
+- **A library's definitions are global cells under full names** (`cl:remove`),
+  so a full name works anywhere, private names included. A file's own names
+  and its imports are resolved at compile time by `lc-resolve-global`
+  (`lib/compiler/compiler.lisp`), through the `LispUnit` being compiled
+  (`LispCurrentUnit`; `evalFile:` binds one, the REPL has a session one). Code
+  compiled with no unit (a Smalltalk suite's `evalAll:`) sees no imports: run
+  it inside `LispCurrentUnit value: LispUnit session during: [...]`.
+- **A `define-macro` in a library must write its helpers in full**
+  (`cl:%cl-last-of`): its expansion is compiled in the caller's file. A
+  `syntax-rules` macro needs no care: its scope carries its unit.
+- **An import serves only forms compiled after its `require`**, so a `require`
+  inside a test body is too late for that body: reach the names through `eval`.
+- **Library files of cog-lisp use only their exports in tests**; a test reaching
+  a private helper writes its full name (`test:%pass`).
+- **A program file inherits its loader's imports; a library starts with none.**
+  Defining an imported name is an error; redefining a built-in from a program
+  is a warning on stderr (not for cog-lisp's own `lib/` files, nor in the
+  language server, which shows it as a diagnostic).
+- **The libraries the seed compiles** (`core`, `format`, `json`, `http`,
+  `coverage`, the compiler) are not libraries: they stay global, sealed. The
+  ones `require`d at run time (`cl`, `test`, `datetime`, `pretty`,
+  `format-source`) are, and every exported procedure or macro must be
+  documented (the 10.1 suite); `docs/builtins.md` lists them under Libraries.
+
 ## Documentation and the generated files (Phase 10)
 
 - **Every built-in is documented in the image.** A primitive by the table at the

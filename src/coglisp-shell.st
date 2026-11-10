@@ -247,8 +247,10 @@ cm value: repl value: 'running' value: 'process: buffer
 cm value: repl value: 'running' value: 'run
 	"Loop until end of input. Output from display/write goes to the same stream as results."
 	"read and read-char with no port read the lines typed after the form (Phase 7.9)"
-	LispPrimitives withOutput: out do: [
-		LispPrimitives withInput: (LispInputPort onStream: (LispLineStream on: in)) do: [self loop]].
+	"the session is a unit of its own: its imports last until it ends (specs/namespaces.md R-12)"
+	LispCurrentUnit value: LispUnit session during: [
+		LispPrimitives withOutput: out do: [
+			LispPrimitives withInput: (LispInputPort onStream: (LispLineStream on: in)) do: [self loop]]].
 	out nextPut: Character lf; flush'.
 cm value: repl value: 'running' value: 'loop
 	| buffer |

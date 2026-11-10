@@ -165,6 +165,7 @@ hours
 http
 ignore
 image
+imports
 index
 inexact
 infinite
@@ -185,6 +186,7 @@ lcm
 length
 let
 letrec
+library
 line
 lisp
 list

@@ -244,24 +244,121 @@ The full path of the file (require 'name) would load: name.lisp in the first fol
             (if [file exists] [file fullName] (loop (cdr folders))))))))
 [require-path category: "Files"]
 
-(define (require name)
-  "(require 'name)
-Loads the library name.lisp from the first folder of (hash-table-ref *env* 'library-path) that has it, once, and answers its full path; a name with slashes names a subfolder. The library path is the folders of COGLISP_PATH, then cog-lisp's own lib folder: (require 'cl) loads the Common Lisp names, (require 'test) the test library."
-  (if (not (symbol? name))
-      (error (string-append "require: not a symbol: " (with-output-to-string (lambda () (write name))))))
-  (let ((seen (assq name (hash-table-ref *env* 'libraries))))
-    (if seen
-        (cdr seen)
-        (let ((file (require-path name)))
-          (if (not file)
-              (error (string-append "require: no library named " (symbol->string name) " in "
-                                    (with-output-to-string
-                                      (lambda () (display (hash-table-ref/default *env* 'library-path '())))))))
-          ;; recorded before it loads, so a library that requires itself does not loop
-          (hash-table-set! *env* 'libraries (cons (cons name file) (hash-table-ref *env* 'libraries)))
-          (load file)
-          file))))
+(define (require name . options)
+  "(require 'name [option value] ...), (require \"file.lisp\" [option value] ...)
+Loads a library once and brings its exported names into this file (or this REPL session): name.lisp from the first folder of (hash-table-ref *env* 'library-path) that has it, or a file named by a string, beside this file. Answers the file's full path. With no options every export comes in unqualified; 'prefix p brings them in as p followed by the name ((require 'console 'prefix 'con:) gives con:rule), 'only, 'except and 'rename '((old new) ...) choose. A library's full names (console:rule) work whether or not they are imported. (require 'cl) loads the Common Lisp names, (require 'test) the test library."
+  (let* ((file (%require-file name))
+         (key (if (symbol? name) name file))
+         (seen (assoc key (hash-table-ref *env* 'libraries))))
+    (unless seen
+      ;; recorded before it loads, so a library that requires itself does not loop
+      (hash-table-set! *env* 'libraries (cons (cons key file) (hash-table-ref *env* 'libraries)))
+      (%load-library file))
+    (let ((unit (%unit-at file)) (here (%current-unit)))
+      (if (and unit here [unit isLibrary])
+          (%require-import here unit options)
+          (if (pair? options)
+              (error (string-append "require: " file " is not a library, so it has nothing to import")))))
+    file))
 [require category: "Files"]
+
+;; the full path of the library require names
+(define (%require-file name)
+  (cond ((symbol? name)
+         (let ((file (require-path name)))
+           (if (not file)
+               (error (string-append "require: no library named " (symbol->string name) " in "
+                                     (with-output-to-string
+                                       (lambda () (display (hash-table-ref/default *env* 'library-path '())))))))
+           file))
+        ((string? name)
+         (let ((ref [(smalltalk LispCompiler) resolveInput: name]))
+           (if (not [ref exists]) (error (string-append "require: no such file: " name)))
+           [ref fullName]))
+        (else (error (string-append "require: not a symbol or a file name: "
+                                    (with-output-to-string (lambda () (write name))))))))
+
+;; bring library's exports into unit, as options say: only, then except, then
+;; rename, then prefix (specs/namespaces.md R-5)
+(define (%require-import unit library options)
+  (let ((exports (vector->list [library exports]))
+        (lib-name (symbol->string [library library])))
+    (define (check-exported names what)
+      (for-each (lambda (n)
+                  (unless (memq n exports)
+                    (error (string-append "require: " lib-name " does not export " (symbol->string n)
+                                          " (in " what ")"))))
+                names))
+    (let loop ((os options) (only #f) (except '()) (rename '()) (prefix #f))
+      (cond
+        ((pair? os)
+         (unless (pair? (cdr os))
+           (error (string-append "require: the option " (with-output-to-string (lambda () (write (car os)))) " has no value")))
+         (let ((o (car os)) (v (cadr os)))
+           (cond ((eq? o 'only) (check-exported v "only") (loop (cddr os) v except rename prefix))
+                 ((eq? o 'except) (check-exported v "except") (loop (cddr os) only v rename prefix))
+                 ((eq? o 'rename)
+                  (check-exported (map car v) "rename")
+                  (loop (cddr os) only except v prefix))
+                 ((eq? o 'prefix)
+                  (unless (symbol? v) (error "require: a prefix is a symbol, such as con:"))
+                  (loop (cddr os) only except rename v))
+                 (else (error (string-append "require: unknown option "
+                                             (with-output-to-string (lambda () (write o)))
+                                             "; the options are only, except, rename and prefix"))))))
+        (else
+         ;; all or nothing: every conflict is found before any name is imported
+         [unit importAll:
+               (list->vector
+                (map (lambda (e)
+                       (let* ((renamed (let ((r (assq e rename))) (if r (cadr r) e)))
+                              (local (if prefix
+                                         (string->symbol (string-append (symbol->string prefix) (symbol->string renamed)))
+                                         renamed)))
+                         [local -> [library qualify: e]]))
+                     (filter (lambda (e) (and (or (not only) (memq e only)) (not (memq e except)))) exports)))])))))
+
+(define-syntax library
+  "(library name (export name ...))
+The first form of a library's file: the file's top-level definitions belong to the library name, and only the names exported are brought in by (require 'name). Each definition is also reachable by its full name, name:definition, from anywhere."
+  (syntax-rules (export)
+    ((_ name (export id ...)) (%library 'name '(id ...)))))
+
+(define (%library name exports)
+  (let ((unit (%current-unit)) (path (current-load-path)))
+    (if (or (not unit) (not path) (not [unit isAtFirstForm]))
+        (error "library: only as the first form of a file that is being loaded"))
+    (if (not (symbol? name)) (error "library: the name is a symbol"))
+    (for-each (lambda (e) (if (not (symbol? e)) (error "library: an export is a symbol"))) exports)
+    [unit beLibrary: name exports: (list->vector exports) owned: (list->vector (%library-own-names path))]
+    name))
+
+;; the names a file defines at its top level (in begin forms too): read, not run
+(define (%library-own-names path)
+  (define (names-of form acc)
+    (cond ((not (pair? form)) acc)
+          ((eq? (car form) 'begin) (fold names-of acc (cdr form)))
+          ((and (memq (car form) '(define define-macro define-syntax)) (pair? (cdr form)))
+           (let ((target (cadr form)))
+             (cond ((symbol? target) (cons target acc))
+                   ((and (pair? target) (symbol? (car target))) (cons (car target) acc))
+                   (else acc))))
+          (else acc)))
+  (call-with-input-file path
+    (lambda (port)
+      (let loop ((acc '()))
+        (let ((form (read port)))
+          (if (eof-object? form) acc (loop (names-of form acc))))))))
+
+(define (imports)
+  "(imports)
+What this file, or this REPL session, has imported: a list of (name . full-name), sorted by name."
+  (let ((unit (%current-unit)))
+    (if (not unit)
+        '()
+        (sort (map (lambda (a) (cons [a key] [a value])) (vector->list [[[unit imports] associations] asArray]))
+              (lambda (a b) (string<? (symbol->string (car a)) (symbol->string (car b))))))))
+[imports category: "Files"]
 
 ;;; Lists: R7RS's list-ref, list-tail and c[ad]r names, and SRFI 1's filter,
 ;;; remove, delete, delete-duplicates, fold, reduce and iota, with sort

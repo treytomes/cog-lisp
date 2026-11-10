@@ -32,6 +32,11 @@ const files = {
   // specs/library-path.md AC-5: a required library's macros are known to diagnostics.
   // (defun broken) is an error only as cl.lisp's macro: as a call it compiles quietly.
   'cl-user.lisp': "(require 'cl)\n(defun square (x) (* x x))\n(defun broken)\n",
+  // specs/namespaces.md R-13: a library, a document importing it under a prefix,
+  // and one defining a name it imported
+  'geo.lisp': '(library geo (export rule))\n(define (rule n)\n  "(rule n)\nA line of n dashes."\n  (make-string n #\\-))\n',
+  'uses-geo.lisp': "(require \"geo.lisp\" 'prefix 'g:)\n(display (g:rule 3))\n",
+  'clash.lisp': "(require \"geo.lisp\")\n(define (rule x) x)\n",
 };
 for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(workspace, name), text);
 const uri = (name) => pathToFileURL(path.join(workspace, name)).href;
@@ -54,6 +59,8 @@ async function main() {
   const server = windows
     ? cp.spawn('cmd.exe', ['/d', '/c', '.\\cog-lisp.bat', 'lib\\lsp.lisp'], { cwd: root, env })
     : cp.spawn('./cog-lisp.sh', ['lib/lsp.lisp'], { cwd: root, env });
+  // drained, as VS Code's client does: a full stderr pipe would stop the server
+  server.stderr.on('data', () => {});
   const connection = rpc.createMessageConnection(
     new rpc.StreamMessageReader(server.stdout), new rpc.StreamMessageWriter(server.stdin));
   const diagnostics = {};
@@ -121,7 +128,8 @@ async function main() {
   check("the document's own macro (twice) is known: no error at its use",
     !mainDiags.some((d) => d.range.start.line === 2));
   const brokenDiags = diagnostics[uri('broken.lisp')] || [];
-  const clDiags = diagnostics[uri('cl-user.lisp')] || [];
+  // errors only: (defun square ...) also redefines the built-in square, a warning (specs/namespaces.md R-10)
+  const clDiags = (diagnostics[uri('cl-user.lisp')] || []).filter((d) => d.severity === 1);
   check("a document's (require 'cl) is run, so its defun is a macro: only the misused one is reported (library-path AC-5)",
     clDiags.length === 1 && clDiags[0].range.start.line === 2 && clDiags[0].message.includes('defun'));
   check('a read error is reported where reading stopped', brokenDiags.length === 1 && brokenDiags[0].message.includes('string'));
@@ -161,6 +169,26 @@ async function main() {
   let refused = null;
   try { await format('fmt-broken.lisp', { tabSize: 4, insertSpaces: false }); } catch (e) { refused = e.message; }
   check('a document that does not read is an error, naming the line', !!refused && refused.includes('never closed (line 1)'));
+
+  // namespaces (specs/namespaces.md R-13, AC-4): through the document's imports
+  await openText('uses-geo.lisp', files['uses-geo.lisp']);
+  const geoHover = await connection.sendRequest('textDocument/hover', at('uses-geo.lisp', 1, 11));
+  check("hover through a prefix shows the library's documentation",
+    !!geoHover && JSON.stringify(geoHover.contents).includes('A line of n dashes'));
+  const geoDefs = await connection.sendRequest('textDocument/definition', at('uses-geo.lisp', 1, 11));
+  check("go to definition through a prefix finds the library's file",
+    Array.isArray(geoDefs) && geoDefs.length === 1 && same(geoDefs[0].uri, uri('geo.lisp')));
+  const geoItems = await connection.sendRequest('textDocument/completion', at('uses-geo.lisp', 1, 10));
+  check('completion offers the names the document imported, under their prefix',
+    geoItems.some((i) => i.label === 'g:rule'));
+  await openText('clash.lisp', files['clash.lisp']);
+  const clash = diagnostics[uri('clash.lisp')] || [];
+  check('defining a name the document imported is a diagnostic (R-8)',
+    clash.length === 1 && clash[0].message.includes('rule is imported (as geo:rule)'));
+  await openText('redefines.lisp', '(define (http-request . args) args)\n');
+  const redefines = diagnostics[uri('redefines.lisp')] || [];
+  check('redefining a built-in is a warning in the editor, on its form (R-10)',
+    redefines.length === 1 && redefines[0].severity === 2 && redefines[0].message.includes('replaces the built-in http-request'));
 
   // speed, on a file the size of the compiler
   const big = fs.readFileSync(path.join(root, 'lib', 'compiler', 'compiler.lisp'), 'utf8');

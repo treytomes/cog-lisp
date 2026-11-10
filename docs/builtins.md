@@ -10,7 +10,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 `(documentation 'name)` answers the same text at the REPL.
 
 - [Special forms](#special-forms) (16)
-- [Derived forms](#derived-forms) (15)
+- [Derived forms](#derived-forms) (16)
 - [Equality and types](#equality-and-types) (11)
 - [Numbers](#numbers) (62)
 - [Lists](#lists) (64)
@@ -23,12 +23,13 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Evaluation and macros](#evaluation-and-macros) (8)
 - [Output](#output) (4)
 - [Ports](#ports) (16)
-- [Files](#files) (20)
+- [Files](#files) (21)
 - [Network](#network) (8)
 - [The system](#the-system) (7)
 - [Smalltalk interop](#smalltalk-interop) (11)
 - [Language server](#language-server) (2)
 - [The compiler and reader](#the-compiler-and-reader) (23)
+- [Libraries](#libraries): cl, test, datetime, pretty, format-source
 
 ## Special forms
 
@@ -65,6 +66,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `let-values` | `(let-values ((formals expr) ...) body ...)` | macro | Binds the values of each expr to its formals, as lambda parameters, evaluated outside the bindings. |
 | `letrec` | `(letrec ((name init) ...) body ...)` | macro | As letrec*: bindings visible to every init and the body. |
 | `letrec*` | `(letrec* ((name init) ...) body ...)` | macro | Bindings visible to every init and the body, assigned in order: for procedures that call each other. |
+| `library` | `(library name (export name ...))` | macro | The first form of a library's file: the file's top-level definitions belong to the library name, and only the names exported are brought in by (require 'name). Each definition is also reachable by its full name, name:definition, from anywhere. |
 | `or` | `(or e ...)` | macro | The first true value, or #f; evaluation stops there. |
 | `parameterize` | `(parameterize ((param value) ...) body ...)` | macro | Evaluates the body with each param giving value (after its converter), and gives the old values back however the body is left: by returning, an error or a restart. |
 | `restart-case` | `(restart-case form (name (param ...) body ...) ...)` | macro | Evaluates form with named restarts; invoking one leaves form and evaluates its body with the arguments. |
@@ -418,9 +420,10 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `delete-file` | `(delete-file path)` | procedure | Deletes the file at path. |
 | `file-exists?` | `(file-exists? path)` | procedure | True if there is a file at path. |
 | `get-environment-variable` | `(get-environment-variable name)` | procedure | The value of the environment variable name, a string, or #f if it is not set. |
+| `imports` | `(imports)` | procedure | What this file, or this REPL session, has imported: a list of (name . full-name), sorted by name. |
 | `open-input-file` | `(open-input-file path)` | procedure | An input port reading the file at path. |
 | `open-output-file` | `(open-output-file path)` | procedure | An output port writing the file at path, which is replaced. |
-| `require` | `(require 'name)` | procedure | Loads the library name.lisp from the first folder of (hash-table-ref *env* 'library-path) that has it, once, and answers its full path; a name with slashes names a subfolder. The library path is the folders of COGLISP_PATH, then cog-lisp's own lib folder: (require 'cl) loads the Common Lisp names, (require 'test) the test library. |
+| `require` | `(require 'name [option value] ...), (require "file.lisp" [option value] ...)` | procedure | Loads a library once and brings its exported names into this file (or this REPL session): name.lisp from the first folder of (hash-table-ref *env* 'library-path) that has it, or a file named by a string, beside this file. Answers the file's full path. With no options every export comes in unqualified; 'prefix p brings them in as p followed by the name ((require 'console 'prefix 'con:) gives con:rule), 'only, 'except and 'rename '((old new) ...) choose. A library's full names (console:rule) work whether or not they are imported. (require 'cl) loads the Common Lisp names, (require 'test) the test library. |
 | `require-path` | `(require-path 'name)` | procedure | The full path of the file (require 'name) would load: name.lisp in the first folder of (hash-table-ref *env* 'library-path) that has it, or #f. Loads nothing. |
 | `with-input-from-file` | `(with-input-from-file path thunk)` | procedure | Calls thunk with the current input read from the file. |
 | `with-output-to-file` | `(with-output-to-file path thunk)` | procedure | Calls thunk with the current output written to the file. |
@@ -445,7 +448,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 |---|---|---|---|
 | `disassemble` | `(disassemble proc)` | procedure | Writes the bytecode of the procedure proc. |
 | `exit` | `(exit [code])` | procedure | Ends the program: (exit) and (exit #t) succeed, (exit #f) fails, (exit n) exits with n. |
-| `load` | `(load path)` | procedure | Reads and evaluates every form of the file at path, relative to the file being loaded, and answers the full path of that file. |
+| `load` | `(load path)` | procedure | Reads and evaluates every form of the file at path, relative to the file being loaded, and answers the full path of that file. A library file brings in every name it exports, unqualified. |
 | `procedure-documentation` | `(procedure-documentation proc)` | procedure | The documentation of proc, or #f: the call form on its first line, then what it does. |
 | `procedure-source` | `(procedure-source proc)` | procedure | The text proc was compiled from, or #f for a primitive. |
 | `save-image` | `(save-image)` | procedure | Saves the running image, so its definitions are there when it next starts. |
@@ -501,3 +504,157 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `reader-range-of` | `(reader-range-of reader list)` | procedure | The start and end offsets of the text the reader read the list from, or #f. |
 | `reader-source-for` | `(reader-source-for reader list)` | procedure | The text the reader read the list from, or #f. |
 | `special-form-names` | `(special-form-names)` | procedure | The names of the special forms, sorted. |
+
+## Libraries
+
+Not built in: a program loads one with `(require 'name)`, which brings in
+the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and
+`name:x` names each one from anywhere (specs/namespaces.md).
+
+### cl
+
+`(require 'cl)`
+
+| Name | Call | Kind | What it does |
+|---|---|---|---|
+| `1+` | `(1+ x)` | procedure | Returns a number incremented by one. |
+| `1-` | `(1- x)` | procedure | Returns a number decremented by one. |
+| `aref` | `(aref vector index)` | procedure | The element of vector at index, as vector-ref; setf can assign it. Vectors have one dimension, so one index. |
+| `atom` | `(atom x)` | procedure | Tests whether a value is not a pair. |
+| `boundp` | `(boundp symbol)` | procedure | True if the global environment binds symbol; an error if it is not a symbol. |
+| `consp` | `(consp x)` | procedure | Tests whether a value is a pair. |
+| `defconstant` | `(defconstant name value)` | macro | Defines name as value, and answers name. Not enforced: name can still be redefined or set. |
+| `defmacro` | `(defmacro name (param ... [&rest r]) body ...)` | macro | Defines the macro name, as define-macro does: body builds the expansion. Answers name. |
+| `defparameter` | `(defparameter name value)` | macro | Defines the variable name as value, and answers name. |
+| `defsetf` | `(defsetf access update), (defsetf access (param ...) (store) body ...)` | macro | Gives access a setter, so (setf (access arg ...) v) works: the short form calls (update arg ... v); the long form runs the body with each param bound to its argument and store to v. Answers the name access. |
+| `defun` | `(defun name (param ... [&rest r]) body ...)` | macro | Defines the procedure name, as (define (name param ...) body ...) does, and answers name. |
+| `defvar` | `(defvar name [value])` | macro | Defines the variable name, as () when no value is given, and answers name. It always assigns (Common Lisp's leaves a bound name alone). |
+| `dolist` | `(dolist (x list [result]) body ...)` | macro | Runs body with x bound to each element of list in turn, then answers result, else (). |
+| `dotimes` | `(dotimes (i n [result]) body ...)` | macro | Runs body with i bound to 0, 1, ... up to n - 1, then answers result, else (). |
+| `eighth` | `(eighth list)` | procedure | The eighth element of list. |
+| `eq` | `(eq a b)` | procedure | Compares values using eq? semantics. |
+| `eql` | `(eql a b)` | procedure | Compares values using eqv? semantics. |
+| `equal` | `(equal a b)` | procedure | Compares values structurally. |
+| `evenp` | `(evenp x)` | procedure | Tests whether an integer is even. |
+| `fifth` | `(fifth list)` | procedure | The fifth element of list. |
+| `first` | `(first x)` | procedure | Returns the first element of a list. |
+| `flet` | `(flet ((name (param ...) body ...) ...) e ...)` | macro | Local procedures, visible in the e forms but not to each other. |
+| `fourth` | `(fourth list)` | procedure | The fourth element of list. |
+| `funcall` | `(funcall f args ...)` | procedure | Calls a function with the supplied arguments. |
+| `gethash` | `(gethash key table [default])` | procedure | The value table holds for key, else default, else (). Only the value: test for a key with hash-table-contains?. setf can assign it. |
+| `handler-bind` | `(handler-bind ((type handler) ...) body ...)` | macro | Runs body; a condition of a type calls its handler before anything unwinds. A handler that returns declines, and the search goes on. |
+| `handler-case` | `(handler-case form (type ([var]) body ...) ...)` | macro | The value of form; or, when it signals a condition of a clause type (error, condition, t, or a Smalltalk exception class), unwinds and answers that clause body, with var bound to the condition. |
+| `ignore-errors` | `(ignore-errors body ...)` | macro | The value of the body, or () when it signals an error. |
+| `labels` | `(labels ((name (param ...) body ...) ...) e ...)` | macro | Local procedures that can call each other and themselves, visible in the e forms. |
+| `last` | `(last lst)` | procedure | Returns the final cons cell of a non-empty list. |
+| `listp` | `(listp x)` | procedure | Tests whether a value is a list. |
+| `mapcar` | `(mapcar f lst)` | procedure | Maps a function over a list and returns the results. |
+| `minusp` | `(minusp x)` | procedure | Tests whether a number is negative. |
+| `nil` | `nil` | value | The value (). |
+| `ninth` | `(ninth list)` | procedure | The ninth element of list. |
+| `nth` | `(nth n lst)` | procedure | Returns the element at zero-based index n. |
+| `nthcdr` | `(nthcdr n lst)` | procedure | Returns the tail reached after dropping n elements. |
+| `null` | `(null x)` | procedure | Tests whether a value is the empty list. |
+| `numberp` | `(numberp x)` | procedure | Tests whether a value is numeric. |
+| `oddp` | `(oddp x)` | procedure | Tests whether an integer is odd. |
+| `plusp` | `(plusp x)` | procedure | Tests whether a number is positive. |
+| `pop` | `(pop place)` | macro | Answers the first element of the list in place, a variable, and leaves the rest of it there. |
+| `prog1` | `(prog1 first e ...)` | macro | Evaluates first and then each e, and answers the value of first. |
+| `progn` | `(progn e ...)` | macro | Evaluates each e in turn and answers the last, as begin does. |
+| `push` | `(push x place)` | macro | Puts x on the front of the list in place, a variable, and answers the new list. |
+| `remhash` | `(remhash key table)` | procedure | Removes key from table, and answers whether it was there. |
+| `remove` | `(remove item list)` | procedure | list without the elements eql to item (Common Lisp's; cog-lisp's own remove takes a test, as SRFI 1's does). |
+| `remove-duplicates` | `(remove-duplicates list)` | procedure | list without its repeated elements (eql), the first of each kept. |
+| `remove-if` | `(remove-if test list)` | procedure | list without the elements for which test is true. |
+| `rest` | `(rest x)` | procedure | Returns the list after its first element. |
+| `second` | `(second x)` | procedure | Returns the second element of a list. |
+| `setf` | `(setf place value ...)` | macro | Assigns each value to its place, in turn: a variable, or a call such as (car x) or (vector-ref v i), which goes through its setter. Answers the last value. |
+| `setq` | `(setq name value ...)` | macro | Assigns each value to its name, in turn, and answers the last value. Each name must already be defined. |
+| `seventh` | `(seventh list)` | procedure | The seventh element of list. |
+| `sixth` | `(sixth list)` | procedure | The sixth element of list. |
+| `string-capitalize` | `(string-capitalize string)` | procedure | string with each word capitalized and the rest of it in lower case. |
+| `symbolp` | `(symbolp x)` | procedure | Tests whether a value is a symbol. |
+| `t` | `t` | value | The value #t. |
+| `tenth` | `(tenth list)` | procedure | The tenth element of list. |
+| `third` | `(third x)` | procedure | Returns the third element of a list. |
+| `unwind-protect` | `(unwind-protect protected cleanup ...)` | macro | The value of protected; the cleanup forms run after it however it ends, an error included. |
+| `zerop` | `(zerop x)` | procedure | Tests whether a number is zero. |
+
+### test
+
+`(require 'test)`
+
+| Name | Call | Kind | What it does |
+|---|---|---|---|
+| `check` | `(check expr expected)` | macro | Passes when the value of expr is equal? to expected; a failure shows both. |
+| `check-error` | `(check-error expr [text])` | macro | Passes when expr signals an error, whose message contains text when text is given. |
+| `check-error-class` | `(check-error-class expr class)` | macro | Passes when expr signals an error of the Smalltalk class named class, such as LispUnboundError. |
+| `check-false` | `(check-false expr)` | macro | Passes when expr is #f. |
+| `check-true` | `(check-true expr)` | macro | Passes when expr is true (anything but #f). |
+| `check-written` | `(check-written expr text)` | macro | Passes when write prints the value of expr as text. |
+| `define-test` | `(define-test name body ...)` | macro | Registers a test; run-tests runs its body, compiled when it runs, so a test can use what an earlier test defined or loaded. |
+| `eval-all` | `(eval-all source)` | procedure | Evaluates each expression in source and returns the last result. |
+| `run-tests` | `(run-tests)` | procedure | Runs registered tests and exits with a status based on the results. |
+| `run-tests/report` | `(run-tests/report)` | procedure | Runs registered tests and returns a summary report. |
+
+### datetime
+
+`(require 'datetime)`
+
+| Name | Call | Kind | What it does |
+|---|---|---|---|
+| `datetime->string` | `Readable string for dt.` | procedure |  |
+| `datetime->unix` | `Unix timestamp (seconds) for dt.` | procedure |  |
+| `datetime-add` | `dt + dur (dur is a Duration).` | procedure |  |
+| `datetime-day` | `Returns the day component of a datetime.` | procedure |  |
+| `datetime-diff-seconds` | `Seconds between two datetimes (a - b).` | procedure |  |
+| `datetime-from-date` | `DateAndTime at midnight on the given date.` | procedure |  |
+| `datetime-from-parts` | `DateAndTime from full components.` | procedure |  |
+| `datetime-from-string` | `(datetime-from-string string)` | procedure | The datetime an ISO 8601 string names: 2026-11-09, 2026-11-09T13:00, 2026-11-09T13:00:05.25+01:00. Without an offset it is UTC. The inverse of datetime->string. |
+| `datetime-from-unix` | `DateAndTime from a Unix timestamp (seconds).` | procedure |  |
+| `datetime-hour` | `Returns the hour component of a datetime.` | procedure |  |
+| `datetime-minute` | `Returns the minute component of a datetime.` | procedure |  |
+| `datetime-month` | `Returns the month component of a datetime.` | procedure |  |
+| `datetime-now` | `Current date and time.` | procedure |  |
+| `datetime-second` | `Returns the second component of a datetime.` | procedure |  |
+| `datetime-subtract` | `dt - dur (dur is a Duration).` | procedure |  |
+| `datetime-year` | `Returns the year component of a datetime.` | procedure |  |
+| `datetime<=?` | `Compares two datetimes for less-than-or-equal.` | procedure |  |
+| `datetime<?` | `Compares two datetimes for less-than.` | procedure |  |
+| `datetime=?` | `Compares two datetimes for equality.` | procedure |  |
+| `datetime>=?` | `Compares two datetimes for greater-than-or-equal.` | procedure |  |
+| `datetime>?` | `Compares two datetimes for greater-than.` | procedure |  |
+| `duration->seconds` | `Seconds in dur.` | procedure |  |
+| `duration->string` | `Readable string for dur.` | procedure |  |
+| `duration-add` | `Adds two durations.` | procedure |  |
+| `duration-days` | `Duration of n days.` | procedure |  |
+| `duration-hours` | `Duration of n hours.` | procedure |  |
+| `duration-minutes` | `Duration of n minutes.` | procedure |  |
+| `duration-seconds` | `Duration of n seconds.` | procedure |  |
+| `duration-subtract` | `Subtracts the second duration from the first.` | procedure |  |
+| `duration<=?` | `Tests whether the first duration is no longer than the second.` | procedure |  |
+| `duration<?` | `Tests whether the first duration is shorter than the second.` | procedure |  |
+| `duration=?` | `Tests whether two durations are equal.` | procedure |  |
+| `interval->string` | `Returns a readable representation of an interval.` | procedure |  |
+| `interval-contains?` | `True if dt lies within iv (inclusive on both ends).` | procedure |  |
+| `interval-duration-seconds` | `Length of iv in seconds.` | procedure |  |
+| `interval-end` | `Returns the end datetime of an interval.` | procedure |  |
+| `interval-start` | `Returns the start datetime of an interval.` | procedure |  |
+| `make-interval` | `Interval from start datetime to end datetime.` | procedure |  |
+
+### pretty
+
+`(require 'pretty)`
+
+| Name | Call | Kind | What it does |
+|---|---|---|---|
+| `pretty-string` | `(pretty-string value [indent])` | procedure | value as a readable string: a list one element a line, a hash table as #hash( key: value, ... ) with its keys sorted, nested ones indented, the rest as display shows them (strings as write does). indent, 0 by default, is the column the value starts at. |
+
+### format-source
+
+`(require 'format-source)`
+
+| Name | Call | Kind | What it does |
+|---|---|---|---|
+| `format-source` | `(format-source text [style width])` | procedure | text, cog-lisp source, laid out: a form whose elements hold no list on one line; otherwise its head and header arguments (if's test, let's bindings, define's name) on the first line, each other argument on a line of its own one level deeper, and the closing parenthesis on its own line. Comments, strings and every other token come out exactly as they went in; only whitespace changes. Indents with tabs, or with (format-source text 'spaces 2) that many spaces a level. Text that does not read is an error naming the line. |
+| `format-source-headers` | `format-source-headers` | value | A value (a list): see the library's source. |

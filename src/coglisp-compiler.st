@@ -16,7 +16,7 @@
  LispCompiler withoutOptions: #(...) do: [...] switches some off, for
  benchmarks and debugging.
  ============================================================================"
-| failures cm comp err lpath lread |
+| failures cm comp err lpath lread unit unitvar |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -33,6 +33,10 @@ err  := (LispError << #LispCompileError) slots: { #forms }; package: 'CogLisp-Co
 lpath := (DynamicVariable << #LispLoadPath) package: 'CogLisp-Compiler'; install.
 "The reader written in LISP, behind LispReader's protocol (Phase 8 step 8.5)."
 lread := (Object << #LispReaderInLisp) slots: { #state. #stream. #source }; package: 'CogLisp-Compiler'; install.
+"What is being compiled, a file or the REPL session, and the one per process (specs/namespaces.md)."
+unit := (Object << #LispUnit) slots: { #path. #library. #exports. #owned. #imports. #source. #offset. #forms. #warnings };
+	sharedVariables: { #Units. #Libraries. #Builtins }; package: 'CogLisp-Compiler'; install.
+unitvar := (DynamicVariable << #LispCurrentUnit) package: 'CogLisp-Compiler'; install.
 
 cm value: err value: 'accessing' value: 'forms
 	"The forms the error happened in, innermost first, ending with the top-level
@@ -92,7 +96,10 @@ cm value: comp value: 'evaluating' value: 'evalAll: aString named: aName
 	| r d result |
 	r := LispReader on: aString.
 	result := LispUnspecified default.
-	[[(d := r next) == LispReader eofObject] whileFalse: [result := self eval: d from: r]]
+	[[(d := r next) == LispReader eofObject] whileFalse: [
+		"where the form is, for a warning (specs/namespaces.md R-10)"
+		LispCurrentUnit value ifNotNil: [:u | u source: aString offset: (r datumStart ifNil: [0])].
+		result := self eval: d from: r]]
 		on: Error
 		do: [:e | | offset |
 			(e isKindOf: LispLocatedError) ifTrue: [e pass].
@@ -105,7 +112,11 @@ cm value: comp value: 'evaluating' value: 'evalFile: aPath
 	| file |
 	file := self class resolveInput: aPath.
 	file exists ifFalse: [^ (LispFileError new) signal: ''file not found: '' , aPath].
-	^ LispLoadPath value: file fullName during: [self evalAll: file contents named: file fullName]'.
+	"each file is compiled in a unit of its own (specs/namespaces.md)"
+	^ LispLoadPath value: file fullName during: [
+		LispCurrentUnit
+			value: (LispUnit forFile: file fullName inheriting: LispCurrentUnit value)
+			during: [self evalAll: file contents named: file fullName]]'.
 
 "=== paths ================================================================="
 cm value: comp class value: 'paths' value: 'isAbsolute: aPath
@@ -197,8 +208,50 @@ cm value: comp class value: 'implementation' value: 'sealLispCompiler: lib
 			v := (LispEnvironment default cellFor: sym) valueIfUnbound: [nil].
 			walkProc value: v.
 			(v isKindOf: (Smalltalk at: #LispHashTable)) ifTrue: [v values do: [:x | walkProc value: x]]]].
+	self sealLibraries: lib frozen: frozen.
 	"machine code made before sealing may still read the old cells"
 	Smalltalk vm voidCogVMState'.
+cm value: comp class value: 'implementation' value: 'builtInLibraryNames
+	"the lib/ files the build compiles into the image, besides the compiler"
+	^ #(''core.lisp'' ''format.lisp'' ''json.lisp'' ''http.lisp'' ''coverage.lisp'')'.
+cm value: comp class value: 'implementation' value: 'sealLibraries: lib frozen: frozen
+	"The built-in libraries are sealed too (specs/namespaces.md R-9): every global
+	 cell their code calls that holds a procedure becomes a private copy, so a
+	 program that redefines http-request does not change http-get. A cell that
+	 holds data stays shared, so a value a program sets is seen. The copies are
+	 the ones the compiler''s seal made, where it made one."
+	| copies seen walk walkProc callable |
+	copies := IdentitySet new.
+	frozen do: [:c | copies add: c].
+	seen := IdentitySet new.
+	callable := [:v | (v isKindOf: (Smalltalk at: #LispProcedure)) or: [v isKindOf: (Smalltalk at: #LispMacro)]].
+	walk := nil.
+	walk := [:code |
+		(seen includes: code) ifFalse: [
+			seen add: code.
+			1 to: code numLiterals do: [:i | | lit |
+				lit := code literalAt: i.
+				(lit isKindOf: LispGlobal)
+					ifTrue: [
+						(copies includes: lit) ifFalse: [
+							(frozen includesKey: lit)
+								ifTrue: [code literalAt: i put: (frozen at: lit)]
+								ifFalse: [(callable value: (lit valueIfUnbound: [nil])) ifTrue: [| copy |
+									copy := lit frozenCopy.
+									frozen at: lit put: copy.
+									copies add: copy.
+									code literalAt: i put: copy]]]]
+					ifFalse: [
+						(lit isKindOf: CompiledBlock) ifTrue: [walk value: lit].
+						(lit isKindOf: BlockClosure) ifTrue: [walk value: lit compiledBlock]]]]].
+	walkProc := [:v |
+		((v isKindOf: (Smalltalk at: #LispProcedure)) and: [v block isKindOf: BlockClosure])
+			ifTrue: [walk value: v block compiledBlock]].
+	self builtInLibraryNames do: [:name |
+		(self definedNamesIn: lib / name) do: [:sym | | v |
+			v := (LispEnvironment default cellFor: sym) valueIfUnbound: [nil].
+			walkProc value: v.
+			(v isKindOf: (Smalltalk at: #LispHashTable)) ifTrue: [v values do: [:x | walkProc value: x]]]]'.
 cm value: comp class value: 'implementation' value: 'lispSourceMap: aSourceMap
 	"What the LISP compiler takes as a source map: the LISP reader''s state inside
 	 its adapter, or #f."
@@ -246,6 +299,8 @@ cm value: comp class value: 'seeded build' value: 'buildFromSeed: build
 	forms := call value: ''length'' value: { result at: 2 }.
 	diffs := LispCons elementsOf: (call value: ''bootstrap-differences'' value: { result. 0. 1 }) for: ''build''.
 	self sealLispCompiler: lib.
+	"what a program redefining is warned about (specs/namespaces.md R-10)"
+	LispUnit recordBuiltins.
 	LispEntries := self lispEntries.
 	prims classPool at: #GensymCounter put: nil.
 	BuildInfo := OrderedCollection new.
@@ -371,6 +426,157 @@ cm value: lread value: 'source' value: 'sourceFor: aCons
 	| s |
 	s := (self entry: #sourceFor) value: state value: aCons.
 	^ s == false ifTrue: [nil] ifFalse: [s]'.
+
+"=== LispUnit, LispCurrentUnit (specs/namespaces.md) =======================
+ A unit is what is being compiled: a file, or the REPL session. It holds the
+ file's imports (a name in the file to the full name it means), and, for a
+ library, its name, its exports and the names it owns (defines). The compiler
+ resolves every free name through the current unit (lc-resolve-global,
+ lib/compiler/compiler.lisp); compiled code holds cells as before. A program
+ file another file loads starts with the loader's imports, as if included; a
+ library starts with none. A library's definitions are global cells under full
+ names (console:rule), so a full name works from anywhere."
+cm value: unit class value: 'instance creation' value: 'forFile: aPath inheriting: outer
+	| u |
+	u := self new setPath: aPath.
+	(outer notNil and: [outer isLibrary not]) ifTrue: [u inheritImports: outer imports].
+	self units at: aPath put: u.
+	^ u'.
+cm value: unit class value: 'instance creation' value: 'session
+	^ self new setPath: nil'.
+cm value: unit class value: 'registry' value: 'units
+	Units isNil ifTrue: [Units := Dictionary new].
+	^ Units'.
+cm value: unit class value: 'registry' value: 'atPath: aPath
+	^ self units at: aPath ifAbsent: [nil]'.
+cm value: unit class value: 'registry' value: 'libraries
+	Libraries isNil ifTrue: [Libraries := IdentityDictionary new].
+	^ Libraries'.
+cm value: unit class value: 'registry' value: 'libraryNamed: aSymbol
+	^ self libraries at: aSymbol ifAbsent: [nil]'.
+cm value: unit class value: 'registry' value: 'current
+	^ LispCurrentUnit value'.
+cm value: unit class value: 'imports' value: 'importAllFrom: aPath
+	"After load: a library brings every export into the current unit, unqualified."
+	| u cur |
+	u := self atPath: aPath.
+	cur := LispCurrentUnit value.
+	(u notNil and: [u isLibrary and: [cur notNil]]) ifTrue: [
+		cur importAll: (u exports collect: [:e | e -> (u qualify: e)])]'.
+cm value: unit class value: 'built-ins' value: 'recordBuiltins
+	"Every name bound now, at the end of the build: the built-ins, whose
+	 redefinition by a program is warned about (R-10)."
+	Builtins := IdentitySet new.
+	LispEnvironment default cellsDo: [:c | c isBound ifTrue: [Builtins add: c symbol]]'.
+cm value: unit class value: 'built-ins' value: 'isBuiltin: aSymbol
+	^ Builtins notNil and: [Builtins includes: aSymbol]'.
+cm value: unit value: 'private' value: 'setPath: aPath
+	path := aPath.
+	imports := IdentityDictionary new.
+	owned := IdentitySet new.
+	exports := #()'.
+cm value: unit value: 'private' value: 'inheritImports: aDictionary
+	imports := aDictionary copy'.
+cm value: unit value: 'accessing' value: 'path
+	^ path'.
+cm value: unit value: 'accessing' value: 'library
+	^ library'.
+cm value: unit value: 'accessing' value: 'exports
+	^ exports'.
+cm value: unit value: 'accessing' value: 'imports
+	^ imports'.
+cm value: unit value: 'testing' value: 'isLibrary
+	^ library notNil'.
+cm value: unit value: 'library' value: 'beLibrary: aSymbol exports: anArray owned: names
+	"The file declares itself the library aSymbol (R-1): it owns the names it
+	 defines and those it exports, and starts with no imports of its own."
+	library notNil ifTrue: [^ (LispError new) signal: ''library: this file is already the library '' , library name].
+	library := aSymbol.
+	exports := anArray asArray.
+	owned := IdentitySet new.
+	owned addAll: exports; addAll: names.
+	imports := IdentityDictionary new.
+	self class libraries at: aSymbol put: self'.
+cm value: unit value: 'library' value: 'owns: aSymbol
+	^ owned includes: aSymbol'.
+cm value: unit value: 'library' value: 'addOwned: aSymbol
+	owned add: aSymbol'.
+cm value: unit value: 'library' value: 'exports: aSymbol
+	^ exports includes: aSymbol'.
+cm value: unit value: 'library' value: 'qualify: aSymbol
+	"aSymbol''s full name in this library: console:rule"
+	^ LispSymbol named: library name , '':'' , aSymbol name'.
+cm value: unit value: 'imports' value: 'importAt: aSymbol
+	^ imports at: aSymbol ifAbsent: [nil]'.
+cm value: unit value: 'imports' value: 'importConflict: aLocal as: aTarget
+	"Why aLocal cannot mean aTarget here (R-8), or nil: a different import under the
+	 same name, or a name the library itself defines."
+	| existing |
+	(self isLibrary and: [self owns: aLocal]) ifTrue: [
+		^ ''require: '' , aLocal name , '' is defined by this library, '' , library name ,
+			''; import with a prefix, or rename it''].
+	existing := imports at: aLocal ifAbsent: [nil].
+	(existing notNil and: [existing ~~ aTarget]) ifTrue: [
+		^ ''require: '' , aLocal name , '' is already imported as '' , existing name ,
+			''; import one of them with a prefix, or rename it''].
+	^ nil'.
+cm value: unit value: 'imports' value: 'import: aLocal as: aTarget
+	"Makes aLocal mean aTarget in this unit. The same import twice is nothing."
+	(self importConflict: aLocal as: aTarget) ifNotNil: [:why | ^ (LispError new) signal: why].
+	imports at: aLocal put: aTarget'.
+cm value: unit value: 'imports' value: 'importAll: pairs
+	"Each (local . target) of pairs, an Array of Associations, or none of them: every
+	 conflict is found before anything is imported."
+	pairs do: [:p | (self importConflict: p key as: p value) ifNotNil: [:why | ^ (LispError new) signal: why]].
+	pairs do: [:p | imports at: p key put: p value]'.
+cm value: unit value: 'position' value: 'source: aString offset: anInteger
+	"called before each top-level form of the file is evaluated"
+	source := aString.
+	offset := anInteger.
+	forms := (forms ifNil: [0]) + 1'.
+cm value: unit value: 'position' value: 'isAtFirstForm
+	"is the form being evaluated the file''s first? (library must be)"
+	^ path notNil and: [(forms ifNil: [0]) <= 1]'.
+cm value: unit value: 'position' value: 'where
+	"path:line, or the REPL, for a warning"
+	| line |
+	path isNil ifTrue: [^ ''the REPL''].
+	line := 1.
+	(source notNil and: [offset notNil]) ifTrue: [
+		1 to: (offset min: source size) do: [:i | (source at: i) = Character lf ifTrue: [line := line + 1]]].
+	^ path , '':'' , line printString'.
+cm value: unit value: 'warnings' value: 'warn: aString
+	"A warning on stderr, naming where (R-10); or kept, for whoever collects them
+	 (the language server shows them in the editor). LispTextOutput is in a later
+	 package."
+	| err |
+	self isOwnSource ifTrue: [^ self].
+	warnings ifNotNil: [^ warnings add: aString].
+	err := (Smalltalk at: #LispTextOutput) stderr.
+	err nextPutAll: ''warning: '' , self where , '': '' , aString; nextPut: Character lf; flush'.
+cm value: unit value: 'warnings' value: 'isOwnSource
+	"is this file one of the own lib/ sources of cog-lisp, whose definitions are the
+	 built-ins? Reloading one (as some suites do) replaces nothing a program wrote.
+	 The folder is under COGLISP_HOME, as the home in *env* is, else under the
+	 parent of the image folder."
+	| given home |
+	path ifNil: [^ false].
+	given := OSEnvironment current at: ''COGLISP_HOME'' ifAbsent: [''''].
+	home := given isEmpty
+		ifTrue: [Smalltalk imageDirectory parent]
+		ifFalse: [given asFileReference].
+	^ (path asFileReference fullName asLowercase copyReplaceAll: ''\'' with: ''/'')
+		beginsWith: ((home / ''lib'') fullName asLowercase copyReplaceAll: ''\'' with: ''/'') , ''/'''.
+cm value: unit value: 'warnings' value: 'collectWarnings
+	warnings := OrderedCollection new'.
+cm value: unit value: 'warnings' value: 'takeWarnings
+	"the warnings kept since the last take, as an Array"
+	| ws |
+	ws := (warnings ifNil: [#()]) asArray.
+	warnings ifNotNil: [warnings := OrderedCollection new].
+	^ ws'.
+cm value: unitvar value: 'accessing' value: 'default
+	^ nil'.
 
 "=== load report ==========================================================="
 Stdio stdout

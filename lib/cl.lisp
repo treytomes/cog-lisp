@@ -25,10 +25,23 @@
 ;;;     gives a function a setter; define-setf-expander is not provided.
 ;;;   - gethash answers only the value, not whether the key was there (use
 ;;;     hash-table-contains?); aref takes one index.
-;;;   - remove takes an item, as in Common Lisp: it shadows cog-lisp's own remove,
-;;;     which takes a test (SRFI 1), while this file is loaded.
+;;;   - remove takes an item, as in Common Lisp: in a file that requires cl it
+;;;     shadows cog-lisp's own remove, which takes a test (SRFI 1); elsewhere the
+;;;     built-in is untouched. cl:remove names cl's from anywhere.
 ;;;   - format is cog-lisp's own, built in, with Common Lisp's directives.
 ;;;   - Not provided: loop, keywords, Common Lisp's multiple values, &optional, &key.
+
+;;; A library (specs/namespaces.md): (require 'cl) brings these names in; each
+;;; is also cl:name everywhere, and the names not exported are private.
+
+(library cl
+  (export t nil defun defmacro defvar defparameter defconstant setq setf defsetf
+         progn prog1 labels flet dolist dotimes first second third rest nthcdr
+         nth last fourth fifth sixth seventh eighth ninth tenth boundp remove
+         remove-if remove-duplicates string-capitalize aref gethash remhash
+         consp listp atom null eql eq equal numberp symbolp zerop plusp minusp
+         evenp oddp 1+ 1- mapcar funcall push pop handler-case handler-bind
+         ignore-errors unwind-protect))
 
 (define t #t)
 (define nil '())
@@ -44,32 +57,44 @@
 
 ; Each answers the name it defines, as Common Lisp's do (issue #3).
 (define-macro (defun name params . body)
+  "(defun name (param ... [&rest r]) body ...)
+Defines the procedure name, as (define (name param ...) body ...) does, and answers name."
   `(begin (define (,name . ,(%cl-params params)) ,@body) ',name))
 
 (define-macro (defmacro name params . body)
+  "(defmacro name (param ... [&rest r]) body ...)
+Defines the macro name, as define-macro does: body builds the expansion. Answers name."
   `(begin (define-macro (,name . ,(%cl-params params)) ,@body) ',name))
 
 (define-macro (defvar name . value)
+  "(defvar name [value])
+Defines the variable name, as () when no value is given, and answers name. It always assigns (Common Lisp's leaves a bound name alone)."
   `(begin (define ,name ,(if (null? value) ''() (car value))) ',name))
 
 (define-macro (defparameter name value)
+  "(defparameter name value)
+Defines the variable name as value, and answers name."
   `(begin (define ,name ,value) ',name))
 
 ; (defconstant name value): defines name, and answers it (issue #4). Not
 ; enforced: the name can still be redefined or set!.
 (define-macro (defconstant name value)
+  "(defconstant name value)
+Defines name as value, and answers name. Not enforced: name can still be redefined or set."
   `(begin (define ,name ,value) ',name))
 
 ;;; assignment and sequencing
 
 ;; (setq a 1 b 2) sets each in turn and returns the last value
 (define-macro (setq . pairs)
+  "(setq name value ...)
+Assigns each value to its name, in turn, and answers the last value. Each name must already be defined."
   (cond ((null? pairs) ''())
         ((null? (cdr (cdr pairs)))
          `(begin (set! ,(car pairs) ,(car (cdr pairs))) ,(car pairs)))
         (else
          `(begin (set! ,(car pairs) ,(car (cdr pairs)))
-                 (setq ,@(cdr (cdr pairs)))))))
+                 (cl:setq ,@(cdr (cdr pairs)))))))
 
 ;; (setf place value ...) -- each place a variable or a call such as (car x),
 ;; assigned with the generalized set! (specs/phase-9-language.md step 9.4); the
@@ -83,7 +108,7 @@ Assigns each value to its place, in turn: a variable, or a call such as (car x) 
       (let ((g (gensym)))
         `(let ((,g #f))
            (set! ,(car pairs) (begin (set! ,g ,(car (cdr pairs))) ,g))
-           ,(if (null? (cdr (cdr pairs))) g `(setf ,@(cdr (cdr pairs))))))))
+           ,(if (null? (cdr (cdr pairs))) g `(cl:setf ,@(cdr (cdr pairs))))))))
 
 ;; (defsetf access update) -- (setf (access arg ...) v) calls (update arg ... v)
 ;; (defsetf access (param ...) (store) body ...) -- runs body with the params bound
@@ -104,14 +129,18 @@ Gives access a setter, so (setf (access arg ...) v) works: the short form calls 
         `(begin
            (set! (setter ,access)
                  (lambda ,args
-                   (let ((,store (%cl-last-of ,args)))
-                     (apply (lambda ,(%cl-params params) ,@body) (%cl-all-but-last ,args)))))
+                   (let ((,store (cl:%cl-last-of ,args)))
+                     (apply (lambda ,(%cl-params params) ,@body) (cl:%cl-all-but-last ,args)))))
            ',access))))
 
 (define-macro (progn . body)
+  "(progn e ...)
+Evaluates each e in turn and answers the last, as begin does."
   `(begin ,@body))
 
 (define-macro (prog1 first . rest)
+  "(prog1 first e ...)
+Evaluates first and then each e, and answers the value of first."
   (let ((g (gensym)))
     `(let ((,g ,first)) ,@rest ,g)))
 
@@ -119,6 +148,8 @@ Gives access a setter, so (setf (access arg ...) v) works: the short form calls 
 
 ;; (labels ((f (x) ...) ...) body ...) -- may call each other
 (define-macro (labels defs . body)
+  "(labels ((name (param ...) body ...) ...) e ...)
+Local procedures that can call each other and themselves, visible in the e forms."
   `(let ()
      ,@(map (lambda (d)
               `(define (,(car d) . ,(%cl-params (car (cdr d)))) ,@(cdr (cdr d))))
@@ -127,6 +158,8 @@ Gives access a setter, so (setf (access arg ...) v) works: the short form calls 
 
 ;; (flet ((f (x) ...) ...) body ...) -- not visible to each other
 (define-macro (flet defs . body)
+  "(flet ((name (param ...) body ...) ...) e ...)
+Local procedures, visible in the e forms but not to each other."
   `(let ,(map (lambda (d)
                 `(,(car d) (lambda ,(%cl-params (car (cdr d))) ,@(cdr (cdr d)))))
               defs)
@@ -136,6 +169,8 @@ Gives access a setter, so (setf (access arg ...) v) works: the short form calls 
 
 ;; (dolist (x list [result]) body ...)
 (define-macro (dolist spec . body)
+  "(dolist (x list [result]) body ...)
+Runs body with x bound to each element of list in turn, then answers result, else ()."
   (let ((loop (gensym))
         (rest (gensym)))
     `(let ,loop ((,rest ,(car (cdr spec))))
@@ -147,6 +182,8 @@ Gives access a setter, so (setf (access arg ...) v) works: the short form calls 
 
 ;; (dotimes (i n [result]) body ...) -- i runs from 0 below n
 (define-macro (dotimes spec . body)
+  "(dotimes (i n [result]) body ...)
+Runs body with i bound to 0, 1, ... up to n - 1, then answers result, else ()."
   (let ((loop (gensym))
         (limit (gensym)))
     `(let ((,limit ,(car (cdr spec))))
@@ -240,6 +277,8 @@ string with each word capitalized and the rest of it in lower case."
 
 ;; (aref vector index): cog-lisp's vectors have one dimension
 (define (aref v . indexes)
+  "(aref vector index)
+The element of vector at index, as vector-ref; setf can assign it. Vectors have one dimension, so one index."
   (if (and (pair? indexes) (null? (cdr indexes)))
       (vector-ref v (car indexes))
       (error "aref: cog-lisp's vectors have one dimension: give one index")))
@@ -253,11 +292,15 @@ string with each word capitalized and the rest of it in lower case."
 ;; cog-lisp's multiple values do not shrink to one, so a second value would break
 ;; (+ 1 (gethash k h 0)). Test for a key with (hash-table-contains? table key).
 (define (gethash key table . default)
+  "(gethash key table [default])
+The value table holds for key, else default, else (). Only the value: test for a key with hash-table-contains?. setf can assign it."
   (hash-table-ref/default table key (if (null? default) '() (car default))))
 (set! (setter gethash)
       (lambda (key table . default-and-value)
         (hash-table-set! table key (%cl-last-of default-and-value))))
 (define (remhash key table)
+  "(remhash key table)
+Removes key from table, and answers whether it was there."
   (let ((had (hash-table-contains? table key)))
     (hash-table-delete! table key)
     had))
@@ -317,9 +360,13 @@ string with each word capitalized and the rest of it in lower case."
   (apply f args))
 
 (define-macro (push x place)
+  "(push x place)
+Puts x on the front of the list in place, a variable, and answers the new list."
   `(set! ,place (cons ,x ,place)))
 
 (define-macro (pop place)
+  "(pop place)
+Answers the first element of the list in place, a variable, and leaves the rest of it there."
   (let ((g (gensym)))
     `(let ((,g (car ,place)))
        (set! ,place (cdr ,place))
@@ -338,9 +385,11 @@ string with each word capitalized and the rest of it in lower case."
 
 ;; (handler-case form (type (var) body ...) ...) -- unwinds, then runs the clause
 (define-macro (handler-case form . clauses)
+  "(handler-case form (type ([var]) body ...) ...)
+The value of form; or, when it signals a condition of a clause type (error, condition, t, or a Smalltalk exception class), unwinds and answers that clause body, with var bound to the condition."
   (let ((c (gensym)))
     `(guard (,c ,@(map (lambda (cl)
-                         `((%cl-type-match? ',(car cl) ,c)
+                         `((cl:%cl-type-match? ',(car cl) ,c)
                            (let ,(if (null? (car (cdr cl))) '() `((,(car (car (cdr cl))) ,c)))
                              ,@(cdr (cdr cl)))))
                        clauses))
@@ -349,19 +398,25 @@ string with each word capitalized and the rest of it in lower case."
 ;; (handler-bind ((type handler) ...) body ...) -- handlers run before unwinding;
 ;; one that returns declines, and the search goes on
 (define-macro (handler-bind bindings . body)
+  "(handler-bind ((type handler) ...) body ...)
+Runs body; a condition of a type calls its handler before anything unwinds. A handler that returns declines, and the search goes on."
   (if (null? bindings)
-      `(progn ,@body)
+      `(cl:progn ,@body)
       (let ((c (gensym)))
         `(%handler-bind
-           (lambda (,c) (when (%cl-type-match? ',(car (car bindings)) ,c)
+           (lambda (,c) (when (cl:%cl-type-match? ',(car (car bindings)) ,c)
                           (,(car (cdr (car bindings))) ,c)))
-           (lambda () (handler-bind ,(cdr bindings) ,@body))))))
+           (lambda () (cl:handler-bind ,(cdr bindings) ,@body))))))
 
 ;; (ignore-errors form ...) -- nil when an error is signalled
 (define-macro (ignore-errors . body)
+  "(ignore-errors body ...)
+The value of the body, or () when it signals an error."
   (let ((c (gensym)))
-    `(guard (,c ((error-object? ,c) nil)) ,@body)))
+    `(guard (,c ((error-object? ,c) cl:nil)) ,@body)))
 
 ;; (unwind-protect protected cleanup ...)
 (define-macro (unwind-protect protected . cleanup)
+  "(unwind-protect protected cleanup ...)
+The value of protected; the cleanup forms run after it however it ends, an error included."
   `(dynamic-wind (lambda () #f) (lambda () ,protected) (lambda () ,@cleanup)))

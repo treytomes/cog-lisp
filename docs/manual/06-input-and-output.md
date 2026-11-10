@@ -353,4 +353,4 @@ http: could not connect to 127.0.0.1
 
 ---
 
-Previous: [Hash tables](05-hash-tables.md) · [Contents](README.md) · Next: [Errors, conditions and restarts](07-errors.md)
+Previous: [Hash tables](05-hash-tables.md) · [Contents](README.md) · Next: [Libraries and namespaces](07-namespaces.md)

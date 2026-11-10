@@ -47,10 +47,12 @@
   (check (require-path 'cl) (file-in home "lib" "cl.lisp"))
   (check (require-path 'test) (file-in home "lib" "test.lisp")))
 
-(define-test "an unknown name, and a name that is not a symbol"
+(define-test "an unknown name, a file that is not there, and a name that is neither"
   (check (require-path 'no-such-library) #f)
   (check-error (require 'no-such-library) "require: no library named no-such-library in")
-  (check-error (require "cl") "require: not a symbol"))
+;; a string names a file beside this one (specs/namespaces.md)
+  (check-error (require "cl") "require: no such file: cl")
+  (check-error (require 42) "require: not a symbol or a file name: 42"))
 
 (define-test "load answers the full path of the file it loaded (R-5)"
   (let ((before library-test-loads))

@@ -9,7 +9,11 @@
      cellsDo: (lambda (c) (when [c isBound] (set! acc (cons (cons [c symbol] [c value]) acc))))]
     acc))
 
-(define (internal-name? s) (char=? (string-ref (symbol->string s) 0) #\%))
+;; internal: %name, or a library's private lib:%name (specs/namespaces.md)
+(define (internal-name? s)
+  (let* ((n (symbol->string s)) (colon (string-index n #\:))
+         (local (if colon (substring n (+ colon 1) (string-length n)) n)))
+    (or (= (string-length local) 0) (char=? (string-ref local 0) #\%))))
 (define (primitive? v) (and (procedure? v) (not (procedure-source v))))
 
 ;; the first line of a documentation string
@@ -42,7 +46,7 @@
   (let ((core (sr-filter (lambda (g) (and [(cdr g) isKindOf: (smalltalk LispSyntax)]
                                           (equal? (documentation-category (car g)) "Derived forms")))
                          (all-globals)))
-        (forms '(cond and or when unless let* letrec* letrec case do let-values let*-values guard restart-case parameterize)))
+        (forms '(cond and or when unless let* letrec* letrec case do let-values let*-values guard restart-case parameterize library)))
     (check (sr-filter (lambda (n) (not (documentation n))) forms) '())
     (check (sr-filter (lambda (n) (not (names-itself? n (documentation n)))) forms) '())
     (check (length core) (length forms))))
@@ -96,5 +100,25 @@ x times x."
   (check (first-line (documentation 'hash-table-exists?)) "(hash-table-exists? table key)")
   (check (first-line (documentation 'hash-table-contains?)) "(hash-table-contains? table key)")
   (check (hash-table-exists? (alist->hash-table '((a . 1))) 'a) #t))
+
+;; specs/namespaces.md AC-5, R-14: each shipped library exports what it documents,
+;; and the reference lists them; a value (cl's t and nil) has no documentation
+(define-test "every procedure and macro a shipped library exports is documented"
+  (let ((env [(smalltalk LispEnvironment) default]) (missing '()))
+    (for-each
+     (lambda (library)
+       ;; test is loaded already, and running: loading it again would reset it
+       (when (smalltalk-nil? [(smalltalk LispUnit) libraryNamed: library])
+         (require library 'only '()))
+       (let ((unit [(smalltalk LispUnit) libraryNamed: library]))
+         (for-each (lambda (name)
+                     (let* ((full [unit qualify: name])
+                            (value [env at: full ifAbsent: (lambda () #f)]))
+                       (when (and (or (procedure? value) [value isKindOf: (smalltalk LispMacro)])
+                                  (not (documentation full)))
+                         (set! missing (cons full missing)))))
+                   (vector->list [unit exports]))))
+     '(cl test datetime pretty format-source))
+    (check missing '())))
 
 (run-tests)

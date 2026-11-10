@@ -10,6 +10,12 @@
 ;;; #hash( key: value, ... ); a dotted pair as (a . b); strings as written, with
 ;;; their quotes; () as (); #t and #f as themselves.
 
+;;; A library (specs/namespaces.md): (require 'pretty) brings these names in; each
+;;; is also pretty:name everywhere, and the names not exported are private.
+
+(library pretty
+  (export pretty-string))
+
 (define (%pretty-atom x)
   (cond ((string? x) (with-output-to-string (lambda () (write x))))
         ((eq? x #t) "#t")

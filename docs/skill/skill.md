@@ -8,7 +8,8 @@ description: Write, run and fix cog-lisp programs (.lisp files run by cog-lisp.s
 
 cog-lisp is **Scheme** (R7RS), not Common Lisp. It runs inside a Pharo
 Smalltalk image and can send Smalltalk messages. Only the names in
-`reference.md` (beside this file) exist; anything else is unbound.
+`reference.md` (beside this file) exist, a library's once it is required;
+anything else is unbound.
 
 **Always answer with a program that prints the result.** Asked to print the
 squares of 1 to 3, write `(display (map (lambda (n) (* n n)) (list 1 2 3)))`,
@@ -16,8 +17,8 @@ never `(1 4 9)`: data written as code is a call, and fails.
 
 ## Run a program
 
-Work in the cog-lisp folder, which holds `cog-lisp.sh` and `cog-lisp.bat`; if
-you cannot find it, ask the user.
+`cog-lisp.sh` and `cog-lisp.bat` are in the cog-lisp folder, and run a program
+from any folder; if you cannot find them, ask the user.
 
 - Linux, or Git Bash on Windows: `./cog-lisp.sh program.lisp`
 - Windows (cmd or PowerShell): `.\cog-lisp.bat program.lisp`
@@ -40,6 +41,10 @@ Never run `cog-lisp` without a file: its REPL waits for typing.
 
 ## Traps
 
+These hold for plain cog-lisp. `(require 'cl)` adds Common Lisp's `defun`,
+`nil`, `first`, `last` and more (reference.md, under cl); its `last` answers
+the last pair: `(last (list 1 2 3))` is `(3)`.
+
 <!-- traps -->
 
 ## Examples
@@ -60,5 +65,5 @@ Each runs, and prints exactly what is shown.
 
 ## More
 
-`reference.md` (beside this file) lists every built-in. The cog-lisp folder
+`reference.md` (beside this file) lists every built-in, and each library's names. The cog-lisp folder
 also has the manual (`docs/manual/`) and more programs (`examples/`).

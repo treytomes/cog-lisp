@@ -38,6 +38,14 @@ spread over several files, and can load cog-lisp's own libraries from anywhere;
 JSON is read and written, and pages fetched over HTTP and HTTPS."
   "string-ports" "files" "echo" "program" "libraries" "json" "http")
 
+(chapter "namespaces" "Libraries and namespaces"
+  "A library exports some of its names and keeps the rest; each file chooses how
+to bring them in: unqualified, under a prefix, or a few under other names. Names
+from different libraries never collide, and a full name such as shapes:area
+always works."
+  "namespaces" "namespaces-prefix" "namespaces-choose" "namespaces-private"
+  "namespaces-files" "namespaces-conflicts")
+
 (chapter "errors" "Errors, conditions and restarts"
   "Errors are conditions that handlers catch; restarts let a handler choose how to
 go on without unwinding first."

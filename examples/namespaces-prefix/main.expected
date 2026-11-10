@@ -1,0 +1,5 @@
+----------
+(if ((man ?x)) then (mortal ?x))
+---
+(if ((b)) then (a))
+house 1

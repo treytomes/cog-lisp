@@ -9,6 +9,21 @@
 
 ;;; --- Absolute datetimes ------------------------------------------------
 
+;;; A library (specs/namespaces.md): (require 'datetime) brings these names in; each
+;;; is also datetime:name everywhere, and the names not exported are private.
+
+(library datetime
+  (export datetime-now datetime-from-unix datetime-from-date datetime-from-parts
+         datetime->unix datetime->string datetime-from-string datetime-year
+         datetime-month datetime-day datetime-hour datetime-minute
+         datetime-second datetime-add datetime-subtract datetime-diff-seconds
+         datetime<? datetime<=? datetime=? datetime>? datetime>=?
+         duration-seconds duration-minutes duration-hours duration-days
+         duration->seconds duration->string duration-add duration-subtract
+         duration<? duration<=? duration=? make-interval interval-start
+         interval-end interval-contains? interval-duration-seconds
+         interval->string))
+
 (define (datetime-now)
 	"Current date and time."
 	[(smalltalk DateAndTime) now]

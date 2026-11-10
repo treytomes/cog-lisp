@@ -1,0 +1,6 @@
+(#ff0000 #00ff00)
+((mix red blue) (red green blue))
+#0000ff
+#0000ff
+(green p:all p:mix red sky)
+require: palette does not export purple (in only)

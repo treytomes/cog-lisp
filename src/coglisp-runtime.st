@@ -2021,9 +2021,21 @@ cm value: prims class value: 'installing' value: 'installIOInto: anEnv
 	anEnv define: (LispSymbol named: ''newline'') value: (LispProcedure fixed: [self output nextPut: Character lf; flush. LispUnspecified default] arity: 0)'.
 cm value: prims class value: 'installing' value: 'installSystemInto: anEnv
 	"load answers the full path of the file it loaded (specs/library-path.md R-5), which require records"
-	anEnv define: (LispSymbol named: ''load'') value: (LispProcedure fixed: [:path |
+	anEnv define: (LispSymbol named: ''load'') value: (LispProcedure fixed: [:path | | full |
+		LispCompiler new evalFile: path.
+		full := (LispCompiler resolveInput: path) fullName.
+		"a library loaded with load brings every export in, unqualified (specs/namespaces.md)"
+		LispUnit importAllFrom: full.
+		full] arity: 1).
+	"require loads with %load-library, and imports as its options say"
+	anEnv define: (LispSymbol named: ''%load-library'') value: (LispProcedure fixed: [:path |
 		LispCompiler new evalFile: path.
 		(LispCompiler resolveInput: path) fullName] arity: 1).
+	"the unit of the file loaded from path, or #f; the current unit, or #f"
+	anEnv define: (LispSymbol named: ''%unit-at'') value: (LispProcedure fixed: [:path |
+		(LispUnit atPath: path) ifNil: [false]] arity: 1).
+	anEnv define: (LispSymbol named: ''%current-unit'') value: (LispProcedure fixed: [
+		LispCurrentUnit value ifNil: [false]] arity: 0).
 	"(exit) and (exit #t) succeed, (exit #f) fails, (exit n) for n in 0..255 (R7RS; review R-10)"
 	anEnv define: (LispSymbol named: ''exit'') value: (LispProcedure variadic: [:codes | | c |
 		c := codes lispElements ifEmpty: [0] ifNotEmpty: [:cs | cs first].
@@ -2046,7 +2058,7 @@ cm value: prims class value: 'installing' value: 'installSystemInto: anEnv
 	"its documentation (Phase 10 step 10.1): name, call form, description"
 	self document: anEnv category: ''The system'' with: #(
 		''load'' ''(load path)''
-			''Reads and evaluates every form of the file at path, relative to the file being loaded, and answers the full path of that file.''
+			''Reads and evaluates every form of the file at path, relative to the file being loaded, and answers the full path of that file. A library file brings in every name it exports, unqualified.''
 		''exit'' ''(exit [code])''
 			''Ends the program: (exit) and (exit #t) succeed, (exit #f) fails, (exit n) exits with n.''
 		''save-image'' ''(save-image)''

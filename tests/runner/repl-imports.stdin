@@ -1,0 +1,5 @@
+(begin (require 'pretty 'prefix 'p:) 'imported)
+(p:pretty-string '(1 2))
+(imports)
+(pretty-string 1)
+(pretty:pretty-string 7)

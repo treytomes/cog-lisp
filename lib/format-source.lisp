@@ -24,6 +24,12 @@
 ;;; Tokens: #(kind text newlines-before line), kind one of
 ;;;   open close atom string comment prefix
 
+;;; A library (specs/namespaces.md): (require 'format-source) brings these names in; each
+;;; is also format-source:name everywhere, and the names not exported are private.
+
+(library format-source
+  (export format-source format-source-headers))
+
 (define %fs-form-feed (integer->char 12))
 (define (%fs-separator? c) (or (memv c '(#\space #\tab #\newline #\return)) (eqv? c %fs-form-feed)))
 (define (%fs-delimiter? c)
