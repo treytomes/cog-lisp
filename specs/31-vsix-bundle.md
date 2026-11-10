@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Done (2026-11-10; §7), AC-6 for the owner. Accepted (owner, 2026-11-10) with the leanings of §8: not minified, the client a development dependency, the license texts in one generated file |
+| **Status** | Done (2026-11-10; §7); AC-6 checked by the owner (2026-11-10). Accepted (owner, 2026-11-10) with the leanings of §8: not minified, the client a development dependency, the license texts in one generated file |
 | **Asked for by** | The owner (2026-11-10), after the v0.5.0 release warned that the extension "consists of 330 files, out of which 170 are JavaScript files. For performance reasons, you should bundle your extension". Asked whether the website was being packaged into it (it is not, §1), the owner asked: "Let's write a spec for `cog-lisp` that will implement this." |
 | **Relates to** | `specs/16-phase-10-documentation-and-editor.md` step 10.5 (the language client, and the notices for the npm packages it brought); `specs/28-versioning.md` (`build-ext`, the version stamped into the `.vsix`); `specs/25-vscode-spelling.md` (the package check) |
 
@@ -205,9 +205,9 @@ the next tag, whose release log should no longer show the warning.
   - With `semver`'s row taken out of the notices, `npm run bundle` stopped with
     "semver 7.8.6 has no row in THIRD-PARTY-NOTICES.md", exit 1, and left no
     `dist/` (AC-3).
-- **AC-6, for the owner:** build with `build-ext`, install with `load-ext`,
-  reload VS Code, and try hover help, Run File, the REPL, go to definition and
-  diagnostics.
+- **AC-6, checked by the owner (2026-11-10):** the `.vsix` from `build-ext`
+  (`0.5.1-dev.3.20261110212926`), installed with `load-ext` in VS Code: "That
+  works."
 
 ## 8. Decisions for the owner
 
