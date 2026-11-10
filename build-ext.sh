@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Build the VS Code extension as vscode/cog-lisp.vsix (the bash twin of
 # build-ext.bat). Installs the extension's npm packages from package-lock.json
-# if they are missing, then packages it. Install the result with load-ext.sh,
-# then reload the VS Code window.
+# when they do not match it, then packages it. Install the result with
+# load-ext.sh, then reload the VS Code window.
 #
 # The .vsix carries this build's version (specs/28-versioning.md R-10), from
 # scripts/version.sh: package.json and package-lock.json hold it only while
@@ -12,10 +12,8 @@
 set -e
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT/vscode"
-if [ ! -d node_modules/@vscode/vsce ]; then
-  echo "Installing the extension's npm packages..."
-  npm ci
-fi
+# npm ci when node_modules/ does not match package-lock.json (specs/31-vsix-bundle.md R-8)
+node scripts/deps.js
 
 VERSION="$("$ROOT/scripts/version.sh")"
 SAVED="$(mktemp -d)"

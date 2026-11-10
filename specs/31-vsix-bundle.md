@@ -134,6 +134,19 @@ esbuild 0.28.2,
   - `npm run bundle` builds it, and packaging does that by itself;
   - a new npm package in the bundle needs a row in `THIRD-PARTY-NOTICES.md`,
     or the bundle step fails.
+- **R-8. `build-ext` reinstalls when the lockfile has moved** (an amendment,
+  asked for by the owner on 2026-11-10 after this step was merged: "I'd rather
+  not have to remember"). Both twins used to run `npm ci` only when
+  `node_modules/@vscode/vsce` was missing. So a checkout installed before esbuild
+  was added skipped the install, and the bundle step failed: it could not find
+  esbuild. Both twins now run `vscode/scripts/deps.js` instead. It:
+  - compares every package `package-lock.json` lists with the version installed
+    under `node_modules/`, reading what is there rather than a stamp, so it
+    holds however `npm ci` was last run, CI's own included;
+  - checks a package the lockfile marks optional (esbuild's builds for other
+    platforms) only if it is installed;
+  - runs `npm ci` when anything is missing or at another version, and does
+    nothing otherwise. `--check` only reports.
 
 ## 4. Acceptance criteria
 
@@ -158,7 +171,7 @@ esbuild 0.28.2,
 
 ## 5. Steps
 
-One step: R-1 to R-7, the checks, and this spec's "as built". Release it with
+One step: R-1 to R-7 (R-8 came after, as an amendment), the checks, and this spec's "as built". Release it with
 the next tag, whose release log should no longer show the warning.
 
 ## 6. Risks
@@ -208,6 +221,17 @@ the next tag, whose release log should no longer show the warning.
 - **AC-6, checked by the owner (2026-11-10):** the `.vsix` from `build-ext`
   (`0.5.1-dev.3.20261110212926`), installed with `load-ext` in VS Code: "That
   works."
+- **R-8, checked on Windows with both twins (2026-11-10):**
+
+  | State of `node_modules/` | What `build-ext` did |
+  |---|---|
+  | none (a fresh worktree) | `npm ci`, then packaged |
+  | current | packaged, with no install |
+  | installed from the lockfile before esbuild | found "esbuild (wanted 0.28.2, found none)", ran `npm ci`, packaged |
+  | `semver` at 7.8.5, not 7.8.6 | found it, ran `npm ci`, packaged |
+
+  `package.json` was put back at `0.0.0` each time, and `npm test` passed.
+  `deps.js` is under `scripts/`, so it is not packaged (AC-1).
 
 ## 8. Decisions for the owner
 

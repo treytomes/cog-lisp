@@ -518,6 +518,9 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   needs a row at its version in `vscode/THIRD-PARTY-NOTICES.md`, or the bundle
   step fails; it writes their license texts to `dist/THIRD-PARTY-LICENSES.txt`.
   The extension's npm packages are all `devDependencies`, so vsce packages none.
+  `build-ext` runs `npm ci` by itself whenever `node_modules/` does not match
+  `package-lock.json` (`vscode/scripts/deps.js`; `--check` only reports), so
+  after a pull that changes the lockfile, just rebuild.
   Its diagnostics check each top-level form with `lisp-check`, which treats a
   top-level `begin` and a top-level macro's expansion as top-level forms, as
   `eval` does (so `cl`'s `defmacro`, a `begin` around a `define-macro`, is no

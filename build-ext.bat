@@ -2,8 +2,8 @@
 setlocal
 rem ===========================================================================
 rem  cog-lisp : build the VS Code extension as vscode\cog-lisp.vsix
-rem  Installs the extension's npm packages from package-lock.json if they are
-rem  missing, then packages it. Install the result with load-ext.bat, then
+rem  Installs the extension's npm packages from package-lock.json when they do
+rem  not match it, then packages it. Install the result with load-ext.bat, then
 rem  reload the VS Code window. The bash twin is build-ext.sh.
 rem
 rem  The .vsix carries this build's version (specs/28-versioning.md R-10), from
@@ -16,13 +16,11 @@ rem ===========================================================================
 set "ROOT=%~dp0"
 cd /d "%ROOT%vscode" || exit /b 1
 
-if exist node_modules\@vscode\vsce goto :package
-echo Installing the extension's npm packages...
-call npm ci
+rem npm ci when node_modules\ does not match package-lock.json (specs/31-vsix-bundle.md R-8)
+node scripts\deps.js
 set RC=%ERRORLEVEL%
-if not "%RC%"=="0" (echo npm ci failed & exit /b %RC%)
+if not "%RC%"=="0" exit /b %RC%
 
-:package
 set "VERSION="
 for /f "delims=" %%v in ('call "%ROOT%scripts\version.bat"') do set "VERSION=%%v"
 if not defined VERSION (echo build-ext: no version from scripts\version.bat & exit /b 1)
