@@ -183,7 +183,7 @@
   "http-response?": {"call": "(http-response? x)", "kind": "procedure", "category": "Network", "description": "#t if x is a response from http-request."},
   "http-status": {"call": "(http-status response)", "kind": "procedure", "category": "Network", "description": "The response's status code, an integer such as 200 or 404."},
   "if": {"call": "(if test then [else])", "kind": "special form", "category": "Special forms", "description": "Evaluates then if test is true (anything but #f), else else."},
-  "image-build-info": {"call": "(image-build-info)", "kind": "procedure", "category": "Evaluation and macros", "description": "How this image was built: an association list of its seed, the bootstrap and its fixpoint."},
+  "image-build-info": {"call": "(image-build-info)", "kind": "procedure", "category": "Evaluation and macros", "description": "How this image was built: an association list of its seed, the bootstrap and its fixpoint, and its version, commit and build time (version, commit, built)."},
   "imports": {"call": "(imports)", "kind": "procedure", "category": "Files", "description": "What this file, or this REPL session, has imported: a list of (name . full-name), sorted by name."},
   "inexact": {"call": "(inexact z)", "kind": "procedure", "category": "Numbers", "description": "The float nearest to z."},
   "inexact->exact": {"call": "(inexact->exact z)", "kind": "procedure", "category": "Numbers", "description": "The old name of exact."},

@@ -1,4 +1,4 @@
-# cog-lisp CI (specs/phase-8.9-ci-cd.md section 4.1): every suite on Linux and on
+# cog-lisp CI (specs/14-phase-8.9-ci-cd.md section 4.1): every suite on Linux and on
 # Windows, every suite on Linux again with the seed rebuilt from its source
 # (the recovery path, Phase 9 step 9.1), and the VS Code extension's tests, on
 # every push and pull request. The language server (Phase 10 step 10.5) is
@@ -31,6 +31,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # tags and history, for the build's version (specs/28-versioning.md R-3)
+          fetch-depth: 0
       - name: Cache the Pharo downloads
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -62,7 +65,7 @@ jobs:
             ${{ runner.temp }}/coglisp-run-all
             ${{ runner.temp }}/coglisp-runner
 
-  # The way back if every seed is lost (specs/phase-9-language.md 9.1): rebuild
+  # The way back if every seed is lost (specs/15-phase-9-language.md 9.1): rebuild
   # the pinned seed from its tagged source, as it was built, without the
   # released seed, then build this tree from it and run every suite.
   recovery:
@@ -108,6 +111,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # tags and history, for the build's version (specs/28-versioning.md R-3)
+          fetch-depth: 0
       - name: Cache the Pharo downloads
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -152,14 +158,20 @@ jobs:
         working-directory: vscode
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # tags and history, for the build's version (specs/28-versioning.md R-3)
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: vscode/package-lock.json
       - run: npm ci
-      - name: The extension packages
-        run: npm run package
+      - name: The extension packages, with this build's version, and package.json is put back
+        run: |
+          ../build-ext.sh
+          git diff --exit-code -- package.json package-lock.json
+          cat cog-lisp.vsix.version
       - run: npm test
       - name: Cache the VS Code the editor checks run in
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

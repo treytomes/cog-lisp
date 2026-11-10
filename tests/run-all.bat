@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 rem ===========================================================================
-rem  cog-lisp : run every acceptance suite  (specs/phase-7.5-review-and-tooling.md AC-5)
+rem  cog-lisp : run every acceptance suite  (specs/07-phase-7.5-review-and-tooling.md AC-5)
 rem    tests\run-all.bat
 rem  Builds pharo\cog-lisp.image from the seed (build-image.bat), runs each
 rem  tests\phase-*.st in a fresh copy of it (pharo\suite.image: suites file in
@@ -40,6 +40,8 @@ if not "!RC!"=="0" (
 )
 echo   ok    build-image ^(from the seed^)
 
+rem  the version of a build (specs/28-versioning.md AC-1): scripts\version.bat
+call :versioning
 for %%T in (tests\phase-*.st) do call :suite "%%~fT" "%%~nT"
 if exist "pharo\suite.image" del /q "pharo\suite.image" "pharo\suite.changes"
 call :runner
@@ -62,6 +64,12 @@ copy /y "pharo\cog-lisp.changes" "pharo\suite.changes" >nul
 "%VM%" --headless "%CD%\pharo\suite.image" --no-default-preferences st "%~1" <"%TMPD%\empty-input.txt" >"%TMPD%\%~2.out" 2>&1
 set RC=!ERRORLEVEL!
 call :tally "%~2" "%TMPD%\%~2.out" !RC!
+exit /b 0
+
+:versioning
+call "%CD%\tests\versioning.bat" <"%TMPD%\empty-input.txt" >"%TMPD%\versioning.out" 2>&1
+set RC=!ERRORLEVEL!
+call :tally "versioning" "%TMPD%\versioning.out" !RC!
 exit /b 0
 
 :runner

@@ -1,5 +1,5 @@
 ;;; lsp.lisp -- cog-lisp's language server, served by the image itself
-;;; (specs/phase-10-documentation-and-editor.md step 10.5)
+;;; (specs/16-phase-10-documentation-and-editor.md step 10.5)
 ;;;
 ;;;   ./cog-lisp.sh lib/lsp.lisp       (cog-lisp.bat lib\lsp.lisp on Windows)
 ;;;
@@ -10,10 +10,10 @@
 ;;;
 ;;; It serves hover, completion, go to definition, diagnostics, macro
 ;;; expansion (the cog-lisp/expand request) and formatting (format-source,
-;;; specs/formatter.md R-4). It reads the workspace's .lisp files
+;;; specs/26-formatter.md R-4). It reads the workspace's .lisp files
 ;;; but never runs them, except a document's top-level define-syntax,
 ;;; define-macro and require forms, so later forms expand as they will when the
-;;; file runs (the owner's decision 4; require, specs/library-path.md AC-5).
+;;; file runs (the owner's decision 4; require, specs/18-library-path.md AC-5).
 
 ;;; ---------------------------------------------------------------------------
 ;;; JSON
@@ -277,7 +277,7 @@
    (if (lsp-def-documentation d) (string-append (lsp-markdown-documentation (lsp-def-documentation d)) "\n\n---\n\n") "")
    "```cog-lisp\n" (lsp-lines-up-to (lsp-def-source d) 20) "\n```"))
 
-;;; Namespaces (specs/namespaces.md R-13): each document is compiled in a unit of
+;;; Namespaces (specs/27-namespaces.md R-13): each document is compiled in a unit of
 ;;; its own (lsp-diagnostics), kept here, so a name means what it means in that
 ;;; document: an import (con:rule as engine:rule), or a library's full name.
 
@@ -406,7 +406,7 @@
     (and home
          (string-prefix? (lsp-key (string-append home "/lib/")) (lsp-key path)))))
 
-;; the warnings compiling a form made (a redefined built-in, specs/namespaces.md
+;; the warnings compiling a form made (a redefined built-in, specs/27-namespaces.md
 ;; R-10), as diagnostics on that form
 (define (lsp-form-warnings text starts from to)
   (let ((unit (%current-unit)))
@@ -531,7 +531,9 @@
                               "completionProvider" (lsp-object "resolveProvider" #f)
                               "definitionProvider" #t
                               "documentFormattingProvider" #t)
-   "serverInfo" (lsp-object "name" "cog-lisp" "version" "0.2")))
+   ;; the image's version, which the extension compares with its own
+   ;; (specs/28-versioning.md R-11)
+   "serverInfo" (lsp-object "name" "cog-lisp" "version" (hash-table-ref/default *env* 'version "dev"))))
 
 (define lsp-roots '())
 
@@ -548,7 +550,7 @@
   (lsp-index-text! (lsp-key (lsp-uri->path uri)) uri text)
   (lsp-publish-diagnostics! uri))
 
-;; textDocument/formatting (specs/formatter.md R-4): one edit replacing the whole
+;; textDocument/formatting (specs/26-formatter.md R-4): one edit replacing the whole
 ;; document, indented as the request's options say; none if nothing changes. Text
 ;; that does not read is an error, answered as one, and the document is untouched.
 (define (lsp-formatting params)

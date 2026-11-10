@@ -1,8 +1,8 @@
 @echo off
 setlocal
 rem ===========================================================================
-rem  cog-lisp : build the cog-lisp image  (specs/phase-9-language.md 9.1;
-rem  first specs/phase-5-repl-runner.md 4.1)
+rem  cog-lisp : build the cog-lisp image  (specs/15-phase-9-language.md 9.1;
+rem  first specs/04-phase-5-repl-runner.md 4.1)
 rem  Loads src\, lib\core.lisp and lib\compiler\ into the seed, an earlier cog-lisp
 rem  image pinned in pharo.pins (pharo\seed.image), whose compiler compiles the new
 rem  one, and saves the result as pharo\cog-lisp-new.image; only then does it take the
@@ -23,8 +23,16 @@ if not exist "%VM%" goto :noseed
 if exist "%PHARO%\cog-lisp-new.image" del /q "%PHARO%\cog-lisp-new.image"
 if exist "%PHARO%\cog-lisp-new.changes" del /q "%PHARO%\cog-lisp-new.changes"
 
+rem  The build's version (specs/28-versioning.md R-9), for *env* and
+rem  (image-build-info): COGLISP_VERSION when set (a release), else from git.
+if not defined COGLISP_BUILD_TIME for /f %%t in ('powershell -NoProfile -Command "(Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmss')"') do set "COGLISP_BUILD_TIME=%%t"
+for /f "delims=" %%v in ('call "%ROOT%scripts\version.bat"') do set "COGLISP_VERSION=%%v"
+set "COGLISP_COMMIT=unknown"
+for /f %%c in ('git -C "%ROOT%." rev-parse --short HEAD 2^>nul') do set "COGLISP_COMMIT=%%c"
+
 echo === cog-lisp : building image ===
-echo     from : %SEED%
+echo     from    : %SEED%
+echo     version : %COGLISP_VERSION%
 "%VM%" --headless "%SEED%" --no-default-preferences st "%ROOT%build\build.st"
 if errorlevel 1 goto :failed
 if not exist "%PHARO%\cog-lisp-new.image" goto :failed

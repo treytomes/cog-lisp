@@ -200,7 +200,8 @@ ame.bat`. The VS Code extension does this.
 - **One image serves every platform:** an image built on Linux runs on the
   Windows VM unchanged (checked by every release). So platform choices are made at
   run time (`OSPlatform current isWindows`), never at build time.
-- **Docker is the local Linux:** there is no WSL. A container with the repository
+- **Docker is the local Linux** (WSL's `AlmaLinux-8` is a spare, when Docker
+  is down: see the global CLAUDE.md). A container with the repository
   mounted read-only and copied into `/work` (leave out `pharo/`, `.git`, `dist/`)
   runs the bash scripts; copy the image zip from `pharo/downloads/` rather than
   downloading it again (`files.pharo.org` is slow from inside a container here).
@@ -238,6 +239,28 @@ ame.bat`. The VS Code extension does this.
   (DLL imports) and `objdump -p … | grep NEEDED` (Linux) in Docker show what
   the VM really loads. The findings and the procedure for a pin change are in
   `release/licenses/README.md`.
+
+## Versions (specs/28-versioning.md)
+
+- **A git tag is the only source of a version.** `scripts/version.sh` / `.bat`
+  print it: `0.4.0` at a release's tag, otherwise
+  `0.4.1-dev.<commits since the tag>.<UTC time, 14 digits>[.dirty]`
+  (`.dirty`: uncommitted changes to tracked files); `COGLISP_VERSION` wins.
+  `build-image` stamps it into `*env*` and `(image-build-info)` (with `commit`
+  and `built`); `build-ext` stamps it into the `.vsix` only and puts
+  `package.json` and `package-lock.json` back (they stay `0.0.0` in git).
+  `tests/versioning.sh` / `.bat` check the twins give the same answers.
+- **VS Code cannot reinstall the version it is running.** `--force` renames the
+  installed folder first; Windows refuses while the extension runs (EPERM, after
+  about 1,100 retries), and a restarted window runs it again before the install.
+  A new version goes into a new folder, so `load-ext` refuses a version already
+  installed: rebuild first.
+- **In cmd, `TIME` (and `DATE`, `RANDOM`, `CD`, `ERRORLEVEL`) are dynamic
+  variables:** a script variable must not use those names.
+- **From PowerShell, `bash` is WSL's** (`System32\bash.exe`), not Git Bash: run
+  bash scripts with the Bash tool, or Git's `bash.exe` by its full path.
+- **CI checks out with `fetch-depth: 0`**: a shallow clone has no tags, and its
+  builds would get the fallback version `0.0.0-dev.0.<time>`.
 
 ## Timing and benchmarking (Pharo 14) — Phase 6
 
@@ -398,7 +421,7 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **A `define-syntax` macro keeps its source**: its expander's
   `procedure-source` is the `define-syntax` form's text.
 
-## Libraries and namespaces (specs/namespaces.md)
+## Libraries and namespaces (specs/27-namespaces.md)
 
 - **A library's definitions are global cells under full names** (`cl:remove`),
   so a full name works anywhere, private names included. A file's own names
@@ -466,7 +489,7 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   "$BUNDLE_APP_CONFIG" && bin/github-pages build --source
   /github/workspace/docs --destination /github/workspace/_site'`, where `<dir>`
   holds a copy of `docs/`. Its own entrypoint fails without a token.
-- **`format` is built in** (specs/format.md): `lib/format.lisp`, which the build
+- **`format` is built in** (specs/19-format.md): `lib/format.lisp`, which the build
   loads after `lib/core.lisp` and the seed compiles (so: plain code, nothing
   from `lib/cl.lisp`). Its parser and directive records came from
   `~/projects/lisp-expert` and keep their names, because that project's suites,
@@ -522,13 +545,13 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   and `c[ad]r` names, and SRFI 1's `filter`, `remove`, `delete`,
   `delete-duplicates`, `fold`, `reduce`, `iota`, `any`, `every`, `find`,
   `filter-map`, `append-map` and `alist-delete`, with `sort`, are built in
-  (`lib/core.lisp`; specs/lisp-expert-libraries.md, specs/lisp-expert-review.md).
+  (`lib/core.lisp`; specs/22-lisp-expert-libraries.md, specs/23-lisp-expert-review.md).
   The compiler may use them only once a seed has them. **`map` evaluates right
   to left**; `append-map`, `filter-map` and the rest go left to right.
 - **`parameterize` and `make-parameter`** (R7RS) are built in, over
   `dynamic-wind`: one binding per image. cog-lisp has no `call/cc`; its
   non-local exits are errors and restarts.
-- **HTTP(S) is the system's curl, hidden in cog-lisp** (specs/https-and-json.md):
+- **HTTP(S) is the system's curl, hidden in cog-lisp** (specs/21-https-and-json.md):
   `lib/http.lisp` (`http-request`, `http-get`, `url-encode`, built in) over
   `LispProcess` (`src/coglisp-runtime.st`), which runs a program from an
   argument list, never a shell (`CreateProcessW` / `posix_spawnp`), and polls
@@ -549,7 +572,7 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   leading arguments onto the list.
 - **Libraries to `require`:** `cl`, `test`, `datetime`, `pretty` and
   `format-source` (the source formatter, also `tools/format.lisp` and the
-  language server's formatting; specs/formatter.md) (`lib/*.lisp`); `format`, `json-read`/`json-write` and `coverage-*` are built in.
+  language server's formatting; specs/26-formatter.md) (`lib/*.lisp`); `format`, `json-read`/`json-write` and `coverage-*` are built in.
 - **The LISP compiler's errors hide its own bugs.** As in `LispCompiler>>compile:`,
   an unexpected error while translating becomes `bad syntax: <form>`, so a bug in
   `lib/compiler/*.lisp` (an unbound helper, say) shows only as "bad syntax" on
@@ -597,7 +620,9 @@ Memory of this API is unreliable across versions — these were confirmed live:
 This project follows spec-driven development: **write the spec before the code.**
 
 - Specs live in `specs/` — one document per phase/feature, each with explicit
-  requirements and **acceptance criteria**.
+  requirements and **acceptance criteria**. Each file name starts with its
+  number in the order of development (`specs/27-namespaces.md`); a new spec takes
+  the next number, and the index is `specs/README.md`.
 - Every acceptance criterion should be mechanically checkable by a headless
   script, following the `poc/answer.st` convention: build, run, print
   `PASS`/`FAIL` per check, and a final `RESULT: n/n` line.
@@ -625,7 +650,7 @@ This project follows spec-driven development: **write the spec before the code.*
   exits 0 or 1, so a new suite is picked up by `run-all.bat` with no other change.
 - **An unhandled error in a `st` chunk prints its stack and exits 1**; it does
   not hang (unlike an unhandled error inside a Clap command).
-- **Two VMs on one cog-lisp image no longer collide** (specs/startup-anywhere.md,
+- **Two VMs on one cog-lisp image no longer collide** (specs/17-startup-anywhere.md,
   2026-11-09).
   - **The old failure:** Pharo looked for the changes file beside the image *and
     in the current folder*, and tried every place for writing before any for

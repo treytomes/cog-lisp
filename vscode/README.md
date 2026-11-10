@@ -1,7 +1,7 @@
 # cog-lisp for VS Code
 
 A thin extension for working on cog-lisp in VS Code
-(`specs/phase-7.5-review-and-tooling.md` §5). It adds:
+(`specs/07-phase-7.5-review-and-tooling.md` §5). It adds:
 
 - **Highlighting** for `.lisp` files in this workspace: comments (`;`, nested
   `#| |#`), strings, characters, numbers, booleans, quote marks, special forms,
@@ -25,7 +25,7 @@ A thin extension for working on cog-lisp in VS Code
   when `src\*.st`, `lib\compiler\*.lisp` or a library the build compiles (`lib\core.lisp`, `format.lisp`,
   `json.lisp`, `http.lisp`, `coverage.lisp`) is newer than `pharo\cog-lisp.image` and offers to rebuild
   (setting `cogLisp.warnStaleImage`).
-- **cog-lisp's names in the spell checker** (`specs/vscode-spelling.md`): when
+- **cog-lisp's names in the spell checker** (`specs/25-vscode-spelling.md`): when
   Code Spell Checker is installed, the extension gives it a dictionary of the
   built-ins' names and the libraries' (`cspell/`, generated from the image), for
   `.lisp` files and Markdown, so `nthcdr` and `letrec` are not flagged.
@@ -44,7 +44,7 @@ A thin extension for working on cog-lisp in VS Code
   - **cog-lisp: Expand Macro**, which opens the expansion of the macro call at
     the cursor (the innermost one) beside the file;
   - **Format Document** (Shift+Alt+F), with `format-source`
-    (`specs/formatter.md`): a form with a body over lines, each argument on its
+    (`specs/26-formatter.md`): a form with a body over lines, each argument on its
     own line and the closing parenthesis on its own, everything else on one line;
     comments and strings untouched. `cog-lisp` files indent with tabs by default
     (`editor.insertSpaces` false for the language); your own settings win.
@@ -64,15 +64,31 @@ unpacked release; macOS is not supported yet.
 
 ## Build, test, install
 
+From the repository root:
+
 ```bat
-cd vscode
-npm install
-npm test
-npm run package
-code --install-extension cog-lisp.vsix
+build-ext.bat
+load-ext.bat
 ```
 
-`npm test` runs the form-scanner checks, the hover-help checks, the package
+`build-ext.bat` (or `build-ext.sh`) packages `vscode/cog-lisp.vsix`, installing
+the npm packages first if they are missing, and `load-ext.bat` (or
+`load-ext.sh`) installs it. After installing, reload the window
+(*Developer: Reload Window*). Uninstall with
+`code --uninstall-extension cog-lisp.cog-lisp`.
+
+**Every build has a version of its own** (specs/28-versioning.md), from git and
+the build's time: `0.4.1-dev.4.20261110153000` is four commits after v0.4.0,
+built at 15:30:00 UTC, and `.dirty` marks uncommitted changes. `build-ext` writes
+it into the `.vsix` only (the committed `package.json` keeps `0.0.0`), and
+beside it as `cog-lisp.vsix.version`. VS Code cannot replace an extension of the
+same version while it runs it (it retries a rename for minutes, then fails with
+`EPERM`, even after a restart), so `load-ext` refuses a version that is already
+installed: rebuild first. A release builds its own (`cog-lisp-VERSION.vsix`).
+At each start the extension writes its version and the image's to the cog-lisp
+output channel, with a warning when they come from different commits.
+
+`npm test` (in `vscode/`) runs the form-scanner checks, the hover-help checks, the package
 checks (the `.vsix` holds `builtins.json`, the language client and a notice for
 every npm package it ships, and claims `.lisp` files) and the grammar assertions
 in `test/syntax.test.lisp` (scopes checked with `vscode-tmgrammar-test`).
@@ -83,16 +99,6 @@ once with the language server, when the image is built.
 
 The extension ships `vscode-languageclient` and its dependencies, all MIT or
 ISC: `THIRD-PARTY-NOTICES.md`.
-
-From the repository root, `build-ext.bat` (or `build-ext.sh`) packages it,
-installing the npm packages first if they are missing, and `load-ext.bat` (or
-`load-ext.sh`) installs it.
-
-**Rebuild the `.vsix` before installing it** (`npm run package`): it is not kept
-in git, so an old one stays in this folder until you do. A release builds its
-own (`cog-lisp-VERSION.vsix`). After installing, reload the window
-(*Developer: Reload Window*).
-Uninstall with `code --uninstall-extension cog-lisp.cog-lisp`.
 
 ## Checking it by hand (AC-8 to AC-10)
 

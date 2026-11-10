@@ -1,4 +1,4 @@
-// The language server (specs/phase-10-documentation-and-editor.md step 10.5):
+// The language server (specs/16-phase-10-documentation-and-editor.md step 10.5):
 // VS Code's own message layer (vscode-jsonrpc, which vscode-languageclient is
 // built on) talks to lib/lsp.lisp, served by the image. Needs a built image;
 // run from vscode/ with `node test/lsp.test.js`. PASS/FAIL + RESULT convention.
@@ -29,10 +29,10 @@ const files = {
   'main.lisp': '(define-syntax twice (syntax-rules () ((_ e) (begin e e))))\n' +
     '(display (area 2 3))\n(twice (display "x"))\n(define (f x) (if))\n; 😀 (string-ref "s" 0)\n(string-ref "s" 0)\n',
   'broken.lisp': '(define ok 1)\n(display "unterminated\n',
-  // specs/library-path.md AC-5: a required library's macros are known to diagnostics.
+  // specs/18-library-path.md AC-5: a required library's macros are known to diagnostics.
   // (defun broken) is an error only as cl.lisp's macro: as a call it compiles quietly.
   'cl-user.lisp': "(require 'cl)\n(defun square (x) (* x x))\n(defun broken)\n",
-  // specs/namespaces.md R-13: a library, a document importing it under a prefix,
+  // specs/27-namespaces.md R-13: a library, a document importing it under a prefix,
   // and one defining a name it imported
   'geo.lisp': '(library geo (export rule))\n(define (rule n)\n  "(rule n)\nA line of n dashes."\n  (make-string n #\\-))\n',
   'uses-geo.lisp': "(require \"geo.lisp\" 'prefix 'g:)\n(display (g:rule 3))\n",
@@ -79,6 +79,14 @@ async function main() {
   const caps = init.capabilities;
   check('initialize offers hover, completion and definition (' + startup + ' ms)',
     caps.hoverProvider === true && !!caps.completionProvider && caps.definitionProvider === true);
+  // specs/28-versioning.md AC-5: the image's version, as *env* reports it to a program
+  const probe = path.join(imageCopy, 'version.lisp');
+  fs.writeFileSync(probe, "(display (hash-table-ref *env* 'version))\n");
+  const imageVersion = (windows
+    ? cp.spawnSync('cmd.exe', ['/d', '/c', '.\\cog-lisp.bat', probe], { cwd: root, env, input: '' })
+    : cp.spawnSync('./cog-lisp.sh', [probe], { cwd: root, env, input: '' })).stdout.toString().trim();
+  check("initialize reports the image's version (" + imageVersion + ')',
+    !!init.serverInfo && init.serverInfo.version === imageVersion && /^\d+\.\d+\.\d+/.test(imageVersion));
   connection.sendNotification('initialized', {});
 
   const open = async (name) => {
@@ -128,7 +136,7 @@ async function main() {
   check("the document's own macro (twice) is known: no error at its use",
     !mainDiags.some((d) => d.range.start.line === 2));
   const brokenDiags = diagnostics[uri('broken.lisp')] || [];
-  // errors only: (defun square ...) also redefines the built-in square, a warning (specs/namespaces.md R-10)
+  // errors only: (defun square ...) also redefines the built-in square, a warning (specs/27-namespaces.md R-10)
   const clDiags = (diagnostics[uri('cl-user.lisp')] || []).filter((d) => d.severity === 1);
   check("a document's (require 'cl) is run, so its defun is a macro: only the misused one is reported (library-path AC-5)",
     clDiags.length === 1 && clDiags[0].range.start.line === 2 && clDiags[0].message.includes('defun'));
@@ -148,7 +156,7 @@ async function main() {
   const ex2 = await connection.sendRequest('cog-lisp/expand', at('main.lisp', 9, 18));
   check('... or the enclosing one', ex2 && ex2.form.startsWith('(when p') && ex2.expansion.startsWith('(if p'));
 
-  // formatting (specs/formatter.md R-4, AC-4)
+  // formatting (specs/26-formatter.md R-4, AC-4)
   check('initialize offers formatting', caps.documentFormattingProvider === true);
   const openText = async (name, text) => {
     const seen = nextDiagnostics();
@@ -170,7 +178,7 @@ async function main() {
   try { await format('fmt-broken.lisp', { tabSize: 4, insertSpaces: false }); } catch (e) { refused = e.message; }
   check('a document that does not read is an error, naming the line', !!refused && refused.includes('never closed (line 1)'));
 
-  // namespaces (specs/namespaces.md R-13, AC-4): through the document's imports
+  // namespaces (specs/27-namespaces.md R-13, AC-4): through the document's imports
   await openText('uses-geo.lisp', files['uses-geo.lisp']);
   const geoHover = await connection.sendRequest('textDocument/hover', at('uses-geo.lisp', 1, 11));
   check("hover through a prefix shows the library's documentation",

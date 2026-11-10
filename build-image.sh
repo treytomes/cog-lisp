@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ===========================================================================
 #  cog-lisp : build the cog-lisp image  (bash equivalent of build-image.bat;
-#  specs/phase-9-language.md 9.1; first specs/phase-5-repl-runner.md 4.1)
+#  specs/15-phase-9-language.md 9.1; first specs/04-phase-5-repl-runner.md 4.1)
 #  Loads src/, lib/core.lisp and lib/compiler/ into the seed, an earlier cog-lisp
 #  image pinned in pharo.pins (pharo/seed.image), whose compiler compiles the new
 #  one, and saves the result as pharo/cog-lisp-new.image; only then does it take the
@@ -25,8 +25,18 @@ fi
 
 rm -f "$PHARO/cog-lisp-new.image" "$PHARO/cog-lisp-new.changes"
 
+# The build's version (specs/28-versioning.md R-9), for *env* and
+# (image-build-info): COGLISP_VERSION when set (a release), else from git.
+COGLISP_BUILD_TIME="${COGLISP_BUILD_TIME:-$(date -u +%Y%m%d%H%M%S)}"
+export COGLISP_BUILD_TIME
+COGLISP_VERSION="$("$ROOT/scripts/version.sh")"
+export COGLISP_VERSION
+COGLISP_COMMIT="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+export COGLISP_COMMIT
+
 echo "=== cog-lisp : building image ==="
-echo "    from : $SEED"
+echo "    from    : $SEED"
+echo "    version : $COGLISP_VERSION"
 if ! "$VM" --headless "$SEED" --no-default-preferences st "$ROOT/build/build.st" || [ ! -f "$PHARO/cog-lisp-new.image" ]; then
   echo "build-image: build failed - see messages above" >&2
   exit 1

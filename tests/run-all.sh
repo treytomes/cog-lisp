@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ===========================================================================
 #  cog-lisp : run every acceptance suite  (bash equivalent of tests\run-all.bat;
-#  specs/phase-7.5-review-and-tooling.md AC-5, Phase 8.9)
+#  specs/07-phase-7.5-review-and-tooling.md AC-5, Phase 8.9)
 #    tests/run-all.sh
 #  Builds pharo/cog-lisp.image from the seed (build-image.sh), runs each
 #  tests/phase-*.st in a fresh copy of it (pharo/suite.image: suites file in
@@ -60,6 +60,10 @@ if ! "$ROOT/build-image.sh" >"$TMPD/build-image.out" 2>&1; then
   exit 1
 fi
 echo "  ok    build-image (from the seed)"
+
+# the version of a build (specs/28-versioning.md AC-1): scripts/version.sh
+"$ROOT/tests/versioning.sh" </dev/null >"$TMPD/versioning.out" 2>&1
+tally versioning "$TMPD/versioning.out" $?
 
 for t in tests/phase-*.st; do
   name="$(basename "$t" .st)"

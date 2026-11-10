@@ -2,7 +2,7 @@
 
 Every special form, derived form and built-in procedure, with its call form
 and what it does. Generated from the documentation kept in the image
-(specs/phase-10-documentation-and-editor.md, step 10.2): do not edit by hand.
+(specs/16-phase-10-documentation-and-editor.md, step 10.2): do not edit by hand.
 After changing documentation, rebuild the image and run
 `./cog-lisp.sh tools/generate-docs.lisp` (or `cog-lisp.bat`).
 
@@ -369,7 +369,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | `coverage-stop` | `(coverage-stop)` | procedure | Ends the coverage session, and answers its counts: a list, in the order the code was compiled, of #(file line column kind count text). kind is procedure (an entry), true or false (a side of an if); file is #f for a form typed at the REPL, and line and column #f where no position is known. |
 | `eval` | `(eval form)` | procedure | Compiles and runs form at top level, and answers its value. |
 | `gensym` | `(gensym [prefix])` | procedure | A new uninterned symbol, unlike any other, for a name a macro makes up. |
-| `image-build-info` | `(image-build-info)` | procedure | How this image was built: an association list of its seed, the bootstrap and its fixpoint. |
+| `image-build-info` | `(image-build-info)` | procedure | How this image was built: an association list of its seed, the bootstrap and its fixpoint, and its version, commit and build time (version, commit, built). |
 | `macroexpand` | `(macroexpand form)` | procedure | form expanded until it is no longer a macro call. |
 | `macroexpand-1` | `(macroexpand-1 form)` | procedure | form expanded once, if it is a macro call; else form itself. |
 
@@ -509,7 +509,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 
 Not built in: a program loads one with `(require 'name)`, which brings in
 the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and
-`name:x` names each one from anywhere (specs/namespaces.md).
+`name:x` names each one from anywhere (specs/27-namespaces.md).
 
 ### cl
 

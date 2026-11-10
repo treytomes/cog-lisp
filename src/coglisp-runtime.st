@@ -1,6 +1,6 @@
 "============================================================================
  cog-lisp : Phase 4 implementation  (package CogLisp-Runtime)
- Procedures + primitive library per specs/phase-4-runtime-primitives.md.
+ Procedures + primitive library per specs/03-phase-4-runtime-primitives.md.
 
  LOADER script. Must be filed in AFTER coglisp-reader.st, coglisp-core.st, and
  coglisp-compiler.st. Set-car and set-cdr contain a bang, written doubled so the
@@ -1198,7 +1198,7 @@ cm value: prims class value: 'installing' value: 'installMacroSupportInto: anEnv
 		''macroexpand'' ''(macroexpand form)''
 			''form expanded until it is no longer a macro call.''
 		''image-build-info'' ''(image-build-info)''
-			''How this image was built: an association list of its seed, the bootstrap and its fixpoint.'')'.
+			''How this image was built: an association list of its seed, the bootstrap and its fixpoint, and its version, commit and build time (version, commit, built).'')'.
 cm value: prims class value: 'installing' value: 'installConditionsInto: anEnv
 	"Phase 7.7: conditions are Pharo exceptions. Handlers catch Error (which includes
 	 LispRaise), never Notifications, Warnings or restart transfers. A handler gets
@@ -1474,7 +1474,7 @@ cm value: prims class value: 'installing' value: 'installFilesInto: anEnv
 	def value: ''current-output-port'' value: (LispProcedure fixed: [LispOutputPort on: self output] arity: 0).
 	def value: ''current-error-port'' value: (LispProcedure fixed: [LispOutputPort on: LispTextOutput stderr] arity: 0).
 	def value: ''command-line'' value: (LispProcedure fixed: [LispCons fromArray: (CommandLine ifNil: [#()])] arity: 0).
-	"R7RS 6.14; specs/library-path.md: *env* reads COGLISP_HOME and COGLISP_PATH through it"
+	"R7RS 6.14; specs/18-library-path.md: *env* reads COGLISP_HOME and COGLISP_PATH through it"
 	def value: ''get-environment-variable'' value: (LispProcedure fixed: [:name |
 		OSEnvironment current at: (self string: name for: ''get-environment-variable'') asString ifAbsent: [false]] arity: 1).
 	def value: ''current-load-path'' value: (LispProcedure fixed: [LispLoadPath value ifNil: [false]] arity: 0).
@@ -1522,7 +1522,7 @@ cm value: prims class value: 'installing' value: 'installFilesInto: anEnv
 			''Writes x with a datum label for every part it shares, so the sharing reads back.'')'.
 cm value: prims class value: 'exiting' value: 'runAtExit
 	"Before the process ends, through exit or the end of a program, call %at-exit if a
-	 library defined it: lib/coverage.lisp writes its report there (specs/coverage.md
+	 library defined it: lib/coverage.lisp writes its report there (specs/20-coverage.md
 	 R-6). It runs once, and an error in it does not stop the exit."
 	| name hook |
 	name := LispSymbol named: ''%at-exit''.
@@ -2020,11 +2020,11 @@ cm value: prims class value: 'installing' value: 'installIOInto: anEnv
 	anEnv define: (LispSymbol named: ''write'') value: (LispProcedure fixed: [:x | self output nextPutAll: (LispPrinter writeString: x); flush. LispUnspecified default] arity: 1).
 	anEnv define: (LispSymbol named: ''newline'') value: (LispProcedure fixed: [self output nextPut: Character lf; flush. LispUnspecified default] arity: 0)'.
 cm value: prims class value: 'installing' value: 'installSystemInto: anEnv
-	"load answers the full path of the file it loaded (specs/library-path.md R-5), which require records"
+	"load answers the full path of the file it loaded (specs/18-library-path.md R-5), which require records"
 	anEnv define: (LispSymbol named: ''load'') value: (LispProcedure fixed: [:path | | full |
 		LispCompiler new evalFile: path.
 		full := (LispCompiler resolveInput: path) fullName.
-		"a library loaded with load brings every export in, unqualified (specs/namespaces.md)"
+		"a library loaded with load brings every export in, unqualified (specs/27-namespaces.md)"
 		LispUnit importAllFrom: full.
 		full] arity: 1).
 	"require loads with %load-library, and imports as its options say"
@@ -2080,7 +2080,7 @@ cm value: prims class value: 'installing' value: 'installControlInto: anEnv
 		''apply'' ''(apply proc list)''
 			''Calls proc with the elements of list as its arguments.'')'.
 
-"=== LispProcess (specs/https-and-json.md R-6, R-10) =========================
+"=== LispProcess (specs/21-https-and-json.md R-6, R-10) =========================
  Runs a program from a list of arguments, never through a shell, and answers
  its exit code, or nil when the program cannot be started. Windows:
  CreateProcessW with one command line, each argument quoted by the rules
@@ -2214,7 +2214,7 @@ cm value: procx class value: 'curl' value: 'decode: bytes charset: aNameOrNil
 		on: Error do: [:e | ZnUTF8Encoder new].
 	^ [encoder decodeBytes: bytes] on: Error do: [:e | ZnUTF8Encoder new decodeBytes: bytes]'.
 
-"=== LispHttpResponse (specs/https-and-json.md R-7) ==========================
+"=== LispHttpResponse (specs/21-https-and-json.md R-7) ==========================
  What http-request answers: the status, the headers as an alist of
  (lower-case-name . value), and the body as a string."
 cm value: hresp class value: 'instance creation' value: 'status: s headers: h body: b

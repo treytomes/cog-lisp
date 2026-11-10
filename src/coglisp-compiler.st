@@ -33,7 +33,7 @@ err  := (LispError << #LispCompileError) slots: { #forms }; package: 'CogLisp-Co
 lpath := (DynamicVariable << #LispLoadPath) package: 'CogLisp-Compiler'; install.
 "The reader written in LISP, behind LispReader's protocol (Phase 8 step 8.5)."
 lread := (Object << #LispReaderInLisp) slots: { #state. #stream. #source }; package: 'CogLisp-Compiler'; install.
-"What is being compiled, a file or the REPL session, and the one per process (specs/namespaces.md)."
+"What is being compiled, a file or the REPL session, and the one per process (specs/27-namespaces.md)."
 unit := (Object << #LispUnit) slots: { #path. #library. #exports. #owned. #imports. #source. #offset. #forms. #warnings };
 	sharedVariables: { #Units. #Libraries. #Builtins }; package: 'CogLisp-Compiler'; install.
 unitvar := (DynamicVariable << #LispCurrentUnit) package: 'CogLisp-Compiler'; install.
@@ -97,7 +97,7 @@ cm value: comp value: 'evaluating' value: 'evalAll: aString named: aName
 	r := LispReader on: aString.
 	result := LispUnspecified default.
 	[[(d := r next) == LispReader eofObject] whileFalse: [
-		"where the form is, for a warning (specs/namespaces.md R-10)"
+		"where the form is, for a warning (specs/27-namespaces.md R-10)"
 		LispCurrentUnit value ifNotNil: [:u | u source: aString offset: (r datumStart ifNil: [0])].
 		result := self eval: d from: r]]
 		on: Error
@@ -112,7 +112,7 @@ cm value: comp value: 'evaluating' value: 'evalFile: aPath
 	| file |
 	file := self class resolveInput: aPath.
 	file exists ifFalse: [^ (LispFileError new) signal: ''file not found: '' , aPath].
-	"each file is compiled in a unit of its own (specs/namespaces.md)"
+	"each file is compiled in a unit of its own (specs/27-namespaces.md)"
 	^ LispLoadPath value: file fullName during: [
 		LispCurrentUnit
 			value: (LispUnit forFile: file fullName inheriting: LispCurrentUnit value)
@@ -215,7 +215,7 @@ cm value: comp class value: 'implementation' value: 'builtInLibraryNames
 	"the lib/ files the build compiles into the image, besides the compiler"
 	^ #(''core.lisp'' ''format.lisp'' ''json.lisp'' ''http.lisp'' ''coverage.lisp'')'.
 cm value: comp class value: 'implementation' value: 'sealLibraries: lib frozen: frozen
-	"The built-in libraries are sealed too (specs/namespaces.md R-9): every global
+	"The built-in libraries are sealed too (specs/27-namespaces.md R-9): every global
 	 cell their code calls that holds a procedure becomes a private copy, so a
 	 program that redefines http-request does not change http-get. A cell that
 	 holds data stays shared, so a value a program sets is seen. The copies are
@@ -265,7 +265,7 @@ cm value: comp class value: 'implementation' value: 'readerOn: aStringOrStream
 
 "=== the image build, from a seed (Phase 9 step 9.1) ======================="
 cm value: comp class value: 'seeded build' value: 'buildFromSeed: build
-	"Steps 4 to 7 of the build (specs/phase-9-language.md, 9.1 in detail), run by
+	"Steps 4 to 7 of the build (specs/15-phase-9-language.md, 9.1 in detail), run by
 	 build/build.st on the seed image after it has filed in src/. build holds what
 	 the build kept from the seed (#seedEntries, its sealed compiler). The seed
 	 compiles lib/core.lisp and lib/compiler/ into a fresh environment, the
@@ -283,13 +283,13 @@ cm value: comp class value: 'seeded build' value: 'buildFromSeed: build
 	prims classPool at: #GensymCounter put: nil.
 	prims installDefault.
 	self new evalFile: (lib / ''core.lisp'') fullName.
-	"format, built in (specs/format.md), compiled by the seed like core.lisp"
+	"format, built in (specs/19-format.md), compiled by the seed like core.lisp"
 	self new evalFile: (lib / ''format.lisp'') fullName.
-	"json-read and json-write (specs/https-and-json.md R-3)"
+	"json-read and json-write (specs/21-https-and-json.md R-3)"
 	self new evalFile: (lib / ''json.lisp'') fullName.
-	"http-request and http-get, over the system''s curl (specs/https-and-json.md R-6)"
+	"http-request and http-get, over the system''s curl (specs/21-https-and-json.md R-6)"
 	self new evalFile: (lib / ''http.lisp'') fullName.
-	"the coverage recorder (specs/coverage.md), before the compiler, which calls it"
+	"the coverage recorder (specs/20-coverage.md), before the compiler, which calls it"
 	self new evalFile: (lib / ''coverage.lisp'') fullName.
 	self compilerSourceNames , #(''bootstrap.lisp'') do: [:name |
 		self new evalFile: (lib / ''compiler'' / name) fullName].
@@ -299,7 +299,7 @@ cm value: comp class value: 'seeded build' value: 'buildFromSeed: build
 	forms := call value: ''length'' value: { result at: 2 }.
 	diffs := LispCons elementsOf: (call value: ''bootstrap-differences'' value: { result. 0. 1 }) for: ''build''.
 	self sealLispCompiler: lib.
-	"what a program redefining is warned about (specs/namespaces.md R-10)"
+	"what a program redefining is warned about (specs/27-namespaces.md R-10)"
 	LispUnit recordBuiltins.
 	LispEntries := self lispEntries.
 	prims classPool at: #GensymCounter put: nil.
@@ -313,7 +313,22 @@ cm value: comp class value: 'seeded build' value: 'buildFromSeed: build
 		add: #fixpoint -> true;
 		add: #forms -> forms;
 		add: #''seed-differences'' -> diffs size.
+	"the build''s version, commit and time, from build-image (specs/28-versioning.md R-9)"
+	BuildInfo
+		add: #version -> (self buildVariable: ''COGLISP_VERSION'' else: ''dev'');
+		add: #commit -> (self buildVariable: ''COGLISP_COMMIT'' else: ''unknown'');
+		add: #built -> (self buildTime: (self buildVariable: ''COGLISP_BUILD_TIME'' else: '''')).
 	^ diffs'.
+cm value: comp class value: 'seeded build' value: 'buildVariable: aName else: aString
+	"an environment variable the build was started with, or aString when it is unset or empty"
+	| v |
+	v := OSEnvironment current at: aName ifAbsent: [''''].
+	^ v isEmpty ifTrue: [aString] ifFalse: [v]'.
+cm value: comp class value: 'seeded build' value: 'buildTime: digits
+	"20261110153000 as 2026-11-10T15:30:00Z; unknown when it is not 14 digits"
+	(digits size = 14 and: [digits allSatisfy: [:c | c isDigit]]) ifFalse: [^ ''unknown''].
+	^ (digits copyFrom: 1 to: 4) , ''-'' , (digits copyFrom: 5 to: 6) , ''-'' , (digits copyFrom: 7 to: 8) , ''T''
+		, (digits copyFrom: 9 to: 10) , '':'' , (digits copyFrom: 11 to: 12) , '':'' , (digits copyFrom: 13 to: 14) , ''Z'''.
 cm value: comp class value: 'seeded build' value: 'pinsAt: aFile
 	"KEY=VALUE lines of pharo.pins, as a Dictionary; # starts a comment."
 	| pins |
@@ -427,7 +442,7 @@ cm value: lread value: 'source' value: 'sourceFor: aCons
 	s := (self entry: #sourceFor) value: state value: aCons.
 	^ s == false ifTrue: [nil] ifFalse: [s]'.
 
-"=== LispUnit, LispCurrentUnit (specs/namespaces.md) =======================
+"=== LispUnit, LispCurrentUnit (specs/27-namespaces.md) =======================
  A unit is what is being compiled: a file, or the REPL session. It holds the
  file's imports (a name in the file to the full name it means), and, for a
  library, its name, its exports and the names it owns (defines). The compiler

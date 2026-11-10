@@ -26,6 +26,7 @@ crash.dmp
 # The VS Code extension's dev tools and its packaged .vsix are regenerable.
 /vscode/node_modules/
 /vscode/*.vsix
+/vscode/*.vsix.version
 
 # --- OS cruft ----------------------------------------------------------------
 Thumbs.db

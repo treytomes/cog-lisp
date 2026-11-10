@@ -1,4 +1,4 @@
-// cog-lisp for VS Code (specs/phase-7.5-review-and-tooling.md section 5).
+// cog-lisp for VS Code (specs/07-phase-7.5-review-and-tooling.md section 5).
 // Deliberately thin: highlighting and brackets are declarative (package.json,
 // the grammar, language-configuration.json); this file only adds commands that
 // call the repo's own scripts, so the editor runs exactly what the terminal runs.
@@ -328,6 +328,10 @@ async function startLanguageServer(context) {
     }
   };
   client = new lc.LanguageClient('cogLisp', 'cog-lisp language server', serverOptions, clientOptions);
+  // each start, restarts included, reports both versions (specs/28-versioning.md R-11)
+  client.onDidChangeState((e) => {
+    if (e.newState === lc.State.Running) reportVersions(context.extension.packageJSON.version, client);
+  });
   try {
     await client.start();
     serverActive = true;
@@ -367,9 +371,28 @@ function logLine(text) {
   outputChannel.appendLine(text);
 }
 
+// a version without its build time (0.4.1-dev.4.20261110153000.dirty ->
+// 0.4.1-dev.4.dirty): an image and an extension built from one commit differ
+// only there (specs/28-versioning.md R-8)
+function versionWithoutTime(v) {
+  return String(v).replace(/\.\d{14}(?=(\.dirty)?$)/, '');
+}
+
+// the extension's version and the image's, in the cog-lisp output channel, with
+// a warning when they come from different commits or releases
+function reportVersions(extensionVersion, languageClient) {
+  const info = languageClient.initializeResult && languageClient.initializeResult.serverInfo;
+  const imageVersion = info && info.version ? info.version : 'unknown';
+  logLine('cog-lisp: the extension is ' + extensionVersion + ', the image is ' + imageVersion);
+  if (versionWithoutTime(extensionVersion) !== versionWithoutTime(imageVersion)) {
+    logLine('warning: the extension and the image are different versions: rebuild the one that is older '
+      + '(build-ext and load-ext, or build-image), so hover and completion match the image.');
+  }
+}
+
 function activate(context) {
   registerBuiltins(context);
-  // cog-lisp's names in Code Spell Checker, when it is installed (specs/vscode-spelling.md)
+  // cog-lisp's names in Code Spell Checker, when it is installed (specs/25-vscode-spelling.md)
   registerSpelling(context, vscode, logLine);
   context.subscriptions.push(vscode.commands.registerCommand('cog-lisp.expandMacro', expandMacro));
   startLanguageServer(context);

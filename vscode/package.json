@@ -1,8 +1,8 @@
 {
   "name": "cog-lisp",
   "displayName": "cog-lisp",
-  "description": "Syntax, run, and REPL support for cog-lisp, the image-based LISP on Pharo (specs/phase-7.5-review-and-tooling.md section 5).",
-  "version": "0.1.0",
+  "description": "Syntax, run, and REPL support for cog-lisp, the image-based LISP on Pharo (specs/07-phase-7.5-review-and-tooling.md section 5).",
+  "version": "0.0.0",
   "publisher": "cog-lisp",
   "private": true,
   "license": "MIT",
