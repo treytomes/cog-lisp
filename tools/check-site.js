@@ -99,6 +99,68 @@ check('each of the reference\'s ' + refSections + ' sections has its table (' + 
 const sections = [...(text['builtins.html'] || '').matchAll(/href="#([^"]+)"/g)].length;
 check('the reference links to its sections (' + sections + ')', sections >= 10);
 
+// the theme (specs/30-site-theme.md AC-1 to AC-5)
+const sheet = 'assets/css/site.css';
+const linksSheet = (p) => [...text[p].matchAll(/<link\s[^>]*rel="stylesheet"[^>]*href="([^"]*)"/g)]
+  .some((m) => { const t = target(p, m[1]); return t && t.file === sheet; });
+const noSheet = pages.filter((p) => !linksSheet(p));
+const primer = pages.filter((p) => /href="[^"]*assets\/css\/style\.css/.test(text[p]));
+check('every page links the theme\'s ' + sheet + ', and none Primer\'s style.css (AC-1)',
+  fs.existsSync(path.join(site, sheet)) && noSheet.length === 0 && primer.length === 0,
+  [...noSheet.map((p) => p + ' (no site.css)'), ...primer.map((p) => p + ' (style.css)')].join(', '));
+
+// the sidebar: its links, as the pages they reach, and which one is current
+const sidebarOf = (p) => (text[p].match(/<aside class="sidebar"[\s\S]*?<\/aside>/) || [''])[0];
+const sidebarLinks = (p) => [...sidebarOf(p).matchAll(/<a\s+href="([^"]*)"([^>]*)>/g)]
+  .map((m) => ({ file: (target(p, m[1]) || {}).file, current: /aria-current="page"/.test(m[2]) }));
+const navProblems = [];
+for (const p of pages) {
+  const nav = (text[p].match(/<nav class="site-nav"[\s\S]*?<\/nav>/) || [''])[0];
+  const navCount = [...nav.matchAll(/<a\s/g)].length;
+  if (navCount !== 4) navProblems.push(p + ' (' + navCount + ' links in the header)');
+  const links = sidebarLinks(p);
+  const reached = new Set(links.map((l) => l.file));
+  const lacking = ['manual/index.html', 'builtins.html', ...chapters.map((c) => 'manual/' + c.replace(/\.md$/, '.html'))]
+    .filter((f) => !reached.has(f));
+  if (lacking.length) navProblems.push(p + ' (its sidebar lacks ' + lacking.join(', ') + ')');
+  const current = links.filter((l) => l.current).map((l) => l.file);
+  if (/^manual\/\d\d-/.test(p) && (current.length !== 1 || current[0] !== p))
+    navProblems.push(p + ' (marked current: ' + (current.join(', ') || 'none') + ')');
+}
+check('every page has the header\'s four links and the sidebar of every chapter and the reference; a chapter is marked current (AC-2)',
+  navProblems.length === 0, navProblems.slice(0, 10).join('; '));
+
+const foreign = [];
+for (const p of pages) {
+  const refs = [...text[p].matchAll(/<script\s[^>]*src="([^"]*)"/g), ...text[p].matchAll(/<link\s[^>]*rel="stylesheet"[^>]*href="([^"]*)"/g)];
+  for (const m of refs) if (!target(p, m[1])) foreign.push(p + ': ' + m[1]);
+}
+check('no page loads a script or stylesheet from another site (AC-3)', foreign.length === 0, foreign.slice(0, 10).join('; '));
+
+// WCAG 2's contrast ratio of two #rrggbb colors
+function luminance(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+const contrast = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+const css = fs.existsSync(path.join(site, sheet)) ? fs.readFileSync(path.join(site, sheet), 'utf8') : '';
+const root = (css.match(/:root\s*\{([\s\S]*?)\}/) || ['', ''])[1];
+const colors = (prefix) => [...root.matchAll(new RegExp('(--' + prefix + '-[a-z0-9-]+):\\s*(#[0-9a-fA-F]{6})\\s*;', 'g'))].map((m) => [m[1], m[2]]);
+const fgs = colors('fg');
+const bgs = colors('bg');
+const weak = [];
+for (const [f, fc] of fgs) for (const [b, bc] of bgs) {
+  const r = contrast(fc, bc);
+  if (r < 4.5) weak.push(f + ' on ' + b + ' ' + r.toFixed(2) + ':1');
+}
+check('every foreground color has a contrast of 4.5:1 or more against every background (' + fgs.length + ' on ' + bgs.length + '; AC-4)',
+  fgs.length > 0 && bgs.length > 0 && weak.length === 0, weak.join(', '));
+
+const refText = (text['builtins.html'] || '').replace(/<!--[\s\S]*?-->/g, '');
+check('the reference shows readers no note for maintainers (AC-5)',
+  text['builtins.html'] !== undefined && !refText.includes('generate-docs.lisp'));
+
 console.log('');
 console.log('== RESULT: ' + pass + '/' + total + ' checks passed ==');
 process.exit(pass === total ? 0 : 1);

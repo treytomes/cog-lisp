@@ -55,7 +55,7 @@ The phases, in order ([the project plan](../PROJECT-PLAN.md) describes each):
 | 8.9 | [CI/CD, and running on Linux](14-phase-8.9-ci-cd.md) | Implemented |
 | 9 | [Finishing the language](15-phase-9-language.md): seeded builds, the numeric tower, hygienic macros, generalized `set!` | Implemented (9.1–9.4) |
 | 10 | [Knowing the language](16-phase-10-documentation-and-editor.md): documentation, the reference, the manual, the language server, the site, the agent skill | Implemented (10.1–10.7) |
-| 11 | [A world of its own: the pure LISP image](30-phase-11-pure-image.md) | Accepted in outline; each step specified before it starts |
+| 11 | [A world of its own: the pure LISP image](31-phase-11-pure-image.md) | Accepted in outline; each step specified before it starts |
 
 Steps between phases (from 2026-11-09), from reviewing `lisp-expert`, the
 GitHub issues and the owner's requests:
@@ -75,3 +75,4 @@ GitHub issues and the owner's requests:
 | [27-namespaces.md](27-namespaces.md) | Libraries and namespaces: `library`, `require`'s imports, private names | Done |
 | [28-versioning.md](28-versioning.md) | One version, from the git tag, for the image and the extension | Accepted |
 | [29-console.md](29-console.md) | Rich console output and input, in the manner of Spectre.Console | Accepted |
+| [30-site-theme.md](30-site-theme.md) | A theme of its own for the site: dark, typographic, a terminal's | Done |

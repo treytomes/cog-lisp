@@ -525,6 +525,12 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   "$BUNDLE_APP_CONFIG" && bin/github-pages build --source
   /github/workspace/docs --destination /github/workspace/_site'`, where `<dir>`
   holds a copy of `docs/`. Its own entrypoint fails without a token.
+  The theme is ours (`specs/30-site-theme.md`): `docs/_layouts/default.html`
+  (header, the sidebar of chapters read from the site's pages, footer),
+  `docs/assets/css/site.css`, `docs/assets/js/site.js` and `favicon.svg`, all
+  dark, nothing fetched from another site. A color in `site.css` is a `--fg-` or
+  `--bg-` custom property, and `check-site.js` fails a foreground under 4.5:1
+  against any background. Generated pages need no front matter to use it.
 - **`format` is built in** (specs/19-format.md): `lib/format.lisp`, which the build
   loads after `lib/core.lisp` and the seed compiles (so: plain code, nothing
   from `lib/cl.lisp`). Its parser and directive records came from

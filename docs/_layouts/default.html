@@ -1,32 +1,62 @@
 <!DOCTYPE html>
-<!-- The cog-lisp site's layout (specs/16-phase-10-documentation-and-editor.md step
-     10.6): the Primer theme's own (jekyll-theme-primer 0.6.0), with its "Improve
-     this page" footer replaced. The pages are generated, so an edit made to one
-     would be overwritten; the footer names the release the site documents, which
-     the build sets as cog_lisp_version. -->
+<!-- The cog-lisp site's layout (specs/30-site-theme.md R-1; first
+     specs/16-phase-10-documentation-and-editor.md step 10.6). The pages are
+     generated Markdown with no front matter, so everything the theme needs is
+     here: the header, the sidebar of chapters (read from the site's own pages,
+     so a new chapter appears by itself), and the footer, which names the release
+     the site documents (cog_lisp_version, set by the build). -->
+{%- assign chapters = site.pages | where_exp: "p", "p.dir == '/manual/'" | where_exp: "p", "p.name != 'README.md'" | sort: "name" -%}
+{%- if page.url == "/" -%}{%- assign kind = "home" -%}
+{%- elsif page.url == "/builtins.html" -%}{%- assign kind = "reference" -%}
+{%- elsif page.dir == "/manual/" -%}{%- assign kind = "manual" -%}
+{%- else -%}{%- assign kind = "other" -%}{%- endif -%}
 <html lang="{{ site.lang | default: "en-US" }}">
   <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
+    <meta name="color-scheme" content="dark">
 {% seo %}
-    <link rel="stylesheet" href="{{ "/assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
-    {% include head-custom.html %}
+    <link rel="icon" href="{{ "/assets/favicon.svg" | relative_url }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ "/assets/css/site.css?v=" | append: site.github.build_revision | relative_url }}">
+    <script src="{{ "/assets/js/site.js?v=" | append: site.github.build_revision | relative_url }}" defer></script>
   </head>
-  <body>
-    <div class="container-lg px-3 my-5 markdown-body">
-      {% if site.title and site.title != page.title %}
-      <h1><a href="{{ "/" | relative_url }}">{{ site.title }}</a></h1>
-      {% endif %}
+  <body class="page-{{ kind }}">
+    <a class="skip" href="#content">Skip to the page</a>
+    <header class="site-header">
+      <a class="brand" href="{{ "/" | relative_url }}"><span class="prompt">&gt;</span> {{ site.title }}<span class="cursor" aria-hidden="true"></span></a>
+      <nav class="site-nav" aria-label="The site">
+        <a href="{{ "/manual/" | relative_url }}"{% if kind == "manual" %} class="current"{% endif %}>Manual</a>
+        <a href="{{ "/builtins.html" | relative_url }}"{% if kind == "reference" %} class="current"{% endif %}>Built-ins</a>
+        <a href="https://github.com/treytomes/cog-lisp/releases">Releases</a>
+        <a href="https://github.com/treytomes/cog-lisp">Source</a>
+      </nav>
+    </header>
 
-      {{ content }}
+    <div class="site">
+      <aside class="sidebar" aria-label="Contents">
+        <p class="sidebar-head"><a href="{{ "/manual/" | relative_url }}"{% if page.url == "/manual/" %} aria-current="page"{% endif %}>The manual</a></p>
+        <ul class="chapters">
+          {%- for c in chapters %}
+          <li><a href="{{ c.url | relative_url }}"{% if c.url == page.url %} aria-current="page"{% endif %}><span class="n">{{ forloop.index | prepend: "0" | slice: -2, 2 }}</span> {{ c.title }}</a></li>
+          {%- endfor %}
+        </ul>
+        <p class="sidebar-head"><a href="{{ "/builtins.html" | relative_url }}"{% if kind == "reference" %} aria-current="page"{% endif %}>The built-ins</a></p>
+        <nav class="on-this-page" aria-label="On this page" hidden></nav>
+      </aside>
 
-      <div class="footer border-top border-gray-light mt-5 pt-3 text-right text-gray">
-        {% if site.cog_lisp_version %}This site documents cog-lisp {{ site.cog_lisp_version }}. {% endif %}<a href="https://github.com/treytomes/cog-lisp/releases">Releases</a> · <a href="https://github.com/treytomes/cog-lisp">Source</a>
-      </div>
+      <main id="content" class="content">
+        {%- if kind == "home" %}
+        <div class="hero">
+          <p class="hero-title"><span class="prompt">&gt;</span> {{ site.title }}<span class="cursor" aria-hidden="true"></span></p>
+          <p class="tagline">;; {{ site.description }}</p>
+        </div>
+        {%- endif %}
+        {{ content }}
+      </main>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/anchor-js/4.1.0/anchor.min.js" integrity="sha256-lZaRhKri35AyJSypXXs4o6OPFTbTmUoltBbDCbdzegg=" crossorigin="anonymous"></script>
-    <script>anchors.add();</script>
+
+    <footer class="site-footer">
+      {% if site.cog_lisp_version %}This site documents cog-lisp {{ site.cog_lisp_version }}. {% endif %}<a href="https://github.com/treytomes/cog-lisp/releases">Releases</a> · <a href="https://github.com/treytomes/cog-lisp">Source</a>
+    </footer>
   </body>
 </html>

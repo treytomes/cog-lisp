@@ -21,7 +21,7 @@ Finish the language, so that Phase 11 can turn to the image:
 
 The pure image (the runtime in LISP, the audit of Pharo's subsystems, stripping,
 our own VM, the LISP-visible tools, then networking and graphics) is Phase 11
-(`specs/30-phase-11-pure-image.md`), split off by the owner on 2026-11-04 because it
+(`specs/31-phase-11-pure-image.md`), split off by the owner on 2026-11-04 because it
 will take much longer.
 
 ## 2. Where we start (measured 2026-11-04)

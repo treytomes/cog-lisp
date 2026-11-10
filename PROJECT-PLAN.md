@@ -31,7 +31,7 @@ first. See [`specs/README.md`](specs/README.md) for the workflow and index.
 | 9 | Finishing the language: seeded builds, the numeric tower, hygienic macros | ✅ **done** — [spec](specs/15-phase-9-language.md); 9.1 seeded builds, 9.2 the numeric tower, 9.3 hygienic macros (examples [seeded-build](examples/seeded-build.lisp), [numbers](examples/numbers.lisp), [new-number-type](examples/new-number-type.lisp), [syntax-rules](examples/syntax-rules.lisp), [shadowing](examples/shadowing.lisp)) |
 | 10 | Knowing the language: documentation, the built-ins reference, hover help, the manual, a language server | ✅ **done** — [spec](specs/16-phase-10-documentation-and-editor.md); 10.1 documentation in the image, 10.2 [the reference](docs/builtins.md), 10.3 hover help offline, 10.4 [the manual](docs/manual/README.md), 10.5 a language server served by the image ([`lib/lsp.lisp`](lib/lsp.lisp)), 10.6 [the site](https://treytomes.github.io/cog-lisp/) on GitHub Pages, 10.7 [a skill for agents](.agents/skills/cog-lisp/SKILL.md); all suites 1875/1875 (Windows), 1878/1878 (Linux) |
 | — | From reviewing a real project: start-up, `require`, `format`, coverage, JSON, HTTP(S), list built-ins, `parameterize`, the spell checker, the source formatter | ✅ **done** — [below](#next-from-reviewing-a-real-project-2026-11-09); released as v0.3.0 and v0.4.0; all suites 2917/2917 (Windows) |
-| 11 | A world of its own: the pure LISP image, then networking and graphics from LISP | ⬜ [spec](specs/30-phase-11-pure-image.md) accepted in outline |
+| 11 | A world of its own: the pure LISP image, then networking and graphics from LISP | ⬜ [spec](specs/31-phase-11-pure-image.md) accepted in outline |
 
 Phase 0 is proven, not just planned: [`poc/answer.st`](poc/answer.st) builds
 three `CompiledMethod`s directly from Opal IR — a constant, a two-argument add,
@@ -281,7 +281,7 @@ system, `format`, a weather REPL), found bugs and gaps that are not its own:
   rules, tables, panels and prompts, in the manner of Spectre.Console.
 
 ### Phase 11 — A world of its own
-[Spec](specs/30-phase-11-pure-image.md), accepted in outline; a long phase, each
+[Spec](specs/31-phase-11-pure-image.md), accepted in outline; a long phase, each
 step specified in detail before it starts (owner, 2026-11-04). The VM always
 needs a small Smalltalk-shaped kernel; "pure" means no stock image at run or
 build time, only the Pharo subsystems the world needs, and a world a user meets
