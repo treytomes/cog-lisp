@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Steps 1 to 3 done (2026-11-10; §10 to §12); step 4 (live displays) to come. Accepted (owner, 2026-11-09) with the leanings of §8, and its amendment (§4.8, §9) with the leanings of §9 (owner, 2026-11-10). Decision 5 (names) is settled by `specs/27-namespaces.md`: the library keeps its short names, and a program that wants them apart writes `(require 'console 'prefix 'con:)`. A spike first (§3). Amendment proposed 2026-11-10, for a later full-screen library: §4.8, spike items 6 and 7, AC-8, §9. A second amendment, from lisp-expert's use of the renderables (R-24, §13), accepted with its leanings and built (owner, 2026-11-10) |
+| **Status** | Steps 1 to 3 done (2026-11-10; §10 to §12); step 4 (live displays) to come. Accepted (owner, 2026-11-09) with the leanings of §8, and its amendment (§4.8, §9) with the leanings of §9 (owner, 2026-11-10). Decision 5 (names) is settled by `specs/27-namespaces.md`: the library keeps its short names, and a program that wants them apart writes `(require 'console 'prefix 'con:)`. A spike first (§3). Amendment proposed 2026-11-10, for a later full-screen library: §4.8, spike items 6 and 7, AC-8, §9. A second amendment, from lisp-expert's use of the renderables (R-24, §13), accepted with its leanings and built (owner, 2026-11-10). A third amendment, for the full-screen library (`specs/32-tui.md` §5, C-1 to C-7; §14 here), accepted with that spec (owner, 2026-11-10), not yet built |
 | **Asked for by** | The owner (2026-11-09): "I'm used to writing C# console programs with the help of Spectre.Console. How do we provide cog-lisp with similar console I/O capabilities? I think this one needs a specification document." |
 | **Relates to** | `LispTextOutput` and `LispStdin` (Phase 5; `src/coglisp-runtime.st`, `src/coglisp-shell.st`); the HTTP design (`specs/21-https-and-json.md`), whose rule it follows: the operating system's details stay inside cog-lisp |
 
@@ -573,3 +573,27 @@ panel's, include them. A panel's header has five cells less than the panel
 that drew a top border one cell wider than the box. Checks: AC-24a to AC-24e in
 `tests/lisp/console-renderables.lisp` (12 checks); every earlier golden output
 is unchanged.
+
+## 14. Third amendment: what the full-screen library needs (accepted 2026-11-10)
+
+Accepted with `specs/32-tui.md` (owner, 2026-11-10), which §9 here foresaw
+and whose step 1 builds it, after that spec's spike (its §3). The requirements
+are that spec's §5, C-1 to C-7, kept there so they are read beside what uses
+them:
+
+- **C-1.** Mouse events, under `with-mouse` (R-21), with Windows' mouse records
+  turned into the reports a Unix terminal sends, and quick-edit mode off while
+  it is on.
+- **C-2.** A resize event that carries the new size, which the capabilities
+  answer from then on; on Linux, the size polled while `read-event` waits.
+- **C-3.** `move-cursor` and `cursor-shape`, restored at exit.
+- **C-4.** `draw-segments`, a positioned write without padding, and
+  `console-flush`.
+- **C-5.** A clock, `console-now`, which the test console moves only by
+  `(wait ms)`; `test-console-screen`, the screen so far; and the shorthand for
+  `call`, resizes and the mouse.
+- **C-6.** `with-console-lock`, R-14's lock, exported.
+- **C-7.** `with-interrupt-key`, if the spike shows it can be done.
+
+None is a full-screen feature: a prompt or a live display may use any of them.
+Checks: in `tests/lisp/console-core.lisp` (`specs/32-tui.md` AC-2).
