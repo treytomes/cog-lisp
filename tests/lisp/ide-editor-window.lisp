@@ -2,7 +2,9 @@
 ;;; (R-5 to R-11; AC-3), opened headless and driven through its presenter: the
 ;;; project's files in the tree, a tab for each file, unsaved edits marked, saving
 ;;; in the file's own line endings, Do it, Print it and Load file as part of the
-;;; file, formatting, and the LISP styling. The files are in a temporary folder.
+;;; file in the tab's REPL, Run in a REPL window of its own, the toolbar and the
+;;; status line, formatting, and the LISP styling. The files are in a temporary
+;;; folder.
 ;;; Every change to a window is made in the UI process (on-ui), as a key or a
 ;;; click makes it: from another process it can land in the middle of a layout.
 (load "../../lib/test.lisp")
@@ -34,7 +36,8 @@
 (define (run! p action)                    ; a key's action, then its evaluation waited for
   (on-ui (action))
   [p waitUntilIdle: 30000])
-(define (output e) (on-ui [e outputText]))
+(define (status e) (on-ui [e statusText]))                 ; what the last action did
+(define (shown p) (on-ui [[p repl] transcriptString]))    ; the tab's REPL
 (define (names refs) (map (lambda (r) [r basename]) (vector->list [refs asArray])))
 
 (define-test "R-5 the tree shows the folder's .lisp files and the folders holding them"
@@ -79,7 +82,7 @@
     (on-ui [p save])
     (check-false (on-ui [p isDirty]))
     (check (raw f) (string-append "(define x 2)" crlf))  ; written as it was
-    (check-true (has? (output e) "saved w.lisp"))
+    (check-true (has? (status e) "saved w.lisp"))
     (check (change-kind (car (reverse (ide-changes)))) 'save)
     (close! w)
     [d ensureDeleteAll]))
@@ -93,18 +96,21 @@
     (set-text! p (string-append (text p) "(w-twice 21)\n"))
     (cursor! p (- (string-length (text p)) 3))
     (check-true (run! p (lambda () [p doIt])))
-    (check-true (has? (output e) "42"))
+    (check-true (has? (shown p) "> (w-twice 21)\n42\n"))     ; its form, then its value
     ;; a selection is evaluated instead, in the file's unit: its private name is seen
     (let ((before (text p)))
       (set-text! p (string-append before "(%w-double 5)\n"))
       (select! p (+ (string-length before) 1) (+ (string-length before) 13)))
     (check-true (run! p (lambda () [p doIt])))
-    (check-true (has? (output e) "10"))
+    (check-true (has? (shown p) "(%w-double 5)\n10\n"))
     ;; an error is reported, and the session is not left at a break
     (set-text! p (string-append (text p) "(car 5)\n"))
     (let ((n (string-length (text p)))) (select! p (- n 7) (- n 1)))
     (check-true (run! p (lambda () [p doIt])))
-    (check-true (has? (output e) "error: "))
+    (check-true (has? (shown p) "error: "))
+    (check-true (member "abort" (vector->list [[p repl] restartNames])))   ; at a break, as a REPL is
+    (on-ui [[p repl] chooseRestart: "abort"])
+    (check-true [p waitUntilIdle: 20000])
     (check (result-values (ide-eval [p session] "(w-twice 1)")) '(2))
     (close! w)
     [d ensureDeleteAll]))
@@ -130,8 +136,7 @@
     (set-text! p "(define editor-window-loaded 2)\n(display \"hello\")\n")
     (check-true (run! p (lambda () [p loadFile])))
     (check (eval 'editor-window-loaded) 2)
-    (check-true (has? (output e) "hello"))
-    (check-true (has? (output e) "loaded l.lisp"))
+    (check-true (has? (shown p) "; load l.lisp\nhello"))      ; the label, not the whole text
     (close! w)
     [d ensureDeleteAll]))
 
@@ -142,7 +147,7 @@
          (p (open-file! e f)))
     (on-ui [p loadFile] [p doIt])
     (check-true [p waitUntilIdle: 60000])
-    (check-true (has? (output e) "busy: an evaluation is running"))
+    (check-true (has? (status e) "busy: an evaluation is running"))
     (check-false [p isBusy])
     (close! w)
     [d ensureDeleteAll]))
@@ -158,7 +163,7 @@
     (check (on-ui [[p text] copyFrom: (- (string-length (text p)) 24) to: (- (string-length (text p)) 1)])
            "(display \"end of input\")")
     (check-true (run! p (lambda () [p doIt])))
-    (check-true (has? (output e) "end of input"))
+    (check-true (has? (shown p) "end of input"))
     (check-false [p isBusy])
     (close! w)
     [d ensureDeleteAll]))
@@ -173,14 +178,84 @@
     (check-true [p isBusy])
     (on-ui [p interrupt])
     (check-true [p waitUntilIdle: 20000])
-    (check-true (has? (output e) "error: "))
+    (check-true (has? (shown p) "error: "))
     (check-false [p isBusy])
+    (on-ui [[p repl] chooseRestart: "abort"])
+    (check-true [p waitUntilIdle: 20000])
     (set-text! p "(+ 40 2)\n")
     (cursor! p 1)
     (check-true (run! p (lambda () [p doIt])))
-    (check-true (has? (output e) "42"))
+    (check-true (has? (shown p) "42"))
     (on-ui [p interrupt])
-    (check-true (has? (output e) "nothing to interrupt"))
+    (check-true (has? (status e) "nothing to interrupt"))
+    (close! w)
+    [d ensureDeleteAll]))
+
+(define-test "R-44 the tab's REPL: a program reads what is typed there; its prompt evaluates in the file"
+  (let* ((d (temp "cog-lisp-editor-pane"))
+         (f (write-raw! [d / "lib-pane.lisp"]
+                        "(library ide-window-pane (export greet))\n(define (%who) \"pane\")\n(define (greet) (string-append \"hello, \" (read-line)))\n"))
+         (e (editor)) (w (open! e))
+         (p (open-file! e f))
+         (r [p repl]))
+    (check-true (smalltalk-nil? [r instVarNamed: "session"]))   ; no session until it evaluates
+    (set-text! p (string-append (text p) "(greet)\n"))
+    (cursor! p (- (string-length (text p)) 3))
+    (on-ui [p doIt])
+    (check-false [p waitUntilIdle: 500])                 ; waiting for its line
+    (on-ui [r inputText: "world"] [r submit])
+    (check-true [p waitUntilIdle: 20000])
+    (check-true (has? (shown p) "\"hello, world\""))
+    ;; typed at the prompt: part of the file, its private name seen
+    (on-ui [r inputText: "(%who)"] [r submit])
+    (check-true [r waitUntilIdle: 20000])
+    (check-true (has? (shown p) "(%who)\n\"pane\""))
+    ;; closing the window leaves the file's session open
+    (close! w)
+    (check-true (and (memq [p session] (ide-sessions)) #t))
+    [d ensureDeleteAll]))
+
+(define-test "R-43 Run: the file as saved, in a REPL window of its own, reading what is typed there"
+  (let* ((d (temp "cog-lisp-editor-run"))
+         (f (write-raw! [d / "echo.lisp"]
+                        "(display (string-upcase (read-line)))\n(newline)\n(display \"end of input\")\n"))
+         (e (editor)) (w (open! e))
+         (p (open-file! e f)))
+    (set-text! p "(display \"not saved\")\n")
+    (let ((run (on-ui [p run])))
+      (check-true (has? (status e) "running echo.lisp as saved: its unsaved edits are not in it"))
+      (check-true (eq? run [e lastRun]))
+      (check-false [run waitUntilIdle: 500])           ; reading its line
+      (on-ui [run inputText: "hello"] [run submit])
+      (check-true [run waitUntilIdle: 20000])
+      (check-true (has? [run transcriptString] "HELLO\nend of input"))
+      (check-false (has? [run transcriptString] "not saved"))
+      (on-ui [[run window] close]))
+    (close! w)
+    [d ensureDeleteAll]))
+
+(define-test "R-42 the toolbar acts on the tab chosen; the status line says what it did"
+  (let* ((d (temp "cog-lisp-editor-toolbar"))
+         (a (write-raw! [d / "a.lisp"] "(define toolbar-a 1)\n"))
+         (b (write-raw! [d / "b.lisp"] "(define toolbar-b 2)\n"))
+         (e (editor)) (w (open! e))
+         (items (vector->list [[[e toolbar] items] asArray]))
+         (button (lambda (label) (find (lambda (i) (string=? [[i label] asString] label)) items))))
+    (check (map (lambda (i) [[i label] asString]) items) '("Run" "Load" "Save" "Format" "Interrupt"))
+    (on-ui [(button "Save") click])
+    (check-true (has? (status e) "no file is open"))
+    (let* ((pa (open-file! e a)) (pb (open-file! e b)))
+      (check-true (eq? (on-ui [e selectedPage]) pb))
+      (on-ui [(button "Load") click])
+      (check-true [pb waitUntilIdle: 20000])
+      (check (eval 'toolbar-b) 2)
+      (open-file! e a)                                   ; its tab chosen again
+      (set-text! pa "(define toolbar-a 10)\n")
+      (on-ui [(button "Save") click])
+      (check (raw a) "(define toolbar-a 10)\n")
+      (check-true (has? (status e) "saved a.lisp"))
+      (on-ui [(button "Interrupt") click])
+      (check-true (has? (status e) "nothing to interrupt")))
     (close! w)
     [d ensureDeleteAll]))
 
@@ -218,20 +293,19 @@
          (entries (vector->list [[[[p code] actions] entries] asArray]))
          (shown (filter (lambda (a) [a isVisible]) entries)))
     (check (map (lambda (a) [[a name] asString]) shown)
-           '("Do it" "Print it" "Load file" "Interrupt" "Save" "Format" "Cut" "Copy" "Paste"))
+           '("Run" "Do it" "Print it" "Load file" "Interrupt" "Save" "Format" "Cut" "Copy" "Paste"))
     (check (map (lambda (a) [[a name] asString]) (remove (lambda (a) [a isVisible]) entries))
-           '("do-it-typed" "print-it-typed" "load-file-typed" "save-typed" "format-typed"))
-    (check (length (filter (lambda (a) [a hasShortcutKey]) entries)) 10)))  ; Rubric's own keys cut, copy, paste
+           '("run-typed" "do-it-typed" "print-it-typed" "load-file-typed" "save-typed" "format-typed"))
+    (check (length (filter (lambda (a) [a hasShortcutKey]) entries)) 12)))  ; Rubric's own keys cut, copy, paste
 
 (define-test "R-11 a right click builds the menu: the page's actions only"
   (let* ((d (temp "cog-lisp-editor-menu"))
-         (f (write-raw! [d / "m.lisp"] "(+ 1 2)
-"))
+         (f (write-raw! [d / "m.lisp"] "(+ 1 2)\n"))
          (e (editor)) (w (open! e))
          (p (open-file! e f))
          (menu (on-ui [[[p code] adapter] codePaneMenu: #f shifted: #f])))
     (check (map (lambda (i) [[i contents] asString]) (vector->list [[menu items] asArray]))
-           '("Do it" "Print it" "Load file" "Interrupt" "Save" "Format" "Cut" "Copy" "Paste"))
+           '("Run" "Do it" "Print it" "Load file" "Interrupt" "Save" "Format" "Cut" "Copy" "Paste"))
     (close! w)
     [d ensureDeleteAll]))
 

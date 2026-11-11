@@ -292,6 +292,24 @@ Item 6 is answered already.
   browser for a built-in.
 - **R-11. Keys are Pharo's** (§12 decision 6): Ctrl+D, Ctrl+P, Ctrl+I, Ctrl+S,
   Ctrl+B, as the playground and the browser use them.
+- **R-42. A toolbar** above the tabs: *Run*, *Load*, *Save*, *Format* and
+  *Interrupt*, acting on the file in the tab chosen, so the editor's actions are
+  found without the menu or the keys. A status line below the tabs says what
+  the last action did (saved, refused while busy, nothing to interrupt).
+- **R-43. Run** (Ctrl+R) runs the file as a program, from a clean start, as
+  `cog-lisp.bat` would: in a new REPL window, which loads the file as it is on
+  disk. So a program that reads its input (`read-line`) or draws with the
+  console library runs as in a terminal, its input typed in that window, and
+  Interrupt there stops it. Saving and evaluating stay separate (§12 decision
+  4): a file with unsaved edits is run as saved, and the status line says so.
+- **R-44. The REPL is the editor's output pane.** Each file's tab has a REPL
+  below its text, on the file's session (R-9): what Do it, Print it and Load
+  file evaluate is shown there as it runs, its output as it is written, then
+  its values, an error with its restarts as in a REPL window; a program reading
+  its input reads what is typed there; and a form typed at its prompt is
+  evaluated as part of the file. Do it and Print it show their form after the
+  prompt; Load file shows `; load name.lisp`. The session is made at the first
+  evaluation, not when the file opens, so opening a library does not load it.
 
 ### 5.4 The REPL
 
@@ -554,6 +572,12 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
   next input; a console `table` shows with its borders. By hand: `ide.bat` and
   `ide.sh` open the image on a project; saving and reopening keeps the REPL's
   history; a stale image offers a fresh one.
+- **AC-3c (step 3, R-42 to R-44).** Headless: the toolbar's buttons act on the
+  chosen tab; Run opens a REPL window that runs the file as saved, and a
+  `read-line` in it answers a line typed there; Do it shows its form and value in
+  the tab's REPL; Load file of a program that reads a line, then a line typed in
+  the tab's REPL, finishes it; a form typed at that REPL's prompt is evaluated
+  in the file's unit.
 - **AC-3 (step 3).** Headless: a file opens styled (a string, a comment and a
   special form each with their style); Do it on a `define` in a library file
   defines the library's qualified name; Print it inserts `;; => value`; saving
@@ -676,7 +700,7 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 |------|------|--------|
 | 1 | The spike (§4.1); the editor services (R-29, R-30) | Done (2026-11-10): `lib/editor-services.lisp` and `tests/lisp/editor-services.lisp` (62 checks); the language server on it, its 31 checks and VS Code's 5 offline and 12 with the server passing unchanged |
 | 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c done (2026-11-11): R-39 (§16). 2d done (2026-11-11), the owner's trial of 2c: R-40, R-41 (§17) |
-| 3 | The editor | 3a done (2026-11-11): R-5, R-6, R-8's saving, R-9 (but Inspect it), R-11, Format; the owner's trial fixed (§18). 3b next: R-10, R-8's files changed on disk, R-7's indenting on Enter |
+| 3 | The editor | 3a done (2026-11-11): R-5, R-6, R-8's saving, R-9 (but Inspect it), R-11, Format; the owner's trial fixed (§18). 3c done (2026-11-11), the owner's request: R-42 to R-44 (§19). 3b next: R-10, R-8's files changed on disk, R-7's indenting on Enter |
 | 4 | The browser and the inspector | |
 | 5 | Errors and the debugger | |
 | 6 | Finishing | |
@@ -958,3 +982,36 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
   saving in CRLF, Do it at the cursor and on a selection in a library's unit,
   an error, Print it, Load file, busy, Format, the styler, the keys and the
   menu); `tests/lisp/ide-window-console.lisp`'s menu check names *Editor*.
+
+## 19. As built: step 3c, running programs from the editor (2026-11-11)
+
+The owner's trial of 3a found no way to run a program that reads its input,
+and Ctrl+L hard to find; R-42 to R-44 were added for it.
+
+- **The toolbar** (R-42): *Run*, *Load*, *Save*, *Format*, *Interrupt*, above
+  the tabs, each acting on the tab chosen (the editor maps each tab to its page:
+  tabs can be closed, so their order is not the pages'). With no file open,
+  the status line says to choose one. The status line, below, replaced 3a's
+  output pane: saved, refused while busy, nothing to interrupt, running.
+- **Run** (R-43, Ctrl+R, the menu's first item): a new REPL window, titled with
+  the file's name, that loads the file as saved, as `ide.bat --run` does; it
+  reads what is typed there and is interrupted there. A tab with unsaved edits
+  runs as saved, and the status line says so.
+- **The tab's REPL** (R-44): each page holds a `LispReplPresenter` below its
+  text, on the file's session (`sessionSource:`, made at its first evaluation;
+  a REPL leaves a session handed to it open when it closes). Do it, Print it
+  and Load file go through it (`evaluate:showing:then:`): the form, or
+  `; load name.lisp`, after its prompt, then output, values or an error with
+  its restart buttons, as in a REPL window. A line typed there answers a
+  program's `read-line`; a form typed at its prompt is evaluated as part of
+  the file. Print it's insertion comes from the result block, and changes the
+  code pane through `LispIde onUi:`: headless, a result is shown in the
+  evaluation's process.
+- **Checks**: `tests/lisp/ide-editor-window.lisp` (87): the tab's REPL showing
+  each evaluation, its break and abort, a program in it reading a typed line, a
+  form typed at its prompt seeing a private name, its session made late and
+  kept; Run reading a typed line and running the file as saved; the toolbar on
+  the tab chosen and with none; the menu and keys with Run.
+- **For the owner to check**: `ide.bat --fresh`; in the editor, `echo.lisp` with
+  *Run* (type lines in the new window, then Interrupt or close it), and with
+  *Load*, typing lines in the tab's REPL; Ctrl+R on a real keyboard.

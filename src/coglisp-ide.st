@@ -38,12 +38,12 @@ sess := (Object << #LispSession) slots: { #name. #maker. #unit. #compiler. #proc
 sinput := (Object << #LispSessionInput) slots: { #lines. #ready. #closed }; package: 'CogLisp-IDE'; install.
 sresult := (Object << #LispSessionResult) slots: { #status. #values. #output. #report. #restarts. #level }; package: 'CogLisp-IDE'; install.
 ide := (Object << #LispIde) sharedVariables: { #Watcher }; package: 'CogLisp-IDE'; install.
-replp := (SpPresenter << #LispReplPresenter) slots: { #session. #view. #termView. #restartsBar. #interruptButton. #history. #historyIndex. #shown. #transcriptText. #historyLines. #buffer. #bufferCursor. #updates. #idle. #busy. #level. #restarts. #terminal. #keys. #columns. #rows }; package: 'CogLisp-IDE'; install.
+replp := (SpPresenter << #LispReplPresenter) slots: { #session. #view. #termView. #restartsBar. #interruptButton. #history. #historyIndex. #shown. #transcriptText. #historyLines. #buffer. #bufferCursor. #updates. #idle. #busy. #level. #restarts. #terminal. #keys. #columns. #rows. #sessionSource. #ownsSession. #after }; package: 'CogLisp-IDE'; install.
 tview := (Morph << #LispTerminalView) slots: { #target. #lines. #caret. #top. #selectFrom. #selectTo }; package: 'CogLisp-IDE'; install.
 files := (SpPresenter << #LispFilesPresenter) slots: { #list. #source. #runButton. #refreshButton }; package: 'CogLisp-IDE'; install.
 styler := (SHRBTextStyler << #LispStyler) slots: { #palette }; package: 'CogLisp-IDE'; install.
-epage := (SpPresenter << #LispEditorPage) slots: { #code. #path. #ending. #savedText. #editor. #updates. #idle. #busy. #running }; package: 'CogLisp-IDE'; install.
-editorp := (SpPresenter << #LispEditorPresenter) slots: { #tree. #notebook. #output. #pages. #folder }; package: 'CogLisp-IDE'; install.
+epage := (SpPresenter << #LispEditorPage) slots: { #code. #path. #ending. #savedText. #editor. #repl }; package: 'CogLisp-IDE'; install.
+editorp := (SpPresenter << #LispEditorPresenter) slots: { #tree. #notebook. #status. #toolbar. #pages. #tabs. #folder. #lastRun }; package: 'CogLisp-IDE'; install.
 keyq := (Object << #LispKeyQueue) slots: { #chars. #ready. #wanted }; package: 'CogLisp-IDE'; install.
 
 "=== LispSessionInput: lines typed for a program that reads ==================="
@@ -806,7 +806,9 @@ cm value: replp value: 'initialization' value: 'initializePresenters
 	level := 0.
 	restarts := #().
 	keys := LispKeyQueue new.
-	session := LispIde call: ''ide:ide-session'' with: { LispIde symbol: ''name''. ''REPL'' }.
+	"made at the first evaluation: a session of its own, or the one sessionSource: gives"
+	sessionSource := [LispIde call: ''ide:ide-session'' with: { LispIde symbol: ''name''. ''REPL'' }].
+	ownsSession := true.
 	self emit: self prompt sgr: self promptColor'.
 cm value: replp value: 'initialization' value: 'defaultLayout
 	^ SpBoxLayout newTopToBottom
@@ -824,7 +826,12 @@ cm value: replp value: 'initialization' value: 'initializeWindow: aWindowPresent
 	[aWindowPresenter whenClosedDo: [self closeSession]] on: Error do: [:e | nil]'.
 
 cm value: replp value: 'accessing' value: 'session
-	^ session'.
+	^ session ifNil: [session := sessionSource value]'.
+cm value: replp value: 'accessing' value: 'sessionSource: aBlock
+	"The REPL evaluates in the session aBlock answers, made at its first evaluation
+	 and not its own: closing the REPL leaves it open (the editor''s pane, R-44)."
+	sessionSource := aBlock.
+	ownsSession := false'.
 cm value: replp value: 'accessing' value: 'terminalView
 	^ termView'.
 cm value: replp value: 'accessing' value: 'transcriptText
@@ -1061,23 +1068,28 @@ cm value: replp value: 'evaluating' value: 'submit
 	buffer := ''''. bufferCursor := 0.
 	self evaluate: text'.
 cm value: replp value: 'evaluating' value: 'evaluate: text
-	"Echoes text after the prompt, and evaluates it in the session, in a console the
-	 size of the pane whose keys are the ones typed here (R-39); the window goes on
-	 working while it runs. waitUntilIdle: waits for it."
-	| first |
+	^ self evaluate: text showing: text then: nil'.
+cm value: replp value: 'evaluating' value: 'evaluate: text showing: shown then: aBlock
+	"Shows shown after the prompt (the text itself when typed), and evaluates text in
+	 the session, in a console the size of the pane whose keys are the ones typed
+	 here (R-39); the window goes on working while it runs. Once its result is
+	 shown, aBlock (if any) is given it. waitUntilIdle: waits for it."
+	| first s |
 	self ensureTerminal.
-	self emit: text , String lf.
+	self emit: shown , String lf.
+	after := aBlock.
+	s := self session.
 	busy := true.
 	keys reset.
 	interruptButton enable.
 	self showRestarts: #().
-	session wrapper: (LispIde call: ''ide:ide-window-console'' with: { columns. rows. keys }).
-	first := LispIde call: ''ide:ide-eval'' with: { session. text. LispIde symbol: ''timeout''. 0 }.
+	s wrapper: (LispIde call: ''ide:ide-window-console'' with: { columns. rows. keys }).
+	first := LispIde call: ''ide:ide-eval'' with: { s. text. LispIde symbol: ''timeout''. 0 }.
 	[| r |
 	 r := first.
 	 [(r at: 1) name = ''running''] whileTrue: [
 		self queue: [self appendOutput. self refresh].
-		r := LispIde call: ''ide:ide-wait'' with: { session. 100 }].
+		r := LispIde call: ''ide:ide-wait'' with: { s. 100 }].
 	 self queue: [self show: r].
 	 idle signal] forkAt: Processor userBackgroundPriority'.
 cm value: replp value: 'evaluating' value: 'show: aResult
@@ -1098,7 +1110,8 @@ cm value: replp value: 'evaluating' value: 'show: aResult
 	status = ''error'' ifTrue: [
 		self emit: ''error: '' , (aResult at: 5) , String lf sgr: ''91''.
 		self showRestarts: (aResult at: 6) asArray].
-	self emit: self prompt sgr: self promptColor'.
+	self emit: self prompt sgr: self promptColor.
+	after ifNotNil: [:b | after := nil. b value: aResult]'.
 cm value: replp value: 'evaluating' value: 'showRestarts: names
 	"The restarts as buttons (R-14): abort and continue run at once; one that takes
 	 values puts (name ) at the prompt to be finished."
@@ -1122,6 +1135,8 @@ cm value: replp value: 'evaluating' value: 'interrupt
 	"Stops the evaluation running: the session waits at a break (R-15)."
 	busy ifTrue: [LispIde call: ''ide:ide-interrupt'' with: { session }]'.
 cm value: replp value: 'evaluating' value: 'closeSession
+	"a session handed to it is not the REPL''s to close"
+	ownsSession == false ifTrue: [^ self].
 	session ifNotNil: [LispIde call: ''ide:ide-close'' with: { session }. session := nil]'.
 
 cm value: replp value: 'updating' value: 'queue: aBlock
@@ -1271,12 +1286,20 @@ cm value: epage value: 'initialization' value: 'initializePresenters
 	 page''s actions, which are its menu too (Spec refuses contextMenu: with actions)"
 	code overrideContextMenu: true.
 	LispStyler installOn: code.
+	"the output pane is a REPL on the file''s session (R-44), made at its first evaluation"
+	repl := self instantiate: LispReplPresenter.
+	repl sessionSource: [self session].
 	self bindKeys'.
 cm value: epage value: 'initialization' value: 'defaultLayout
-	^ SpBoxLayout newTopToBottom add: code; yourself'.
+	^ SpPanedLayout newTopToBottom
+		positionOfSlider: 0.62;
+		add: code;
+		add: repl;
+		yourself'.
 cm value: epage value: 'initialization' value: 'keys
 	"The page''s actions (R-11): name, menu label, letter (nil: none), shifted?, action."
 	^ {
+		{ ''run''. ''Run''. $r. false. [self run] }.
 		{ ''do-it''. ''Do it''. $d. false. [self doIt] }.
 		{ ''print-it''. ''Print it''. $p. false. [self printIt] }.
 		{ ''load-file''. ''Load file''. $l. false. [self loadFile] }.
@@ -1312,6 +1335,9 @@ cm value: epage value: 'accessing' value: 'path
 	^ path'.
 cm value: epage value: 'accessing' value: 'code
 	^ code'.
+cm value: epage value: 'accessing' value: 'repl
+	"The REPL below the text, on the file''s session (R-44)."
+	^ repl'.
 cm value: epage value: 'accessing' value: 'text
 	^ code text asString'.
 cm value: epage value: 'accessing' value: 'text: aString
@@ -1356,65 +1382,32 @@ cm value: epage value: 'evaluating' value: 'formInterval
 	form := LispIde call: ''ide:ide-form-at'' with: { self text. ((code cursorPositionIndex ifNil: [1]) - 1) max: 0 }.
 	form == false ifTrue: [^ nil].
 	^ (form car + 1) to: form cdr'.
-cm value: epage value: 'evaluating' value: 'evaluate: aString then: aBlock
-	"Evaluates aString as part of the file, in its session, in a process of its own
-	 so that the window carries on; then, in the UI process, what it wrote is
-	 reported and aBlock given the values written. An error is reported and the
-	 session brought back from its break. One evaluation at a time."
-	busy == true ifTrue: [^ self report: ''busy: an evaluation is running (Interrupt, in the menu, stops it)''].
-	busy := true.
-	idle := Semaphore new.
-	[| s r written |
-	 [s := self session.
-	  running := s.
-	  r := self wait: (LispIde call: ''ide:ide-eval'' with: { s. aString }) in: s.
-	  (r at: 4) isEmpty ifFalse: [| out | out := r at: 4. self queue: [self report: out]].
-	  (r at: 1) name = ''error''
-		ifTrue: [| report |
-			report := r at: 5.
-			self queue: [self report: ''error: '' , report].
-			self wait: (LispIde call: ''ide:ide-eval'' with: { s. ''(abort)'' }) in: s]
-		ifFalse: [
-			written := OrderedCollection new.
-			(r at: 3) do: [:w | written add: w].
-			self queue: [aBlock value: written]]]
-		on: Error do: [:e | | text | text := LispError describe: e. self queue: [self report: ''error: '' , text]].
-	 running := nil.
-	 busy := false.
-	 idle signal] forkAt: Processor userBackgroundPriority named: ''cog-lisp editor evaluation'''.
+cm value: epage value: 'evaluating' value: 'evaluate: aString showing: shown then: aBlock
+	"Evaluates aString as part of the file, in the page''s REPL (R-44): shown after its
+	 prompt, its output and values there as they come; then aBlock (if any) is
+	 given the result. One evaluation at a time."
+	repl isBusy ifTrue: [^ self report: ''busy: an evaluation is running (Interrupt stops it)''].
+	repl evaluate: aString showing: shown then: aBlock'.
 cm value: epage value: 'evaluating' value: 'interrupt
-	"Stops the evaluation running, which is then reported as an error (R-15)."
-	running
-		ifNil: [self report: ''nothing to interrupt'']
-		ifNotNil: [:s | LispIde call: ''ide:ide-interrupt'' with: { s }]'.
-cm value: epage value: 'evaluating' value: 'wait: aResult in: aSession
-	"The result once the evaluation has finished."
-	| r |
-	r := aResult.
-	[(r at: 1) name = ''running''] whileTrue: [
-		r := LispIde call: ''ide:ide-wait'' with: { aSession. 100 }].
-	^ r'.
+	"Stops the evaluation running: the REPL shows its break and restarts (R-15)."
+	repl isBusy
+		ifTrue: [repl interrupt]
+		ifFalse: [self report: ''nothing to interrupt'']'.
 cm value: epage value: 'evaluating' value: 'isBusy
-	^ busy == true'.
-cm value: epage value: 'updating' value: 'queue: aBlock
-	"Runs aBlock in the UI process: an evaluation''s results come from another one."
-	updates ifNil: [updates := OrderedCollection new].
-	updates add: aBlock.
-	self defer: [self flushUpdates]'.
-cm value: epage value: 'updating' value: 'flushUpdates
-	| pending |
-	updates ifNil: [^ self].
-	pending := updates copy.
-	updates removeAll.
-	pending do: [:each | each value]'.
-cm value: epage value: 'updating' value: 'waitUntilIdle: milliseconds
-	"For a test: waits for the evaluation to finish, then shows what it answered
-	 (in the UI process). False if it is still running."
-	idle ifNil: [^ true].
-	(idle waitTimeoutMilliseconds: milliseconds) ifTrue: [^ false].
-	idle signal.
-	LispIde onUi: [self flushUpdates].
-	^ true'.
+	^ repl isBusy'.
+cm value: epage value: 'evaluating' value: 'waitUntilIdle: milliseconds
+	"For a test: waits for the evaluation to finish and be shown. False if it is still running."
+	repl isBusy ifFalse: [^ true].
+	^ repl waitUntilIdle: milliseconds'.
+cm value: epage value: 'evaluating' value: 'run
+	"Ctrl+R: the file as saved, run as a program in a new REPL window (R-43), where it
+	 reads what is typed. Answers that window''s presenter."
+	| name |
+	name := path asFileReference basename.
+	self report: (self isDirty
+		ifTrue: [''running '' , name , '' as saved: its unsaved edits are not in it'']
+		ifFalse: [''running '' , name]).
+	^ editor ifNotNil: [:e | e runFile: path]'.
 cm value: epage value: 'evaluating' value: 'doIt
 	"Ctrl+D: the selection or the form at the cursor, evaluated as part of the file;
 	 its values reported (R-9)."
@@ -1422,22 +1415,28 @@ cm value: epage value: 'evaluating' value: 'doIt
 	interval := self formInterval.
 	interval ifNil: [^ self].
 	self evaluate: (self text copyFrom: interval first to: interval last)
-		then: [:values | self report: (values isEmpty ifTrue: [''done''] ifFalse: [values last])]'.
+		showing: (self text copyFrom: interval first to: interval last)
+		then: nil'.
 cm value: epage value: 'evaluating' value: 'printIt
 	"Ctrl+P: as Do it, and the value written after the form as ;; => value (R-9)."
 	| interval |
 	interval := self formInterval.
 	interval ifNil: [^ self].
 	self evaluate: (self text copyFrom: interval first to: interval last)
-		then: [:values | | written text |
+		showing: (self text copyFrom: interval first to: interval last)
+		then: [:r | (r at: 1) name = ''done'' ifTrue: [| values written |
+			values := OrderedCollection new.
+			(r at: 3) do: [:w | values add: w].
 			written := values isEmpty ifTrue: [''(no value)''] ifFalse: [values last].
-			text := self text.
-			code text: (text copyFrom: 1 to: interval last) , String lf , '';; => '' , written ,
-				(text copyFrom: interval last + 1 to: text size).
-			[code selectionInterval: (interval last + 9 + written size to: interval last + 8 + written size)] on: Error do: [:e | nil]]'.
+			"the code pane is changed in the UI process: a result can come from another"
+			LispIde onUi: [| text |
+				text := self text.
+				code text: (text copyFrom: 1 to: interval last) , String lf , '';; => '' , written ,
+					(text copyFrom: interval last + 1 to: text size).
+				code selectionInterval: (interval last + 9 + written size to: interval last + 8 + written size)]]]'.
 cm value: epage value: 'evaluating' value: 'loadFile
 	"Ctrl+L: the whole text, as the file holds it now, evaluated as part of the file."
-	self evaluate: self text then: [:r | self report: ''loaded '' , path asFileReference basename]'.
+	self evaluate: self text showing: ''; load '' , path asFileReference basename then: nil'.
 cm value: epage value: 'reporting' value: 'report: aString
 	editor ifNotNil: [:e | e report: aString]'.
 
@@ -1453,21 +1452,41 @@ cm value: editorp value: 'initialization' value: 'initializePresenters
 	tree children: [:ref | self childrenOf: ref].
 	tree whenActivatedDo: [:selection | selection selectedItem ifNotNil: [:ref | ref isFile ifTrue: [self openFile: ref fullName]]].
 	notebook := self newNotebook.
-	output := self newText.
-	output beNotEditable.
-	output beNotWrapWord.
+	toolbar := self newToolbar.
+	self toolbarItems do: [:each | | b |
+		b := SpToolbarButtonPresenter new.
+		b label: (each at: 1); help: (each at: 2); action: (each at: 4).
+		[b icon: (self iconNamed: (each at: 3))] on: Error do: [:e | nil].
+		toolbar addItem: b].
+	status := self newLabel.
 	pages := OrderedCollection new.
+	tabs := IdentityDictionary new.
 	self folder: (self defaultFolder)'.
+cm value: editorp value: 'initialization' value: 'toolbarItems
+	"The toolbar (R-42): label, help, icon, action on the tab chosen."
+	^ {
+		{ ''Run''. ''Run the file, as saved, as a program in a new REPL window (Ctrl+R)''. #smallDoIt. [self withPage: [:p | p run]] }.
+		{ ''Load''. ''Evaluate the whole text as part of the file, in its REPL below (Ctrl+L)''. #smallLoadProject. [self withPage: [:p | p loadFile]] }.
+		{ ''Save''. ''Save the file, in its own line endings (Ctrl+S)''. #smallSave. [self withPage: [:p | p save]] }.
+		{ ''Format''. ''Lay the text out as format-source does (Ctrl+Shift+F)''. #smallJustified. [self withPage: [:p | p format]] }.
+		{ ''Interrupt''. ''Stop the evaluation running in the file''''s REPL''. #stop. [self withPage: [:p | p interrupt]] } }'.
 cm value: editorp value: 'initialization' value: 'defaultLayout
 	^ SpBoxLayout newTopToBottom
+		add: toolbar expand: false;
 		add: (SpPanedLayout newLeftToRight
-			positionOfSlider: 0.25;
+			positionOfSlider: 0.22;
 			add: tree;
-			add: (SpPanedLayout newTopToBottom positionOfSlider: 0.8; add: notebook; add: output; yourself);
+			add: notebook;
 			yourself);
+		add: status expand: false;
 		yourself'.
 cm value: editorp value: 'initialization' value: 'initializeWindow: aWindowPresenter
-	aWindowPresenter title: ''cog-lisp editor''; initialExtent: 1000 @ 680'.
+	aWindowPresenter title: ''cog-lisp editor''; initialExtent: 1100 @ 760'.
+cm value: editorp value: 'accessing' value: 'toolbar
+	^ toolbar'.
+cm value: editorp value: 'accessing' value: 'lastRun
+	"The REPL window the last Run opened."
+	^ lastRun'.
 cm value: editorp value: 'files' value: 'defaultFolder
 	| project |
 	project := LispIde call: ''ide:ide-project'' with: #().
@@ -1492,7 +1511,26 @@ cm value: editorp value: 'files' value: 'holdsLisp: aDirectory
 cm value: editorp value: 'files' value: 'pages
 	^ pages'.
 cm value: editorp value: 'files' value: 'pageFor: aPath
-	^ pages detect: [:p | p path asFileReference = aPath asFileReference] ifNone: [nil]'.
+	"The page of a tab still open on aPath."
+	^ self openPages detect: [:p | p path asFileReference = aPath asFileReference] ifNone: [nil]'.
+cm value: editorp value: 'files' value: 'openPages
+	^ notebook pages collect: [:tab | tabs at: tab] thenSelect: [:p | p notNil]'.
+cm value: editorp value: 'files' value: 'selectedPage
+	"The page of the tab chosen, or nil."
+	^ notebook selectedPage ifNotNil: [:tab | tabs at: tab ifAbsent: [nil]]'.
+cm value: editorp value: 'files' value: 'withPage: aBlock
+	self selectedPage
+		ifNil: [self report: ''no file is open: choose one in the tree'']
+		ifNotNil: [:p | aBlock value: p]'.
+cm value: editorp value: 'running' value: 'runFile: aPath
+	"A new REPL window running the file at aPath as a program, from a clean start (R-43)."
+	| p |
+	p := LispReplPresenter new.
+	p open.
+	[p window title: ''cog-lisp: '' , aPath asFileReference basename] on: Error do: [:e | nil].
+	p evaluate: ''(load '' , (LispPrinter writeString: aPath) , '')''.
+	lastRun := p.
+	^ p'.
 cm value: editorp value: 'files' value: 'openFile: aPath
 	"The file in a tab of its own, or its tab if it has one (R-5). Answers its page."
 	| page tab |
@@ -1503,24 +1541,22 @@ cm value: editorp value: 'files' value: 'openFile: aPath
 	pages add: page.
 	tab := SpNotebookPage title: page title provider: [page].
 	[tab beCloseable] on: Error do: [:e | nil].
+	tabs at: tab put: page.
 	notebook addPage: tab.
 	self selectPage: page.
 	^ page'.
+cm value: editorp value: 'files' value: 'tabFor: aPage
+	^ notebook pages detect: [:tab | (tabs at: tab ifAbsent: [nil]) == aPage] ifNone: [nil]'.
 cm value: editorp value: 'files' value: 'selectPage: aPage
-	| i |
-	i := pages indexOf: aPage.
-	(i between: 1 and: notebook pages size) ifTrue: [notebook selectPage: (notebook pages at: i)]'.
+	(self tabFor: aPage) ifNotNil: [:tab | notebook selectPage: tab]'.
 cm value: editorp value: 'files' value: 'pageChanged: aPage
 	"Its title marks unsaved edits."
-	| i |
-	i := pages indexOf: aPage.
-	(i between: 1 and: notebook pages size) ifTrue: [(notebook pages at: i) title: aPage title]'.
-cm value: editorp value: 'reporting' value: 'outputText
-	^ output text asString'.
+	(self tabFor: aPage) ifNotNil: [:tab | tab title: aPage title]'.
+cm value: editorp value: 'reporting' value: 'statusText
+	^ status label asString'.
 cm value: editorp value: 'reporting' value: 'report: aString
-	"A line in the output pane: what an evaluation wrote or answered, a save."
-	output text: output text asString , aString , String lf.
-	[output withAdapterDo: [:a | a widget scrollToEndOfText]] on: Error do: [:e | nil]'.
+	"The status line: what the last action did (R-42); evaluations show in the tab''s REPL."
+	status label: aString'.
 
 "the development image takes its requests when it starts in the GUI (R-37)"
 SessionManager default registerUserClassNamed: #LispIde.
