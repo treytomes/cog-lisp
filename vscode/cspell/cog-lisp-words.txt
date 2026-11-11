@@ -83,6 +83,7 @@ columns
 command
 compile
 compiler
+complete
 completion
 completions
 complex
@@ -120,6 +121,7 @@ defvar
 delete
 denominator
 depth
+describe
 detail
 diff
 differences
@@ -202,6 +204,7 @@ ide
 ignore
 image
 imports
+indent
 index
 indexed
 inexact

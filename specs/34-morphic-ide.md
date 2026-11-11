@@ -700,7 +700,7 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 |------|------|--------|
 | 1 | The spike (§4.1); the editor services (R-29, R-30) | Done (2026-11-10): `lib/editor-services.lisp` and `tests/lisp/editor-services.lisp` (62 checks); the language server on it, its 31 checks and VS Code's 5 offline and 12 with the server passing unchanged |
 | 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c done (2026-11-11): R-39 (§16). 2d done (2026-11-11), the owner's trial of 2c: R-40, R-41 (§17) |
-| 3 | The editor | 3a done (2026-11-11): R-5, R-6, R-8's saving, R-9 (but Inspect it), R-11, Format; the owner's trial fixed (§18). 3c done (2026-11-11), the owner's request: R-42 to R-44 (§19). 3b next: R-10, R-8's files changed on disk, R-7's indenting on Enter |
+| 3 | The editor | 3a done (2026-11-11): R-5, R-6, R-8's saving, R-9 (but Inspect it), R-11, Format; the owner's trial fixed (§18). 3c done (2026-11-11), the owner's request: R-42 to R-44 (§19). 3b done (2026-11-11): R-7, R-8's files changed on disk, R-10 (§20). |
 | 4 | The browser and the inspector | |
 | 5 | Errors and the debugger | |
 | 6 | Finishing | |
@@ -1015,3 +1015,62 @@ and Ctrl+L hard to find; R-42 to R-44 were added for it.
 - **For the owner to check**: `ide.bat --fresh`; in the editor, `echo.lisp` with
   *Run* (type lines in the new window, then Interrupt or close it), and with
   *Load*, typing lines in the tab's REPL; Ctrl+R on a real keyboard.
+
+## 20. As built: step 3b, what the editor knows (2026-11-11)
+
+- **The `ide` procedures** (R-32), over `editor-services`: `ide-check` (a
+  text's problems, the text indexed as the file's), `ide-describe` (the
+  documentation of the name at a place), `ide-complete` (`(start end
+  completions)`), `ide-definitions` (where go to definition goes, the project
+  indexed first by `ide-index-project!`, once), `ide-indent-unit`,
+  `ide-indent` (R-7) and `ide-format` (format-source, indented as the file
+  indents: it formatted with tabs before, whatever the file used).
+- **Unbound names** (AC-3's underline): `editor-check` now warns on each use of
+  a global nothing defines. A form is compiled a second time (`compile-form`)
+  and its method's literals, its blocks' too, searched for unbound
+  `LispGlobal` cells; a name is left out when the text defines it (its
+  top-level forms macro-expanded, so a defining macro counts, and a name
+  defined later in the text is not reported), the image binds it, or another
+  file of the index defines it. A warning, not an error: a program may define
+  a name at run time. The language server shares it, so VS Code shows it too.
+  On eleven of cog-lisp's own files (the compiler among them) it reports
+  nothing; the second compile's warnings (a redefined built-in) are dropped,
+  or each would be reported twice.
+- **Problems** (R-10): a page checks its text 0.4 s after it last changed, in a
+  process of its own; a check of a text that changed meanwhile is dropped. The
+  problems are underlined by the styler (an error in red too: `TextEmphasis
+  underlined`) and listed in a *Problems* tab beside the REPL's, titled with
+  their number; choosing one selects it. Styling again keeps the selection.
+- **The documentation of the name at the cursor** is in the status line as the
+  cursor moves (its first two lines). **Completion** (Ctrl+Space, *Complete*):
+  one name is inserted, several are offered in a list below the text (a
+  popover). **Go to definition** (Ctrl+B): the file opened in its tab, the
+  definition selected, found by its text (the index reads a CRLF file as it is,
+  the tab holds it with line feeds); several, a list; none, the documentation
+  of a built-in the image has with no file here (the browser comes in step 4).
+  Text is inserted through Rubric's editor (`replaceSelectionWith:`), so Undo
+  undoes it.
+- **Enter** (R-7) starts a new line indented one level deeper than the line
+  holding the innermost list still open, in the file's own unit (a tab, or the
+  spaces of its first indented line).
+- **Files changed on disk** (R-8): while the window is open, every two seconds,
+  each tab's file is compared with its text as saved. Without unsaved edits it
+  is reloaded; with them it is kept aside, the tab's title says *(changed on
+  disk)* and the status line says how to choose: Save keeps these edits,
+  *Reload from disk* takes the file's.
+- **Found**: a single `!` in a method's string (`ide-index-project!`) ended the
+  file-in's chunk, and the build failed with "Unmatched ' in string literal"
+  and no place: every `!` in `src/` is doubled, as CLAUDE.md says.
+- **Checks**: `tests/lisp/ide-editor.lisp` (64: problems with unbound names, a
+  defining macro, a library's private names; documentation; completion; go to
+  definition across a project; indenting; formatting in the file's style) and
+  `tests/lisp/ide-editor-window.lisp` (128: underlines and the problems tab, a
+  check by itself after a pause, the selection kept, documentation at the
+  cursor, completion inserted and offered, go to definition in a CRLF file and
+  on a built-in, Enter, a file changed on disk with and without unsaved edits);
+  the language server's 31 checks and `tests/lisp/editor-services.lisp` (62)
+  pass unchanged.
+- **For the owner to check**: `ide.bat --fresh`; typing a misspelled name and
+  seeing it underlined; Ctrl+Space and Ctrl+B on a real keyboard, and the
+  completion list's keys (arrows, Enter); a file changed in VS Code while open
+  in the editor.

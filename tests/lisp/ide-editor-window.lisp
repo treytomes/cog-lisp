@@ -32,6 +32,7 @@
 (define (text p) (on-ui [p text]))
 (define (set-text! p s) (on-ui [p text: s]))
 (define (cursor! p n) (on-ui [[p code] selectionInterval: [n to: (- n 1)]]))  ; a cursor: an empty selection
+(define (caret! p offset) (cursor! p (+ offset 1)))                         ; before the character at offset
 (define (select! p from to) (on-ui [[p code] selectionInterval: [from to: to]]))
 (define (run! p action)                    ; a key's action, then its evaluation waited for
   (on-ui (action))
@@ -265,8 +266,154 @@
          (e (editor)) (w (open! e))
          (p (open-file! e f)))
     (on-ui [p format])
-    (check (text p) (format-source:format-source "(define (f x)   (* x\n 2))\n"))
+    (check (text p) (format-source:format-source "(define (f x)   (* x\n 2))\n" 'spaces 1))  ; as the file indents
+    (set-text! p "(define (f x)\n\t(* x\n 2))\n")
+    (on-ui [p format])
+    (check (text p) "(define (f x)\n\t(* x 2)\n)\n")                           ; tabs, kept
     (close! w)
+    [d ensureDeleteAll]))
+
+(define-test "R-10 problems: underlined in the text, listed beside the REPL, gone once fixed"
+  (let* ((d (temp "cog-lisp-editor-problems"))
+         (f (write-raw! [d / "prob.lisp"] "(define (f x) (frobnicate x))\n(if)\n"))
+         (e (editor)) (w (open! e))
+         (p (open-file! e f)))
+    (on-ui [p checkNow])
+    (check (map (lambda (pr) [[pr at: 4] asString]) (vector->list (on-ui [p problems])))
+           '("unbound variable: frobnicate" "if: bad syntax: (if)"))
+    (check (on-ui [[[[p bottom] pages] at: 2] title]) "Problems (2)")
+    (check (on-ui [[[p bottom] pages] size]) 2)
+    (check (map (lambda (i) (on-ui [p describeProblem: i])) (vector->list (on-ui [p problems])))
+           '("line 1: warning: unbound variable: frobnicate" "line 2: error: if: bad syntax: (if)"))
+    ;; underlined in the text, the error in red too
+    (let* ((styled (on-ui [[[[[p code] adapter] widget] textArea] text]))
+           (underline [[(smalltalk TextEmphasis) underlined] printString])
+           (underlined? (lambda (i) (has? [[[styled attributesAt: i] asArray] printString] underline))))
+      (check-true (underlined? 18))                                ; frobnicate
+      (check-false (underlined? 3))                                ; define
+      (check-true (underlined? 33)))                               ; (if)
+    ;; a problem chosen selects it
+    (on-ui [p selectFrom: 15 to: 25])
+    (check (on-ui [[[p code] selectionInterval] printString]) "(16 to: 25)")
+    ;; a check styles again, and leaves the selection where it was
+    (on-ui [p checkNow])
+    (check (on-ui [[[p code] selectionInterval] printString]) "(16 to: 25)")
+    ;; fixed: none
+    (set-text! p "(define (f x) (car x))\n")
+    (on-ui [p checkNow])
+    (check (vector->list (on-ui [p problems])) '())
+    (check (on-ui [[[[p bottom] pages] at: 2] title]) "Problems")
+    ;; and checked by itself once the text has rested
+    (set-text! p "(define (g x) (zork x))\n")
+    [[(smalltalk Delay) forMilliseconds: 1500] wait]
+    (check (on-ui [[p problems] size]) 1)
+    (close! w)
+    [d ensureDeleteAll]))
+
+(define-test "R-10 the documentation of the name at the cursor, in the status line"
+  (let* ((d (temp "cog-lisp-editor-describe"))
+         (f (write-raw! [d / "doc.lisp"] "(string-append \"a\" \"b\")\n"))
+         (e (editor)) (w (open! e))
+         (p (open-file! e f)))
+    (cursor! p 4)
+    (check-true (string-prefix? "(string-append" (status e)))
+    (close! w)
+    [d ensureDeleteAll]))
+
+(define-test "R-10 completion: one name inserted, several offered"
+  (let* ((d (temp "cog-lisp-editor-complete"))
+         (f (write-raw! [d / "c.lisp"] "(string- \"a\")\n"))
+         (e (editor)) (w (open! e))
+         (p (open-file! e f)))
+    (caret! p 8)
+    (check-true (and (member "string-append" (vector->list (on-ui [p completions]))) #t))
+    (on-ui [p complete])
+    (let ((offered (vector->list (on-ui [p choices]))))
+      (check-true (> (length offered) 3))
+      (check-true (and (member "string-append" offered) #t))
+      (check-true (every (lambda (l) (string-prefix? "string-" l)) offered)))
+    (on-ui [p choose: "string-append"])
+    (check (text p) "(string-append \"a\")\n")
+    (check (on-ui [p cursorOffset]) 14)                            ; after the name
+    ;; a name only one completion fits is completed at once
+    (set-text! p "(call-with-val 1)\n")
+    (caret! p 14)
+    (on-ui [p complete])
+    (check (text p) "(call-with-values 1)\n")
+    (caret! p 0)
+    (on-ui [p complete])
+    (check (status e) "nothing to complete here")
+    (close! w)
+    [d ensureDeleteAll]))
+
+(define-test "R-10 go to definition: the file opened, the definition selected; a built-in, its documentation"
+  (let* ((d (temp "cog-lisp-editor-goto"))
+         (defs (write-raw! [d / "defs.lisp"] (string-append "; the definitions" crlf crlf "(define (goto-target x)" crlf "  x)" crlf)))
+         (use (write-raw! [d / "use.lisp"] "(goto-target 1)\n(car '(1))\n"))
+         (e (editor)) (w (open! e)))
+    [e folder: [d fullName]]
+    (let ((p (open-file! e use)))
+      (cursor! p 3)
+      (on-ui [p goToDefinition])
+      (let ((target (on-ui [e selectedPage])))
+        (check (on-ui [target name]) "defs.lisp")
+        (let* ((sel (on-ui [[target code] selectionInterval]))
+               (t (text target)))
+          (check (substring t (- [sel first] 1) [sel last]) "(define (goto-target x)\n  x)")))  ; found in a CRLF file
+      (on-ui [e openFile: use])
+      (cursor! p 18)
+      (on-ui [p goToDefinition])
+      (check-true (string-prefix? "defined in the image, with no file here: (car" (status e))))
+    (close! w)
+    [d ensureDeleteAll]))
+
+(define-test "R-7 Enter indents the new line as the file does"
+  (let* ((d (temp "cog-lisp-editor-enter"))
+         (f (write-raw! [d / "i.lisp"] "(define (f x)\n    (let ((a 1))"))
+         (e (editor)) (w (open! e))
+         (p (open-file! e f)))
+    (caret! p (string-length (text p)))
+    (on-ui [p newlineAndIndent])
+    (check (text p) "(define (f x)\n    (let ((a 1))\n        ")      ; four spaces a level, as the file
+    (caret! p 13)
+    (on-ui [p newlineAndIndent])
+    (check (substring (text p) 0 18) "(define (f x)\n    ")
+    (close! w)
+    [d ensureDeleteAll]))
+
+(define-test "R-8 a file changed on disk: reloaded; with unsaved edits, reported and both kept"
+  (let* ((d (temp "cog-lisp-editor-disk"))
+         (f (write-raw! [d / "disk.lisp"] "(define v 1)\n"))
+         (e (editor)) (w (open! e))
+         (p (open-file! e f)))
+    (check-true [e isWatching])                                    ; while the window is open
+    (write-raw! [f asFileReference] "(define v 2)\n")
+    (on-ui [e checkFilesOnDisk])
+    (check (text p) "(define v 2)\n")
+    (check-false (on-ui [p isDirty]))
+    (check-true (has? (status e) "reloaded disk.lisp: it changed on disk"))
+    ;; edited here, then changed there: these edits kept, the change reported
+    (set-text! p "(define v 3)\n")
+    (write-raw! [f asFileReference] "(define v 4)\n")
+    (on-ui [e checkFilesOnDisk])
+    (check (text p) "(define v 3)\n")
+    (check-true (on-ui [p hasDiskConflict]))
+    (check (on-ui [p title]) "disk.lisp * (changed on disk)")
+    (check-true (has? (status e) "changed on disk while it has unsaved edits"))
+    ;; Reload from disk takes the file's
+    (on-ui [p reloadFromDisk])
+    (check (text p) "(define v 4)\n")
+    (check-false (on-ui [p hasDiskConflict]))
+    (check (on-ui [p title]) "disk.lisp")
+    ;; or Save keeps these
+    (set-text! p "(define v 5)\n")
+    (write-raw! [f asFileReference] "(define v 6)\n")
+    (on-ui [e checkFilesOnDisk])
+    (on-ui [p save])
+    (check (raw f) "(define v 5)\n")
+    (check-false (on-ui [p hasDiskConflict]))
+    (close! w)
+    (check-false [e isWatching])
     [d ensureDeleteAll]))
 
 (define-test "R-6 the styler styles LISP: comments, strings, keywords, parentheses"
@@ -293,10 +440,12 @@
          (entries (vector->list [[[[p code] actions] entries] asArray]))
          (shown (filter (lambda (a) [a isVisible]) entries)))
     (check (map (lambda (a) [[a name] asString]) shown)
-           '("Run" "Do it" "Print it" "Load file" "Interrupt" "Save" "Format" "Cut" "Copy" "Paste"))
+           '("Run" "Do it" "Print it" "Load file" "Interrupt" "Save" "Format"
+             "Complete" "Go to definition" "Reload from disk" "Cut" "Copy" "Paste"))
     (check (map (lambda (a) [[a name] asString]) (remove (lambda (a) [a isVisible]) entries))
-           '("run-typed" "do-it-typed" "print-it-typed" "load-file-typed" "save-typed" "format-typed"))
-    (check (length (filter (lambda (a) [a hasShortcutKey]) entries)) 12)))  ; Rubric's own keys cut, copy, paste
+           '("run-typed" "do-it-typed" "print-it-typed" "load-file-typed" "save-typed" "format-typed"
+             "complete-typed" "go-to-definition-typed" "newline" "newline-typed"))       ; Enter: a key only
+    (check (length (filter (lambda (a) [a hasShortcutKey]) entries)) 18)))  ; Rubric's own keys cut, copy, paste
 
 (define-test "R-11 a right click builds the menu: the page's actions only"
   (let* ((d (temp "cog-lisp-editor-menu"))
@@ -305,7 +454,8 @@
          (p (open-file! e f))
          (menu (on-ui [[[p code] adapter] codePaneMenu: #f shifted: #f])))
     (check (map (lambda (i) [[i contents] asString]) (vector->list [[menu items] asArray]))
-           '("Run" "Do it" "Print it" "Load file" "Interrupt" "Save" "Format" "Cut" "Copy" "Paste"))
+           '("Run" "Do it" "Print it" "Load file" "Interrupt" "Save" "Format"
+             "Complete" "Go to definition" "Reload from disk" "Cut" "Copy" "Paste"))
     (close! w)
     [d ensureDeleteAll]))
 

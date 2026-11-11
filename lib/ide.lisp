@@ -31,7 +31,9 @@
           ide-project ide-request ide-stale-files ide-update
           ide-window-console ide-loaded-files
           change-before ide-project-files ide-read-file ide-save-file ide-undo-change
-          ide-form-at ide-file-session ide-load-file))
+          ide-form-at ide-file-session ide-load-file
+          ide-check ide-describe ide-complete ide-definitions ide-index-project!
+          ide-indent-unit ide-indent ide-format))
 (require 'editor-services)
 (require 'console)
 
@@ -434,3 +436,102 @@ The session that evaluates forms as part of the file at path (R-9): in its unit,
                                  'unit (if (smalltalk-nil? unit) #f unit))))
             (hash-table-set! %file-sessions key s)
             s)))))
+
+;;; ---------------------------------------------------------------------------
+;;; What the editor knows about a text (step 3b, R-7, R-10): editor-services'
+;;; answers, for a file's text as an editor holds it
+
+(define (ide-check path text)
+  "(ide-check path text)
+The problems in text, the file at path as an editor holds it, in the order of the text: editor-check's (read and compile errors, warnings, and uses of globals nothing defines). The text is indexed as the file's, so its definitions are found before it is saved. Runs only its define-syntax, define-macro, require and library forms."
+  (editor-index-text! path text)
+  (editor-check path text))
+
+(define (%first-line-of s)
+  (let ((i (string-index s #\newline))) (if i (substring s 0 i) s)))
+
+(define (ide-describe path text offset)
+  "(ide-describe path text offset)
+The documentation of the name at offset in text (the file at path): a documented definition's, else what the name means in the file (a built-in's, an import's), else the first line of its definition; #f for no name or nothing known."
+  (let ((found (editor-symbol-at text offset)))
+    (and found
+         (let* ((name (car found))
+                (defs (editor-definitions-for path name))
+                (documented (find definition-documentation defs))
+                (doc (documentation (editor-resolve path name))))
+           (cond (documented (definition-documentation documented))
+                 (doc doc)
+                 ((pair? defs) (%first-line-of (definition-source (car defs))))
+                 (else #f))))))
+
+(define (ide-complete path text offset)
+  "(ide-complete path text offset)
+The names that complete the one being typed at offset in text: (start end completions), where start to end is the name around offset, to be replaced, and completions (editor-services' records) are those whose label starts with what is before offset, sorted; #f when no name is being typed."
+  (let ((found (editor-symbol-at text offset)))
+    (and found
+         (let* ((start (cadr found)) (prefix (substring text start offset)))
+           (and (not (string=? prefix ""))
+                (list start (caddr found)
+                      (sort (filter (lambda (c) (string-prefix? prefix (completion-label c))) (editor-completions path))
+                            (lambda (a b) (string<? (completion-label a) (completion-label b))))))))))
+
+(define %indexed-projects (make-hash-table equal?))
+
+(define (ide-index-project! . folder)
+  "(ide-index-project! [folder])
+Indexes the .lisp files under folder (the project's, ide-project, if not given), once, for go to definition and completion. Answers #t, or #f with no folder."
+  (let ((root (if (pair? folder) (car folder) (ide-project))))
+    (and root
+         (let ((key (editor-key [[root asFileReference] fullName])))
+           (unless (hash-table-ref/default %indexed-projects key #f)
+             (editor-index-folder! root)
+             (hash-table-set! %indexed-projects key #t))
+           #t))))
+
+(define (ide-definitions path text offset)
+  "(ide-definitions path text offset)
+The definitions of the name at offset in text (the file at path), as editor-services' records: where go to definition goes. The project is indexed first (ide-index-project!); () for a built-in with no file, or no name."
+  (ide-index-project!)
+  (let ((found (editor-symbol-at text offset)))
+    (if found (editor-definitions-for path (car found)) '())))
+
+(define (ide-indent-unit text)
+  "(ide-indent-unit text)
+How text indents a level: a tab when its first indented line starts with one, else that line's spaces (2 when no line is indented)."
+  (let loop ((lines (string-split text #\newline)))
+    (if (null? lines)
+        "  "
+        (let* ((line (car lines)) (n (string-length line)))
+          (cond ((and (> n 0) (eq? (string-ref line 0) #\tab)) (string #\tab))
+                ((and (> n 0) (eq? (string-ref line 0) #\space))
+                 (let count ((i 0))
+                   (cond ((and (< i n) (eq? (string-ref line i) #\space)) (count (+ i 1)))
+                         ((< i n) (make-string (min i 8) #\space))
+                         (else (loop (cdr lines))))))      ; a blank line
+                (else (loop (cdr lines))))))))
+
+(define (ide-indent text offset)
+  "(ide-indent text offset)
+The indentation for a new line started at offset in text (R-7): one level deeper than the line holding the innermost list still open there, as format-source lays a form's arguments one level deeper; none outside any list. A level is ide-indent-unit's."
+  (let loop ((tokens (editor-tokens (substring text 0 offset))) (open '()))
+    (cond ((pair? tokens)
+           (case (token-kind (car tokens))
+             ((open) (loop (cdr tokens) (cons (token-start (car tokens)) open)))
+             ((close) (loop (cdr tokens) (if (pair? open) (cdr open) open)))
+             (else (loop (cdr tokens) open))))
+          ((null? open) "")
+          (else
+           (let* ((at (car open))
+                  (line-start (let back ((i at)) (if (and (> i 0) (not (eq? (string-ref text (- i 1)) #\newline))) (back (- i 1)) i)))
+                  (lead (let ahead ((i line-start))
+                          (if (and (< i at) (memv (string-ref text i) '(#\space #\tab))) (ahead (+ i 1)) i))))
+             (string-append (substring text line-start lead) (ide-indent-unit text)))))))
+
+(define (ide-format text)
+  "(ide-format text)
+text laid out by format-source, indented as text indents (ide-indent-unit): with tabs, or that many spaces a level."
+  (require 'format-source)
+  (let ((unit (ide-indent-unit text)))
+    (if (string=? unit (string #\tab))
+        (format-source:format-source text)
+        (format-source:format-source text 'spaces (string-length unit)))))

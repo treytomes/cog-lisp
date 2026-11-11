@@ -5,6 +5,7 @@
 ;;; files are written in a temporary folder.
 (load "../../lib/test.lisp")
 (require 'ide)
+(require 'editor-services)
 
 (define here [[[[(smalltalk LispLoadPath) value] asFileReference] parent] fullName])
 (define (temp name)
@@ -117,5 +118,65 @@
       (check (result-status r) 'error)
       (check-true (string? (result-report r))))
     [d ensureDeleteAll]))
+
+;;; ---------------------------------------------------------------------------
+;;; Step 3b: what the editor knows about a text
+
+(define (messages problems) (map problem-message problems))
+
+(define-test "R-10 problems: errors, and each use of a global nothing defines, in order"
+  (let ((path [[[(smalltalk FileLocator) temp] / "cog-lisp-ide-check.lisp"] fullName]))
+    (check (messages (ide-check path "(define (f x) (frobnicate x (g x)))\n(define (g y) (+ y 1))\n"))
+           '("unbound variable: frobnicate"))                       ; g, defined later, is not
+    (check (map (lambda (p) (list (problem-severity p) (problem-start p) (problem-end p)))
+                (ide-check path "(display nope)\n(if)\n"))
+           '((warning 9 13) (error 15 19)))
+    ;; a name a macro defines is defined
+    (check (ide-check path "(define-macro (defconst n v) (list 'define n v))\n(defconst ide-k 1)\n(+ ide-k 1)\n") '())
+    ;; a library's own names, private ones too (a library form reads its file)
+    (let ((lib "(library ide-check-lib (export pub))\n(define (%priv) 1)\n(define (pub) (%priv))\n"))
+      (write-raw! [path asFileReference] lib)
+      (check (ide-check path lib) '())
+      [[path asFileReference] ensureDelete])))
+
+(define-test "R-10 documentation at a place: a built-in's, a definition's, or nothing"
+  (let ((path [[[(smalltalk FileLocator) temp] / "cog-lisp-ide-doc.lisp"] fullName])
+        (text "(define (ide-doc-f x)\n  \"(ide-doc-f x)\nTwice x.\"\n  (* 2 x))\n(string-append \"a\" (ide-doc-f 1))\n"))
+    (ide-check path text)
+    (check-true (string-prefix? "(string-append" (ide-describe path text (+ (string-search text "string-append") 3))))
+    (check (ide-describe path text (+ (string-search text "(ide-doc-f 1") 2)) "(ide-doc-f x)\nTwice x.")
+    (check-false (ide-describe path text (- (string-length text) 1)))))
+
+(define-test "R-10 completion: the names starting as the one typed, and the place to replace"
+  (let* ((path [[[(smalltalk FileLocator) temp] / "cog-lisp-ide-complete.lisp"] fullName])
+         (text "(string-ap \"a\")")
+         (answer (ide-complete path text 10)))
+    (check (car answer) 1)
+    (check (cadr answer) 10)
+    (check-true (and (member "string-append" (map completion-label (caddr answer))) #t))
+    (check-true (every (lambda (c) (string-prefix? "string-ap" (completion-label c))) (caddr answer)))
+    (check-false (ide-complete path text 0))))
+
+(define-test "R-10 go to definition: across the project's files"
+  (let* ((d (temp "cog-lisp-ide-defs"))
+         (lib (write-raw! [d / "defs.lisp"] "(define (ide-defs-target x) x)\n"))
+         (user (write-raw! [d / "use.lisp"] "(ide-defs-target 1)\n")))
+    (check-true (ide-index-project! [d fullName]))
+    (let ((defs (ide-definitions user "(ide-defs-target 1)\n" 3)))
+      (check (map definition-name defs) '("ide-defs-target"))
+      (check (editor-key (definition-path (car defs))) (editor-key lib))
+      (check (definition-start (car defs)) 0))
+    (check (ide-definitions user "(car 1)" 2) '())                 ; a built-in: no file
+    [d ensureDeleteAll]))
+
+(define-test "R-7 indenting a new line: one level deeper than the line of the list open there"
+  (check (ide-indent "(define (f x)" 13) "  ")
+  (check (ide-indent "(define (f x)\n  (let ((a 1))" 28) "    ")
+  (check (ide-indent "(define (f x)\n  (g x))" 22) "")                ; all closed
+  (check (ide-indent "(define (f x)\n\t(g x" 19) (string #\tab #\tab))   ; the file's tabs
+  (check (ide-indent-unit "(a\n    b)") "    ")
+  (check (ide-indent-unit "(a)") "  ")
+  (check (ide-format "(define (f x)\n(g x)\n(h x))\n") "(define (f x)\n  (g x)\n  (h x)\n)\n")
+  (check (ide-format "(define (f x)\n\t(g x)\n(h x))\n") "(define (f x)\n\t(g x)\n\t(h x)\n)\n"))
 
 (run-tests)

@@ -41,9 +41,9 @@ ide := (Object << #LispIde) sharedVariables: { #Watcher }; package: 'CogLisp-IDE
 replp := (SpPresenter << #LispReplPresenter) slots: { #session. #view. #termView. #restartsBar. #interruptButton. #history. #historyIndex. #shown. #transcriptText. #historyLines. #buffer. #bufferCursor. #updates. #idle. #busy. #level. #restarts. #terminal. #keys. #columns. #rows. #sessionSource. #ownsSession. #after }; package: 'CogLisp-IDE'; install.
 tview := (Morph << #LispTerminalView) slots: { #target. #lines. #caret. #top. #selectFrom. #selectTo }; package: 'CogLisp-IDE'; install.
 files := (SpPresenter << #LispFilesPresenter) slots: { #list. #source. #runButton. #refreshButton }; package: 'CogLisp-IDE'; install.
-styler := (SHRBTextStyler << #LispStyler) slots: { #palette }; package: 'CogLisp-IDE'; install.
-epage := (SpPresenter << #LispEditorPage) slots: { #code. #path. #ending. #savedText. #editor. #repl }; package: 'CogLisp-IDE'; install.
-editorp := (SpPresenter << #LispEditorPresenter) slots: { #tree. #notebook. #status. #toolbar. #pages. #tabs. #folder. #lastRun }; package: 'CogLisp-IDE'; install.
+styler := (SHRBTextStyler << #LispStyler) slots: { #palette. #page }; package: 'CogLisp-IDE'; install.
+epage := (SpPresenter << #LispEditorPage) slots: { #code. #path. #ending. #savedText. #editor. #repl. #bottom. #problemsList. #problems. #checkGeneration. #diskText. #choices }; package: 'CogLisp-IDE'; install.
+editorp := (SpPresenter << #LispEditorPresenter) slots: { #tree. #notebook. #status. #toolbar. #pages. #tabs. #folder. #lastRun. #watching }; package: 'CogLisp-IDE'; install.
 keyq := (Object << #LispKeyQueue) slots: { #chars. #ready. #wanted }; package: 'CogLisp-IDE'; install.
 
 "=== LispSessionInput: lines typed for a program that reads ==================="
@@ -1218,10 +1218,11 @@ cm value: files value: 'actions' value: 'runSelected
 	p submit.
 	^ p'.
 
-"=== LispStyler: LISP source, styled from its tokens (R-6) ===================="
+"=== LispStyler: LISP source, styled from its tokens (R-6), problems underlined (R-10) ==="
 cm value: styler value: 'styling' value: 'privateStyle: aText
 	"The text styled from editor-services'' tokens: comments, strings, characters,
-	 numbers, quotes, keywords (special forms and macros), parentheses by depth."
+	 numbers, quotes, keywords (special forms and macros), parentheses by depth;
+	 then the page''s problems underlined, an error in red too."
 	| tokens |
 	aText ifEmpty: [^ self].
 	charAttr := Array new: aText size withAll: (self attributesFor: #default).
@@ -1230,7 +1231,17 @@ cm value: styler value: 'styling' value: 'privateStyle: aText
 		t := tokens car.
 		self addStyle: (self styleFor: t) from: (t at: 2) + 1 to: (t at: 3).
 		tokens := tokens cdr].
+	page ifNotNil: [:pg | pg problems do: [:p | | from to extra |
+		from := (p at: 2) + 1.
+		to := (p at: 3) min: aText size.
+		extra := (p at: 1) name = ''error''
+			ifTrue: [{ TextEmphasis underlined. TextColor color: self class errorColor }]
+			ifFalse: [{ TextEmphasis underlined }].
+		from to: to do: [:i | charAttr at: i put: (charAttr at: i) , extra]]].
 	^ aText runs: (RunArray newFrom: charAttr)'.
+cm value: styler value: 'styling' value: 'page: aPage
+	"The page whose problems are underlined."
+	page := aPage'.
 cm value: styler value: 'styling' value: 'styleFor: aToken
 	| kind |
 	kind := (aToken at: 1) name asString.
@@ -1250,6 +1261,8 @@ cm value: styler value: 'styling' value: 'attributesFor: aSymbol
 	^ palette at: aSymbol ifAbsent: [super attributesFor: aSymbol]'.
 cm value: styler class value: 'palette' value: 'isDarkTheme
 	^ [Smalltalk ui theme backgroundColor luminance < 0.5] on: Error do: [:e | true]'.
+cm value: styler class value: 'palette' value: 'errorColor
+	^ Color fromHexString: ''F14C4C'''.
 cm value: styler class value: 'palette' value: 'paletteForDark: dark
 	"style -> text attributes: a color, and italic for comments"
 	| colors d |
@@ -1267,17 +1280,20 @@ cm value: styler class value: 'palette' value: 'paletteForDark: dark
 		d at: style put: attrs asArray].
 	^ d'.
 cm value: styler class value: 'installing' value: 'installOn: aCodePresenter
-	"Styles aCodePresenter''s text as LISP, once its widget is built."
+	^ self installOn: aCodePresenter for: nil'.
+cm value: styler class value: 'installing' value: 'installOn: aCodePresenter for: aPage
+	"Styles aCodePresenter''s text as LISP, once its widget is built, underlining
+	 aPage''s problems (if a page is given)."
 	aCodePresenter withSyntaxHighlight.
-	aCodePresenter whenBuiltDo: [:ann | self installInWidget: ann widget].
-	aCodePresenter withAdapterDo: [:a | a widget ifNotNil: [:w | self installInWidget: w]]'.
-cm value: styler class value: 'installing' value: 'installInWidget: aWidget
+	aCodePresenter whenBuiltDo: [:ann | self installInWidget: ann widget for: aPage].
+	aCodePresenter withAdapterDo: [:a | a widget ifNotNil: [:w | self installInWidget: w for: aPage]]'.
+cm value: styler class value: 'installing' value: 'installInWidget: aWidget for: aPage
 	[| decorator |
 	 decorator := aWidget textArea shoutStyler.
-	 decorator styler: (self new view: decorator; yourself).
+	 decorator styler: (self new view: decorator; page: aPage; yourself).
 	 decorator refreshStyling] on: Error do: [:e | nil]'.
 
-"=== LispEditorPage: one file, open in the editor (R-5 to R-9) ================"
+"=== LispEditorPage: one file, open in the editor (R-5 to R-11, R-44) ========="
 cm value: epage value: 'initialization' value: 'initializePresenters
 	code := self newCode.
 	"not wrapped: a wrapped Rubric pane can recompose forever as its scroll bar comes and goes"
@@ -1285,19 +1301,30 @@ cm value: epage value: 'initialization' value: 'initializePresenters
 	"Pharo''s own Do it, Print it and Inspect it evaluate Smalltalk: replaced by the
 	 page''s actions, which are its menu too (Spec refuses contextMenu: with actions)"
 	code overrideContextMenu: true.
-	LispStyler installOn: code.
+	problems := #().
+	LispStyler installOn: code for: self.
 	"the output pane is a REPL on the file''s session (R-44), made at its first evaluation"
 	repl := self instantiate: LispReplPresenter.
 	repl sessionSource: [self session].
+	"the problems the text would meet (R-10), beside it"
+	problemsList := self newList.
+	problemsList display: [:p | self describeProblem: p].
+	problemsList whenActivatedDo: [:selection | selection selectedItem ifNotNil: [:p | self selectFrom: (p at: 2) to: (p at: 3)]].
+	bottom := self newNotebook.
+	bottom addPage: (SpNotebookPage title: ''REPL'' provider: [repl]).
+	bottom addPage: (SpNotebookPage title: ''Problems'' provider: [problemsList]).
+	checkGeneration := 0.
+	code whenSelectionChangedDo: [:selection | self describeAtCursor].
 	self bindKeys'.
 cm value: epage value: 'initialization' value: 'defaultLayout
 	^ SpPanedLayout newTopToBottom
 		positionOfSlider: 0.62;
 		add: code;
-		add: repl;
+		add: bottom;
 		yourself'.
 cm value: epage value: 'initialization' value: 'keys
-	"The page''s actions (R-11): name, menu label, letter (nil: none), shifted?, action."
+	"The page''s actions (R-11): name, menu label (nil: a key only), key (a letter,
+	 #space, #enter, or nil: none), shifted?, action."
 	^ {
 		{ ''run''. ''Run''. $r. false. [self run] }.
 		{ ''do-it''. ''Do it''. $d. false. [self doIt] }.
@@ -1306,6 +1333,10 @@ cm value: epage value: 'initialization' value: 'keys
 		{ ''interrupt''. ''Interrupt''. nil. false. [self interrupt] }.
 		{ ''save''. ''Save''. $s. false. [self save] }.
 		{ ''format''. ''Format''. $f. true. [self format] }.
+		{ ''complete''. ''Complete''. #space. false. [self complete] }.
+		{ ''go-to-definition''. ''Go to definition''. $b. false. [self goToDefinition] }.
+		{ ''reload''. ''Reload from disk''. nil. false. [self reloadFromDisk] }.
+		{ ''newline''. nil. #enter. false. [self newlineAndIndent] }.
 		"keys of Rubric''s own: Ctrl+X, Ctrl+C, Ctrl+V"
 		{ ''cut''. ''Cut''. nil. false. [self withEditor: [:ed | ed cut]] }.
 		{ ''copy''. ''Copy''. nil. false. [self withEditor: [:ed | ed copySelection]] }.
@@ -1315,29 +1346,41 @@ cm value: epage value: 'initialization' value: 'withEditor: aBlock
 cm value: epage value: 'initialization' value: 'bindKeys
 	"Each action in the pane''s menu with its key, a real key (a KeyboardKey); the same
 	 key typed (a Character, as a script sends it) is bound too, shortcut only and
-	 under its own name, or Spec refuses it."
-	self keys do: [:each | | name label char shifted action real typed |
-		name := each at: 1. label := each at: 2. char := each at: 3. shifted := each at: 4. action := each at: 5.
-		char
+	 under its own name, or Spec refuses it. An action with no label is a key only."
+	self keys do: [:each | | name label key shifted action real typed |
+		name := each at: 1. label := each at: 2. key := each at: 3. shifted := each at: 4. action := each at: 5.
+		key
 			ifNil: [code addActionWith: [:a | a name: label; action: action]]
 			ifNotNil: [
-				real := (KeyboardKey named: char asUppercase asString) asKeyCombination.
-				typed := char.
-				"shift first: actionModifier answers Ctrl or Cmd, which takes no shift"
-				shifted ifTrue: [real := KMModifier shift + real. typed := typed shift].
-				real := real actionModifier.
-				typed := typed actionModifier.
-				code addActionWith: [:a | a name: label; shortcutKey: real; action: action].
+				key == #space
+					ifTrue: [real := KeyboardKey space asKeyCombination actionModifier. typed := Character space actionModifier]
+					ifFalse: [key == #enter
+						ifTrue: [real := KeyboardKey enter asKeyCombination. typed := Character cr asKeyCombination]
+						ifFalse: [
+							real := (KeyboardKey named: key asUppercase asString) asKeyCombination.
+							typed := key.
+							"shift first: actionModifier answers Ctrl or Cmd, which takes no shift"
+							shifted ifTrue: [real := KMModifier shift + real. typed := typed shift].
+							real := real actionModifier.
+							typed := typed actionModifier]].
+				label
+					ifNil: [code addActionWith: [:a | a name: name; shortcutKey: real; beShortcutOnly; action: action]]
+					ifNotNil: [code addActionWith: [:a | a name: label; shortcutKey: real; action: action]].
 				code addActionWith: [:a | a name: name , ''-typed''; shortcutKey: typed; beShortcutOnly; action: action]]]'.
 cm value: epage value: 'accessing' value: 'editor: anEditor
 	editor := anEditor'.
 cm value: epage value: 'accessing' value: 'path
 	^ path'.
+cm value: epage value: 'accessing' value: 'name
+	^ path asFileReference basename'.
 cm value: epage value: 'accessing' value: 'code
 	^ code'.
 cm value: epage value: 'accessing' value: 'repl
 	"The REPL below the text, on the file''s session (R-44)."
 	^ repl'.
+cm value: epage value: 'accessing' value: 'bottom
+	"The notebook below the text: the REPL and the problems."
+	^ bottom'.
 cm value: epage value: 'accessing' value: 'text
 	^ code text asString'.
 cm value: epage value: 'accessing' value: 'text: aString
@@ -1345,8 +1388,58 @@ cm value: epage value: 'accessing' value: 'text: aString
 cm value: epage value: 'accessing' value: 'isDirty
 	"Edited since it was opened or saved?"
 	^ self text ~= savedText'.
+cm value: epage value: 'accessing' value: 'hasDiskConflict
+	"Changed on disk while it had unsaved edits, and not yet chosen between (R-8)?"
+	^ diskText notNil'.
 cm value: epage value: 'accessing' value: 'title
-	^ path asFileReference basename , (self isDirty ifTrue: ['' *''] ifFalse: [''''])'.
+	^ self name , (self isDirty ifTrue: ['' *''] ifFalse: ['''']) ,
+		(diskText ifNil: [''''] ifNotNil: [:t | '' (changed on disk)''])'.
+cm value: epage value: 'accessing' value: 'cursorOffset
+	"Where the cursor (or the selection) starts: a character offset from 0."
+	^ ((code selectionInterval ifNil: [1 to: 0]) first - 1) max: 0'.
+cm value: epage value: 'accessing' value: 'listFrom: aList
+	"A LISP list as an Array."
+	| items l |
+	items := OrderedCollection new.
+	l := aList.
+	[l isKindOf: LispCons] whileTrue: [items add: l car. l := l cdr].
+	^ items asArray'.
+cm value: epage value: 'accessing' value: 'oneLine: aString
+	"The first two lines of aString, on one line: a documentation''s call and its first sentence."
+	| lines |
+	lines := (aString lines reject: [:l | l trimBoth isEmpty]) asArray.
+	lines isEmpty ifTrue: [^ ''''].
+	^ lines size = 1 ifTrue: [lines first] ifFalse: [lines first , ''  '' , (lines at: 2)]'.
+
+cm value: epage value: 'editing' value: 'placeCursor: offset
+	"The cursor before the character at offset (from 0)."
+	code selectionInterval: (offset + 1 to: offset)'.
+cm value: epage value: 'editing' value: 'selectFrom: start to: end
+	"The text from start to before end (offsets from 0) selected, and brought into view."
+	code selectionInterval: (start + 1 to: end).
+	[code withAdapterDo: [:a | a widget textArea scrollSelectionIntoView: nil]] on: Error do: [:e | nil]'.
+cm value: epage value: 'editing' value: 'replaceFrom: start to: end with: aString
+	"The text from start to before end (offsets from 0) replaced by aString, as typing
+	 it would (Rubric''s editor, so Undo undoes it), the cursor after it."
+	| done text |
+	done := false.
+	code selectionInterval: (start + 1 to: end).
+	[code withAdapterDo: [:a | a widget textArea editor replaceSelectionWith: aString. done := true]]
+		on: Error do: [:e | done := false].
+	done ifFalse: [
+		text := self text.
+		code text: (text copyFrom: 1 to: start) , aString , (text copyFrom: end + 1 to: text size)].
+	self placeCursor: start + aString size'.
+cm value: epage value: 'editing' value: 'newlineAndIndent
+	"Enter (R-7): a new line, indented one level deeper than the line of the list
+	 still open there, in the file''s own indentation (ide-indent)."
+	| sel start end indent |
+	sel := code selectionInterval ifNil: [1 to: 0].
+	start := (sel first - 1) max: 0.
+	end := sel isEmpty ifTrue: [start] ifFalse: [sel last].
+	indent := [LispIde call: ''ide:ide-indent'' with: { self text. start }] on: Error do: [:e | ''''].
+	self replaceFrom: start to: end with: (String with: Character lf) , indent'.
+
 cm value: epage value: 'file' value: 'openPath: aPath
 	"Reads the file (ide-read-file): its text with line feeds, its line ending kept for saving."
 	| answer |
@@ -1355,22 +1448,161 @@ cm value: epage value: 'file' value: 'openPath: aPath
 	savedText := answer car.
 	ending := answer cdr.
 	code text: savedText.
-	code whenTextChangedDo: [editor ifNotNil: [:e | e pageChanged: self]]'.
+	code whenTextChangedDo: [
+		editor ifNotNil: [:e | e pageChanged: self].
+		self scheduleCheck].
+	self scheduleCheck'.
 cm value: epage value: 'file' value: 'save
-	"Writes the file in its own line endings (R-8); saving does not evaluate."
+	"Writes the file in its own line endings (R-8); saving does not evaluate. Chooses
+	 these edits over the file''s, if it changed on disk meanwhile."
 	| text |
 	text := self text.
 	LispIde call: ''ide:ide-save-file'' with: { path. text. LispIde symbol: ''ending''. ending }.
 	savedText := text.
-	self report: ''saved '' , path asFileReference basename.
+	diskText := nil.
+	self report: ''saved '' , self name.
 	editor ifNotNil: [:e | e pageChanged: self]'.
 cm value: epage value: 'file' value: 'format
-	"The whole text laid out by format-source, the formatter VS Code uses."
+	"The whole text laid out by format-source, the formatter VS Code uses, indented
+	 as the file indents (ide-format)."
 	| formatted |
-	formatted := [LispIde evalString: ''(require (quote format-source))''.
-		LispIde call: ''format-source:format-source'' with: { self text }]
+	formatted := [LispIde call: ''ide:ide-format'' with: { self text }]
 		on: Error do: [:e | self report: ''format: '' , (LispError describe: e). ^ self].
 	code text: formatted'.
+cm value: epage value: 'file' value: 'checkDisk
+	"The file as it is on disk (R-8): taken when the page has no unsaved edits; else
+	 kept aside and reported, until Save (these edits) or Reload from disk (the file''s)."
+	| answer disk |
+	path asFileReference exists ifFalse: [^ self].
+	answer := [LispIde call: ''ide:ide-read-file'' with: { path }] on: Error do: [:e | nil].
+	answer ifNil: [^ self].
+	disk := answer car.
+	disk = savedText ifTrue: [
+		diskText ifNotNil: [diskText := nil. editor ifNotNil: [:e | e pageChanged: self]].
+		^ self].
+	self isDirty
+		ifFalse: [
+			savedText := disk.
+			ending := answer cdr.
+			diskText := nil.
+			code text: disk.
+			self report: ''reloaded '' , self name , '': it changed on disk'']
+		ifTrue: [disk = diskText ifFalse: [
+			diskText := disk.
+			self report: self name , '' changed on disk while it has unsaved edits here: Save keeps these, Reload from disk takes the file''''s'']].
+	editor ifNotNil: [:e | e pageChanged: self]'.
+cm value: epage value: 'file' value: 'reloadFromDisk
+	"The file as it is on disk, in place of the page''s text and its unsaved edits."
+	| answer |
+	answer := LispIde call: ''ide:ide-read-file'' with: { path }.
+	savedText := answer car.
+	ending := answer cdr.
+	diskText := nil.
+	code text: savedText.
+	self report: ''reloaded '' , self name.
+	editor ifNotNil: [:e | e pageChanged: self]'.
+
+cm value: epage value: 'problems' value: 'problems
+	"The problems of the last check (R-10): #(severity start end message) each."
+	^ problems ifNil: [#()]'.
+cm value: epage value: 'problems' value: 'scheduleCheck
+	"Checks the text once it has rested for 0.4 s, in a process of its own; a check of
+	 a text that has changed since is dropped."
+	| gen text |
+	checkGeneration := checkGeneration + 1.
+	gen := checkGeneration.
+	text := self text.
+	[(Delay forMilliseconds: 400) wait.
+	 gen = checkGeneration ifTrue: [self check: text generation: gen]]
+		forkAt: Processor userBackgroundPriority named: ''cog-lisp editor check'''.
+cm value: epage value: 'problems' value: 'checkNow
+	"Checks the text now (a test''s way)."
+	checkGeneration := checkGeneration + 1.
+	self check: self text generation: checkGeneration'.
+cm value: epage value: 'problems' value: 'check: text generation: gen
+	| found |
+	found := [LispIde call: ''ide:ide-check'' with: { path. text }] on: Error do: [:e | nil].
+	(found isNil or: [gen ~= checkGeneration]) ifTrue: [^ self].
+	LispIde onUi: [self showProblems: (self listFrom: found)]'.
+cm value: epage value: 'problems' value: 'showProblems: anArray
+	problems := anArray.
+	problemsList items: anArray.
+	bottom pages size >= 2 ifTrue: [
+		(bottom pages at: 2) title: (anArray isEmpty
+			ifTrue: [''Problems'']
+			ifFalse: [''Problems ('' , anArray size printString , '')''])].
+	[code withAdapterDo: [:a | a widget textArea shoutStyler refreshStyling]] on: Error do: [:e | nil]'.
+cm value: epage value: 'problems' value: 'describeProblem: aProblem
+	| line |
+	line := ((self text copyFrom: 1 to: ((aProblem at: 2) min: self text size)) occurrencesOf: Character lf) + 1.
+	^ ''line '' , line printString , '': '' , (aProblem at: 1) name , '': '' , (aProblem at: 4)'.
+
+cm value: epage value: 'knowing' value: 'describeAtCursor
+	"The documentation of the name at the cursor, in the status line (R-10)."
+	| doc |
+	editor ifNil: [^ self].
+	path ifNil: [^ self].
+	doc := [LispIde call: ''ide:ide-describe'' with: { path. self text. self cursorOffset }] on: Error do: [:e | false].
+	doc == false ifTrue: [^ self].
+	self report: (self oneLine: doc)'.
+cm value: epage value: 'knowing' value: 'completionAnswer
+	^ LispIde call: ''ide:ide-complete'' with: { path. self text. self cursorOffset }'.
+cm value: epage value: 'knowing' value: 'completions
+	"The names that complete the one at the cursor (R-10)."
+	| answer |
+	answer := self completionAnswer.
+	answer == false ifTrue: [^ #()].
+	^ (self listFrom: answer cdr cdr car) collect: [:c | c at: 1]'.
+cm value: epage value: 'knowing' value: 'complete
+	"Ctrl+Space: the name at the cursor completed; with several, a choice of them."
+	| answer labels start end |
+	answer := self completionAnswer.
+	answer == false ifTrue: [^ self report: ''nothing to complete here''].
+	start := answer car.
+	end := answer cdr car.
+	labels := (self listFrom: answer cdr cdr car) collect: [:c | c at: 1].
+	labels isEmpty ifTrue: [^ self report: ''no name starts so''].
+	labels size = 1 ifTrue: [^ self replaceFrom: start to: end with: labels first].
+	self showChoices: labels then: [:i | self replaceFrom: start to: end with: (labels at: i)]'.
+cm value: epage value: 'knowing' value: 'goToDefinition
+	"Ctrl+B: the definition of the name at the cursor, opened at its place; with
+	 several, a choice of them; a built-in with no file, its documentation."
+	| defs |
+	editor ifNotNil: [:e | e indexProject].
+	defs := self listFrom: (LispIde call: ''ide:ide-definitions'' with: { path. self text. self cursorOffset }).
+	defs isEmpty ifTrue: [| doc |
+		doc := [LispIde call: ''ide:ide-describe'' with: { path. self text. self cursorOffset }] on: Error do: [:e | false].
+		^ self report: (doc == false
+			ifTrue: [''no definition found'']
+			ifFalse: [''defined in the image, with no file here: '' , (self oneLine: doc)])].
+	defs size = 1 ifTrue: [^ editor openDefinition: defs first].
+	self showChoices: (defs collect: [:d | (d at: 1) , ''  ('' , (d at: 2) asFileReference basename , '')''])
+		then: [:i | editor openDefinition: (defs at: i)]'.
+cm value: epage value: 'knowing' value: 'showChoices: labels then: aBlock
+	"A list of labels below the text; choosing one (Enter, a double click) gives
+	 aBlock its index."
+	| list pop |
+	list := self newList.
+	list items: labels.
+	list whenActivatedDo: [:selection | selection selectedItem ifNotNil: [:label | self choose: label]].
+	choices := { labels. aBlock. nil }.
+	pop := [self newPopover] on: Error do: [:e | nil].
+	pop ifNotNil: [
+		[pop relativeTo: code; presenter: list; bePositionBottom; popup.
+		 choices at: 3 put: pop.
+		 list takeKeyboardFocus] on: Error do: [:e | nil]]'.
+cm value: epage value: 'knowing' value: 'choices
+	"The labels offered by the last choice, or #()."
+	^ choices ifNil: [#()] ifNotNil: [:c | c first]'.
+cm value: epage value: 'knowing' value: 'choose: aLabel
+	| c i |
+	c := choices.
+	c ifNil: [^ self].
+	i := c first indexOf: aLabel.
+	i = 0 ifTrue: [^ self].
+	choices := nil.
+	(c at: 3) ifNotNil: [:pop | [pop dismiss] on: Error do: [:e | nil]].
+	(c at: 2) value: i'.
 cm value: epage value: 'evaluating' value: 'session
 	"The session that evaluates as part of this file (R-9)."
 	^ LispIde call: ''ide:ide-file-session'' with: { path }'.
@@ -1481,7 +1713,23 @@ cm value: editorp value: 'initialization' value: 'defaultLayout
 		add: status expand: false;
 		yourself'.
 cm value: editorp value: 'initialization' value: 'initializeWindow: aWindowPresenter
-	aWindowPresenter title: ''cog-lisp editor''; initialExtent: 1100 @ 760'.
+	aWindowPresenter title: ''cog-lisp editor''; initialExtent: 1100 @ 760.
+	"while the window is open, its files are compared with the disk (R-8)"
+	[aWindowPresenter whenOpenedDo: [self startWatching]] on: Error do: [:e | nil].
+	[aWindowPresenter whenClosedDo: [watching := false]] on: Error do: [:e | nil]'.
+cm value: editorp value: 'files on disk' value: 'startWatching
+	"Every two seconds, the open files compared with the disk, in the UI process."
+	watching == true ifTrue: [^ self].
+	watching := true.
+	[[watching] whileTrue: [
+		(Delay forMilliseconds: 2000) wait.
+		watching ifTrue: [[LispIde onUi: [self checkFilesOnDisk]] on: Error do: [:e | nil]]]]
+		forkAt: Processor userBackgroundPriority named: ''cog-lisp editor: files on disk'''.
+cm value: editorp value: 'files on disk' value: 'checkFilesOnDisk
+	"Each open file compared with the disk: reloaded, or its change reported (R-8)."
+	self openPages do: [:p | p checkDisk]'.
+cm value: editorp value: 'files on disk' value: 'isWatching
+	^ watching == true'.
 cm value: editorp value: 'accessing' value: 'toolbar
 	^ toolbar'.
 cm value: editorp value: 'accessing' value: 'lastRun
@@ -1522,6 +1770,20 @@ cm value: editorp value: 'files' value: 'withPage: aBlock
 	self selectedPage
 		ifNil: [self report: ''no file is open: choose one in the tree'']
 		ifNotNil: [:p | aBlock value: p]'.
+cm value: editorp value: 'definitions' value: 'indexProject
+	"The project''s files indexed for go to definition and completion, once."
+	folder ifNotNil: [:f | [LispIde call: ''ide:ide-index-project!!'' with: { f fullName }] on: Error do: [:e | nil]]'.
+cm value: editorp value: 'definitions' value: 'openDefinition: aDefinition
+	"Its file in a tab, the definition selected (R-10). The definition is found by its
+	 text, which the tab holds with line feeds whatever the file has; else by its place."
+	| page source at |
+	page := self openFile: (aDefinition at: 2).
+	source := (aDefinition at: 6) copyReplaceAll: (String with: Character cr with: Character lf) with: (String with: Character lf).
+	at := page text indexOfSubCollection: source.
+	at > 0
+		ifTrue: [page selectFrom: at - 1 to: at - 1 + source size]
+		ifFalse: [page selectFrom: (aDefinition at: 3) to: (aDefinition at: 4)].
+	^ page'.
 cm value: editorp value: 'running' value: 'runFile: aPath
 	"A new REPL window running the file at aPath as a program, from a clean start (R-43)."
 	| p |

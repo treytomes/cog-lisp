@@ -198,30 +198,91 @@ The unit the text at path was last checked in (editor-check), whose imports say 
 (define (%syntax-definition? d)
   (or (%head-is? d 'define-syntax) (%head-is? d 'define-macro) (%head-is? d 'require) (%head-is? d 'library)))
 
+;; the globals a compiled form names that nothing has defined: the unbound
+;; cells in its method's literals, its blocks' too
+(define (%unbound-cells method)
+  (let walk ((m method) (acc '()))
+    (fold (lambda (lit acc)
+            (cond ([lit isKindOf: (smalltalk LispGlobal)] (if [lit isBound] acc (cons lit acc)))
+                  ([lit isKindOf: (smalltalk CompiledBlock)] (walk lit acc))
+                  ([lit isKindOf: (smalltalk BlockClosure)] (walk [lit compiledBlock] acc))
+                  (else acc)))
+          acc
+          (vector->list [m literals]))))
+
+;; the names a top-level form defines, its macro calls expanded: a define, or
+;; the defines of a begin (define-record-type's, a user's defining macro's)
+(define (%defined-names d)
+  (let ((e (guard (x (#t d)) (macroexpand d))))
+    (cond ((%head-is? e 'begin) (append-map %defined-names (cdr e)))
+          ((%definition-of e) => (lambda (def) (list (car def))))
+          (else '()))))
+
+(define (%local-name name)
+  (let ((colon (string-index name #\:)))
+    (if colon (substring name (+ colon 1) (string-length name)) name)))
+
+;; a warning for each place a form names a global nothing defines: not the text
+;; (a name defined later in it is unbound while it is checked), not the image,
+;; not another file of the index; a program may still define it at run time
+(define (%unbound-problems text refs defined)
+  (append-map
+   (lambda (ref)
+     (let* ((from (cadr ref)) (to (caddr ref)) (form-text (substring text from to)))
+       (append-map
+        (lambda (cell)
+          (let* ((name (symbol->string [cell symbol])) (local (%local-name name)))
+            (if (or [cell isBound]
+                    (hash-table-contains? defined name) (hash-table-contains? defined local)
+                    (pair? (editor-definitions-named local)))
+                '()
+                (filter-map (lambda (tok)
+                              (and (eq? (token-kind tok) 'symbol)
+                                   (let ((word (substring form-text (token-start tok) (token-end tok))))
+                                     (and (or (string=? word name) (string=? word local))
+                                          (vector 'warning (+ from (token-start tok)) (+ from (token-end tok))
+                                                  (string-append "unbound variable: " word))))))
+                            (editor-tokens form-text)))))
+        (delete-duplicates (car ref) eq?))))
+   (reverse refs)))
+
 (define (%problems text)
-  (let ((r (make-reader text)))
+  (let ((r (make-reader text)) (defined (make-hash-table equal?)) (refs '()))
+    (define (finish acc)
+      (sort (append (reverse acc) (%unbound-problems text refs defined))
+            (lambda (a b) (< (problem-start a) (problem-start b)))))
     (let loop ((acc '()))
       (let ((d (guard (e ((read-error? e)
                           (let ((pos (let ((p [e position])) (if (smalltalk-nil? p) (reader-position r) p))))
                             (vector 'read-error pos (error-object-message e)))))
                  (reader-next r))))
-        (cond ((eof-object? d) (reverse acc))
+        (cond ((eof-object? d) (finish acc))
               ((and (vector? d) (> (vector-length d) 0) (eq? (vector-ref d 0) 'read-error))
-               (reverse (cons (vector 'error (vector-ref d 1) (+ (vector-ref d 1) 1) (vector-ref d 2)) acc)))
+               (finish (cons (vector 'error (vector-ref d 1) (+ (vector-ref d 1) 1) (vector-ref d 2)) acc)))
               (else
+               (for-each (lambda (n) (hash-table-set! defined (symbol->string n) #t)) (%defined-names d))
                (let* ((from (reader-datum-start r))
                       (to (reader-position r))
+                      (warnings '())
                       (problem
                        (guard (e (#t (let ((place (%error-place r e from to)))
                                        (vector 'error (car place) (max (cdr place) (car place)) (condition-report e)))))
-                         (if (%syntax-definition? d) (lisp-eval d r) (lisp-check d r))
-                         #f))
-                      (warnings (%form-warnings from to)))
+                         (if (%syntax-definition? d)
+                             (lisp-eval d r)
+                             (begin
+                               (lisp-check d r)
+                               (set! warnings (%form-warnings from to))
+                               ;; compiled again, for the globals it names; its warnings are the check's again
+                               (let ((cells (guard (x (#t '())) (%unbound-cells (compile-form d r)))))
+                                 (%form-warnings from to)
+                                 (when (pair? cells) (set! refs (cons (list cells from to) refs))))))
+                         #f)))
+                 (when (null? warnings) (set! warnings (%form-warnings from to)))
                  (loop (append (reverse warnings) (if problem (cons problem acc) acc))))))))))
 
 (define (editor-check path text)
   "(editor-check path text)
-The problems compiling text, the file at path, would meet: each read error, compile error and warning, placed on its form. Runs only its define-syntax, define-macro, require and library forms. The unit it compiles in is kept (editor-unit-of)."
+The problems compiling text, the file at path, would meet: each read error, compile error and warning, placed on its form, and a warning on each use of a global nothing defines (not the text, the image, or a file of the index), in the order of the text. Runs only its define-syntax, define-macro, require and library forms. The unit it compiles in is kept (editor-unit-of)."
   (let ((unit [(smalltalk LispUnit) forFile: path inheriting: (smalltalk-nil)]))
     ;; its warnings are answered, not written to stderr
     [unit collectWarnings]
