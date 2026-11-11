@@ -89,7 +89,10 @@ world read and change its own runtime (owner, 2026-11-04).
   networking and graphics. Expected keeps besides: the kernel, collections,
   streams, files, stdio, processes, FFI. Expected removals: the IDE, Monticello,
   Metacello, refactoring, Pharo's own tests. Decided by measurement: Opal, Clap,
-  Regex, the windowing UI (Morphic, Spec), which graphics may or may not need.
+  Regex. **Expected keeps since 2026-11-10** (`specs/34-morphic-ide.md`, owner):
+  Morphic, Spec2, Rubric, Shout, and the inspector and debugger of NewTools,
+  which cog-lisp's own tools are built on; the audit still measures their size,
+  and the tools' front end stays replaceable by a LISP-written one (11.7).
 
 ### 11.3 The pure image
 - **Built from the seed**: the build loads cog-lisp, unloads every package the

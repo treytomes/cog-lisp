@@ -78,3 +78,4 @@ GitHub issues and the owner's requests:
 | [30-site-theme.md](30-site-theme.md) | A theme of its own for the site: dark, typographic, a terminal's | Done |
 | [31-vsix-bundle.md](31-vsix-bundle.md) | The VS Code extension as one bundled file (esbuild), not 330 | Done |
 | [32-tui.md](32-tui.md) | Full-screen terminal programs, in the manner of Terminal.Gui v2, on the console's core | Accepted |
+| [34-morphic-ide.md](34-morphic-ide.md) | Developing in the image: a LISP editor, REPL, browser and inspector in Morphic | Accepted |
