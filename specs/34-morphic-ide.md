@@ -309,6 +309,26 @@ Item 6 is answered already.
 - **R-16. The console library's output** (spike 7, §12 decision 7): colors and
   bold shown, cursor movement dropped, so a table or a tree renders and a live
   display degrades to plain lines; its prompts read lines from the pane.
+- **R-39. The console library renders fully in a window** (owner, 2026-11-10:
+  "`lisp-expert` makes use of the `console` library. I would like the `console`
+  library to be able to perform its enhanced rendering inside of the Pharo
+  UI"). R-16 shows colors and drops the rest; R-39 goes further, so a program
+  such as lisp-expert's weather REPL looks and works in a window as it does in
+  a terminal:
+  - a **terminal pane**: a Morphic view of a cell grid, in a monospace font,
+    drawn from the same escape-code interpreter as the test console (29's
+    R-23), so cursor movement, clearing and redrawing in place work (a
+    `choose` list's highlight, later live displays);
+  - its **size is the window's**: the console's width and height follow the
+    pane, and a renderable rendered there fits it;
+  - **keys** go to the console library as its events (29's R-19), so `ask`,
+    `confirm` and `choose` read keys, not lines, and Escape and Ctrl+C cancel;
+  - the console's **capabilities** there: a terminal, interactive, true color,
+    Unicode (29's R-1, R-2), so a program needs no change;
+  - a **REPL window** whose transcript is such a pane, and a way to run a
+    program in one (R-37's *Run File in the Pharo GUI*).
+  It is built as step 2c, after the launchers; its checks drive the pane
+  headless, as the test console is driven, and read its cells back.
 - **R-31. Each evaluation has its own ports** (spike 4). The current output and
   input ports, and the console library's capabilities, are bound per process
   (as `LispCurrentUnit` and the restarts are), not in variables the whole image
@@ -471,7 +491,8 @@ its windows.
 1. **The spike** (§4), its answers recorded; and **the editor services** taken
    out of the language server (R-29, R-30).
 2. **The development image and the REPL** (R-1 to R-4, R-12 to R-16, R-31),
-   and VS Code's commands to reach it (R-37).
+   and VS Code's commands to reach it (R-37); then, as 2c, the console library's
+   full rendering in a window (R-39).
 3. **The editor** (R-5 to R-11).
 4. **The browser and the inspector** (R-17 to R-24), with the definitions'
    places (R-21).
@@ -626,7 +647,7 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 | Step | What | Status |
 |------|------|--------|
 | 1 | The spike (§4.1); the editor services (R-29, R-30) | Done (2026-11-10): `lib/editor-services.lisp` and `tests/lisp/editor-services.lisp` (62 checks); the language server on it, its 31 checks and VS Code's 5 offline and 12 with the server passing unchanged |
-| 2 | The development image and the REPL | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b next: R-1 to R-4, R-37 |
+| 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c next: R-39 |
 | 3 | The editor | |
 | 4 | The browser and the inspector | |
 | 5 | Errors and the debugger | |
@@ -673,3 +694,58 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
   calling process.
 - **Checks**: `tests/lisp/ide-sessions.lisp` (60) and
   `tests/lisp/ide-repl-window.lisp` (54).
+
+## 15. As built: step 2b, the development image (2026-11-11)
+
+- **`ide.bat` and `ide.sh`** (R-1): `[FOLDER]` opens the development image,
+  `pharo/ide/cog-lisp-ide.image` (made from `pharo/cog-lisp.image` the first
+  time), on a project folder (`COGLISP_IDE_PROJECT`, else the current folder);
+  `--repl` and `--run FILE` ask it for a REPL window, or for a file run in one;
+  `--fresh` builds a new image, sets the old development image aside
+  (`cog-lisp-ide.before-fresh-<time>.image`) and opens the new one. They start
+  `Pharo.exe` (`pharo/pharo` on Linux) with `--interactive`, from `pharo/ide/`:
+  the GUI VM writes what a program prints to a file named `stdout` in its
+  current folder.
+- **Requests** (R-37, decision 13 as leaned): a request is a form in a file in
+  `pharo/ide/requests/`: `(project "folder")`, `(repl)`, `(run "file")`,
+  `(update)`. A running image takes them every two seconds, oldest name first,
+  and touches `pharo/ide/heartbeat`; a launcher that finds the heartbeat less
+  than ten seconds old only leaves its request, and otherwise starts the image,
+  which takes it at start. `lib/ide.lisp`'s `ide-request` reads one, and
+  `LispIde`'s start-up hook (registered with the `SessionManager`, acting only
+  at a GUI start of an image with a `requests/` folder beside it) acts on it.
+  A run is recorded as a change (kind `run`).
+- **Opening ready** (R-4): the first time it takes requests, the image opens a
+  REPL window if no request opened one. The world menu has `cog-lisp REPL` and
+  `cog-lisp: update the image from the checkout`. Pharo's Welcome window still
+  opens; the project's files appear with the editor (step 3).
+- **The update in place** (R-3): `ide-stale-files` compares the modification
+  times of `src/*.st`, `lib/compiler/` and the built-in libraries (`core`,
+  `format`, `json`, `http`, `coverage`) with the image's build time
+  (`image-build-info`'s `built`), or its last update: no git is needed, and a
+  pull touches the files it changes. This replaces "compares the commit".
+  `ide-update` copies the image as last saved beside it
+  (`.before-update.image` and `.changes`), files in `src/` again and removes
+  what it no longer defines (`LispIde refileSourceFrom:`, the build's chunks 2
+  and 3), loads each changed built-in library into the live environment, loads
+  again the project's files the image had loaded (those still there), and
+  records the update. A change to `lib/compiler/` is answered `fresh`: the
+  compiler's rebuilding itself in place (spike 9's last question) is not done,
+  and `ide.bat --fresh` is the way. At start the image offers the update when
+  files changed (`UIManager confirm:`).
+- **Checked by hand on 2026-11-11** (Windows): `ide.bat` on `lisp-expert` made
+  and opened the image, its heartbeat ran and it took the request; `ide.sh
+  --repl` and `ide.bat --run expert/main.lisp` were taken while it ran, the
+  demo's tables and colors in its window; an `(update)` request after a change
+  to `src/coglisp-ide.st` updated the running image in place, and a new window
+  showed the change. The REPL's transcript is now a code pane, whose monospace
+  font has the box-drawing characters (the first piece of R-39).
+- **VS Code** (R-37): *Run File in the Pharo GUI* (on the editor's Run menu
+  and the palette) and *Open a REPL in the Pharo GUI*, beside the terminal's
+  commands, start the `ide` script detached, the workspace folder as the
+  project. A release bundle has no `ide` script, and the commands say so.
+- **Checks**: `tests/lisp/ide-development-image.lisp` (39: requests, the
+  project, taking request files, the headless start doing nothing, staleness,
+  `fresh` for the compiler, and an update on a copy of the checkout carrying a
+  new built-in and a new `src/` method while a session's own definition still
+  answers); VS Code's integration suite checks the commands are there.

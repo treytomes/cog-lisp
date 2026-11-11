@@ -12,8 +12,10 @@
                       break loop on the failing computation's stack (R-14)
    LispSessionInput   the lines a session's program reads, as they are typed
    LispSessionResult  what a request answered: done, error, aborted or running
-   LispIde            the way from Smalltalk into lib/ide.lisp, and the console
-                      library's escape codes as text attributes (R-16)
+   LispIde            the way from Smalltalk into lib/ide.lisp, the console
+                      library's escape codes as text attributes (R-16), and the
+                      development image's start in the GUI: its requests, its
+                      heartbeat, its update in place (R-1 to R-4, R-37)
    LispReplPresenter  the REPL window (R-12 to R-16), on lib/ide.lisp's sessions
  ============================================================================"
 | failures cm sess sinput sresult ide replp |
@@ -26,7 +28,7 @@ cm := [:cls :cat :src |
 sess := (Object << #LispSession) slots: { #name. #maker. #unit. #compiler. #process. #requests. #ready. #answers. #answered. #pending. #output. #input. #inputPort. #busy. #wrapper }; sharedVariables: { #Sessions }; package: 'CogLisp-IDE'; install.
 sinput := (Object << #LispSessionInput) slots: { #lines. #ready. #closed }; package: 'CogLisp-IDE'; install.
 sresult := (Object << #LispSessionResult) slots: { #status. #values. #output. #report. #restarts. #level }; package: 'CogLisp-IDE'; install.
-ide := (Object << #LispIde) package: 'CogLisp-IDE'; install.
+ide := (Object << #LispIde) sharedVariables: { #Watcher }; package: 'CogLisp-IDE'; install.
 replp := (SpPresenter << #LispReplPresenter) slots: { #session. #transcript. #input. #restartsBar. #interruptButton. #history. #historyIndex. #shown. #transcriptText. #updates. #idle. #busy. #level. #restarts }; package: 'CogLisp-IDE'; install.
 
 "=== LispSessionInput: lines typed for a program that reads ==================="
@@ -317,6 +319,115 @@ cm value: ide class value: 'terminal text' value: 'textFromTerminal: aString
 	flush value.
 	^ result'.
 
+"=== LispIde: the development image in the GUI (R-1 to R-4, R-37) ==========="
+cm value: ide class value: 'development image' value: 'startUp: resuming
+	"At a GUI start of a development image (one with a requests folder beside it),
+	 take its requests and keep its heartbeat. Any other start, a headless run or
+	 a build, does nothing here."
+	(resuming and: [Smalltalk isInteractive and: [(Smalltalk imageDirectory / ''requests'') exists]])
+		ifTrue: [[self startInGui] forkAt: Processor userBackgroundPriority]'.
+cm value: ide class value: 'development image' value: 'startEnvironment
+	"*env* as a program run has it. The launchers set COGLISP_HOME; without it the
+	 cog-lisp folder is the one above pharo/ide/."
+	| name |
+	[(OSEnvironment current at: ''COGLISP_HOME'' ifAbsent: ['''']) isEmpty ifTrue: [
+		OSEnvironment current at: ''COGLISP_HOME'' put: Smalltalk imageDirectory parent parent fullName]]
+		on: Error do: [:e | nil].
+	name := LispSymbol named: ''%env-start!!''.
+	(LispEnvironment default isBound: name) ifTrue: [(LispEnvironment default lookup: name) value]'.
+cm value: ide class value: 'development image' value: 'startInGui
+	"Takes requests every two seconds, touching the heartbeat the launchers read;
+	 the first time, opens a REPL if no request did, and offers an update when the
+	 checkout has changed since the image was built (R-3, R-4)."
+	| dir first |
+	dir := Smalltalk imageDirectory / ''requests''.
+	self startEnvironment.
+	self ensureLoaded.
+	Watcher ifNotNil: [:w | w terminate].
+	first := true.
+	Watcher := [[| opened |
+		self touchHeartbeat.
+		opened := [self takeRequestsIn: dir] on: Error do: [:e | #()].
+		first ifTrue: [
+			first := false.
+			opened isEmpty ifTrue: [self inUI: [LispReplPresenter open]].
+			[self offerUpdate] on: Error do: [:e | nil]].
+		(Delay forSeconds: 2) wait] repeat] newProcess.
+	Watcher name: ''cog-lisp requests''; priority: Processor userBackgroundPriority; resume'.
+cm value: ide class value: 'development image' value: 'touchHeartbeat
+	(Smalltalk imageDirectory / ''heartbeat'') ensureDelete; writeStreamDo: [:s | s nextPutAll: DateAndTime now printString]'.
+cm value: ide class value: 'development image' value: 'inUI: aBlock
+	"aBlock in the UI process; at once, headless."
+	UIManager default defer: aBlock'.
+cm value: ide class value: 'development image' value: 'takeRequestsIn: aDirectory
+	"Takes the request files in aDirectory, oldest name first, each removed once read,
+	 and acts on what lib/ide.lisp makes of it. Answers the REPL windows opened."
+	| dir opened |
+	dir := aDirectory asFileReference.
+	opened := OrderedCollection new.
+	dir exists ifFalse: [^ opened].
+	((dir files select: [:f | f extension = ''request'']) asSortedCollection: [:a :b | a basename <= b basename]) do: [:f | | text answer |
+		text := [f contents] on: Error do: [:e | nil].
+		f ensureDelete.
+		text ifNotNil: [
+			answer := [self call: ''ide:ide-request'' with: { text }] on: Error do: [:e | nil].
+			(self act: answer) ifNotNil: [:p | opened add: p]]].
+	^ opened'.
+cm value: ide class value: 'development image' value: 'act: anAnswer
+	"repl: a new REPL window; (run path): a new REPL window that loads path; update:
+	 the update in place. Answers the window opened, or nil."
+	| p |
+	anAnswer isNil ifTrue: [^ nil].
+	(anAnswer isKindOf: LispSymbol) ifTrue: [
+		anAnswer name = ''repl'' ifTrue: [p := LispReplPresenter new. self inUI: [p open]. ^ p].
+		anAnswer name = ''update'' ifTrue: [self inUI: [self updateFromCheckout]].
+		^ nil].
+	(anAnswer isKindOf: LispCons) ifTrue: [| path |
+		path := anAnswer cdr car.
+		p := LispReplPresenter new.
+		self inUI: [p open. p evaluate: ''(load '' , (LispPrinter writeString: path) , '')''].
+		^ p].
+	^ nil'.
+cm value: ide class value: 'development image' value: 'offerUpdate
+	| stale |
+	stale := self call: ''ide:ide-stale-files'' with: #().
+	(stale isKindOf: LispCons) ifFalse: [^ self].
+	self inUI: [
+		(UIManager default confirm: ''The checkout has changed since this image was built: '' ,
+			(LispPrinter writeString: stale) ,
+			''. Update the image in place now? A copy of it as last saved is kept beside it.'')
+			ifTrue: [self updateFromCheckout]]'.
+cm value: ide class value: 'development image' value: 'updateFromCheckout
+	"The update in place (R-3), its answer shown."
+	| answer |
+	answer := self call: ''ide:ide-update'' with: #().
+	UIManager default inform: ''cog-lisp update: '' , (LispPrinter writeString: answer)'.
+cm value: ide class value: 'development image' value: 'refileSourceFrom: aPath
+	"Files in the src/ packages at aPath again, as the build does (build.st chunk 2),
+	 then removes the methods src/ no longer defines (chunk 3). Answers the names removed."
+	| dir compiled listener packages |
+	dir := aPath asFileReference.
+	compiled := Set new.
+	listener := Object new.
+	SystemAnnouncer uniqueInstance
+		when: MethodAdded, MethodModified
+		do: [:a | compiled add: a methodClass name asString , ''>>'' , a selector]
+		for: listener.
+	[#(''coglisp-reader.st'' ''coglisp-core.st'' ''coglisp-compiler.st'' ''coglisp-runtime.st'' ''coglisp-shell.st'' ''coglisp-ide.st'')
+		do: [:name | (dir / name) fileIn]]
+		ensure: [SystemAnnouncer uniqueInstance unsubscribe: listener].
+	packages := ((PackageOrganizer default packages select: [:p | p name beginsWith: ''CogLisp-'']) collect: [:p | p name asString]) asArray.
+	^ (LispCompiler removeStaleFrom: (Dictionary new
+		at: #compiled put: compiled;
+		at: #seedPackages put: packages;
+		yourself)) asArray'.
+cm value: ide class value: 'world menu' value: 'menuCommandOn: aBuilder
+	<worldMenu>
+	(aBuilder item: #''cog-lisp: update the image from the checkout'')
+		order: 0.6;
+		help: ''Bring this image up to date with the source in the checkout, in place (specs/34-morphic-ide.md R-3)'';
+		action: [self updateFromCheckout]'.
+
 "=== LispReplPresenter: the REPL window (R-12 to R-16) ======================="
 cm value: replp class value: 'opening' value: 'open
 	"A new REPL window, on a session of its own."
@@ -328,8 +439,9 @@ cm value: replp class value: 'world menu' value: 'menuCommandOn: aBuilder
 		help: ''A cog-lisp REPL, on a session of its own (specs/34-morphic-ide.md)'';
 		action: [self open]'.
 cm value: replp value: 'initialization' value: 'initializePresenters
-	transcript := self newText.
-	transcript beNotEditable.
+	"a code pane: its font is monospace, with the box-drawing characters tables use"
+	transcript := self newCode.
+	transcript withoutSyntaxHighlight; withoutLineNumbers; beNotEditable.
 	input := self newText.
 	input placeholder: ''A form, then Enter. Up and Down: the history.''.
 	input addShortcutWith: [:action | action shortcutKey: Character cr asKeyCombination; action: [self submit]].
@@ -500,6 +612,9 @@ cm value: replp value: 'history' value: 'historyForward
 	historyIndex > history size
 		ifTrue: [historyIndex := history size + 1. input text: '''']
 		ifFalse: [input text: (history at: historyIndex)]'.
+
+"the development image takes its requests when it starts in the GUI (R-37)"
+SessionManager default registerUserClassNamed: #LispIde.
 
 "=== load report ==========================================================="
 Stdio stdout

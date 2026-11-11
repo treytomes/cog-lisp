@@ -671,7 +671,7 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 
 ### ide: `(require 'ide)`
 
-- `(change-kind change)`: evaluate: an evaluation that defined names.
+- `(change-kind change)`: evaluate (an evaluation that defined names), run (a file run, from a request), update (the image updated in place), or log (the record began to be kept in a file).
 - `(change-maker change)`: person or agent.
 - `(change-names change)`: The names it defined, strings.
 - `(change-session change)`: The name of the session that made it.
@@ -682,13 +682,17 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(ide-eval session text option ...)`: Evaluates text's forms in session and answers the result. Options: timeout (milliseconds to wait; as long as it takes if not given): a result still running then has status running, and ide-wait answers it. An evaluation that defines names is recorded (ide-changes).
 - `(ide-interrupt session)`: Stops the evaluation session is running: it waits at a break, with its restarts (abort among them), and the evaluation's result has status error.
 - `(ide-log-to! path)`: From now on the changes are also kept in the file at path, one written record a line, rewritten at each change, so the record outlives a crash. #f stops it.
+- `(ide-project [folder])`: The project folder the image works on, or #f; with folder, makes it the project (a path) and indexes its .lisp files for the editor services.
+- `(ide-request text)`: Takes a request the launchers (ide.bat, ide.sh) and VS Code leave for the image, a form as text: (project folder) makes folder the project and answers project; (repl) answers repl, for a new REPL window; (run path) records the run (a change, kind run) and answers (run path); (update) answers update. Anything else answers unknown.
 - `(ide-session option ...)`: A new session: evaluations in a process of their own, with their own unit and output and input ports. Options: name (a string; session 1, 2, ...), maker (person or agent: who its changes are recorded as made by; person), unit (the unit to evaluate in, such as a file's; a session unit of its own), wrapper (a procedure given a thunk, run around every evaluation: (lambda (thunk) (with-console '(colors none) thunk))).
 - `(ide-session-busy? session)`: #t while it evaluates; at a break, waiting for a restart or another form, #f.
 - `(ide-session-maker session)`: person or agent: who its changes are recorded as made by.
 - `(ide-session-name session)`: Its name, a string.
 - `(ide-session-output session)`: Everything the session has written to its output port, a string.
 - `(ide-sessions)`: The sessions open in the image.
+- `(ide-stale-files option ...)`: The source files the image is built from (src/*.st, lib/compiler/, and the built-in libraries core, format, json, http and coverage) that changed since it was built or last updated, as paths relative to the cog-lisp folder; () when it is up to date, or was not built from a seed. Options: home (the cog-lisp folder; *env*'s).
 - `(ide-type session line)`: Gives the program session runs a line to read: read-line answers it, and read reads from it.
+- `(ide-update option ...)`: Brings the image up to date with the checkout, in place, keeping what it holds (R-3): copies the image as last saved beside it (name.before-update.image), files in src/ again and removes the methods src/ no longer defines, compiles each changed built-in library into the live environment, loads the project's files again, and records the update. A change to lib/compiler/ it cannot carry: it answers fresh, for a fresh image (ide.bat --fresh). Answers an association list: status (current, updated, fresh or failed), files (the changed ones), backup (the copy's path), report (a failure's). Options: home (the cog-lisp folder), image (the image file to copy; this one).
 - `(ide-wait session [milliseconds])`: The result of the oldest evaluation not yet answered, waiting at most milliseconds (as long as it takes if not given); a result with status running if it has not come.
 - `(result-level result)`: How many breaks deep the session is: 0 at the top.
 - `(result-output result)`: What the evaluation wrote to the output port, a string.

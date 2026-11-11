@@ -35,6 +35,14 @@ async function run() {
     }
     return false;
   };
+  // the Pharo GUI's commands, beside the terminal's (specs/34-morphic-ide.md R-37),
+  // registered once the extension has activated
+  const guiCommands = ['cog-lisp.runFileInGui', 'cog-lisp.startReplInGui', 'cog-lisp.runFile', 'cog-lisp.startRepl'];
+  check('the commands to run a file and open a REPL in the Pharo GUI are there',
+    await until(async () => {
+      const commands = await vscode.commands.getCommands(true);
+      return guiCommands.every((c) => commands.includes(c));
+    }, 15000));
 
   if (mode === 'offline') {
     await until(async () => (await hoverText(doc, 0, 3)).includes('(define'), 5000);

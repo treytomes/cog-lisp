@@ -70,12 +70,27 @@
         "command": "cog-lisp.rebuildImage",
         "title": "Rebuild Image",
         "category": "cog-lisp"
+      },
+      {
+        "command": "cog-lisp.runFileInGui",
+        "title": "Run File in the Pharo GUI",
+        "category": "cog-lisp",
+        "icon": "$(window)"
+      },
+      {
+        "command": "cog-lisp.startReplInGui",
+        "title": "Open a REPL in the Pharo GUI",
+        "category": "cog-lisp"
       }
     ],
     "menus": {
       "editor/title/run": [
         {
           "command": "cog-lisp.runFile",
+          "when": "editorLangId == cog-lisp"
+        },
+        {
+          "command": "cog-lisp.runFileInGui",
           "when": "editorLangId == cog-lisp"
         }
       ],
@@ -86,6 +101,10 @@
         },
         {
           "command": "cog-lisp.sendToRepl",
+          "when": "editorLangId == cog-lisp"
+        },
+        {
+          "command": "cog-lisp.runFileInGui",
           "when": "editorLangId == cog-lisp"
         }
       ]

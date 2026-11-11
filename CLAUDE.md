@@ -518,6 +518,14 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **The output and input ports are per process** since step 2a (R-31):
   `withOutput:do:` and `withInput:do:` bind `DynamicVariable`s, so a forked
   process writes to the image-wide default (stdout), not to its parent's port.
+- **The development image** is `pharo/ide/cog-lisp-ide.image`, the owner's own:
+  `ide.bat`/`ide.sh` make and open it, and hand a running one requests through
+  files in `pharo/ide/requests/` (it touches `pharo/ide/heartbeat` while it
+  runs). Builds and suites never touch it. Never kill its `Pharo.exe`. It
+  updates itself in place from the checkout (`ide-update`, or the world menu);
+  a `lib/compiler/` change needs `ide.bat --fresh`. The GUI VM writes a
+  program's output to a file named `stdout` in its current folder, so the
+  launchers start it from `pharo/ide/`.
 - **`Semaphore>>waitTimeoutMSecs:` is deprecated** and its notice goes to
   stdout; use `waitTimeoutMilliseconds:` (answers true on a timeout).
 - **The editor services speak character offsets**; the language server turns

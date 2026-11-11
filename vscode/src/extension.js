@@ -98,6 +98,57 @@ async function runFile() {
   await vscode.tasks.executeTask(task);
 }
 
+/** Hands the development image in Pharo's GUI a request through the ide script
+ *  (specs/34-morphic-ide.md R-37): it starts the image if it is not running, or
+ *  leaves the request for the running image to take. The script is started on
+ *  its own, so VS Code never waits on it; project is the workspace folder. */
+function runIde(args, project) {
+  const root = requireRoot();
+  if (!root) return false;
+  if (!fs.existsSync(path.join(root, script('ide')))) {
+    vscode.window.showErrorMessage('cog-lisp: the Pharo GUI needs a cog-lisp checkout, with ' + script('ide') + ' (a release bundle has no GUI).');
+    return false;
+  }
+  const env = Object.assign({}, process.env);
+  if (project) env.COGLISP_IDE_PROJECT = project;
+  const options = { cwd: root, env, detached: true, stdio: 'ignore', windowsHide: true };
+  const child = WINDOWS
+    ? cp.spawn('cmd.exe', scriptArgs('ide.bat', args), options)
+    : cp.spawn('/bin/bash', [path.join(root, 'ide.sh'), ...args], options);
+  child.on('error', (e) => vscode.window.showErrorMessage('cog-lisp: could not start ' + script('ide') + ': ' + e.message));
+  child.unref();
+  return true;
+}
+
+/** The workspace folder holding uri, or the first one. */
+function projectFolder(uri) {
+  const folder = (uri && vscode.workspace.getWorkspaceFolder(uri)) || (vscode.workspace.workspaceFolders || [])[0];
+  return folder ? folder.uri.fsPath : undefined;
+}
+
+/** Run the active file in a new REPL window of the development image (R-37). */
+async function runFileInGui() {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) return;
+  const doc = editor.document;
+  if (doc.isUntitled) {
+    vscode.window.showErrorMessage('cog-lisp: save the file before running it.');
+    return;
+  }
+  if (doc.isDirty) await doc.save();
+  if (runIde(['--run', doc.uri.fsPath], projectFolder(doc.uri))) {
+    vscode.window.setStatusBarMessage('cog-lisp: running ' + path.basename(doc.uri.fsPath) + ' in the Pharo GUI', 5000);
+  }
+}
+
+/** Open a REPL window in the development image (R-37). */
+function startReplInGui() {
+  const doc = vscode.window.activeTextEditor && vscode.window.activeTextEditor.document;
+  if (runIde(['--repl'], projectFolder(doc && doc.uri))) {
+    vscode.window.setStatusBarMessage('cog-lisp: opening a REPL in the Pharo GUI', 5000);
+  }
+}
+
 /** Rebuild pharo/cog-lisp.image with the build-image script (review T-3). */
 async function rebuildImage() {
   const root = requireRoot();
@@ -401,6 +452,8 @@ function activate(context) {
     vscode.commands.registerCommand('cog-lisp.startRepl', () => ensureRepl(true)),
     vscode.commands.registerCommand('cog-lisp.sendToRepl', sendToRepl),
     vscode.commands.registerCommand('cog-lisp.rebuildImage', rebuildImage),
+    vscode.commands.registerCommand('cog-lisp.runFileInGui', runFileInGui),
+    vscode.commands.registerCommand('cog-lisp.startReplInGui', startReplInGui),
     vscode.window.registerTerminalProfileProvider('cog-lisp.repl', {
       provideTerminalProfile() {
         const root = cogLispRoot();

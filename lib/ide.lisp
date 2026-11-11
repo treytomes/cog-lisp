@@ -14,6 +14,10 @@
 ;;;   - an evaluation that defines names is recorded: when, which session, made
 ;;;     by a person or an agent, the names, and the text.
 ;;;
+;;; Step 2b (the development image, R-1 to R-4, R-37): the project it works on,
+;;; the requests the launchers and VS Code leave for it, what changed in the
+;;; checkout since it was built, and the update in place (R-3).
+;;;
 ;;; Records are vectors, read with their accessors:
 ;;;   a result  #(status values written output report restarts level)
 ;;;   a change  #(time session maker kind names text)
@@ -23,7 +27,8 @@
           ide-eval ide-wait ide-type ide-interrupt ide-close
           result-status result-values result-written result-output result-report result-restarts result-level
           ide-changes ide-log-to!
-          change-time change-session change-maker change-kind change-names change-text))
+          change-time change-session change-maker change-kind change-names change-text
+          ide-project ide-request ide-stale-files ide-update))
 (require 'editor-services)
 
 ;; an option's value in (name value ...), or default
@@ -139,7 +144,7 @@ Ends session and its process."
 (define (change-time c) "(change-time change)\nWhen it was made, a date and time as text." (vector-ref c 0))
 (define (change-session c) "(change-session change)\nThe name of the session that made it." (vector-ref c 1))
 (define (change-maker c) "(change-maker change)\nperson or agent." (vector-ref c 2))
-(define (change-kind c) "(change-kind change)\nevaluate: an evaluation that defined names." (vector-ref c 3))
+(define (change-kind c) "(change-kind change)\nevaluate (an evaluation that defined names), run (a file run, from a request), update (the image updated in place), or log (the record began to be kept in a file)." (vector-ref c 3))
 (define (change-names c) "(change-names change)\nThe names it defined, strings." (vector-ref c 4))
 (define (change-text c) "(change-text change)\nThe text evaluated." (vector-ref c 5))
 
@@ -166,3 +171,118 @@ From now on the changes are also kept in the file at path, one written record a 
   (set! %log-path path)
   (when path (%record! (vector [[[(smalltalk DateAndTime) now] printString] asString] "" 'person 'log '() path)))
   path)
+
+;;; ---------------------------------------------------------------------------
+;;; The project, and requests (R-1, R-37)
+
+(define %project #f)
+
+(define (%now) [[[(smalltalk DateAndTime) now] printString] asString])
+
+(define (ide-project . folder)
+  "(ide-project [folder])
+The project folder the image works on, or #f; with folder, makes it the project (a path) and indexes its .lisp files for the editor services."
+  (when (pair? folder)
+    (set! %project (car folder))
+    (guard (e (#t #f)) (editor-index-folder! (car folder))))
+  %project)
+
+(define (ide-request text)
+  "(ide-request text)
+Takes a request the launchers (ide.bat, ide.sh) and VS Code leave for the image, a form as text: (project folder) makes folder the project and answers project; (repl) answers repl, for a new REPL window; (run path) records the run (a change, kind run) and answers (run path); (update) answers update. Anything else answers unknown."
+  (let ((d (guard (e (#t #f)) (read (open-input-string text)))))
+    (cond ((and (pair? d) (eq? (car d) 'project) (pair? (cdr d)) (string? (cadr d)))
+           (ide-project (cadr d))
+           'project)
+          ((equal? d '(repl)) 'repl)
+          ((and (pair? d) (eq? (car d) 'run) (pair? (cdr d)) (string? (cadr d)))
+           (%record! (vector (%now) "" 'person 'run (list (cadr d)) text))
+           (list 'run (cadr d)))
+          ((equal? d '(update)) 'update)
+          (else 'unknown))))
+
+;;; ---------------------------------------------------------------------------
+;;; What changed in the checkout, and the update in place (R-3)
+
+;; the built-in libraries the seed compiles into every image, in their order
+(define %built-in-libraries '("core" "format" "json" "http" "coverage"))
+
+;; when the image last took the checkout's source: its build, or its last update
+(define %updated #f)
+(define (%since)
+  (or %updated
+      (let ((built (assq 'built (image-build-info))))
+        (and built [(smalltalk DateAndTime) fromString: (cdr built)]))))
+
+(define (%home options)
+  (%option options 'home (hash-table-ref/default *env* 'home #f)))
+
+;; (relative . full) for each source file an image is built from, under home
+(define (%sources home)
+  (let ((in (lambda (folder ext)
+              (let ((dir [[home asFileReference] / folder]))
+                (if [dir isDirectory]
+                    (filter-map (lambda (f) (and [[f basename] endsWith: ext]
+                                                 (cons (string-append folder "/" [f basename]) [f fullName])))
+                                (vector->list [[dir files] asArray]))
+                    '())))))
+    (append (in "src" ".st")
+            (in "lib/compiler" ".lisp")
+            (filter-map (lambda (name)
+                          (let ((f [[home asFileReference] / (string-append "lib/" name ".lisp")]))
+                            (and [f exists] (cons (string-append "lib/" name ".lisp") [f fullName]))))
+                        %built-in-libraries))))
+
+(define (ide-stale-files . options)
+  "(ide-stale-files option ...)
+The source files the image is built from (src/*.st, lib/compiler/, and the built-in libraries core, format, json, http and coverage) that changed since it was built or last updated, as paths relative to the cog-lisp folder; () when it is up to date, or was not built from a seed. Options: home (the cog-lisp folder; *env*'s)."
+  (let ((since (%since)) (home (%home options)))
+    (if (not (and since home))
+        '()
+        (map car (filter (lambda (s) [[[(cdr s) asFileReference] modificationTime] > since]) (%sources home))))))
+
+(define (%starts-with? s prefix) (and (>= (string-length s) (string-length prefix)) (string=? (substring s 0 (string-length prefix)) prefix)))
+
+;; a copy of the image as it was last saved, beside it: the way back (R-3)
+(define (%backup image)
+  (let* ((f [image asFileReference])
+         (base [f basenameWithoutExtension])
+         (copy [[f parent] / (string-append base ".before-update.image")])
+         (changes [[f parent] / (string-append base ".changes")])
+         (changes-copy [[f parent] / (string-append base ".before-update.changes")]))
+    [copy ensureDelete]
+    [f copyTo: copy]
+    (when [changes exists] [changes-copy ensureDelete] [changes copyTo: changes-copy])
+    [copy fullName]))
+
+(define (ide-update . options)
+  "(ide-update option ...)
+Brings the image up to date with the checkout, in place, keeping what it holds (R-3): copies the image as last saved beside it (name.before-update.image), files in src/ again and removes the methods src/ no longer defines, compiles each changed built-in library into the live environment, loads the project's files again, and records the update. A change to lib/compiler/ it cannot carry: it answers fresh, for a fresh image (ide.bat --fresh). Answers an association list: status (current, updated, fresh or failed), files (the changed ones), backup (the copy's path), report (a failure's). Options: home (the cog-lisp folder), image (the image file to copy; this one)."
+  (let* ((home (%home options))
+         (files (ide-stale-files 'home home))
+         (image (%option options 'image [[(smalltalk Smalltalk) imagePath] asString])))
+    (cond
+      ((null? files) (list (cons 'status 'current) (cons 'files '())))
+      ((any (lambda (f) (%starts-with? f "lib/compiler/")) files)
+       (list (cons 'status 'fresh) (cons 'files files)
+             (cons 'report "lib/compiler/ changed: the compiler cannot rebuild itself in place yet; make a fresh image")))
+      (else
+       (let ((backup (%backup image)))
+         (guard (e (#t (list (cons 'status 'failed) (cons 'files files) (cons 'backup backup)
+                             (cons 'report (condition-report e)))))
+           (when (any (lambda (f) (%starts-with? f "src/")) files)
+             [(smalltalk LispIde) refileSourceFrom: [[[home asFileReference] / "src"] fullName]])
+           (for-each (lambda (name)
+                       (let ((relative (string-append "lib/" name ".lisp")))
+                         (when (member relative files)
+                           (load [[[home asFileReference] / relative] fullName]))))
+                     %built-in-libraries)
+           ;; the project's files the image had loaded, loaded again (those still there)
+           (when %project
+             (let ((key (editor-key %project)))
+               (for-each (lambda (path) (when (and (%starts-with? (editor-key path) key) [[path asFileReference] exists]) (load path)))
+                         (filter string? (map (lambda (p) (if (smalltalk-nil? p) #f [p asString]))
+                                              (vector->list [[[(smalltalk LispUnit) units] keys] asArray]))))))
+           (set! %updated [(smalltalk DateAndTime) now])
+           (%record! (vector (%now) "" 'person 'update files home))
+           (list (cons 'status 'updated) (cons 'files files) (cons 'backup backup))))))))

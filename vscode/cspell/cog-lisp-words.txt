@@ -161,6 +161,7 @@ expt
 false
 fifth
 file
+files
 fill
 filter
 find
@@ -305,6 +306,7 @@ problem
 procedure
 prog
 progn
+project
 prompt
 protect
 push
@@ -373,6 +375,7 @@ sqrt
 square
 stack
 stage
+stale
 start
 status
 stop
