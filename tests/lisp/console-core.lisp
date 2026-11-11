@@ -210,4 +210,68 @@
   (check (shown (lambda () (display "abcd") (display (string-append esc "[1;3H" esc "[K")))) "ab")
   (check (shown (lambda () (display "main") (with-alternate-screen (lambda () (display "other"))))) "main"))
 
+;;; --- an emulated terminal, written a piece at a time (specs/34-morphic-ide.md R-39) ---
+
+(define-test "make-terminal: written in pieces, an escape code split across writes"
+  (let ((t (make-terminal 20 4)))
+    (terminal-write! t "ab")
+    (terminal-write! t (string-append esc "[3"))           ; half a color
+    (terminal-write! t "1mred")
+    (terminal-write! t (string-append esc "[0m!"))
+    (let ((s (terminal-screen t)))
+      (check (screen-text s) "abred!")
+      (check (style-foreground (cdr (screen-cell s 3 1))) 'red)
+      (check (style-foreground (cdr (screen-cell s 6 1))) #f)
+      (check (screen-cursor s) '(7 . 1))
+      (check (screen-output s) (string-append "ab" esc "[31mred" esc "[0m!"))))
+  ;; cursor movement redraws in place, as for a choose list
+  (let ((t (make-terminal 20 4)))
+    (terminal-write! t "one\ntwo\n")
+    (terminal-write! t (string-append esc "[2A" esc "[2K" "ONE"))
+    (check (screen-text (terminal-screen t)) "ONE\ntwo"))
+  ;; without a log, screen-output is empty
+  (let ((t (make-terminal 10 2 'log #f)))
+    (terminal-write! t "x")
+    (check (screen-output (terminal-screen t)) "")))
+
+(define-test "make-terminal: the rows that scroll off are kept, with history"
+  (let ((t (make-terminal 10 2 'history 2)))
+    (terminal-write! t "a\nb\nc\nd\ne")
+    (check (screen-text (terminal-screen t)) "d\ne")
+    (let ((gone (terminal-take-scrolled! t)))
+      (check (length gone) 2)                                ; a, b and c went; two kept
+      (check (map (lambda (row) (string (car (vector-ref row 0)))) gone) '("b" "c")))
+    (check (terminal-take-scrolled! t) '())
+    (terminal-write! t "\nf")
+    (check (map (lambda (row) (string (car (vector-ref row 0)))) (terminal-take-scrolled! t)) '("d")))
+  (let ((t (make-terminal 10 2)))                            ; no history: none kept
+    (terminal-write! t "a\nb\nc")
+    (check (terminal-take-scrolled! t) '())))
+
+;; a reader over a string of characters: the next one, or #f when none is left
+(define (reader-over text)
+  (let ((chars (string->list text)))
+    (lambda (ms) (if (null? chars) #f (let ((c (car chars))) (set! chars (cdr chars)) c)))))
+
+(define-test "a console with a reader reads its keys from it"
+  (with-console (list 'reader (reader-over (string-append "a" esc "[A" (string (integer->char 13)))))
+    (lambda ()
+      (check (event-char (read-event)) #\a)
+      (check (event-key (read-event)) 'up)
+      (check (event-key (read-event)) 'enter)
+      (check-false (read-event 10)))))                       ; nothing left: the timeout
+
+(define-test "the prompts read keys from a reader, as at a terminal"
+  (let* ((answer #f)
+         (out (with-output-to-string
+                (lambda ()
+                  (with-console (list 'reader (reader-over (string-append esc "[B" esc "[B" (string (integer->char 13))))
+                                      'terminal? #t 'interactive? #t 'colors 'none 'width 40 'height 10)
+                    (lambda () (set! answer (choose "Pick" '(red green blue)))))))))
+    (check answer 'blue)
+    ;; the list was drawn, and redrawn in place: an emulated terminal shows the end
+    (let ((t (make-terminal 40 10)))
+      (terminal-write! t out)
+      (check (screen-text (terminal-screen t)) "Pick blue"))))
+
 (run-tests)

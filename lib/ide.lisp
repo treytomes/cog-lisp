@@ -28,8 +28,10 @@
           result-status result-values result-written result-output result-report result-restarts result-level
           ide-changes ide-log-to!
           change-time change-session change-maker change-kind change-names change-text
-          ide-project ide-request ide-stale-files ide-update))
+          ide-project ide-request ide-stale-files ide-update
+          ide-window-console))
 (require 'editor-services)
+(require 'console)
 
 ;; an option's value in (name value ...), or default
 (define (%option options name default)
@@ -286,3 +288,17 @@ Brings the image up to date with the checkout, in place, keeping what it holds (
            (set! %updated [(smalltalk DateAndTime) now])
            (%record! (vector (%now) "" 'person 'update files home))
            (list (cons 'status 'updated) (cons 'files files) (cons 'backup backup))))))))
+
+;;; ---------------------------------------------------------------------------
+;;; A console in a window (R-39)
+
+(define (ide-window-console width height keys)
+  "(ide-window-console width height keys)
+A wrapper for a session (ide-session's wrapper option) whose evaluations run in a console that is a window's: a terminal, interactive, true color and Unicode, width by height cells, its keys read from keys (an object answering nextWithin: milliseconds with the next character typed, or nil), so the console library renders and reads keys as in a terminal."
+  (let ((reader (lambda (ms)
+                  (let ((c [keys nextWithin: (if ms ms (smalltalk-nil))]))
+                    (if (smalltalk-nil? c) #f c)))))
+    (lambda (thunk)
+      (with-console (list 'terminal? #t 'interactive? #t 'colors 'truecolor 'unicode? #t
+                          'width width 'height height 'reader reader)
+                    thunk))))

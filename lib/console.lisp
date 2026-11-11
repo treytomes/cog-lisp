@@ -30,7 +30,8 @@
           make-region draw-region
           read-event event? event-kind event-key event-char event-modifiers event-text key-event?
           with-raw-mode with-alternate-screen with-hidden-cursor
-          with-test-console screen-text screen-line screen-cell screen-output screen-cursor))
+          with-test-console screen-text screen-line screen-cell screen-output screen-cursor
+          make-terminal terminal-write! terminal-screen terminal-take-scrolled!))
 
 (define esc (integer->char 27))
 (define (csi . parts) (apply string-append (cons (string esc #\[) parts)))
@@ -514,7 +515,9 @@ Draws lines (from render-lines) into region: each at its row, cut at the region'
        #f
        (string-append (if (> %hidden-depth 0) (csi "?25h") "") (if (> %alternate-depth 0) (csi "?1049l") "")))))
 
-(define (%test-console?) (and (%cap 'events) #t))
+;; a console that is not the terminal: a test console (its events), or one whose
+;; keys come from a reader (a window's, specs/34-morphic-ide.md R-39)
+(define (%test-console?) (and (or (%cap 'events) (%cap 'reader)) #t))
 
 (define (with-raw-mode thunk)
   "(with-raw-mode thunk)
@@ -528,9 +531,9 @@ Runs thunk with the terminal in raw mode (keys arrive one at a time, not echoed)
   (if (not (%cap 'terminal?))
       (thunk)
       (dynamic-wind
-        (lambda () (if (= (get) 0) (begin (%write on) (%terminal-flush))) (set (+ (get) 1)) (%update-restore!))
+        (lambda () (if (= (get) 0) (begin (%write on) (%terminal-flush))) (set (+ (get) 1)) (unless (%cap 'reader) (%update-restore!)))
         thunk
-        (lambda () (set (- (get) 1)) (if (= (get) 0) (begin (%write off) (%terminal-flush))) (%update-restore!)))))
+        (lambda () (set (- (get) 1)) (if (= (get) 0) (begin (%write off) (%terminal-flush))) (unless (%cap 'reader) (%update-restore!))))))
 
 (define (with-alternate-screen thunk)
   "(with-alternate-screen thunk)
@@ -655,14 +658,16 @@ True if event is that key (a key's name, or a character), with exactly those mod
 
 (define (read-event . timeout)
   "(read-event [timeout])
-The next event: a key, a paste or a resize; eof at the end of the input; or #f when timeout milliseconds pass first (none: wait as long as it takes). It waits without stopping other processes. On a terminal it reads in raw mode; on a test console, its events."
+The next event: a key, a paste or a resize; eof at the end of the input; or #f when timeout milliseconds pass first (none: wait as long as it takes). It waits without stopping other processes. On a terminal it reads in raw mode; on a test console, its events; on a console with a reader (a window's), what the reader answers."
   (let ((ms (if (pair? timeout) (car timeout) #f)))
-    (if (%test-console?)
+    (cond
+      ((%cap 'reader) (%decode (%cap 'reader) ms))
+      ((%test-console?)
         (let ((box (%cap 'events)))
           (if (null? (car box))
               (%event 'eof #f #f '() #f)
-              (let ((e (car (car box)))) (set-car! box (cdr (car box))) e)))
-        (begin
+              (let ((e (car (car box)))) (set-car! box (cdr (car box))) e))))
+      (else
           (%terminal-flush)
           (with-raw-mode (lambda () (%decode (lambda (t) (%terminal-read t)) ms)))))))
 
@@ -1348,11 +1353,27 @@ Runs thunk against a test console, and answers its screen: options is a list of 
     (let ((text (%with-bound-console caps (lambda () (with-output-to-string thunk)))))
       (%emulate text width height))))
 
-(define (%blank-row width) (make-vector width (cons #\space %plain)))
+;;; ===========================================================================
+;;; A terminal, emulated (R-23; specs/34-morphic-ide.md R-39): a screen of cells
+;;; the library's output is written to, a piece at a time, as a terminal shows
+;;; it. The test console is one; a console in a window is another.
 
-(define (%emulate text width height)
-  (let ((rows (make-vector height #f)) (saved #f) (col 0) (row 0) (cur %plain) (n (string-length text)))
+;; #(terminal write! snapshot take-scrolled!)
+(define (make-terminal width height . options)
+  "(make-terminal width height option ...)
+An emulated terminal of width by height cells: what terminal-write! writes to it, escape codes and all, it shows as a terminal does, and terminal-screen answers that screen (screen-text, screen-cell and the rest read it). An escape sequence split across two writes is kept until it is whole. Options: history (how many rows scrolled off the top to keep, for terminal-take-scrolled!; 0), log (#t: keep everything written, for screen-output; #t)."
+  (let* ((get (lambda (name default) (let ((m (memq name options))) (if m (cadr m) default))))
+         (history (get 'history 0))
+         (logging (get 'log #t))
+         (log (open-output-string))
+         (scrolled '())                     ; newest first
+         (pending "")
+         (text "") (n 0)
+         (rows (make-vector height #f)) (saved #f) (col 0) (row 0) (cur %plain))
     (define (scroll!)
+      (when (> history 0)
+        (set! scrolled (cons (vector-ref rows 0) scrolled))
+        (if (> (length scrolled) history) (set! scrolled (list-head scrolled history))))
       (do ((i 1 (+ i 1))) ((= i height)) (vector-set! rows (- i 1) (vector-ref rows i)))
       (vector-set! rows (- height 1) (%blank-row width)))
     (define (newline!) (set! col 0) (if (= row (- height 1)) (scroll!) (set! row (+ row 1))))
@@ -1365,20 +1386,21 @@ Runs thunk against a test console, and answers its screen: options is a list of 
               (if (= w 2) (vector-set! (vector-ref rows row) (+ col 1) (cons #f cur)))
               (set! col (+ col w))))))
     (define (clamp v lo hi) (max lo (min hi v)))
-    ;; an escape sequence from i (at ESC); answers where it ends
-    (define (sequence i)
-      (cond ((>= (+ i 1) n) (+ i 1))
+    ;; where the sequence starting at i (at ESC) ends, or #f while it is not whole
+    (define (sequence-end i)
+      (cond ((>= (+ i 1) n) #f)
             ((eq? (string-ref text (+ i 1)) #\])                ; OSC: to ST or BEL
              (let find ((j (+ i 2)))
-               (cond ((>= j n) j)
+               (cond ((>= j n) #f)
                      ((eq? (string-ref text j) (integer->char 7)) (+ j 1))
                      ((and (eq? (string-ref text j) esc) (< (+ j 1) n) (eq? (string-ref text (+ j 1)) #\\)) (+ j 2))
+                     ((and (eq? (string-ref text j) esc) (>= (+ j 1) n)) #f)
                      (else (find (+ j 1))))))
             ((eq? (string-ref text (+ i 1)) #\[)
              (let find ((j (+ i 2)))
-               (if (or (>= j n) (let ((c (string-ref text j))) (and (char>=? c #\@) (char<=? c #\~))))
-                   (begin (if (< j n) (control (substring text (+ i 2) j) (string-ref text j))) (+ j 1))
-                   (find (+ j 1)))))
+               (cond ((>= j n) #f)
+                     ((let ((c (string-ref text j))) (and (char>=? c #\@) (char<=? c #\~))) (+ j 1))
+                     (else (find (+ j 1))))))
             (else (+ i 2))))
     (define (params s) (map (lambda (p) (string->number p)) (string-split s #\;)))
     (define (p1 s default) (let ((ps (params s))) (if (and (pair? ps) (car ps)) (car ps) default)))
@@ -1406,17 +1428,53 @@ Runs thunk against a test console, and answers its screen: options is a list of 
              (do ((i 0 (+ i 1))) ((= i height)) (vector-set! rows i (vector-ref saved i)))
              (set! saved #f))
             (else #f)))
+    (define (write! piece)
+      (if logging (display piece log))
+      (set! text (string-append pending piece))
+      (set! n (string-length text))
+      (set! pending "")
+      (let loop ((i 0))
+        (if (< i n)
+            (let ((c (string-ref text i)))
+              (cond ((eq? c esc)
+                     (let ((end (sequence-end i)))
+                       (if (not end)
+                           (set! pending (substring text i n))           ; the rest comes with the next write
+                           (begin
+                             (if (eq? (string-ref text (+ i 1)) #\[)
+                                 (control (substring text (+ i 2) (- end 1)) (string-ref text (- end 1))))
+                             (loop end)))))
+                    ((eq? c #\newline) (newline!) (loop (+ i 1)))
+                    ((eq? c #\return) (set! col 0) (loop (+ i 1)))
+                    ((eq? c (integer->char 8)) (set! col (max 0 (- col 1))) (loop (+ i 1)))
+                    ((eq? c #\tab) (set! col (min (- width 1) (* 8 (+ 1 (quotient col 8))))) (loop (+ i 1)))
+                    (else (put! c) (loop (+ i 1))))))))
+    (define (snapshot) (vector 'screen width height rows (if logging (get-output-string log) "") col row))
+    (define (take!) (let ((s (reverse scrolled))) (set! scrolled '()) s))
     (do ((i 0 (+ i 1))) ((= i height)) (vector-set! rows i (%blank-row width)))
-    (let loop ((i 0))
-      (if (< i n)
-          (let ((c (string-ref text i)))
-            (cond ((eq? c esc) (loop (sequence i)))
-                  ((eq? c #\newline) (newline!) (loop (+ i 1)))
-                  ((eq? c #\return) (set! col 0) (loop (+ i 1)))
-                  ((eq? c (integer->char 8)) (set! col (max 0 (- col 1))) (loop (+ i 1)))
-                  ((eq? c #\tab) (set! col (min (- width 1) (* 8 (+ 1 (quotient col 8))))) (loop (+ i 1)))
-                  (else (put! c) (loop (+ i 1)))))))
-    (vector 'screen width height rows text col row)))
+    (vector 'terminal write! snapshot take!)))
+
+(define (terminal-write! terminal text)
+  "(terminal-write! terminal text)
+Writes text to an emulated terminal (make-terminal), as a terminal would show it."
+  ((vector-ref terminal 1) text))
+
+(define (terminal-screen terminal)
+  "(terminal-screen terminal)
+An emulated terminal's screen as it is now, read with screen-text, screen-line, screen-cell, screen-cursor and screen-output."
+  ((vector-ref terminal 2)))
+
+(define (terminal-take-scrolled! terminal)
+  "(terminal-take-scrolled! terminal)
+The rows that scrolled off the top of an emulated terminal since this was last asked, oldest first, each a vector of cells (character . style); kept only with make-terminal's history option."
+  ((vector-ref terminal 3)))
+
+(define (%blank-row width) (make-vector width (cons #\space %plain)))
+
+(define (%emulate text width height)
+  (let ((t (make-terminal width height)))
+    (terminal-write! t text)
+    (terminal-screen t)))
 
 (define (vector-map-copy v)
   (let* ((n (vector-length v)) (copy (make-vector n #f)))

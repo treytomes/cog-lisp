@@ -345,13 +345,15 @@ cm value: comp class value: 'seeded build' value: 'pinsAt: aFile
 			pins at: (line copyFrom: 1 to: i - 1) trimBoth put: (line copyFrom: i + 1 to: line size) trimBoth]].
 	^ pins'.
 cm value: comp class value: 'seeded build' value: 'sourceDefinitions
-	"What src/ defines: (class names) -> (package names), read from its class
-	 definitions (the class name after the shift-hash, the package name after the
-	 package keyword). Keep those two patterns out of comments in src/."
+	^ self sourceDefinitionsIn: self lispSourceDirectory parent / ''src'''.
+cm value: comp class value: 'seeded build' value: 'sourceDefinitionsIn: aDirectory
+	"What src/ (aDirectory) defines: (class names) -> (package names), read from its
+	 class definitions (the class name after the shift-hash, the package name after
+	 the package keyword). Keep those two patterns out of comments in src/."
 	| classes packages |
 	classes := Set new.
 	packages := Set new.
-	(self lispSourceDirectory parent / ''src'') files do: [:f |
+	aDirectory asFileReference files do: [:f |
 		f extension = ''st'' ifTrue: [ | text |
 			text := f contents.
 			(text allRegexMatches: ''<< #[A-Za-z0-9]+'') do: [:m | classes add: (m copyAfter: $#) asSymbol].
@@ -378,7 +380,11 @@ cm value: comp class value: 'seeded build' value: 'removeStaleFrom: build
 	 methods is a mistake in what was noted, not a change to the source: it is
 	 refused before anything is removed. Answers the names removed."
 	| defs packages compiled removed classes all stale |
-	defs := self sourceDefinitions.
+	"src/ is beside the image''s folder, or where build at: #sourceDirectory says
+	 (an image updating itself in place from a checkout, specs/34-morphic-ide.md R-3)"
+	defs := (build includesKey: #sourceDirectory)
+		ifTrue: [self sourceDefinitionsIn: (build at: #sourceDirectory)]
+		ifFalse: [self sourceDefinitions].
 	packages := defs value copy addAll: (build at: #seedPackages ifAbsent: [#()]); yourself.
 	compiled := build at: #compiled.
 	classes := OrderedCollection new.

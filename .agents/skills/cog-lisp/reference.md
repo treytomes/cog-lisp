@@ -594,6 +594,7 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(key-event? event key [modifier ...])`: True if event is that key (a key's name, or a character), with exactly those modifiers.
 - `(make-region column row width height)`: A rectangle of the screen, its top left at column and row (from 1), to draw lines into.
 - `(make-renderable proc [measure])`: A renderable whose lines, at a width, are (proc width): a list of lines, each a list of segments (segment text style), at most width cells wide. measure, a procedure of no arguments, answers (narrowest . widest), the cells it needs without breaking a word and the most it takes, for a table or columns to lay it out; without one, both are its widest line at a large width. The renderables the library makes are such; so can a program's.
+- `(make-terminal width height option ...)`: An emulated terminal of width by height cells: what terminal-write! writes to it, escape codes and all, it shows as a terminal does, and terminal-screen answers that screen (screen-text, screen-cell and the rest read it). An escape sequence split across two writes is kept until it is whole. Options: history (how many rows scrolled off the top to keep, for terminal-take-scrolled!; 0), log (#t: keep everything written, for screen-output; #t).
 - `(markup text)`: The styled text that markup text describes, "[bold red]done[/] in 3 s": a value to render, or to put in a table. [[ and ]] are [ and ]; an error names the position.
 - `(markup-escape text)`: text with [ and ] doubled, so markup shows them as they are.
 - `(padded content padding)`: content with space around it: padding is a number for all four sides, (vertical horizontal), or (top right bottom left).
@@ -601,7 +602,7 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(print-markup text)`: Writes markup text, "[bold green]done[/] in [blue]3 s[/]", in its styles, with the colors the console has (none to a pipe or a file).
 - `(print-markup-line text)`: As print-markup, then a newline.
 - `(prompt-cancelled? condition)`: True if condition is the one a prompt raises when Ctrl+C or Escape ends it, for guard.
-- `(read-event [timeout])`: The next event: a key, a paste or a resize; eof at the end of the input; or #f when timeout milliseconds pass first (none: wait as long as it takes). It waits without stopping other processes. On a terminal it reads in raw mode; on a test console, its events.
+- `(read-event [timeout])`: The next event: a key, a paste or a resize; eof at the end of the input; or #f when timeout milliseconds pass first (none: wait as long as it takes). It waits without stopping other processes. On a terminal it reads in raw mode; on a test console, its events; on a console with a reader (a window's), what the reader answers.
 - `(render x)`: Writes x, a renderable, styled text or any value, at the console's width, a line at a time.
 - `(render-lines x width)`: x's lines at width cells: a list of lines, each a list of segments. x is a renderable, styled text (from styled or markup), a string, or any value (as display writes it); text is wrapped at spaces.
 - `(renderable? x)`: True if x is a renderable made by make-renderable.
@@ -625,6 +626,9 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(table-add-column! table header option ...)`: Adds a column to table, as table-column makes it; answers table.
 - `(table-add-row! table cell ...)`: Adds a row to table, a cell for each column; answers table.
 - `(table-column header option ...)`: A column of a table, for its columns option. Options: align (left, center, right; left), width (fixed, in cells).
+- `(terminal-screen terminal)`: An emulated terminal's screen as it is now, read with screen-text, screen-line, screen-cell, screen-cursor and screen-output.
+- `(terminal-take-scrolled! terminal)`: The rows that scrolled off the top of an emulated terminal since this was last asked, oldest first, each a vector of cells (character . style); kept only with make-terminal's history option.
+- `(terminal-write! terminal text)`: Writes text to an emulated terminal (make-terminal), as a terminal would show it.
 - `(text-width text)`: How many cells text takes on a terminal: a wide East Asian character two, a combining mark or a control character none, any other one.
 - `(tree label child ...)`: label, with children below it on guide lines; a child is a tree, or any renderable (a leaf). (tree "root" "a" (tree "b" "c")).
 - `(with-alternate-screen thunk)`: Runs thunk on the terminal's alternate screen, and brings the main screen back, as it was, however thunk is left, and at exit.
@@ -694,6 +698,7 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(ide-type session line)`: Gives the program session runs a line to read: read-line answers it, and read reads from it.
 - `(ide-update option ...)`: Brings the image up to date with the checkout, in place, keeping what it holds (R-3): copies the image as last saved beside it (name.before-update.image), files in src/ again and removes the methods src/ no longer defines, compiles each changed built-in library into the live environment, loads the project's files again, and records the update. A change to lib/compiler/ it cannot carry: it answers fresh, for a fresh image (ide.bat --fresh). Answers an association list: status (current, updated, fresh or failed), files (the changed ones), backup (the copy's path), report (a failure's). Options: home (the cog-lisp folder), image (the image file to copy; this one).
 - `(ide-wait session [milliseconds])`: The result of the oldest evaluation not yet answered, waiting at most milliseconds (as long as it takes if not given); a result with status running if it has not come.
+- `(ide-window-console width height keys)`: A wrapper for a session (ide-session's wrapper option) whose evaluations run in a console that is a window's: a terminal, interactive, true color and Unicode, width by height cells, its keys read from keys (an object answering nextWithin: milliseconds with the next character typed, or nil), so the console library renders and reads keys as in a terminal.
 - `(result-level result)`: How many breaks deep the session is: 0 at the top.
 - `(result-output result)`: What the evaluation wrote to the output port, a string.
 - `(result-report result)`: An error's report, a string; or #f.

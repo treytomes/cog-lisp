@@ -526,6 +526,19 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   a `lib/compiler/` change needs `ide.bat --fresh`. The GUI VM writes a
   program's output to a file named `stdout` in its current folder, so the
   launchers start it from `pharo/ide/`.
+- **A real key arrives as a `KeyboardKey`** (`KeyboardKey enter`, `up`, `down`),
+  a scripted one as a `Character`: bind both, and name each action, or Spec
+  refuses the second (`CmDuplicatedEntryName`). Headless tests that call a
+  presenter's method directly never exercise the binding: check it in the GUI.
+  A key-down event's `keyValue` is Morphic's: 28 to 31 the arrows, 13 Enter,
+  0 Control alone.
+- **Never inject clicks or keys into the GUI while the owner is at the
+  machine**: Windows will not bring Pharo forward over the window in use, so
+  they land in the owner's window instead.
+- **A `start`ed `Pharo.exe` inherits the caller's pipes**: `ide.bat ... | grep`
+  never ends while the image runs. Run the launchers without a pipe.
+- **`removeStaleFrom:` reads `src/` beside the image's folder** unless given
+  `#sourceDirectory`: an image elsewhere (the development image) passes it.
 - **`Semaphore>>waitTimeoutMSecs:` is deprecated** and its notice goes to
   stdout; use `waitTimeoutMilliseconds:` (answers true on a timeout).
 - **The editor services speak character offsets**; the language server turns

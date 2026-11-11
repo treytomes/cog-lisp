@@ -647,7 +647,7 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 | Step | What | Status |
 |------|------|--------|
 | 1 | The spike (§4.1); the editor services (R-29, R-30) | Done (2026-11-10): `lib/editor-services.lisp` and `tests/lisp/editor-services.lisp` (62 checks); the language server on it, its 31 checks and VS Code's 5 offline and 12 with the server passing unchanged |
-| 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c next: R-39 |
+| 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c done (2026-11-11): R-39 (§16) |
 | 3 | The editor | |
 | 4 | The browser and the inspector | |
 | 5 | Errors and the debugger | |
@@ -749,3 +749,54 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
   `fresh` for the compiler, and an update on a copy of the checkout carrying a
   new built-in and a new `src/` method while a session's own definition still
   answers); VS Code's integration suite checks the commands are there.
+
+## 16. As built: step 2c, the console library in a window (2026-11-11)
+
+- **An emulated terminal, written a piece at a time.** The test console's
+  emulator became `make-terminal` (with `terminal-write!`, `terminal-screen`,
+  `terminal-take-scrolled!`), exported by the console library: an escape
+  sequence split across two writes is held until it is whole, and with the
+  `history` option the rows that scroll off the top are kept. The test console
+  is one such terminal, written once.
+- **Keys from a reader.** A console capability, `reader` (a procedure answering
+  the next character typed within a timeout, or #f), makes `read-event`, and
+  so `ask`, `confirm`, `choose` and `choose-many`, read keys there as from a
+  terminal, through the same decoder; raw mode and the real terminal's restore
+  are left alone.
+- **The REPL window's transcript is such a terminal**, the size of its pane in
+  cells of the code font (measured at each evaluation; a new size makes a new
+  terminal, what was shown kept above as history), its rows drawn as text with
+  their colors and emphasis (`LispIde textForRow:`). The prompt, the values and
+  errors are written into it too, with escape codes. Each evaluation runs in
+  `ide-window-console` (`lib/ide.lisp`): a terminal, interactive, true color,
+  Unicode, the pane's size, keys from the window (`LispKeyQueue`).
+- **Keys.** Once the program reads keys, the transcript takes the focus, and a
+  key pressed there goes to it as a terminal sends it (`LispIde
+  keysForValue:character:control:alt:`: the arrows, Home, End, Page Up and Down
+  and Delete as xterm sequences, Backspace as DEL, Ctrl+letter as its control
+  character, Alt after ESC). Enter in the input while a program reads keys
+  sends what was typed and a CR; before, a line typed goes to `read-line` as in
+  2a. Enter and the arrows are bound as `KeyboardKey`s (a real key) and as
+  `Character`s (a scripted one), each action named: Spec refuses two of one
+  name (`CmDuplicatedEntryName`).
+- **Found by hand in the GUI** (2026-11-11, `lisp-expert`'s weather REPL): the
+  greeting panel and the command table draw at the window's width, borders and
+  colors as in a terminal. Enter did not submit (it was bound only as
+  `Character cr`; a real key arrives as `KeyboardKey enter`), and the transcript
+  did not scroll to its end (`scrollToEndOfText` now); both fixed, then checked
+  headless. The update in place failed in the development image:
+  `removeStaleFrom:` looked for `src/` beside the image's folder, which for
+  `pharo/ide/` is no checkout; the update now passes its `src/`
+  (`#sourceDirectory`). Keys typed into the GUI after the fix were not checked
+  by hand: the owner's checklist below.
+- **To check by hand** (AC-5's kind): in a REPL window of the development
+  image, `fetch` in the weather REPL, then the arrow keys and Enter in its
+  city list; `ask` with Backspace; Escape cancelling. And whether the world
+  menu's `cog-lisp REPL` item survives an update in place: after this morning's
+  half-failed update it was gone from the GUI's menu bar, while a headless
+  re-file keeps it.
+- **Checks**: `tests/lisp/console-core.lisp` (19 more: the terminal in pieces,
+  its history, keys from a reader, `choose` by keys) and
+  `tests/lisp/ide-window-console.lisp` (26: key translation, the console's
+  capabilities in a window, a table's borders, `choose`, `ask`, `confirm` and
+  Escape by keys, Enter sending keys, output longer than the pane).

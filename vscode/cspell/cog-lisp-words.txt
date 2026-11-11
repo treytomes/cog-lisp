@@ -347,6 +347,7 @@ rules
 run
 save
 screen
+scrolled
 search
 second
 seconds
@@ -393,8 +394,10 @@ syntax
 table
 tagged
 tail
+take
 tan
 tenth
+terminal
 test
 tests
 text
@@ -426,6 +429,7 @@ when
 whitespace
 width
 wind
+window
 with
 write
 written
