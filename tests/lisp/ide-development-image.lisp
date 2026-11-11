@@ -48,7 +48,7 @@
     (write-file! dir "x.txt" "not a request")
     (let ((opened (vector->list [[(smalltalk LispIde) takeRequestsIn: [dir fullName]] asArray])))
       (check (length opened) 2)
-      (check (map (lambda (f) [f basename]) (vector->list [[dir files] asArray])) '("prog.lisp" "x.txt"))
+      (check (sort (map (lambda (f) [f basename]) (vector->list [[dir files] asArray])) string<?) '("prog.lisp" "x.txt"))   ; a folder lists in no set order
       (check (ide-project) (fwd dir))
       ;; the run's window loaded the file
       (let ((run (cadr opened)))
