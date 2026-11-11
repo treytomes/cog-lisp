@@ -29,7 +29,7 @@
           ide-changes ide-log-to!
           change-time change-session change-maker change-kind change-names change-text
           ide-project ide-request ide-stale-files ide-update
-          ide-window-console))
+          ide-window-console ide-loaded-files))
 (require 'editor-services)
 (require 'console)
 
@@ -302,3 +302,17 @@ A wrapper for a session (ide-session's wrapper option) whose evaluations run in 
       (with-console (list 'terminal? #t 'interactive? #t 'colors 'truecolor 'unicode? #t
                           'width width 'height height 'reader reader)
                     thunk))))
+
+;;; ---------------------------------------------------------------------------
+;;; The files the image has loaded (R-41)
+
+(define (ide-loaded-files)
+  "(ide-loaded-files)
+The files the image has loaded, programs and libraries, each (path . library): library is the library's name, or #f for a program. In the order of their paths."
+  (sort (filter-map (lambda (u)
+                      (let ((p [u path]))
+                        (and (not (smalltalk-nil? p))
+                             (cons [p asString]
+                                   (let ((l [u library])) (if (smalltalk-nil? l) #f l))))))
+                    (vector->list [[[(smalltalk LispUnit) units] values] asArray]))
+        (lambda (a b) (string<? (car a) (car b)))))

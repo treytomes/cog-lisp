@@ -17,7 +17,7 @@
 (define-test "R-12 Enter on a whole form evaluates it; its value is shown after it"
   (let* ((p (repl)) (w [p open]))
     (check-true (run! p "(+ 1 2)"))
-    (check (shown p) "> (+ 1 2)\n3\n")
+    (check (shown p) "> (+ 1 2)\n3\n> ")                  ; and the prompt again
     (check [p inputText] "")
     (check-true (run! p "(define (sq x) (* x x)) (sq 5)"))
     (check-true (has? (shown p) "> (define (sq x) (* x x)) (sq 5)\n25\n"))
@@ -27,7 +27,7 @@
   (let* ((p (repl)) (w [p open]))
     (type! p "(+ 1")
     (check [p inputText] "(+ 1\n")
-    (check (shown p) "")
+    (check (shown p) "> (+ 1\n")                          ; typed at the prompt, not evaluated
     (check-true (run! p "(+ 1\n 2)"))
     (check-true (has? (shown p) "3\n"))
     [w close]))
@@ -35,7 +35,7 @@
 (define-test "R-13 output appears as it is written, before the value"
   (let* ((p (repl)) (w [p open]))
     (check-true (run! p "(display \"hi there\") (newline) 42"))
-    (check (shown p) "> (display \"hi there\") (newline) 42\nhi there\n42\n")
+    (check (shown p) "> (display \"hi there\") (newline) 42\nhi there\n42\n> ")
     [w close]))
 
 (define-test "R-14 an error shows its report and its restarts; abort comes back"

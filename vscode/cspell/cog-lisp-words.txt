@@ -236,6 +236,7 @@ list
 listing
 listp
 load
+loaded
 log
 lower
 macro

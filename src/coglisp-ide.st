@@ -20,8 +20,11 @@
                       its transcript an emulated terminal, the console library
                       rendering there as in a terminal (R-39)
    LispKeyQueue       the keys typed in a window, for the console there (R-39)
+   LispTerminalView   the terminal pane: the console's rows in the code font,
+                      typed into at its cursor (R-40)
+   LispFilesPresenter the files the image has loaded (R-41)
  ============================================================================"
-| failures cm sess sinput sresult ide replp keyq |
+| failures cm sess sinput sresult ide replp keyq tview files |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -32,7 +35,9 @@ sess := (Object << #LispSession) slots: { #name. #maker. #unit. #compiler. #proc
 sinput := (Object << #LispSessionInput) slots: { #lines. #ready. #closed }; package: 'CogLisp-IDE'; install.
 sresult := (Object << #LispSessionResult) slots: { #status. #values. #output. #report. #restarts. #level }; package: 'CogLisp-IDE'; install.
 ide := (Object << #LispIde) sharedVariables: { #Watcher }; package: 'CogLisp-IDE'; install.
-replp := (SpPresenter << #LispReplPresenter) slots: { #session. #transcript. #input. #restartsBar. #interruptButton. #history. #historyIndex. #shown. #transcriptText. #updates. #idle. #busy. #level. #restarts. #terminal. #historyText. #keys. #keyFocus. #columns. #rows }; package: 'CogLisp-IDE'; install.
+replp := (SpPresenter << #LispReplPresenter) slots: { #session. #view. #termView. #restartsBar. #interruptButton. #history. #historyIndex. #shown. #transcriptText. #historyLines. #buffer. #bufferCursor. #updates. #idle. #busy. #level. #restarts. #terminal. #keys. #columns. #rows }; package: 'CogLisp-IDE'; install.
+tview := (Morph << #LispTerminalView) slots: { #target. #lines. #caret. #top. #selectFrom. #selectTo }; package: 'CogLisp-IDE'; install.
+files := (SpPresenter << #LispFilesPresenter) slots: { #list. #source. #runButton. #refreshButton }; package: 'CogLisp-IDE'; install.
 keyq := (Object << #LispKeyQueue) slots: { #chars. #ready. #wanted }; package: 'CogLisp-IDE'; install.
 
 "=== LispSessionInput: lines typed for a program that reads ==================="
@@ -242,8 +247,9 @@ cm value: ide class value: 'reading' value: 'isComplete: aString
 		on: LispReadError
 		do: [:e | e isIncomplete not]'.
 cm value: ide class value: 'terminal text' value: 'palette16
-	^ #((0 0 0) (128 0 0) (0 128 0) (128 128 0) (0 0 128) (128 0 128) (0 128 128) (192 192 192)
-		(128 128 128) (255 0 0) (0 255 0) (255 255 0) (0 0 255) (255 0 255) (0 255 255) (255 255 255))
+	"meant for a dark background: VS Code''s terminal''s (R-40)"
+	^ #((0 0 0) (205 49 49) (13 188 121) (229 229 16) (36 114 200) (188 63 188) (17 168 205) (229 229 229)
+		(102 102 102) (241 76 76) (35 209 139) (245 245 67) (59 142 234) (214 112 214) (41 184 219) (255 255 255))
 		collect: [:rgb | Color r: (rgb at: 1) / 255 g: (rgb at: 2) / 255 b: (rgb at: 3) / 255]'.
 cm value: ide class value: 'terminal text' value: 'color256: n
 	| levels k |
@@ -427,22 +433,25 @@ cm value: ide class value: 'development image' value: 'refileSourceFrom: aPath
 		at: #sourceDirectory put: dir;
 		yourself)) asArray'.
 cm value: ide class value: 'world menu' value: 'menuCommandOn: aBuilder
+	"One cog-lisp menu in the menu bar (R-41)."
 	<worldMenu>
-	(aBuilder item: #''cog-lisp: update the image from the checkout'')
-		order: 0.6;
-		help: ''Bring this image up to date with the source in the checkout, in place (specs/34-morphic-ide.md R-3)'';
+	(aBuilder item: #''cog-lisp'')
+		order: 0.5;
+		help: ''cog-lisp''''s tools (specs/34-morphic-ide.md)''.
+	(aBuilder item: #''New REPL'')
+		parent: #''cog-lisp''; order: 1;
+		help: ''A cog-lisp REPL, on a session of its own'';
+		action: [LispReplPresenter open].
+	(aBuilder item: #''Loaded files'')
+		parent: #''cog-lisp''; order: 2;
+		help: ''The files the image has loaded: their source, and running one in a new REPL'';
+		action: [LispFilesPresenter open].
+	(aBuilder item: #''Update the image from the checkout'')
+		parent: #''cog-lisp''; order: 3;
+		help: ''Bring this image up to date with the source in the checkout, in place (R-3)'';
 		action: [self updateFromCheckout]'.
 
 "=== LispReplPresenter: the REPL window (R-12 to R-16) ======================="
-cm value: replp class value: 'opening' value: 'open
-	"A new REPL window, on a session of its own."
-	^ self new open'.
-cm value: replp class value: 'world menu' value: 'menuCommandOn: aBuilder
-	<worldMenu>
-	(aBuilder item: #''cog-lisp REPL'')
-		order: 0.5;
-		help: ''A cog-lisp REPL, on a session of its own (specs/34-morphic-ide.md)'';
-		action: [self open]'.
 "=== LispKeyQueue: the keys typed in a window, for a console there (R-39) ==="
 cm value: keyq class value: 'instance creation' value: 'new
 	^ super new reset'.
@@ -546,64 +555,208 @@ cm value: ide class value: 'console in a window' value: 'rowIsBlank: aRow
 cm value: ide class value: 'console in a window' value: 'sgr: aCode
 	^ (String with: (Character value: 27)) , ''['' , aCode , ''m'''.
 
-"=== LispReplPresenter: the REPL window (R-12 to R-16, R-39) =================="
+"=== LispTerminalView: a terminal pane, drawn in the code font (R-39, R-40) ===="
+cm value: tview class value: 'instance creation' value: 'on: aTarget
+	"A view whose keys, and whose size, go to aTarget (the REPL window)."
+	^ self new setTarget: aTarget'.
+cm value: tview value: 'initialization' value: 'setTarget: aTarget
+	lines := OrderedCollection with: Text new.
+	caret := nil.
+	top := 1.
+	selectFrom := nil.
+	selectTo := nil.
+	self color: (Color r: 0.118 g: 0.118 b: 0.118); clipSubmorphs: true; extent: 600 @ 400.
+	"the target last: a size set before it is the view''s own"
+	target := aTarget'.
+cm value: tview value: 'accessing' value: 'font
+	^ StandardFonts codeFont'.
+cm value: tview value: 'accessing' value: 'cellWidth
+	^ (self font widthOf: $M) max: 1'.
+cm value: tview value: 'accessing' value: 'lineHeight
+	^ self font height max: 1'.
+cm value: tview value: 'accessing' value: 'columns
+	"How many cells fit across."
+	^ ((self width - 12) / self cellWidth) floor max: 1'.
+cm value: tview value: 'accessing' value: 'rows
+	"How many lines fit down."
+	^ ((self height - 6) / self lineHeight) floor max: 1'.
+cm value: tview value: 'accessing' value: 'lines
+	^ lines'.
+cm value: tview value: 'accessing' value: 'lines: aCollection caret: aPoint
+	"Shows these lines (Texts), the caret at aPoint (column @ line, from 1), or none
+	 for nil; brings the end into view."
+	lines := aCollection isEmpty ifTrue: [OrderedCollection with: Text new] ifFalse: [aCollection].
+	caret := aPoint.
+	self scrollToEnd.
+	self changed'.
+cm value: tview value: 'scrolling' value: 'scrollToEnd
+	top := (lines size - self rows + 1) max: 1'.
+cm value: tview value: 'scrolling' value: 'scrollBy: n
+	top := ((top + n) min: (lines size - self rows + 1)) max: 1.
+	self changed'.
+cm value: tview value: 'geometry' value: 'extent: aPoint
+	| old |
+	old := self extent.
+	super extent: aPoint.
+	old = aPoint ifFalse: [target ifNotNil: [:t | t viewResized]]'.
+cm value: tview value: 'drawing' value: 'drawOn: aCanvas
+	| font bold cw lh x0 y caretColor |
+	super drawOn: aCanvas.
+	font := self font.
+	bold := [font emphasized: 1] on: Error do: [:e | font].
+	cw := self cellWidth.
+	lh := self lineHeight.
+	x0 := self left + 6.
+	caretColor := Color r: 0.85 g: 0.85 b: 0.85.
+	aCanvas clipBy: self innerBounds during: [:c |
+		y := self top + 3.
+		top to: (top + self rows min: lines size) do: [:i | | line col |
+			line := lines at: i.
+			self drawSelectionOf: i on: c at: y.
+			col := 0.
+			line runs withStartStopAndValueDo: [:start :stop :attrs | | s fg isBold |
+				s := line string copyFrom: start to: stop.
+				fg := Color r: 0.85 g: 0.85 b: 0.85.
+				isBold := false.
+				attrs do: [:a |
+					(a isKindOf: TextColor) ifTrue: [fg := a color].
+					((a isKindOf: TextEmphasis) and: [a emphasisCode = 1]) ifTrue: [isBold := true]].
+				c drawString: s at: (x0 + (col * cw)) @ y font: (isBold ifTrue: [bold] ifFalse: [font]) color: fg.
+				col := col + s size].
+			(caret notNil and: [caret y = i]) ifTrue: [| cx ch |
+				cx := x0 + (caret x - 1 * cw).
+				c fillRectangle: (cx @ y extent: cw @ lh) color: caretColor.
+				ch := caret x <= line size ifTrue: [(line string at: caret x) asString] ifFalse: [''''].
+				ch isEmpty ifFalse: [c drawString: ch at: cx @ y font: font color: self color]].
+			y := y + lh]]'.
+cm value: tview value: 'selecting' value: 'drawSelectionOf: i on: aCanvas at: y
+	| from to a b cw x0 |
+	(selectFrom isNil or: [selectTo isNil]) ifTrue: [^ self].
+	from := selectFrom min: selectTo. to := selectFrom max: selectTo.
+	(i between: from y and: to y) ifFalse: [^ self].
+	cw := self cellWidth.
+	x0 := self left + 6.
+	a := i = from y ifTrue: [from x] ifFalse: [1].
+	b := i = to y ifTrue: [to x] ifFalse: [(lines at: i) size + 1].
+	b > a ifTrue: [
+		aCanvas fillRectangle: ((x0 + (a - 1 * cw)) @ y extent: ((b - a) * cw) @ self lineHeight)
+			color: (Color r: 0.2 g: 0.35 b: 0.55)]'.
+cm value: tview value: 'selecting' value: 'positionAt: aPoint
+	"column @ line under aPoint, from 1"
+	| line col |
+	line := ((aPoint y - self top - 3) / self lineHeight) floor + top.
+	line := (line max: 1) min: lines size.
+	col := ((aPoint x - self left - 6) / self cellWidth) rounded + 1.
+	col := (col max: 1) min: (lines at: line) size + 1.
+	^ col @ line'.
+cm value: tview value: 'selecting' value: 'hasSelection
+	^ selectFrom notNil and: [selectTo notNil and: [selectFrom ~= selectTo]]'.
+cm value: tview value: 'selecting' value: 'selectedText
+	"The text selected, lines joined by line feeds."
+	| from to out |
+	self hasSelection ifFalse: [^ ''''].
+	from := selectFrom min: selectTo. to := selectFrom max: selectTo.
+	(selectTo y < selectFrom y or: [selectTo y = selectFrom y and: [selectTo x < selectFrom x]])
+		ifTrue: [from := selectTo. to := selectFrom].
+	out := WriteStream on: String new.
+	from y to: to y do: [:i | | s a b |
+		s := (lines at: i) string.
+		a := i = from y ifTrue: [from x] ifFalse: [1].
+		b := i = to y ifTrue: [to x - 1] ifFalse: [s size].
+		out nextPutAll: (s copyFrom: a to: (b min: s size)).
+		i < to y ifTrue: [out nextPut: Character lf]].
+	^ out contents'.
+cm value: tview value: 'selecting' value: 'clearSelection
+	selectFrom := nil. selectTo := nil'.
+cm value: tview value: 'events' value: 'handlesKeyboard: anEvent
+	^ true'.
+cm value: tview value: 'events' value: 'handlesMouseDown: anEvent
+	^ true'.
+cm value: tview value: 'events' value: 'handlesMouseWheel: anEvent
+	^ true'.
+cm value: tview value: 'events' value: 'keyStroke: anEvent
+	"Every key goes to the REPL window: it edits the line, or sends it to the program."
+	target ifNotNil: [:t | t keyStroke: anEvent]'.
+cm value: tview value: 'events' value: 'mouseDown: anEvent
+	self takeKeyboardFocus.
+	selectFrom := self positionAt: anEvent position.
+	selectTo := selectFrom.
+	self changed'.
+cm value: tview value: 'events' value: 'mouseMove: anEvent
+	anEvent redButtonPressed ifTrue: [
+		selectTo := self positionAt: anEvent position.
+		self changed]'.
+cm value: tview value: 'events' value: 'mouseUp: anEvent
+	self changed'.
+cm value: tview value: 'events' value: 'mouseWheel: anEvent
+	self scrollBy: (anEvent isUp ifTrue: [-3] ifFalse: [3])'.
+
+"=== LispReplPresenter: the REPL window (R-12 to R-16, R-39, R-40) ============"
+cm value: replp class value: 'opening' value: 'open
+	"A new REPL window, on a session of its own."
+	^ self new open; yourself'.
 cm value: replp value: 'initialization' value: 'initializePresenters
-	"The transcript is an emulated terminal (R-39), drawn in a code pane: its font
-	 is monospace, with the box-drawing characters tables use."
-	transcript := self newCode.
-	transcript withoutSyntaxHighlight; withoutLineNumbers; beNotEditable.
-	transcript eventHandler whenKeyDownDo: [:event | self keyDown: event].
-	input := self newText.
-	input placeholder: ''A form, then Enter. Up and Down: the history.''.
-	"a real key arrives as a KeyboardKey (Enter is RETURN), a scripted one as a Character: both"
-	"(each action named: Spec refuses two of one name)"
-	{ ''submit'' -> KeyboardKey enter. ''submit-cr'' -> Character cr } do: [:k |
-		input addShortcutWith: [:action | action name: k key; shortcutKey: k value asKeyCombination; action: [self submit]]].
-	[{ ''back'' -> KeyboardKey up. ''back-arrow'' -> Character arrowUp } do: [:k |
-		input addShortcutWith: [:action | action name: k key; shortcutKey: k value asKeyCombination; action: [self historyBack]]].
-	 { ''forward'' -> KeyboardKey down. ''forward-arrow'' -> Character arrowDown } do: [:k |
-		input addShortcutWith: [:action | action name: k key; shortcutKey: k value asKeyCombination; action: [self historyForward]]]]
-		on: Error do: [:e | nil].
+	"The window is a terminal pane (R-39), typed into at its cursor (R-40), with
+	 the restarts of a break and an Interrupt button below it."
+	termView := LispTerminalView on: self.
+	view := self newMorph.
+	view morph: termView.
 	interruptButton := self newButton.
-	interruptButton label: ''Interrupt''; help: ''Stop the evaluation running''; action: [self interrupt]; disable.
+	interruptButton
+		label: ''Interrupt'';
+		icon: ([self iconNamed: #stop] on: Error do: [:e | nil]);
+		help: ''Stop the evaluation running (Ctrl+C)'';
+		action: [self interrupt];
+		disable.
+	[interruptButton color: (Color r: 0.55 g: 0.2 b: 0.2)] on: Error do: [:e | nil].
 	restartsBar := self newPresenter.
 	restartsBar layout: SpBoxLayout newLeftToRight.
 	history := OrderedCollection new.
 	historyIndex := 0.
 	shown := 0.
+	historyLines := OrderedCollection new.
 	transcriptText := Text new.
-	historyText := Text new.
+	buffer := ''''.
+	bufferCursor := 0.
 	updates := OrderedCollection new.
 	idle := Semaphore new.
 	busy := false.
 	level := 0.
 	restarts := #().
 	keys := LispKeyQueue new.
-	keyFocus := false.
-	session := LispIde call: ''ide:ide-session'' with: { LispIde symbol: ''name''. ''REPL'' }'.
+	session := LispIde call: ''ide:ide-session'' with: { LispIde symbol: ''name''. ''REPL'' }.
+	self emit: self prompt sgr: self promptColor'.
 cm value: replp value: 'initialization' value: 'defaultLayout
 	^ SpBoxLayout newTopToBottom
-		add: transcript;
-		add: restartsBar height: 30;
-		add: (SpBoxLayout newLeftToRight add: input; add: interruptButton expand: false; yourself) height: 70;
+		add: view;
+		add: (SpBoxLayout newLeftToRight
+			add: restartsBar;
+			add: interruptButton expand: false;
+			yourself) height: 34;
 		yourself'.
 cm value: replp value: 'initialization' value: 'initializeWindow: aWindowPresenter
 	aWindowPresenter
 		title: ''cog-lisp REPL'';
 		initialExtent: 760 @ 520.
+	[aWindowPresenter whenOpenedDo: [termView takeKeyboardFocus]] on: Error do: [:e | nil].
 	[aWindowPresenter whenClosedDo: [self closeSession]] on: Error do: [:e | nil]'.
 
 cm value: replp value: 'accessing' value: 'session
 	^ session'.
+cm value: replp value: 'accessing' value: 'terminalView
+	^ termView'.
 cm value: replp value: 'accessing' value: 'transcriptText
 	"The transcript as shown: a Text, its output in the colors the program wrote."
 	^ transcriptText'.
 cm value: replp value: 'accessing' value: 'transcriptString
 	^ transcriptText asString'.
 cm value: replp value: 'accessing' value: 'inputText
-	^ input text asString'.
+	"The line being typed at the cursor."
+	^ buffer'.
 cm value: replp value: 'accessing' value: 'inputText: aString
-	input text: aString'.
+	buffer := aString.
+	bufferCursor := aString size.
+	self refresh'.
 cm value: replp value: 'accessing' value: 'restartNames
 	"The restarts offered while the session waits at a break."
 	^ restarts'.
@@ -622,16 +775,21 @@ cm value: replp value: 'accessing' value: 'wantsKeys
 	"Is the program running reading keys (a prompt, read-event)?"
 	^ keys wantsKeys'.
 
+cm value: replp value: 'colors' value: 'promptColor
+	^ ''92'''.
+cm value: replp value: 'colors' value: 'valueColor
+	^ ''96'''.
+
 cm value: replp value: 'terminal' value: 'measure
-	"The console''s size: as many cells of the code font as fit in the transcript."
-	| font w h |
-	font := StandardFonts codeFont.
-	w := [transcript adapter widget width] on: Error do: [:e | 0].
-	h := [transcript adapter widget height] on: Error do: [:e | 0].
-	columns := ((w - 30) / (font widthOf: $M)) floor.
+	"The console''s size: the pane''s, in cells of the code font."
+	"too small to be a pane (a headless world is 240 by 120): a terminal''s usual size"
+	columns := termView columns.
 	columns < 40 ifTrue: [columns := 100].
-	rows := ((h - 10) / font height) floor.
+	rows := termView rows.
 	rows < 8 ifTrue: [rows := 30]'.
+cm value: replp value: 'terminal' value: 'viewResized
+	"The pane changed size: the next evaluation''s console takes the new one."
+	busy ifFalse: [self ensureTerminal. self refresh]'.
 cm value: replp value: 'terminal' value: 'ensureTerminal
 	"The emulated terminal, made again when the pane''s size changed: what it showed
 	 then stays above, as history."
@@ -640,41 +798,84 @@ cm value: replp value: 'terminal' value: 'ensureTerminal
 	oldRows := rows.
 	self measure.
 	(terminal notNil and: [oldColumns = columns and: [oldRows = rows]]) ifTrue: [^ self].
-	terminal ifNotNil: [
-		self render.
-		historyText := transcriptText , (Text fromString: String lf)].
+	terminal ifNotNil: [| screenLines |
+		screenLines := self screenLines.
+		"the prompt is written again into the new terminal: leave the old one out"
+		(level = 0 and: [busy not and: [screenLines notEmpty and: [screenLines last asString = self prompt trimRight]]])
+			ifTrue: [screenLines removeLast].
+		historyLines addAll: screenLines].
 	terminal := LispIde call: ''console:make-terminal'' with: {
-		columns. rows. LispIde symbol: ''history''. 2000. LispIde symbol: ''log''. false }'.
-cm value: replp value: 'transcript' value: 'emit: aString
+		columns. rows. LispIde symbol: ''history''. 2000. LispIde symbol: ''log''. false }.
+	(oldColumns notNil and: [busy not]) ifTrue: [
+		LispIde call: ''console:terminal-write!!'' with: { terminal. (LispIde sgr: self promptColor) , self prompt , (LispIde sgr: ''0'') }]'.
+cm value: replp value: 'terminal' value: 'emit: aString
 	"Writes to the terminal, as a program''s output is, and shows it."
 	terminal ifNil: [self ensureTerminal].
 	LispIde call: ''console:terminal-write!!'' with: { terminal. aString }.
-	self render'.
-cm value: replp value: 'transcript' value: 'emit: aString sgr: aCode
+	self refresh'.
+cm value: replp value: 'terminal' value: 'emit: aString sgr: aCode
 	self emit: (LispIde sgr: aCode) , aString , (LispIde sgr: ''0'')'.
-cm value: replp value: 'transcript' value: 'render
-	"The transcript: the rows that scrolled off, then the screen down to the cursor
-	 or the last row written."
-	| scrolled screen screenRows cursorRow last screenText |
+cm value: replp value: 'terminal' value: 'takeScrolled
+	| scrolled |
 	terminal ifNil: [^ self].
 	scrolled := LispIde call: ''console:terminal-take-scrolled!!'' with: { terminal }.
 	[scrolled isKindOf: LispCons] whileTrue: [
-		historyText := historyText , (LispIde textForRow: scrolled car) , (Text fromString: String lf).
+		historyLines add: (LispIde textForRow: scrolled car).
 		scrolled := scrolled cdr].
-	historyText size > 400000 ifTrue: [historyText := historyText copyFrom: historyText size - 300000 to: historyText size].
+	historyLines size > 5000 ifTrue: [historyLines removeFirst: historyLines size - 5000]'.
+cm value: replp value: 'terminal' value: 'screenLines
+	"The screen''s rows down to the cursor or the last row written, as Texts."
+	| screen screenRows cursorRow last result |
 	screen := LispIde call: ''console:terminal-screen'' with: { terminal }.
 	screenRows := screen at: 4.
 	cursorRow := (screen at: 7) + 1.
 	last := cursorRow.
 	cursorRow + 1 to: screenRows size do: [:i | (LispIde rowIsBlank: (screenRows at: i)) ifFalse: [last := i]].
-	screenText := Text new.
-	1 to: last do: [:i |
-		screenText := screenText , (LispIde textForRow: (screenRows at: i)).
-		i < last ifTrue: [screenText := screenText , (Text fromString: String lf)]].
-	transcriptText := historyText , screenText.
-	transcript text: transcriptText.
-	"the end in view, as a terminal shows it"
-	[transcript withAdapterDo: [:a | a widget scrollToEndOfText]] on: Error do: [:e | nil]'.
+	result := OrderedCollection new.
+	1 to: last do: [:i | result add: (LispIde textForRow: (screenRows at: i))].
+	^ result'.
+cm value: replp value: 'terminal' value: 'refresh
+	"The pane: the history, the screen, and the line being typed at the cursor, with
+	 the caret where typing goes (R-40)."
+	| screen all cursorRow cursorCol bufferLines caretPoint |
+	terminal ifNil: [^ self].
+	self takeScrolled.
+	all := OrderedCollection withAll: historyLines.
+	screen := LispIde call: ''console:terminal-screen'' with: { terminal }.
+	cursorRow := historyLines size + (screen at: 7) + 1.
+	cursorCol := (screen at: 6) + 1.
+	all addAll: self screenLines.
+	[all size < cursorRow] whileTrue: [all add: Text new].
+	(busy and: [keys wantsKeys])
+		ifTrue: [caretPoint := cursorCol @ cursorRow]
+		ifFalse: [| line pos |
+			"the line being typed, written after the cursor"
+			bufferLines := buffer lines.
+			(buffer isEmpty or: [buffer last = Character lf]) ifTrue: [bufferLines := bufferLines , #('''')].
+			line := all at: cursorRow.
+			line size < (cursorCol - 1) ifTrue: [line := line , (Text fromString: (String new: cursorCol - 1 - line size withAll: Character space))].
+			line := (line copyFrom: 1 to: cursorCol - 1) , (Text fromString: bufferLines first).
+			all at: cursorRow put: line.
+			bufferLines allButFirst doWithIndex: [:l :k |
+				cursorRow + k > all size
+					ifTrue: [all add: (Text fromString: l)]
+					ifFalse: [all at: cursorRow + k put: (Text fromString: l)]].
+			pos := self caretInBuffer.
+			caretPoint := (pos y = 1 ifTrue: [cursorCol + pos x - 1] ifFalse: [pos x]) @ (cursorRow + pos y - 1)].
+	transcriptText := Text new.
+	all doWithIndex: [:l :i |
+		transcriptText := transcriptText , l.
+		i < all size ifTrue: [transcriptText := transcriptText , (Text fromString: String lf)]].
+	termView lines: all caret: caretPoint'.
+cm value: replp value: 'terminal' value: 'caretInBuffer
+	"column @ line of the caret within the line being typed, from 1"
+	| line col |
+	line := 1. col := 1.
+	1 to: bufferCursor do: [:i |
+		(buffer at: i) = Character lf
+			ifTrue: [line := line + 1. col := 1]
+			ifFalse: [col := col + 1]].
+	^ col @ line'.
 cm value: replp value: 'transcript' value: 'appendOutput
 	"What the session wrote since it was last shown."
 	| out |
@@ -685,51 +886,95 @@ cm value: replp value: 'transcript' value: 'appendOutput
 cm value: replp value: 'transcript' value: 'prompt
 	^ level > 0 ifTrue: [level printString , ''> ''] ifFalse: [''> '']'.
 
-cm value: replp value: 'keys' value: 'keyDown: anEvent
-	"A key pressed in the transcript while a program runs goes to it (R-39)."
-	busy ifFalse: [^ self].
-	self typeKeys: (LispIde
-		keysForValue: anEvent keyValue
+cm value: replp value: 'keys' value: 'keyStroke: anEvent
+	"A key pressed in the pane (R-40)."
+	self
+		pressKey: anEvent keyValue
 		character: ([anEvent keyCharacter] on: Error do: [:e | nil])
 		control: (anEvent controlKeyPressed or: [anEvent commandKeyPressed])
-		alt: anEvent altKeyPressed)'.
+		alt: anEvent altKeyPressed'.
+cm value: replp value: 'keys' value: 'pressKey: keyValue character: aCharacter control: control alt: alt
+	"While the program reads keys, every key is its own; otherwise the key edits the
+	 line at the cursor. Ctrl+C copies a selection, else interrupts; Ctrl+V pastes."
+	| ch |
+	ch := (control and: [aCharacter notNil]) ifTrue: [aCharacter asLowercase] ifFalse: [nil].
+	(ch = $c and: [termView hasSelection]) ifTrue: [
+		Clipboard clipboardText: termView selectedText.
+		termView clearSelection; changed.
+		^ self].
+	ch = $v ifTrue: [^ self paste: Clipboard clipboardText asString].
+	termView clearSelection.
+	(busy and: [keys wantsKeys]) ifTrue: [
+		^ self typeKeys: (LispIde keysForValue: keyValue character: aCharacter control: control alt: alt)].
+	ch = $c ifTrue: [busy ifTrue: [self interrupt] ifFalse: [buffer := ''''. bufferCursor := 0. self refresh]. ^ self].
+	control ifTrue: [^ self].
+	keyValue = 13 ifTrue: [^ self submit].
+	keyValue = 8 ifTrue: [^ self deleteBack].
+	keyValue = 127 ifTrue: [^ self deleteForward].
+	keyValue = 28 ifTrue: [bufferCursor := bufferCursor - 1 max: 0. ^ self refresh].
+	keyValue = 29 ifTrue: [bufferCursor := bufferCursor + 1 min: buffer size. ^ self refresh].
+	keyValue = 1 ifTrue: [bufferCursor := 0. ^ self refresh].
+	keyValue = 4 ifTrue: [bufferCursor := buffer size. ^ self refresh].
+	keyValue = 30 ifTrue: [^ self historyBack].
+	keyValue = 31 ifTrue: [^ self historyForward].
+	keyValue = 9 ifTrue: [^ self insert: ''  ''].
+	(aCharacter notNil and: [aCharacter asInteger >= 32 and: [aCharacter asInteger ~= 127]])
+		ifTrue: [self insert: (String with: aCharacter)]'.
 cm value: replp value: 'keys' value: 'typeKeys: aString
 	"Keys for the program running, as a terminal sends them."
 	(busy and: [aString notEmpty]) ifTrue: [keys add: aString]'.
+cm value: replp value: 'editing' value: 'insert: aString
+	buffer := (buffer copyFrom: 1 to: bufferCursor) , aString , (buffer copyFrom: bufferCursor + 1 to: buffer size).
+	bufferCursor := bufferCursor + aString size.
+	self refresh'.
+cm value: replp value: 'editing' value: 'paste: aString
+	| text |
+	text := aString copyReplaceAll: String crlf with: String lf.
+	text := text copyReplaceAll: String cr with: String lf.
+	(busy and: [keys wantsKeys]) ifTrue: [^ self typeKeys: text].
+	self insert: text'.
+cm value: replp value: 'editing' value: 'deleteBack
+	bufferCursor = 0 ifTrue: [^ self].
+	buffer := (buffer copyFrom: 1 to: bufferCursor - 1) , (buffer copyFrom: bufferCursor + 1 to: buffer size).
+	bufferCursor := bufferCursor - 1.
+	self refresh'.
+cm value: replp value: 'editing' value: 'deleteForward
+	bufferCursor >= buffer size ifTrue: [^ self].
+	buffer := (buffer copyFrom: 1 to: bufferCursor) , (buffer copyFrom: bufferCursor + 2 to: buffer size).
+	self refresh'.
 
 cm value: replp value: 'evaluating' value: 'submit
-	"What Enter does: evaluates the input when it holds whole forms, and otherwise
-	 starts a new line in it (R-12). While an evaluation runs, the line is for the
-	 program to read: as a line, or, when it reads keys, as keys and Enter."
+	"What Enter does: evaluates the line typed when it holds whole forms, and
+	 otherwise starts a new line in it (R-12, R-40). While an evaluation runs, the
+	 line is for the program: read as a line, or, when it reads keys, as keys."
 	| text |
-	text := self inputText.
+	text := buffer.
 	busy ifTrue: [
-		input text: ''''.
+		buffer := ''''. bufferCursor := 0.
 		keys wantsKeys
 			ifTrue: [self typeKeys: text , (String with: Character cr)]
 			ifFalse: [
-				self emit: text , String lf sgr: ''90''.
+				self emit: text , String lf.
 				LispIde call: ''ide:ide-type'' with: { session. text }].
 		^ self].
-	text trimBoth isEmpty ifTrue: [^ self].
-	(LispIde isComplete: text) ifFalse: [
-		input text: text , String lf.
-		[input cursorPositionIndex: text size + 2] on: Error do: [:e | nil].
+	text trimBoth isEmpty ifTrue: [
+		buffer := ''''. bufferCursor := 0.
+		self emit: String lf , self prompt sgr: self promptColor.
 		^ self].
+	(LispIde isComplete: text) ifFalse: [^ self insert: String lf].
 	history addLast: text.
 	historyIndex := history size + 1.
-	input text: ''''.
+	buffer := ''''. bufferCursor := 0.
 	self evaluate: text'.
 cm value: replp value: 'evaluating' value: 'evaluate: text
-	"Shows text after the prompt, and evaluates it in the session, in a console the
+	"Echoes text after the prompt, and evaluates it in the session, in a console the
 	 size of the pane whose keys are the ones typed here (R-39); the window goes on
 	 working while it runs. waitUntilIdle: waits for it."
 	| first |
 	self ensureTerminal.
-	self emit: self prompt , text , String lf.
+	self emit: text , String lf.
 	busy := true.
 	keys reset.
-	keyFocus := false.
 	interruptButton enable.
 	self showRestarts: #().
 	session wrapper: (LispIde call: ''ide:ide-window-console'' with: { columns. rows. keys }).
@@ -737,17 +982,13 @@ cm value: replp value: 'evaluating' value: 'evaluate: text
 	[| r |
 	 r := first.
 	 [(r at: 1) name = ''running''] whileTrue: [
-		self queue: [self appendOutput. self focusForKeys].
+		self queue: [self appendOutput. self refresh].
 		r := LispIde call: ''ide:ide-wait'' with: { session. 100 }].
 	 self queue: [self show: r].
 	 idle signal] forkAt: Processor userBackgroundPriority'.
-cm value: replp value: 'evaluating' value: 'focusForKeys
-	"When the program first reads keys, the transcript takes them."
-	(keyFocus not and: [keys wantsKeys]) ifTrue: [
-		keyFocus := true.
-		[transcript takeKeyboardFocus] on: Error do: [:e | nil]]'.
 cm value: replp value: 'evaluating' value: 'show: aResult
-	"A result in the transcript: the values written, or the error and its restarts."
+	"A result in the transcript, the values written or the error and its restarts,
+	 then the prompt again."
 	| status |
 	self appendOutput.
 	status := (aResult at: 1) name asString.
@@ -755,18 +996,18 @@ cm value: replp value: 'evaluating' value: 'show: aResult
 	interruptButton disable.
 	level := aResult at: 7.
 	status = ''done'' ifTrue: [
-		(aResult at: 3) do: [:w | self emit: w , String lf sgr: ''34''].
+		(aResult at: 3) do: [:w | self emit: w , String lf sgr: self valueColor].
 		self showRestarts: #()].
 	status = ''aborted'' ifTrue: [
 		self emit: ''aborted'' , String lf sgr: ''90''.
 		self showRestarts: #()].
 	status = ''error'' ifTrue: [
-		self emit: ''error: '' , (aResult at: 5) , String lf sgr: ''31''.
+		self emit: ''error: '' , (aResult at: 5) , String lf sgr: ''91''.
 		self showRestarts: (aResult at: 6) asArray].
-	keyFocus ifTrue: [keyFocus := false. [input takeKeyboardFocus] on: Error do: [:e | nil]]'.
+	self emit: self prompt sgr: self promptColor'.
 cm value: replp value: 'evaluating' value: 'showRestarts: names
-	"The restarts as buttons (R-14): abort runs at once; one that takes values puts
-	 (name ) in the input to be finished."
+	"The restarts as buttons (R-14): abort and continue run at once; one that takes
+	 values puts (name ) at the prompt to be finished."
 	| layout |
 	restarts := names.
 	layout := SpBoxLayout newLeftToRight.
@@ -777,10 +1018,12 @@ cm value: replp value: 'evaluating' value: 'showRestarts: names
 	restartsBar layout: layout'.
 cm value: replp value: 'evaluating' value: 'chooseRestart: aName
 	(#(''abort'' ''continue'') includes: aName)
-		ifTrue: [self evaluate: ''('' , aName , '')'']
+		ifTrue: [self inputText: ''('' , aName , '')''. self submit]
 		ifFalse: [
-			input text: ''('' , aName , '' )''.
-			[input cursorPositionIndex: aName size + 3] on: Error do: [:e | nil]]'.
+			buffer := ''('' , aName , '' )''.
+			bufferCursor := aName size + 2.
+			self refresh.
+			termView takeKeyboardFocus]'.
 cm value: replp value: 'evaluating' value: 'interrupt
 	"Stops the evaluation running: the session waits at a break (R-15)."
 	busy ifTrue: [LispIde call: ''ide:ide-interrupt'' with: { session }]'.
@@ -805,13 +1048,66 @@ cm value: replp value: 'updating' value: 'waitUntilIdle: milliseconds
 cm value: replp value: 'history' value: 'historyBack
 	history isEmpty ifTrue: [^ self].
 	historyIndex := historyIndex - 1 max: 1.
-	input text: (history at: historyIndex)'.
+	self inputText: (history at: historyIndex)'.
 cm value: replp value: 'history' value: 'historyForward
 	history isEmpty ifTrue: [^ self].
 	historyIndex := historyIndex + 1.
 	historyIndex > history size
-		ifTrue: [historyIndex := history size + 1. input text: '''']
-		ifFalse: [input text: (history at: historyIndex)]'.
+		ifTrue: [historyIndex := history size + 1. self inputText: '''']
+		ifFalse: [self inputText: (history at: historyIndex)]'.
+
+"=== LispFilesPresenter: the files the image has loaded (R-41) =================="
+cm value: files class value: 'opening' value: 'open
+	^ self new open; yourself'.
+cm value: files value: 'initialization' value: 'initializePresenters
+	list := self newList.
+	list display: [:entry | (entry at: 1) asFileReference basename , ''   '' , (entry at: 2)].
+	list whenSelectionChangedDo: [:s | self showSource].
+	source := self newCode.
+	source withoutSyntaxHighlight; beNotEditable.
+	runButton := self newButton.
+	runButton label: ''Run in a new REPL''; action: [self runSelected].
+	refreshButton := self newButton.
+	refreshButton label: ''Refresh''; action: [self refresh].
+	self refresh'.
+cm value: files value: 'initialization' value: 'defaultLayout
+	^ SpBoxLayout newTopToBottom
+		add: (SpPanedLayout newTopToBottom positionOfSlider: 0.35; add: list; add: source; yourself);
+		add: (SpBoxLayout newLeftToRight add: runButton expand: false; add: refreshButton expand: false; yourself) height: 34;
+		yourself'.
+cm value: files value: 'initialization' value: 'initializeWindow: aWindowPresenter
+	aWindowPresenter title: ''cog-lisp: loaded files''; initialExtent: 700 @ 520'.
+cm value: files value: 'accessing' value: 'items
+	^ list items'.
+cm value: files value: 'accessing' value: 'list
+	^ list'.
+cm value: files value: 'accessing' value: 'source
+	^ source'.
+cm value: files value: 'actions' value: 'refresh
+	"The files, as ide-loaded-files answers them: each (path . library), shown as
+	 its name, then its library or its folder."
+	| answer entries |
+	answer := LispIde call: ''ide:ide-loaded-files'' with: #().
+	entries := OrderedCollection new.
+	[answer isKindOf: LispCons] whileTrue: [| e lib |
+		e := answer car.
+		lib := e cdr.
+		entries add: { e car. (lib == false ifTrue: [e car asFileReference parent fullName] ifFalse: [''library '' , lib name asString]) }.
+		answer := answer cdr].
+	list items: entries asArray'.
+cm value: files value: 'actions' value: 'showSource
+	| entry |
+	entry := list selectedItem.
+	source text: (entry ifNil: [''''] ifNotNil: [[(entry at: 1) asFileReference contents] on: Error do: [:e | ''(the file cannot be read: '' , e messageText , '')'']])'.
+cm value: files value: 'actions' value: 'runSelected
+	| entry p |
+	entry := list selectedItem.
+	entry ifNil: [^ self].
+	p := LispReplPresenter new.
+	p open.
+	p inputText: ''(load '' , (LispPrinter writeString: (entry at: 1)) , '')''.
+	p submit.
+	^ p'.
 
 "the development image takes its requests when it starts in the GUI (R-37)"
 SessionManager default registerUserClassNamed: #LispIde.

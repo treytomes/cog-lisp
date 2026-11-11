@@ -685,6 +685,7 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(ide-close session)`: Ends session and its process.
 - `(ide-eval session text option ...)`: Evaluates text's forms in session and answers the result. Options: timeout (milliseconds to wait; as long as it takes if not given): a result still running then has status running, and ide-wait answers it. An evaluation that defines names is recorded (ide-changes).
 - `(ide-interrupt session)`: Stops the evaluation session is running: it waits at a break, with its restarts (abort among them), and the evaluation's result has status error.
+- `(ide-loaded-files)`: The files the image has loaded, programs and libraries, each (path . library): library is the library's name, or #f for a program. In the order of their paths.
 - `(ide-log-to! path)`: From now on the changes are also kept in the file at path, one written record a line, rewritten at each change, so the record outlives a crash. #f stops it.
 - `(ide-project [folder])`: The project folder the image works on, or #f; with folder, makes it the project (a path) and indexes its .lisp files for the editor services.
 - `(ide-request text)`: Takes a request the launchers (ide.bat, ide.sh) and VS Code leave for the image, a form as text: (project folder) makes folder the project and answers project; (repl) answers repl, for a new REPL window; (run path) records the run (a change, kind run) and answers (run path); (update) answers update. Anything else answers unknown.

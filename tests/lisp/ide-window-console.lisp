@@ -99,4 +99,114 @@
       (check-true (has? s (string-append "\n" (number->string (+ [p rows] 19)) "\n"))))
     [w close]))
 
+;;; --- typing at the cursor (R-40) --------------------------------------------------
+
+;; a key as the pane takes it: its Morphic key value, character, Ctrl, Alt
+(define (press! p v c . mods)
+  [p pressKey: v character: c control: (if (memq 'ctrl mods) #t #f) alt: (if (memq 'alt mods) #t #f)])
+(define (press-text! p text) (for-each (lambda (c) (press! p (char->integer c) c)) (string->list text)))
+(define (press-enter! p) (press! p 13 (integer->char 13)))
+(define (sleep-ms n) [[(smalltalk Delay) forMilliseconds: n] wait])
+
+(define-test "R-40 typing goes to the line at the prompt; Enter evaluates it"
+  (let* ((p (repl)) (w [p open]))
+    (press-text! p "(+ 1 2")
+    (check [p inputText] "(+ 1 2")
+    (check-true (string-suffix? "> (+ 1 2" (shown p)))         ; drawn at the cursor
+    (press-text! p ")")
+    (press-enter! p)
+    (check-true [p waitUntilIdle: 10000])
+    (check-true (has? (shown p) "> (+ 1 2)\n3\n> "))
+    [w close]))
+
+(define-test "R-40 editing: the arrows, Home, End, Backspace and Delete"
+  (let* ((p (repl)) (w [p open]))
+    (press-text! p "(+ 1 2)")
+    (press! p 28 (integer->char 28))                           ; left
+    (press! p 8 (integer->char 8))                             ; backspace: the 2
+    (press-text! p "40")
+    (check [p inputText] "(+ 1 40)")
+    (press! p 1 (integer->char 1))                             ; Home
+    (press! p 127 (integer->char 127))                         ; Delete: the (
+    (press-text! p "[")
+    (press! p 4 (integer->char 4))                             ; End
+    (press! p 8 (integer->char 8))
+    (press-text! p "]")
+    (check [p inputText] "[+ 1 40]")
+    [w close]))
+
+(define-test "R-40 Up and Down go through the history when idle"
+  (let* ((p (repl)) (w [p open]))
+    (run! p "(+ 1 1)")
+    (run! p "(+ 2 2)")
+    (press! p 30 (integer->char 30))
+    (check [p inputText] "(+ 2 2)")
+    (press! p 30 (integer->char 30))
+    (check [p inputText] "(+ 1 1)")
+    (press! p 31 (integer->char 31))
+    (check [p inputText] "(+ 2 2)")
+    [w close]))
+
+(define-test "R-40 while a program reads keys, Up and Down are its, not the history's"
+  (let* ((p (repl)) (w [p open]))
+    (run! p "(require 'console)")
+    (run! p "(+ 1 1)")                                         ; a history to not go through
+    (type! p "(choose \"Pick\" '(red green blue))")
+    (check-true (await-keys p))
+    (press! p 31 (integer->char 31))                           ; down
+    (press! p 31 (integer->char 31))
+    (press! p 30 (integer->char 30))                           ; up
+    (press-enter! p)
+    (check-true [p waitUntilIdle: 10000])
+    (check-true (has? (shown p) "Pick green\ngreen\n"))
+    (check [p inputText] "")
+    [w close]))
+
+(define-test "R-40 Ctrl+C interrupts a running evaluation; paste types its text"
+  (let* ((p (repl)) (w [p open]))
+    (type! p "(let loop () (loop))")
+    (sleep-ms 300)
+    (press! p 99 #\c 'ctrl)
+    (check-true [p waitUntilIdle: 10000])
+    (check-true (has? (shown p) "interrupted"))
+    [p chooseRestart: "abort"]
+    [p waitUntilIdle: 10000]
+    [p paste: "(* 6 7)"]
+    (check [p inputText] "(* 6 7)")
+    (press-enter! p)
+    (check-true [p waitUntilIdle: 10000])
+    (check-true (has? (shown p) "42\n"))
+    [w close]))
+
+;;; --- finding the tools and the files (R-41) ------------------------------------------
+
+(require "editor-services/geometry.lisp")
+
+(define-test "R-41 ide-loaded-files: every file loaded, with its library"
+  (let ((files (ide-loaded-files)))
+    (check-true (and (find (lambda (e) (and (string-suffix? "geometry.lisp" (car e)) (eq? (cdr e) 'es-geometry))) files) #t))
+    (check-true (and (find (lambda (e) (and (string-suffix? "ide-window-console.lisp" (car e)) (not (cdr e)))) files) #t))
+    (check (map car files) (sort (map car files) string<?))))
+
+(define-test "R-41 the loaded-files window lists them, shows one, and runs it in a new REPL"
+  (let* ((f [(smalltalk LispFilesPresenter) new]) (w [f open])
+         (items (vector->list [f items]))
+         (geometry (find (lambda (e) (string-suffix? "geometry.lisp" (vector-ref e 0))) items)))
+    (check-true (and geometry #t))
+    (check (vector-ref geometry 1) "library es-geometry")
+    [[f list] selectItem: geometry]
+    (check-true (has? [[[f source] text] asString] "(define (area r)"))
+    (let ((repl [f runSelected]))
+      (check-true [repl waitUntilIdle: 10000])
+      (check-true (has? [repl transcriptString] "(load "))
+      [[repl window] close])
+    [w close]))
+
+(define-test "R-41 one cog-lisp menu: New REPL, Loaded files, Update"
+  (let* ((spec [[(smalltalk PragmaMenuBuilder) pragmaKeyword: ["worldMenu" asSymbol] model: (smalltalk-nil)] menuSpec])
+         (item [[spec items] detect: (lambda (i) [[i label] = "cog-lisp"]) ifNone: (lambda () #f)]))
+    (check-true (and item #t))
+    (check (map (lambda (i) [[i label] asString]) (vector->list [[[item subMenu] items] asArray]))
+           '("New REPL" "Loaded files" "Update the image from the checkout"))))
+
 (run-tests)

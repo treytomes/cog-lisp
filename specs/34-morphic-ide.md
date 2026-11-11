@@ -329,6 +329,32 @@ Item 6 is answered already.
     program in one (R-37's *Run File in the Pharo GUI*).
   It is built as step 2c, after the launchers; its checks drive the pane
   headless, as the test console is driven, and read its cells back.
+- **R-40. Typing at the REPL's cursor, as in a terminal** (owner, 2026-11-11,
+  trying 2c: "It would really be a nicer interface if typing occurred at the
+  REPL cursor the way it does in a terminal, rather than in a separate text
+  field"; and the Up arrow went to the field's history while Down went to the
+  program). This amends R-12: the REPL window has no input field. Its terminal
+  pane (R-39) is a view of its own, drawn in the code font, which takes the
+  keys:
+  - idle, it edits a line at the prompt: the arrows, Home, End, Backspace and
+    Delete within it, Up and Down through the history, paste; Enter evaluates
+    a whole form and starts a new line in an unfinished one;
+  - while a program runs and reads lines, the same editing makes the line it
+    reads; while it reads keys (a prompt, `read-event`), every key goes to it;
+  - Ctrl+C copies a selection, else interrupts a running evaluation (when the
+    program reads keys, it is the program's, as in a terminal);
+  - a caret shows where typing goes; the mouse selects; the wheel scrolls, and
+    output brings the end into view.
+  Colors are a palette meant for a dark background (VS Code's terminal's), and
+  the window's own echo and values are in colors that read on it. The Interrupt
+  button is drawn as a button.
+- **R-41. Finding the tools and the files** (owner, 2026-11-11: "It's not clear
+  how to open a new REPL, or locate existing files that have been loaded into
+  the image"). One `cog-lisp` menu in the world's menu bar: *New REPL*,
+  *Loaded files*, *Update the image from the checkout*. *Loaded files* lists
+  every file the image has loaded (its units with a path: programs and
+  libraries), shows the one chosen, and runs it in a new REPL; it stands on
+  `ide-loaded-files` (R-32), and the editor (step 3) takes over its source pane.
 - **R-31. Each evaluation has its own ports** (spike 4). The current output and
   input ports, and the console library's capabilities, are bound per process
   (as `LispCurrentUnit` and the restarts are), not in variables the whole image
@@ -647,7 +673,7 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 | Step | What | Status |
 |------|------|--------|
 | 1 | The spike (§4.1); the editor services (R-29, R-30) | Done (2026-11-10): `lib/editor-services.lisp` and `tests/lisp/editor-services.lisp` (62 checks); the language server on it, its 31 checks and VS Code's 5 offline and 12 with the server passing unchanged |
-| 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c done (2026-11-11): R-39 (§16) |
+| 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c done (2026-11-11): R-39 (§16). 2d done (2026-11-11), the owner's trial of 2c: R-40, R-41 (§17) |
 | 3 | The editor | |
 | 4 | The browser and the inspector | |
 | 5 | Errors and the debugger | |
@@ -800,3 +826,40 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
   `tests/lisp/ide-window-console.lisp` (26: key translation, the console's
   capabilities in a window, a table's borders, `choose`, `ask`, `confirm` and
   Escape by keys, Enter sending keys, output longer than the pane).
+
+## 17. As built: step 2d, the owner's trial of 2c (2026-11-11)
+
+- **The REPL window is a terminal pane typed at its cursor** (R-40):
+  `LispTerminalView`, a morph of its own in a `SpMorphPresenter`, draws the
+  window's lines in the code font, the caret as a block, a selection, and
+  scrolls with the wheel, bringing the end into view on output. It sends every
+  key to the window (`pressKey:character:control:alt:`), which edits the line
+  at the prompt (drawn after the terminal's cursor, not written into the
+  terminal until Enter), or, while the program reads keys, sends every key to
+  it. So Up and Down are the program's in a `choose`, and the history's at the
+  prompt. Ctrl+C copies a selection, else interrupts; Ctrl+V pastes. The
+  prompt is written into the terminal, so the transcript ends with it.
+- **Rubric was not used for the pane**: its text area hands every keystroke to
+  its editor before any handler, so a terminal's keys could not be taken from
+  it.
+- **Colors** (R-40): VS Code's terminal palette for the 16 colors; the prompt
+  bright green, values bright cyan, errors bright red, on a dark background.
+  The Interrupt button has the stop icon and a red tint (`color:`).
+- **One `cog-lisp` menu** (R-41): *New REPL*, *Loaded files*, *Update the
+  image from the checkout*, all from `LispIde class>>menuCommandOn:`. The REPL
+  window's own `<worldMenu>` method is gone: two such methods of one selector
+  on two classes is the likeliest reason the item vanished after an update.
+- **Loaded files** (R-41): `ide-loaded-files` answers each loaded file's path
+  and its library (#f for a program); `LispFilesPresenter` lists them, shows the
+  one chosen, and runs it in a new REPL.
+- **A headless world is 240 by 120**, so a pane under 40 columns or 8 rows is
+  taken for no pane, and the console gets 100 by 30.
+- **Checks**: `tests/lisp/ide-window-console.lisp` grew to 54 (typing at the
+  cursor, editing keys, the history, the program's keys in a `choose`, Ctrl+C
+  and paste, the loaded files, the window listing them, the menu);
+  `tests/lisp/ide-repl-window.lisp` (54) checks the transcript ending at the
+  prompt.
+- **For the owner to check**: the colors, typing at the cursor, Up and Down in
+  `fetch`'s city list, the menu, and *Loaded files*, in a fresh development
+  image (`ide.bat --fresh`): the window's class changed shape, which an update
+  in place carries badly into windows already open.
