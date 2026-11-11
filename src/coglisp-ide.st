@@ -27,8 +27,9 @@
    LispEditorPage     one file open in the editor (R-5 to R-9)
    LispEditorPresenter the editor: the project's files, a tab for each (R-5 to R-11)
    LispBrowserPresenter the browser: groups, definitions, a definition (R-17 to R-21)
+   LispInspectorPresenter a value as LISP sees it, and Pharo's inspector's LISP tab (R-22 to R-24)
  ============================================================================"
-| failures cm sess sinput sresult ide replp keyq tview files styler epage editorp brw |
+| failures cm sess sinput sresult ide replp keyq tview files styler epage editorp brw insp |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -39,13 +40,14 @@ sess := (Object << #LispSession) slots: { #name. #maker. #unit. #compiler. #proc
 sinput := (Object << #LispSessionInput) slots: { #lines. #ready. #closed }; package: 'CogLisp-IDE'; install.
 sresult := (Object << #LispSessionResult) slots: { #status. #values. #output. #report. #restarts. #level }; package: 'CogLisp-IDE'; install.
 ide := (Object << #LispIde) sharedVariables: { #Watcher }; package: 'CogLisp-IDE'; install.
-replp := (SpPresenter << #LispReplPresenter) slots: { #session. #view. #termView. #restartsBar. #interruptButton. #history. #historyIndex. #shown. #transcriptText. #historyLines. #buffer. #bufferCursor. #updates. #idle. #busy. #level. #restarts. #terminal. #keys. #columns. #rows. #sessionSource. #ownsSession. #after }; package: 'CogLisp-IDE'; install.
+replp := (SpPresenter << #LispReplPresenter) slots: { #session. #view. #termView. #restartsBar. #interruptButton. #history. #historyIndex. #shown. #transcriptText. #historyLines. #buffer. #bufferCursor. #updates. #idle. #busy. #level. #restarts. #terminal. #keys. #columns. #rows. #sessionSource. #ownsSession. #after. #inspectButton. #lastValue. #lastInspector }; package: 'CogLisp-IDE'; install.
 tview := (Morph << #LispTerminalView) slots: { #target. #lines. #caret. #top. #selectFrom. #selectTo }; package: 'CogLisp-IDE'; install.
 files := (SpPresenter << #LispFilesPresenter) slots: { #list. #source. #runButton. #refreshButton }; package: 'CogLisp-IDE'; install.
 styler := (SHRBTextStyler << #LispStyler) slots: { #palette. #page }; package: 'CogLisp-IDE'; install.
-epage := (SpPresenter << #LispEditorPage) slots: { #code. #path. #ending. #savedText. #editor. #repl. #bottom. #problemsList. #problems. #checkGeneration. #diskText. #choices }; package: 'CogLisp-IDE'; install.
+epage := (SpPresenter << #LispEditorPage) slots: { #code. #path. #ending. #savedText. #editor. #repl. #bottom. #problemsList. #problems. #checkGeneration. #diskText. #choices. #lastInspector }; package: 'CogLisp-IDE'; install.
 editorp := (SpPresenter << #LispEditorPresenter) slots: { #tree. #notebook. #status. #toolbar. #pages. #tabs. #folder. #lastRun. #watching. #lastBrowser }; package: 'CogLisp-IDE'; install.
 brw := (SpPresenter << #LispBrowserPresenter) slots: { #search. #groups. #definitions. #header. #notebook. #source. #documentation. #callers. #callees. #disassembly. #saveButton. #editorButton. #smalltalkButton. #status. #current. #lastEditor }; package: 'CogLisp-IDE'; install.
+insp := (SpPresenter << #LispInspectorPresenter) slots: { #object. #history. #views. #title. #backButton. #pharoButton. #notebook. #evaluator. #evalButton. #inspectButton. #status }; package: 'CogLisp-IDE'; install.
 keyq := (Object << #LispKeyQueue) slots: { #chars. #ready. #wanted }; package: 'CogLisp-IDE'; install.
 
 "=== LispSessionInput: lines typed for a program that reads ==================="
@@ -797,6 +799,12 @@ cm value: replp value: 'initialization' value: 'initializePresenters
 		action: [self interrupt];
 		disable.
 	[interruptButton color: (Color r: 0.55 g: 0.2 b: 0.2)] on: Error do: [:e | nil].
+	inspectButton := self newButton.
+	inspectButton
+		label: ''Inspect'';
+		help: ''Inspect the last value'';
+		action: [self inspectLastValue];
+		disable.
 	restartsBar := self newPresenter.
 	restartsBar layout: SpBoxLayout newLeftToRight.
 	history := OrderedCollection new.
@@ -821,6 +829,7 @@ cm value: replp value: 'initialization' value: 'defaultLayout
 		add: view;
 		add: (SpBoxLayout newLeftToRight
 			add: restartsBar;
+			add: inspectButton expand: false;
 			add: interruptButton expand: false;
 			yourself) height: 34;
 		yourself'.
@@ -1109,6 +1118,11 @@ cm value: replp value: 'evaluating' value: 'show: aResult
 	level := aResult at: 7.
 	status = ''done'' ifTrue: [
 		(aResult at: 3) do: [:w | self emit: w , String lf sgr: self valueColor].
+		((aResult at: 2) isKindOf: LispCons) ifTrue: [| l |
+			l := aResult at: 2.
+			[l cdr isKindOf: LispCons] whileTrue: [l := l cdr].
+			lastValue := { l car }.
+			inspectButton enable].
 		self showRestarts: #()].
 	status = ''aborted'' ifTrue: [
 		self emit: ''aborted'' , String lf sgr: ''90''.
@@ -1137,6 +1151,13 @@ cm value: replp value: 'evaluating' value: 'chooseRestart: aName
 			bufferCursor := aName size + 2.
 			self refresh.
 			termView takeKeyboardFocus]'.
+cm value: replp value: 'evaluating' value: 'inspectLastValue
+	"The last value in an inspector (R-13, R-22). Answers its presenter, or nil."
+	lastValue ifNil: [^ nil].
+	^ lastInspector := LispInspectorPresenter openOn: lastValue first'.
+cm value: replp value: 'evaluating' value: 'lastValue
+	"The last value an evaluation answered, in an Array, or nil before one."
+	^ lastValue'.
 cm value: replp value: 'evaluating' value: 'interrupt
 	"Stops the evaluation running: the session waits at a break (R-15)."
 	busy ifTrue: [LispIde call: ''ide:ide-interrupt'' with: { session }]'.
@@ -1335,6 +1356,7 @@ cm value: epage value: 'initialization' value: 'keys
 		{ ''run''. ''Run''. $r. false. [self run] }.
 		{ ''do-it''. ''Do it''. $d. false. [self doIt] }.
 		{ ''print-it''. ''Print it''. $p. false. [self printIt] }.
+		{ ''inspect-it''. ''Inspect it''. $i. false. [self inspectIt] }.
 		{ ''load-file''. ''Load file''. $l. false. [self loadFile] }.
 		{ ''interrupt''. ''Interrupt''. nil. false. [self interrupt] }.
 		{ ''save''. ''Save''. $s. false. [self save] }.
@@ -1673,6 +1695,24 @@ cm value: epage value: 'evaluating' value: 'printIt
 				code text: (text copyFrom: 1 to: interval last) , String lf , '';; => '' , written ,
 					(text copyFrom: interval last + 1 to: text size).
 				code selectionInterval: (interval last + 9 + written size to: interval last + 8 + written size)]]]'.
+cm value: epage value: 'evaluating' value: 'inspectIt
+	"Ctrl+I: as Do it, then its value in an inspector (R-9, R-22)."
+	| interval |
+	interval := self formInterval.
+	interval ifNil: [^ self].
+	self evaluate: (self text copyFrom: interval first to: interval last)
+		showing: (self text copyFrom: interval first to: interval last)
+		then: [:r | ((r at: 1) name = ''done'' and: [(r at: 2) isKindOf: LispCons]) ifTrue: [| v |
+			v := self lastOf: (r at: 2).
+			"the inspector opens in the UI process: a result can come from another"
+			LispIde onUi: [lastInspector := LispInspectorPresenter openOn: v]]]'.
+cm value: epage value: 'evaluating' value: 'lastOf: aList
+	| l |
+	l := aList.
+	[l cdr isKindOf: LispCons] whileTrue: [l := l cdr].
+	^ l car'.
+cm value: epage value: 'evaluating' value: 'lastInspector
+	^ lastInspector'.
 cm value: epage value: 'evaluating' value: 'loadFile
 	"Ctrl+L: the whole text, as the file holds it now, evaluated as part of the file."
 	self evaluate: self text showing: ''; load '' , path asFileReference basename then: nil'.
@@ -2066,6 +2106,191 @@ cm value: brw value: 'editing' value: 'openInEditor
 	page := lastEditor openFile: (current at: 5).
 	(current at: 6) isInteger ifTrue: [page selectFrom: (current at: 6) to: (current at: 7)].
 	^ page'.
+
+"=== LispInspectorPresenter: a value, as LISP sees it (R-22 to R-24) =========="
+cm value: insp class value: 'opening' value: 'openOn: anObject
+	"An inspector window on anObject."
+	^ self new object: anObject; open; yourself'.
+cm value: insp class value: 'opening' value: 'on: anObject
+	"An inspector on anObject, not yet in a window (Pharo''s inspector''s LISP tab)."
+	^ self new object: anObject; yourself'.
+cm value: insp class value: 'opening' value: 'canOpen
+	"Is a world showing, for a window to open in (R-24)?"
+	^ Smalltalk isInteractive'.
+cm value: insp value: 'initialization' value: 'initializePresenters
+	history := OrderedCollection new.
+	title := self newLabel.
+	backButton := self newButton.
+	backButton label: ''Back''; help: ''The value inspected before this one''; action: [self goBack]; disable.
+	pharoButton := self newButton.
+	pharoButton label: ''Pharo inspector''; help: ''Pharo''''s own inspector on it: its slots, Raw and Meta, the Smalltalk door''; action: [object inspect].
+	notebook := self newNotebook.
+	evaluator := self newCode.
+	evaluator beNotWrapWord.
+	evaluator overrideContextMenu: true.
+	LispStyler installOn: evaluator.
+	evaluator text: ''it''.
+	evaluator addActionWith: [:a | a name: ''Evaluate''; shortcutKey: (KeyboardKey named: ''D'') asKeyCombination actionModifier; action: [self evaluate]].
+	evaluator addActionWith: [:a | a name: ''evaluate-typed''; shortcutKey: $d actionModifier; beShortcutOnly; action: [self evaluate]].
+	evaluator addActionWith: [:a | a name: ''Inspect''; shortcutKey: (KeyboardKey named: ''I'') asKeyCombination actionModifier; action: [self inspectResult]].
+	evaluator addActionWith: [:a | a name: ''inspect-typed''; shortcutKey: $i actionModifier; beShortcutOnly; action: [self inspectResult]].
+	evalButton := self newButton.
+	evalButton label: ''Evaluate''; help: ''Evaluate the LISP below, with it bound to the value (Ctrl+D)''; action: [self evaluate].
+	inspectButton := self newButton.
+	inspectButton label: ''Inspect''; help: ''Evaluate it, and inspect what it answers (Ctrl+I)''; action: [self inspectResult].
+	status := self newLabel'.
+cm value: insp value: 'initialization' value: 'defaultLayout
+	^ SpBoxLayout newTopToBottom
+		add: (SpBoxLayout newLeftToRight
+			add: backButton expand: false;
+			add: title;
+			add: pharoButton expand: false;
+			yourself) expand: false;
+		add: (SpPanedLayout newTopToBottom
+			positionOfSlider: 0.72;
+			add: notebook;
+			add: (SpBoxLayout newTopToBottom
+				add: evaluator;
+				add: (SpBoxLayout newLeftToRight
+					add: status;
+					add: evalButton expand: false;
+					add: inspectButton expand: false;
+					yourself) expand: false;
+				yourself);
+			yourself);
+		yourself'.
+cm value: insp value: 'initialization' value: 'initializeWindow: aWindowPresenter
+	aWindowPresenter title: ''cog-lisp inspector''; initialExtent: 720 @ 540'.
+
+cm value: insp value: 'accessing' value: 'object
+	^ object'.
+cm value: insp value: 'accessing' value: 'object: anObject
+	"Inspects anObject: its views, each a tab (R-22)."
+	object := anObject.
+	self refresh'.
+cm value: insp value: 'accessing' value: 'listFrom: aList
+	| items l |
+	items := OrderedCollection new.
+	l := aList.
+	[l isKindOf: LispCons] whileTrue: [items add: l car. l := l cdr].
+	^ items asArray'.
+cm value: insp value: 'accessing' value: 'written: anObject
+	^ [LispPrinter writeString: anObject] on: Error do: [:e | anObject printString]'.
+cm value: insp value: 'accessing' value: 'short: aString
+	^ aString size > 200 ifTrue: [(aString copyFrom: 1 to: 200) , ''...''] ifFalse: [aString]'.
+cm value: insp value: 'accessing' value: 'titleText
+	^ title label asString'.
+cm value: insp value: 'accessing' value: 'statusText
+	^ status label asString'.
+cm value: insp value: 'accessing' value: 'evaluatorText:  aString
+	evaluator text: aString'.
+cm value: insp value: 'accessing' value: 'views
+	"ide-views'' views of the value, as Arrays: #(title rows)."
+	^ views'.
+cm value: insp value: 'accessing' value: 'viewTitles
+	^ views collect: [:v | v at: 1]'.
+cm value: insp value: 'accessing' value: 'rowsOf: aTitle
+	"The rows of the view titled aTitle, each #(label written value)."
+	^ (views detect: [:v | (v at: 1) = aTitle] ifNone: [^ #()]) at: 2'.
+cm value: insp value: 'accessing' value: 'historySize
+	^ history size'.
+
+cm value: insp value: 'viewing' value: 'refresh
+	| written |
+	views := (self listFrom: (LispIde call: ''ide:ide-views'' with: { object }))
+		collect: [:v | { v at: 1. self listFrom: (v at: 2) }].
+	written := self short: (self written: object).
+	title label: written , ''   ('' , object class name , '')''.
+	notebook removeAll.
+	views do: [:v | | table |
+		table := self tableFor: (v at: 2).
+		notebook addPage: (SpNotebookPage title: (v at: 1) provider: [table])].
+	history isEmpty ifTrue: [backButton disable] ifFalse: [backButton enable]'.
+cm value: insp value: 'viewing' value: 'tableFor: rows
+	"A view''s rows as a tree: a row whose value is a list or a vector unfolds into
+	 its own elements, so a nested list shows as a tree (R-22). A double click
+	 inspects a row''s value."
+	| table |
+	table := self newTreeTable.
+	table
+		addColumn: (SpStringTableColumn title: '''' evaluated: [:row | row at: 1]);
+		addColumn: (SpStringTableColumn title: ''value'' evaluated: [:row | self short: (row at: 2)]);
+		roots: rows;
+		children: [:row | self childRowsOf: (row at: 3)].
+	table whenActivatedDo: [:selection | selection selectedItem ifNotNil: [:row | self dive: (row at: 3)]].
+	^ table'.
+cm value: insp value: 'viewing' value: 'childRowsOf: aValue
+	((aValue isKindOf: LispCons) or: [aValue isArray and: [aValue isString not]]) ifFalse: [^ #()].
+	^ self listFrom: ((self listFrom: (LispIde call: ''ide:ide-views'' with: { aValue })) first at: 2)'.
+cm value: insp value: 'viewing' value: 'dive: aValue
+	"aValue inspected in place of the value; Back comes back."
+	history addLast: object.
+	self object: aValue'.
+cm value: insp value: 'viewing' value: 'goBack
+	history isEmpty ifTrue: [^ self].
+	self object: history removeLast'.
+
+cm value: insp value: 'evaluating' value: 'evaluate
+	"The LISP below, evaluated with it bound to the value (R-23); its value shown.
+	 Answers it, or nil after an error."
+	| r |
+	r := [LispIde call: ''ide:ide-evaluate-with-it'' with: { object. evaluator text asString }]
+		on: Error do: [:e | status label: ''error: '' , (LispError describe: e). ^ nil].
+	status label: ''=> '' , (self short: (self written: r)).
+	^ r'.
+cm value: insp value: 'evaluating' value: 'inspectResult
+	"Evaluates, and inspects what it answers."
+	| before r |
+	before := status label.
+	r := self evaluate.
+	(status label asString beginsWith: ''error: '') ifTrue: [^ self].
+	self dive: r'.
+
+"Pharo''s inspector, with LISP views first (R-22): a LISP tab before its own, on LISP''s kinds of value"
+{ LispCons. LispSymbol. LispProcedure. LispMacro. LispHashTable. LispUnit. LispError } do: [:c |
+	cm value: c value: '*CogLisp-IDE' value: 'inspectionLisp
+	<inspectorPresentationOrder: -10 title: ''LISP''>
+	^ LispInspectorPresenter on: self'.
+	cm value: c value: '*CogLisp-IDE' value: 'inspectionLispContext: aContext
+	"its evaluator is the tab''s own, in LISP (R-23), not Pharo''s Smalltalk"
+	aContext withoutEvaluator'].
+
+"inspect and browse, built in (R-24): the tools from any REPL, in the image or at a console"
+cm value: ide class value: 'built-ins' value: 'installToolsInto: anEnv
+	"inspect and browse, primitives that call into lib/ide.lisp, loading it the first time."
+	anEnv define: (LispSymbol named: ''inspect'') value: (LispProcedure fixed: [:x |
+		LispIde call: ''ide:ide-inspect'' with: { x }] arity: 1).
+	anEnv define: (LispSymbol named: ''browse'') value: (LispProcedure fixed: [:x |
+		LispIde call: ''ide:ide-open-source'' with: { x }] arity: 1).
+	LispPrimitives document: anEnv category: ''The system'' with: #(
+		''inspect'' ''(inspect value)''
+			''Inspects value: in an inspector window when the image shows its world (the development image), else by writing its views, a part a line. Answers value.''
+		''browse'' ''(browse name-or-value)''
+			''Opens the original source of a definition, given its name (a symbol) or its value: a definition in a file, in the editor at its place; a primitive, in the browser of Smalltalk, on the method that implements it; else the LISP browser. Without a world, writes where the source is. Answers the place, as ide-open-source does.'')'.
+cm value: ide class value: 'tools' value: 'openEditorOn: aPath from: start to: end
+	"The editor (one already open, else a new one) on the file at aPath, the text from
+	 start to before end (offsets from 0) selected. Answers the page."
+	| editor page |
+	editor := LispEditorPresenter allInstances
+		detect: [:e | e window notNil and: [e window isOpen]]
+		ifNone: [LispEditorPresenter new open; yourself].
+	page := editor openFile: aPath.
+	(start isInteger and: [end isInteger]) ifTrue: [page selectFrom: start to: end].
+	[editor window window activate] on: Error do: [:e | nil].
+	^ page'.
+cm value: ide class value: 'tools' value: 'smalltalkMethodOf: className selector: aSelector
+	"The method of Smalltalk named so (a class name, or one ending in class)."
+	| cls |
+	cls := (className endsWith: '' class'')
+		ifTrue: [(Smalltalk at: (className allButLast: 6) asSymbol) class]
+		ifFalse: [Smalltalk at: className asSymbol].
+	^ cls >> aSelector asSymbol'.
+cm value: ide class value: 'tools' value: 'browseSmalltalk: className selector: aSelector
+	"Pharo''s browser on that method: a primitive''s original source."
+	^ (self smalltalkMethodOf: className selector: aSelector) browse'.
+cm value: ide class value: 'tools' value: 'canOpenWindows
+	"Does the image show its world, for a window to open in?"
+	^ Smalltalk isInteractive'.
 
 "the development image takes its requests when it starts in the GUI (R-37)"
 SessionManager default registerUserClassNamed: #LispIde.

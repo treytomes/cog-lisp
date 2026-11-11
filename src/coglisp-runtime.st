@@ -1147,6 +1147,8 @@ cm value: prims class value: 'installing' value: 'installInto: anEnv
 	self installFilesInto: anEnv.
 	self installTerminalInto: anEnv.
 	self installLanguageServerInto: anEnv.
+	"the image''s tools (CogLisp-IDE, filed in later): inspect and browse"
+	(Smalltalk at: #LispIde ifAbsent: [nil]) ifNotNil: [:tools | tools installToolsInto: anEnv].
 	"every primitive knows its name, for printing and error messages (review R-7)"
 	anEnv cellsDo: [:c | | v |
 		v := c valueIfUnbound: [nil].

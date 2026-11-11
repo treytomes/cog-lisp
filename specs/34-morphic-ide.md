@@ -428,6 +428,12 @@ Item 6 is answered already.
   the inspected value bound to `it`.
 - **R-24. `(inspect x)`** opens this inspector when a world is showing; without
   one, 11.5's inspector at the REPL. Both use the model's views.
+- **R-45. `(browse x)`** (the owner's request, 2026-11-11), built in beside
+  `inspect`: opens the original source of a definition, given its name or its
+  value: a definition in a file, in the editor at its place; a primitive (`(browse
+  car)`), in the browser of Smalltalk, on the method that implements it; anything
+  else bound, in the LISP browser. Without a world it writes where the source is.
+  It answers the place as data.
 
 ### 5.7 Errors and the debugger
 
@@ -707,7 +713,7 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 | 1 | The spike (§4.1); the editor services (R-29, R-30) | Done (2026-11-10): `lib/editor-services.lisp` and `tests/lisp/editor-services.lisp` (62 checks); the language server on it, its 31 checks and VS Code's 5 offline and 12 with the server passing unchanged |
 | 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c done (2026-11-11): R-39 (§16). 2d done (2026-11-11), the owner's trial of 2c: R-40, R-41 (§17) |
 | 3 | The editor | 3a done (2026-11-11): R-5, R-6, R-8's saving, R-9 (but Inspect it), R-11, Format; the owner's trial fixed (§18). 3c done (2026-11-11), the owner's request: R-42 to R-44 (§19). 3b done (2026-11-11): R-7, R-8's files changed on disk, R-10 (§20). |
-| 4 | The browser and the inspector | 4a done (2026-11-11): the browser, R-17 to R-21 (§21). The whole body in it, the compiler edited live (§22). 4b next: the inspector, R-22 to R-24 |
+| 4 | The browser and the inspector | 4a done (2026-11-11): the browser, R-17 to R-21 (§21). The whole body in it, the compiler edited live (§22). 4b done (2026-11-11): the inspector, R-22 to R-24, and R-45, `inspect` and `browse` built in (§23) |
 | 5 | Errors and the debugger | |
 | 6 | Finishing | |
 | 7 | The agent's doorway (its own spec first) | |
@@ -1176,3 +1182,48 @@ live from the browser.
 - **For the owner to check**: `ide.bat --fresh`; in the browser,
   `compiler/compiler.lisp (source)`, a helper edited and saved, then a form
   compiled that uses it; *Browse the Smalltalk* on `car`.
+
+## 23. As built: step 4b, the inspector, inspect and browse (2026-11-11)
+
+- **The `ide` procedures** (R-32, R-33): `ide-views` (a value's views as data,
+  each `#(title rows)`, a row `#(label written value)`, the value itself
+  inspectable: a list's elements from 1, an improper one's rest; a vector's and
+  a string's from 0; a symbol's name, kind, value and documentation; a
+  procedure's name, documentation, source, file and callers; a macro's expander
+  and source; a hash table's keys and values; a unit's library, path, exports
+  and imports; a condition's report, message and irritants; and a last view,
+  Value, for every value), `ide-evaluate-with-it` (R-23), `ide-inspect` (R-24)
+  and `ide-open-source` (R-45).
+- **A procedure's name** is its local one (`ide-close`, not `ide:ide-close`), so
+  its views and `browse` take the name of the cell that holds it.
+- **The window is `LispInspectorPresenter`**: each view a tab, its rows a tree
+  (a part that is a list or a vector unfolds into its own elements, so a nested
+  list is a tree), a double click inspecting a part (Back returns), and a LISP
+  evaluator below (Ctrl+D *Evaluate*, Ctrl+I *Inspect* what it answers), with
+  `it` bound to the value. *Pharo inspector* opens Pharo's own, the Smalltalk
+  door.
+- **Pharo's inspector** has a *LISP* tab first (`inspectorPresentationOrder:
+  -10`) on LISP's own kinds of value (`LispCons`, `LispSymbol`,
+  `LispProcedure`, `LispMacro`, `LispHashTable`, `LispUnit`, `LispError`): that
+  same presenter, its own LISP evaluator, Pharo's Smalltalk one turned off for
+  it (`withoutEvaluator`). Not on `Object`: Smalltalk's own objects keep
+  Pharo's tabs first. Raw and Meta stay last.
+- **The ways in**: *Inspect it* (Ctrl+I) in the editor, as Do it then its value
+  in an inspector; *Inspect* in a REPL window, on the last value (R-13's
+  "clicking a value", as a button: the transcript is a terminal's text, not
+  objects); `(inspect x)`; and the browser's callers and callees.
+- **`inspect` and `browse` are built in** (category The system), primitives the
+  IDE package installs: the runtime's `installInto:` asks `LispIde`, when it is
+  filed in, for them (`installToolsInto:`), so they are in every image built from
+  this source, at any REPL, with no `require`, and load the `ide` library the
+  first time they are called. A world is showing when `Smalltalk
+  isInteractive`; headless (a console REPL, the suites) they write.
+- **Checks**: `tests/lisp/ide-inspector.lisp` (49: each kind's views, the
+  evaluator, `inspect` and `browse` written with no world, their documentation)
+  and `tests/lisp/ide-inspector-window.lisp` (31: the tabs, the tree, diving and
+  Back, the evaluator and Inspect, Pharo's LISP tab, Inspect it in the editor and
+  Inspect in the REPL, the editor and the Smalltalk method `browse` opens);
+  `tests/lisp/ide-editor-window.lisp`'s action lists name *Inspect it*.
+- **For the owner to check**: `ide.bat --fresh`; `(inspect '(1 (2 3) "x"))`
+  and `(browse car)`, `(browse 'filter)`, `(browse 'if)` at a REPL window;
+  Ctrl+I in the editor; a LISP value in Pharo's own inspector.

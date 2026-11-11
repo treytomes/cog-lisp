@@ -440,12 +440,12 @@
          (entries (vector->list [[[[p code] actions] entries] asArray]))
          (shown (filter (lambda (a) [a isVisible]) entries)))
     (check (map (lambda (a) [[a name] asString]) shown)
-           '("Run" "Do it" "Print it" "Load file" "Interrupt" "Save" "Format"
+           '("Run" "Do it" "Print it" "Inspect it" "Load file" "Interrupt" "Save" "Format"
              "Complete" "Go to definition" "Reload from disk" "Cut" "Copy" "Paste"))
     (check (map (lambda (a) [[a name] asString]) (remove (lambda (a) [a isVisible]) entries))
-           '("run-typed" "do-it-typed" "print-it-typed" "load-file-typed" "save-typed" "format-typed"
+           '("run-typed" "do-it-typed" "print-it-typed" "inspect-it-typed" "load-file-typed" "save-typed" "format-typed"
              "complete-typed" "go-to-definition-typed" "newline" "newline-typed"))       ; Enter: a key only
-    (check (length (filter (lambda (a) [a hasShortcutKey]) entries)) 18)))  ; Rubric's own keys cut, copy, paste
+    (check (length (filter (lambda (a) [a hasShortcutKey]) entries)) 20)))  ; Rubric's own keys cut, copy, paste
 
 (define-test "R-11 a right click builds the menu: the page's actions only"
   (let* ((d (temp "cog-lisp-editor-menu"))
@@ -454,7 +454,7 @@
          (p (open-file! e f))
          (menu (on-ui [[[p code] adapter] codePaneMenu: #f shifted: #f])))
     (check (map (lambda (i) [[i contents] asString]) (vector->list [[menu items] asArray]))
-           '("Run" "Do it" "Print it" "Load file" "Interrupt" "Save" "Format"
+           '("Run" "Do it" "Print it" "Inspect it" "Load file" "Interrupt" "Save" "Format"
              "Complete" "Go to definition" "Reload from disk" "Cut" "Copy" "Paste"))
     (close! w)
     [d ensureDeleteAll]))

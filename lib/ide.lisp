@@ -36,7 +36,8 @@
           ide-indent-unit ide-indent ide-format
           ide-groups ide-group-definitions ide-definition-kind ide-browse
           ide-callers ide-callees ide-search ide-disassembly ide-write-definition
-          ide-sealed-sources))
+          ide-sealed-sources
+          ide-views ide-evaluate-with-it ide-inspect ide-open-source))
 (require 'editor-services)
 (require 'console)
 
@@ -869,3 +870,173 @@ The files whose code the image seals (the compiler's, in lib/compiler/, and the 
 
 ;; the sessions evaluating as part of a sealed source
 (define %sealed-sessions (make-hash-table eq?))
+
+;;; ---------------------------------------------------------------------------
+;;; Looking into a value (step 4b, R-22 to R-24)
+
+(define (%row label value) (vector label (%written value) value))
+
+;; at most n rows, then one saying how many more
+(define (%rows-up-to rows n)
+  (if (<= (length rows) n)
+      rows
+      (append (%take rows n)
+              (list (vector "..." (string-append (number->string (- (length rows) n)) " more") #f)))))
+
+(define (%list-view v)
+  (let loop ((l v) (i 1) (rows '()))
+    (cond ((pair? l) (loop (cdr l) (+ i 1) (cons (%row (number->string i) (car l)) rows)))
+          ((null? l) (vector "List" (%rows-up-to (reverse rows) 1000)))
+          (else (vector "List" (%rows-up-to (reverse (cons (%row "rest" l) rows)) 1000))))))   ; improper
+
+(define (%vector-view v)
+  (vector "Vector" (%rows-up-to (let loop ((i (- (vector-length v) 1)) (rows '()))
+                                  (if (< i 0) rows (loop (- i 1) (cons (%row (number->string i) (vector-ref v i)) rows))))
+                                1000)))
+
+(define (%string-view s)
+  (vector "String"
+          (cons (%row "length" (string-length s))
+                (%rows-up-to (let loop ((i (- (string-length s) 1)) (rows '()))
+                               (if (< i 0) rows (loop (- i 1) (cons (%row (number->string i) (string-ref s i)) rows))))
+                             500))))
+
+(define (%symbol-view s)
+  (let ((kind (ide-definition-kind s)))
+    (vector "Symbol"
+            (append (list (%row "name" (symbol->string s))
+                          (%row "kind" (or kind 'unbound)))
+                    (if (and kind (not (eq? kind 'special-form))) (list (%row "value" (%value-of s))) '())
+                    (let ((d (documentation s))) (if d (list (%row "documentation" d)) '()))))))
+
+(define (%name-of v)
+  (let ((n [v name])) (if (smalltalk-nil? n) #f n)))
+
+(define (%procedure-view p)
+  (let* ((name (%name-for p))
+         (b (and name (symbol? name) (ide-browse name)))
+         (src (procedure-source p)))
+    (vector "Procedure"
+            (append (list (%row "name" (or name 'anonymous)))
+                    (let ((d (and name (symbol? name) (documentation name)))) (if d (list (%row "documentation" d)) '()))
+                    (if src (list (%row "source" src)) '())
+                    (if (and b (vector-ref b 4))
+                        (list (%row "file" (vector-ref b 4)))
+                        '())
+                    (if (and name (symbol? name)) (list (%row "callers" (ide-callers name))) '())
+                    (list (%row "kind" (if (%primitive? p) 'primitive 'procedure)))))))
+
+(define (%macro-view m)
+  (let ((src (%source-of m)))
+    (vector "Macro"
+            (append (list (%row "expander" [m expander]))
+                    (if src (list (%row "source" src)) '())))))
+
+(define (%hash-table-view h)
+  (vector "Hash table"
+          (%rows-up-to (map (lambda (k) (vector (%written k) (%written (hash-table-ref h k)) (hash-table-ref h k)))
+                            (sort (hash-table-keys h) (lambda (a b) (string<? (%written a) (%written b)))))
+                       1000)))
+
+(define (%unit-view u)
+  (vector "Unit"
+          (list (%row "library" (let ((l [u library])) (if (smalltalk-nil? l) #f l)))
+                (%row "path" (let ((p [u path])) (if (smalltalk-nil? p) #f p)))
+                (%row "exports" (let ((e [u exports])) (if (smalltalk-nil? e) '() (vector->list e))))
+                (%row "imports" (map (lambda (a) (cons [a key] [a value]))
+                                     (vector->list [[[u imports] associations] asArray]))))))
+
+(define (%condition-view c)
+  (vector "Condition"
+          (list (%row "report" (condition-report c))
+                (%row "message" (error-object-message c))
+                (%row "irritants" (error-object-irritants c)))))
+
+(define (ide-views value)
+  "(ide-views value)
+What the inspector shows of value (R-22), as data: a list of views, each #(title rows), a row #(label written value), written as write writes it, value the part itself, inspectable in its turn. A list's elements, numbered from 1 (an improper list's rest last); a vector's and a string's, from 0; a symbol's name, kind, value and documentation; a procedure's name, documentation, source, file and callers; a macro's expander and source; a hash table's keys and values; a unit's library, path, exports and imports; a condition's report, message and irritants. Every value has a last view, Value: what it is written as, and its class. Long ones show their first thousand rows."
+  (append
+   (cond ((pair? value) (list (%list-view value)))
+         ((vector? value) (list (%vector-view value)))
+         ((string? value) (list (%string-view value)))
+         ((symbol? value) (list (%symbol-view value)))
+         ([value isKindOf: (smalltalk LispMacro)] (list (%macro-view value)))
+         ((procedure? value) (list (%procedure-view value)))
+         ([value isKindOf: (smalltalk LispHashTable)] (list (%hash-table-view value)))
+         ([value isKindOf: (smalltalk LispUnit)] (list (%unit-view value)))
+         ((error-object? value) (list (%condition-view value)))
+         (else '()))
+   (list (vector "Value" (list (let ((w (%written value))) (vector "written" w w))
+                               (vector "class" [[[value class] name] asString] [value class]))))))
+
+(define (ide-evaluate-with-it value text)
+  "(ide-evaluate-with-it value text)
+Evaluates text's forms with it bound to value (R-23), as the inspector's evaluator does, and answers the last form's value."
+  ((eval (read (open-input-string (string-append "(lambda (it) " text "\n)")))) value))
+
+(define (ide-inspect value)
+  "(ide-inspect value)
+Inspects value (R-24): in an inspector window when a world is showing (the development image), else by writing its views to the output port, a row a line. Answers value."
+  (if [(smalltalk LispIde) canOpenWindows]
+      [(smalltalk LispIde) inUI: (procedure->block (lambda () [(smalltalk LispInspectorPresenter) openOn: value]))]
+      (for-each (lambda (view)
+                  (display (vector-ref view 0)) (newline)
+                  (for-each (lambda (row) (display "  ") (display (vector-ref row 0)) (display ": ") (display (vector-ref row 1)) (newline))
+                            (vector-ref view 1)))
+                (ide-views value)))
+  value)
+
+;;; ---------------------------------------------------------------------------
+;;; A definition's original source, opened (browse)
+
+;; the name a value is bound to: its procedure's own name, else a cell holding it
+(define (%name-for x)
+  (if (symbol? x)
+      x
+      (let ((own (and (procedure? x)
+                      (guard (e (#t #f))
+                        (let ((n [x name]))
+                          (cond ((smalltalk-nil? n) #f)
+                                ((string? n) (string->symbol n))
+                                ((symbol? n) n)
+                                (else #f)))))))
+        (if (and own (eq? (%value-of own) x))
+            own
+            (let ((cell (find (lambda (c) (eq? [c value] x)) (%bound-cells))))
+              (and cell [cell symbol]))))))
+
+(define (%line-at path offset)
+  (let ((text (guard (e (#t #f)) (car (ide-read-file path)))))
+    (if (not text)
+        1
+        (let loop ((i 0) (line 1))
+          (if (>= i (min offset (string-length text)))
+              line
+              (loop (+ i 1) (if (eq? (string-ref text i) #\newline) (+ line 1) line)))))))
+
+(define (ide-open-source x)
+  "(ide-open-source name-or-value)
+The original source of a definition, given its name or its value, opened where it can be read and changed (what browse does): a definition in a file, in the editor at its place; a primitive, in the browser of Smalltalk, on the method that implements it; anything else bound, in the LISP browser. Without a world to open windows in, writes where it is instead. Answers the place: (path start end) for a file, (smalltalk class selector) for a primitive, (browser name) else; #f when x names nothing."
+  (let* ((name (%name-for x))
+         (b (and name (ide-browse name))))
+    (if (not b)
+        #f
+        (let* ((path (vector-ref b 4))
+               (st (vector-ref b 8))
+               (place (cond (path (list path (vector-ref b 5) (vector-ref b 6)))
+                            (st (list 'smalltalk (car st) (cadr st)))
+                            (else (list 'browser name)))))
+          (cond ((not [(smalltalk LispIde) canOpenWindows])
+                 (display name) (display ": ")
+                 (cond (path (display path) (display ":") (display (%line-at path (vector-ref b 5))))
+                       (st (display "a primitive, written in Smalltalk, in ") (display (car st)) (display ">>") (display (cadr st))
+                           (newline) (display (caddr st)))
+                       (else (display "no file holds it")))
+                 (newline))
+                (path [(smalltalk LispIde) inUI: (procedure->block
+                                                  (lambda () [(smalltalk LispIde) openEditorOn: path from: (vector-ref b 5) to: (vector-ref b 6)]))])
+                (st [(smalltalk LispIde) inUI: (procedure->block
+                                                (lambda () [(smalltalk LispIde) browseSmalltalk: (car st) selector: (cadr st)]))])
+                (else [(smalltalk LispIde) inUI: (procedure->block
+                                                  (lambda () [(smalltalk LispBrowserPresenter) openOn: name]))]))
+          place))))

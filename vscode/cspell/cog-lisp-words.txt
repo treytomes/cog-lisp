@@ -156,6 +156,7 @@ errors
 esc
 escape
 eval
+evaluate
 even
 evenp
 event
@@ -218,6 +219,7 @@ inexact
 infinite
 info
 input
+inspect
 integer
 interrupt
 interval
@@ -438,6 +440,7 @@ value
 values
 variable
 vector
+views
 wait
 walk
 when
