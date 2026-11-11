@@ -30,6 +30,7 @@ body
 boolean
 bootstrap
 boundp
+browse
 build
 busy
 caaaar
@@ -47,6 +48,8 @@ cadddr
 caddr
 cadr
 call
+callees
+callers
 cancelled
 capabilities
 capitalize
@@ -127,6 +130,7 @@ diff
 differences
 digit
 disassemble
+disassembly
 display
 documentation
 dolist
@@ -190,6 +194,8 @@ gethash
 getter
 global
 grid
+group
+groups
 guard
 handler
 hash

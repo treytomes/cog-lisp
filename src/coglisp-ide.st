@@ -26,8 +26,9 @@
    LispStyler         LISP source styled from its tokens (R-6)
    LispEditorPage     one file open in the editor (R-5 to R-9)
    LispEditorPresenter the editor: the project's files, a tab for each (R-5 to R-11)
+   LispBrowserPresenter the browser: groups, definitions, a definition (R-17 to R-21)
  ============================================================================"
-| failures cm sess sinput sresult ide replp keyq tview files styler epage editorp |
+| failures cm sess sinput sresult ide replp keyq tview files styler epage editorp brw |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -43,7 +44,8 @@ tview := (Morph << #LispTerminalView) slots: { #target. #lines. #caret. #top. #s
 files := (SpPresenter << #LispFilesPresenter) slots: { #list. #source. #runButton. #refreshButton }; package: 'CogLisp-IDE'; install.
 styler := (SHRBTextStyler << #LispStyler) slots: { #palette. #page }; package: 'CogLisp-IDE'; install.
 epage := (SpPresenter << #LispEditorPage) slots: { #code. #path. #ending. #savedText. #editor. #repl. #bottom. #problemsList. #problems. #checkGeneration. #diskText. #choices }; package: 'CogLisp-IDE'; install.
-editorp := (SpPresenter << #LispEditorPresenter) slots: { #tree. #notebook. #status. #toolbar. #pages. #tabs. #folder. #lastRun. #watching }; package: 'CogLisp-IDE'; install.
+editorp := (SpPresenter << #LispEditorPresenter) slots: { #tree. #notebook. #status. #toolbar. #pages. #tabs. #folder. #lastRun. #watching. #lastBrowser }; package: 'CogLisp-IDE'; install.
+brw := (SpPresenter << #LispBrowserPresenter) slots: { #search. #groups. #definitions. #header. #notebook. #source. #documentation. #callers. #callees. #disassembly. #saveButton. #editorButton. #status. #current. #lastEditor }; package: 'CogLisp-IDE'; install.
 keyq := (Object << #LispKeyQueue) slots: { #chars. #ready. #wanted }; package: 'CogLisp-IDE'; install.
 
 "=== LispSessionInput: lines typed for a program that reads ==================="
@@ -476,6 +478,10 @@ cm value: ide class value: 'world menu' value: 'menuCommandOn: aBuilder
 		parent: #''cog-lisp''; order: 1.5;
 		help: ''The editor, on the project: its files, a tab for each (Ctrl+S save, Ctrl+D do it, Ctrl+P print it, Ctrl+L load)'';
 		action: [LispEditorPresenter open].
+	(aBuilder item: #''Browser'')
+		parent: #''cog-lisp''; order: 1.7;
+		help: ''The browser: the libraries and built-ins, their definitions, each with its source, documentation, callers and callees'';
+		action: [LispBrowserPresenter open].
 	(aBuilder item: #''Loaded files'')
 		parent: #''cog-lisp''; order: 2;
 		help: ''The files the image has loaded: their source, and running one in a new REPL'';
@@ -1572,6 +1578,7 @@ cm value: epage value: 'knowing' value: 'goToDefinition
 	defs := self listFrom: (LispIde call: ''ide:ide-definitions'' with: { path. self text. self cursorOffset }).
 	defs isEmpty ifTrue: [| doc |
 		doc := [LispIde call: ''ide:ide-describe'' with: { path. self text. self cursorOffset }] on: Error do: [:e | false].
+		doc == false ifFalse: [editor ifNotNil: [:e | e browseNameAt: self]].
 		^ self report: (doc == false
 			ifTrue: [''no definition found'']
 			ifFalse: [''defined in the image, with no file here: '' , (self oneLine: doc)])].
@@ -1770,6 +1777,16 @@ cm value: editorp value: 'files' value: 'withPage: aBlock
 	self selectedPage
 		ifNil: [self report: ''no file is open: choose one in the tree'']
 		ifNotNil: [:p | aBlock value: p]'.
+cm value: editorp value: 'definitions' value: 'browseNameAt: aPage
+	"The browser on the name at aPage''s cursor, as the file means it (R-10)."
+	| found name |
+	found := LispIde call: ''editor-services:editor-symbol-at'' with: { aPage text. aPage cursorOffset }.
+	found == false ifTrue: [^ nil].
+	name := LispIde call: ''editor-services:editor-resolve'' with: { aPage path. found car }.
+	lastBrowser := LispBrowserPresenter openOn: name.
+	^ lastBrowser'.
+cm value: editorp value: 'definitions' value: 'lastBrowser
+	^ lastBrowser'.
 cm value: editorp value: 'definitions' value: 'indexProject
 	"The project''s files indexed for go to definition and completion, once."
 	folder ifNotNil: [:f | [LispIde call: ''ide:ide-index-project!!'' with: { f fullName }] on: Error do: [:e | nil]]'.
@@ -1819,6 +1836,208 @@ cm value: editorp value: 'reporting' value: 'statusText
 cm value: editorp value: 'reporting' value: 'report: aString
 	"The status line: what the last action did (R-42); evaluations show in the tab''s REPL."
 	status label: aString'.
+
+"=== LispBrowserPresenter: the browser (R-17 to R-21) ========================"
+cm value: brw class value: 'opening' value: 'open
+	^ self new open; yourself'.
+cm value: brw class value: 'opening' value: 'openOn: aName
+	"A browser showing the definition of the symbol aName."
+	| b |
+	b := self new.
+	b open.
+	b browse: aName.
+	^ b'.
+cm value: brw value: 'initialization' value: 'initializePresenters
+	search := self newTextInput.
+	search placeholder: ''Search names and documentation, then Enter''.
+	search whenSubmitDo: [:text | self search: text].
+	groups := self newList.
+	groups display: [:g | self groupLabel: g].
+	groups whenSelectionChangedDo: [:selection | selection selectedItem ifNotNil: [:g | self showGroup: g]].
+	definitions := self newList.
+	definitions display: [:d | self definitionLabel: d].
+	[definitions displayColor: [:d | (d at: 3) == false ifTrue: [Color gray] ifFalse: [self theme textColor]]] on: Error do: [:e | nil].
+	definitions whenSelectionChangedDo: [:selection | selection selectedItem ifNotNil: [:d | self show: (d at: 1)]].
+	header := self newLabel.
+	source := self newCode.
+	source beNotWrapWord.
+	source overrideContextMenu: true.
+	LispStyler installOn: source.
+	source addActionWith: [:a | a name: ''Save''; shortcutKey: (KeyboardKey named: ''S'') asKeyCombination actionModifier; action: [self saveDefinition]].
+	source addActionWith: [:a | a name: ''save-typed''; shortcutKey: $s actionModifier; beShortcutOnly; action: [self saveDefinition]].
+	documentation := self newText.
+	documentation beNotEditable; beNotWrapWord.
+	callers := self newList.
+	callers display: [:n | n name].
+	callers whenActivatedDo: [:selection | selection selectedItem ifNotNil: [:n | self browse: n]].
+	callees := self newList.
+	callees display: [:n | n name].
+	callees whenActivatedDo: [:selection | selection selectedItem ifNotNil: [:n | self browse: n]].
+	disassembly := self newText.
+	disassembly beNotEditable; beNotWrapWord.
+	notebook := self newNotebook.
+	{ ''Source'' -> source. ''Documentation'' -> documentation. ''Callers'' -> callers.
+	  ''Callees'' -> callees. ''Disassembly'' -> disassembly } do: [:each |
+		notebook addPage: (SpNotebookPage title: each key provider: [each value])].
+	saveButton := self newButton.
+	saveButton label: ''Save''; help: ''Write the definition into its file, save it, and evaluate it (Ctrl+S)''; action: [self saveDefinition]; disable.
+	editorButton := self newButton.
+	editorButton label: ''Open in editor''; help: ''Open its file in the editor, at the definition''; action: [self openInEditor]; disable.
+	status := self newLabel.
+	groups items: (self listFrom: (LispIde call: ''ide:ide-groups'' with: #()))'.
+cm value: brw value: 'initialization' value: 'defaultLayout
+	^ SpBoxLayout newTopToBottom
+		add: search expand: false;
+		add: (SpPanedLayout newLeftToRight
+			positionOfSlider: 0.2;
+			add: groups;
+			add: (SpPanedLayout newLeftToRight
+				positionOfSlider: 0.3;
+				add: definitions;
+				add: (SpBoxLayout newTopToBottom
+					add: (SpBoxLayout newLeftToRight
+						add: header;
+						add: saveButton expand: false;
+						add: editorButton expand: false;
+						yourself) expand: false;
+					add: notebook;
+					yourself);
+				yourself);
+			yourself);
+		add: status expand: false;
+		yourself'.
+cm value: brw value: 'initialization' value: 'initializeWindow: aWindowPresenter
+	aWindowPresenter title: ''cog-lisp browser''; initialExtent: 1100 @ 700'.
+
+cm value: brw value: 'accessing' value: 'listFrom: aList
+	| items l |
+	items := OrderedCollection new.
+	l := aList.
+	[l isKindOf: LispCons] whileTrue: [items add: l car. l := l cdr].
+	^ items asArray'.
+cm value: brw value: 'accessing' value: 'groupNames
+	^ groups items collect: [:g | g at: 1]'.
+cm value: brw value: 'accessing' value: 'definitionNames
+	"The definitions listed, as their full names."
+	^ definitions items collect: [:d | (d at: 1) name]'.
+cm value: brw value: 'accessing' value: 'current
+	"The definition shown: ide-browse''s record, or nil."
+	^ current'.
+cm value: brw value: 'accessing' value: 'headerText
+	^ header label asString'.
+cm value: brw value: 'accessing' value: 'sourceText
+	^ source text asString'.
+cm value: brw value: 'accessing' value: 'sourceText: aString
+	source text: aString'.
+cm value: brw value: 'accessing' value: 'documentationText
+	^ documentation text asString'.
+cm value: brw value: 'accessing' value: 'callerNames
+	^ callers items collect: [:n | n name]'.
+cm value: brw value: 'accessing' value: 'calleeNames
+	^ callees items collect: [:n | n name]'.
+cm value: brw value: 'accessing' value: 'disassemblyText
+	^ disassembly text asString'.
+cm value: brw value: 'accessing' value: 'statusText
+	^ status label asString'.
+cm value: brw value: 'accessing' value: 'lastEditor
+	"The editor Open in editor last used."
+	^ lastEditor'.
+cm value: brw value: 'accessing' value: 'groupLabel: aGroup
+	^ (aGroup at: 2) name = ''library''
+		ifTrue: [(aGroup at: 1) , ''  (library)'']
+		ifFalse: [aGroup at: 1]'.
+cm value: brw value: 'accessing' value: 'definitionLabel: anEntry
+	"Its name (a library''s own without the library''s prefix), and its kind."
+	| name colon kind |
+	name := (anEntry at: 1) name.
+	colon := name indexOf: $:.
+	(colon > 0 and: [groups selectedItem notNil and: [(groups selectedItem at: 2) name = ''library'']])
+		ifTrue: [name := name copyFrom: colon + 1 to: name size].
+	kind := (anEntry at: 2) == false ifTrue: [''unbound''] ifFalse: [((anEntry at: 2) name copyReplaceAll: ''-'' with: '' '')].
+	^ name , ''   '' , kind'.
+
+cm value: brw value: 'browsing' value: 'showGroup: aGroup
+	definitions items: (self listFrom: (LispIde call: ''ide:ide-group-definitions'' with: { aGroup at: 1. aGroup at: 2 }))'.
+cm value: brw value: 'browsing' value: 'selectGroupNamed: aString
+	(groups items detect: [:g | (g at: 1) = aString] ifNone: [nil])
+		ifNotNil: [:g | groups selectItem: g]'.
+cm value: brw value: 'browsing' value: 'selectDefinition: aName
+	(definitions items detect: [:d | (d at: 1) == aName] ifNone: [nil])
+		ifNotNil: [:d | definitions selectItem: d]'.
+cm value: brw value: 'browsing' value: 'groupOf: aName
+	"The name of the group aName is listed in."
+	| s colon category |
+	s := aName name.
+	colon := s indexOf: $:.
+	colon > 0 ifTrue: [^ s copyFrom: 1 to: colon - 1].
+	category := [LispIde call: ''documentation-category'' with: { aName }] on: Error do: [:e | false].
+	(category isString and: [self groupNames includes: category]) ifTrue: [^ category].
+	^ ''programs'''.
+cm value: brw value: 'browsing' value: 'browse: aName
+	"aName shown, with its group and its place in the group''s list when it has one."
+	self selectGroupNamed: (self groupOf: aName).
+	self selectDefinition: aName.
+	(current notNil and: [(current at: 1) == aName]) ifFalse: [
+		definitions items: { { aName. LispIde call: ''ide:ide-definition-kind'' with: { aName }. true } }.
+		self selectDefinition: aName]'.
+cm value: brw value: 'browsing' value: 'search: aString
+	"The names and documentation holding aString (R-19), in place of the group''s list."
+	| found |
+	aString trimBoth isEmpty ifTrue: [^ self].
+	found := self listFrom: (LispIde call: ''ide:ide-search'' with: { aString trimBoth }).
+	groups unselectAll.
+	definitions items: (found collect: [:n | { n. LispIde call: ''ide:ide-definition-kind'' with: { n }. true }]).
+	status label: found size printString , '' found for '' , aString trimBoth printString'.
+cm value: brw value: 'browsing' value: 'show: aName
+	"A definition: its header, source, documentation, callers, callees and disassembly."
+	| b path text dis |
+	b := LispIde call: ''ide:ide-browse'' with: { aName }.
+	b == false ifTrue: [current := nil. ^ status label: aName name , '' is not bound''].
+	current := b.
+	path := (b at: 5) == false ifTrue: [nil] ifFalse: [b at: 5].
+	text := path ifNil: [nil] ifNotNil: [:p | [(LispIde call: ''ide:ide-read-file'' with: { p }) car] on: Error do: [:e | nil]].
+	header label: aName name , '' -- '' , ((b at: 2) name copyReplaceAll: ''-'' with: '' '') ,
+		(path ifNil: [''''] ifNotNil: [:p |
+			''   '' , p asFileReference basename , '':'' ,
+			(text ifNil: [''?''] ifNotNil: [:t | (((t copyFrom: 1 to: ((b at: 6) min: t size)) occurrencesOf: Character lf) + 1) printString])]) ,
+		((b at: 8) == true ifTrue: [''   (its file has changed since: stale)''] ifFalse: ['''']).
+	source text: ((b at: 4) isString
+		ifTrue: [b at: 4]
+		ifFalse: [(text notNil and: [(b at: 6) isInteger])
+			ifTrue: [text copyFrom: (b at: 6) + 1 to: ((b at: 7) min: text size)]
+			ifFalse: [''; '' , aName name , '': '' , ((b at: 2) name copyReplaceAll: ''-'' with: '' '') , '', with no source in the image'']]).
+	documentation text: ((b at: 3) isString ifTrue: [b at: 3] ifFalse: [''(no documentation)'']).
+	callers items: (self listFrom: (LispIde call: ''ide:ide-callers'' with: { aName })).
+	callees items: (self listFrom: (LispIde call: ''ide:ide-callees'' with: { aName })).
+	dis := LispIde call: ''ide:ide-disassembly'' with: { aName }.
+	disassembly text: (dis isString ifTrue: [dis] ifFalse: [''(no compiled code: a special form or a variable)'']).
+	path ifNil: [saveButton disable. editorButton disable] ifNotNil: [:p | saveButton enable. editorButton enable].
+	status label: '''''.
+
+cm value: brw value: 'editing' value: 'saveDefinition
+	"Save: the source written into its file, saved and evaluated (R-20); when the file
+	 no longer holds it there, the file opened in the editor instead."
+	| name r |
+	current ifNil: [^ status label: ''nothing is shown''].
+	name := current at: 1.
+	r := [LispIde call: ''ide:ide-write-definition'' with: { name. self sourceText }]
+		on: Error do: [:e | ^ status label: (LispError describe: e)].
+	r == false ifTrue: [
+		self openInEditor.
+		^ status label: ''its file has changed since it was compiled: opened in the editor, not written''].
+	self show: name.
+	(r at: 1) name = ''error''
+		ifTrue: [status label: ''saved; evaluating it failed: '' , (r at: 5)]
+		ifFalse: [status label: ''saved to '' , (current at: 5) asFileReference basename , '' and evaluated'']'.
+cm value: brw value: 'editing' value: 'openInEditor
+	"Its file in the editor (reused while its window is open), the definition selected."
+	| page |
+	(current isNil or: [(current at: 5) == false]) ifTrue: [^ status label: ''no file holds it''].
+	(lastEditor notNil and: [lastEditor window notNil and: [lastEditor window isOpen]])
+		ifFalse: [lastEditor := LispEditorPresenter new. lastEditor open].
+	page := lastEditor openFile: (current at: 5).
+	(current at: 6) isInteger ifTrue: [page selectFrom: (current at: 6) to: (current at: 7)].
+	^ page'.
 
 "the development image takes its requests when it starts in the GUI (R-37)"
 SessionManager default registerUserClassNamed: #LispIde.

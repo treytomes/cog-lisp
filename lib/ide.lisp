@@ -33,7 +33,9 @@
           change-before ide-project-files ide-read-file ide-save-file ide-undo-change
           ide-form-at ide-file-session ide-load-file
           ide-check ide-describe ide-complete ide-definitions ide-index-project!
-          ide-indent-unit ide-indent ide-format))
+          ide-indent-unit ide-indent ide-format
+          ide-groups ide-group-definitions ide-definition-kind ide-browse
+          ide-callers ide-callees ide-search ide-disassembly ide-write-definition))
 (require 'editor-services)
 (require 'console)
 
@@ -535,3 +537,252 @@ text laid out by format-source, indented as text indents (ide-indent-unit): with
     (if (string=? unit (string #\tab))
         (format-source:format-source text)
         (format-source:format-source text 'spaces (string-length unit)))))
+
+;;; ---------------------------------------------------------------------------
+;;; The body, as the browser reads it (step 4a, R-17 to R-21)
+
+;; the reference's categories, in its order (tools/docs.lisp)
+(define %categories
+  '("Special forms" "Derived forms" "Equality and types" "Numbers" "Lists"
+    "Characters" "Strings" "Vectors" "Hash tables" "Control"
+    "Conditions and restarts" "Evaluation and macros" "Output" "Ports" "Files" "Network"
+    "The system" "Smalltalk interop" "Language server" "The compiler and reader"))
+
+(define (%env) [(smalltalk LispEnvironment) default])
+
+(define (%bound-cells)
+  (let ((acc '()))
+    [(%env) cellsDo: (lambda (cell) (when [cell isBound] (set! acc (cons cell acc))))]
+    acc))
+
+(define (%value-of name) (and [(%env) isBound: name] [(%env) lookup: name]))
+
+(define (%qualified? s) (and (string-index s #\:) #t))
+
+(define (%take l n) (if (or (null? l) (= n 0)) '() (cons (car l) (%take (cdr l) (- n 1)))))
+
+(define (%sort-names names)
+  (sort names (lambda (a b) (string<? (symbol->string a) (symbol->string b)))))
+
+;; the procedure behind a value: itself, or a macro's expander
+(define (%procedure-of v)
+  (cond ([v isKindOf: (smalltalk LispMacro)] [v expander])
+        ((procedure? v) v)
+        (else #f)))
+
+(define (%source-of v)
+  (let ((p (%procedure-of v)))
+    (and p (procedure-source p))))
+
+;; a procedure installed by Smalltalk (a primitive) has its block in a method of
+;; a class; one cog-lisp compiled, in a method of no class (a doIt)
+(define (%primitive? p)
+  (guard (e (#t #f))
+    (let ((cls [[[[p block] compiledBlock] method] methodClass]))
+      (not (eq? cls (smalltalk UndefinedObject))))))
+
+(define (ide-definition-kind name)
+  "(ide-definition-kind name)
+What the symbol name is in the image: special-form, macro, syntax (a define-syntax macro), primitive (installed by Smalltalk), procedure, or variable; #f when it is not bound."
+  (if (memq name (special-form-names))
+      'special-form
+      (let ((v (%value-of name)))
+        (cond ((not [(%env) isBound: name]) #f)
+              ([v isKindOf: (smalltalk LispMacro)]
+               (let ((s (%source-of v))) (if (and s (string-prefix? "(define-syntax" s)) 'syntax 'macro)))
+              ((procedure? v) (if (%primitive? v) 'primitive 'procedure))
+              (else 'variable)))))
+
+;; the built-in names in a category, special forms among them
+(define (%category-names category)
+  (let ((acc (if (string=? category "Special forms") (special-form-names) '())))
+    (for-each (lambda (cell)
+                (let* ((name [cell symbol]) (s (symbol->string name)))
+                  (when (and (not (%qualified? s)) (not (memq name (special-form-names)))
+                             (equal? (documentation-category name) category))
+                    (set! acc (cons name acc)))))
+              (%bound-cells))
+    (%sort-names acc)))
+
+;; the globals programs defined: unqualified, not built in
+(define (%program-names)
+  (%sort-names
+   (filter-map (lambda (cell)
+                 (let* ((name [cell symbol]) (s (symbol->string name)))
+                   (and (not (%qualified? s)) (not (memq name (special-form-names)))
+                        (not [(smalltalk LispUnit) isBuiltin: name])
+                        name)))
+               (%bound-cells))))
+
+(define (ide-groups)
+  "(ide-groups)
+The groups the browser lists (R-17), each #(name kind): the built-in categories that have names, in the reference's order (kind category); the loaded libraries, by name (kind library); and programs (kind programs), the globals programs have defined, when there are any."
+  (append
+   (filter-map (lambda (c) (and (pair? (%category-names c)) (vector c 'category))) %categories)
+   (map (lambda (name) (vector name 'library))
+        (sort (map (lambda (u) (symbol->string [u library])) (vector->list [[(smalltalk LispUnit) libraries] asArray]))
+              string<?))
+   (if (pair? (%program-names)) (list (vector "programs" 'programs)) '())))
+
+(define (ide-group-definitions name kind)
+  "(ide-group-definitions name kind)
+The definitions in a group of ide-groups, each #(name kind exported?): name the full symbol, kind ide-definition-kind's, exported? whether a library exports it (#t outside libraries). A library's exports come first, then its private names, each by name."
+  (case kind
+    ((category) (map (lambda (n) (vector n (ide-definition-kind n) #t)) (%category-names name)))
+    ((programs) (map (lambda (n) (vector n (ide-definition-kind n) #t)) (%program-names)))
+    ((library)
+     (let* ((unit [(smalltalk LispUnit) libraryNamed: (string->symbol name)])
+            (exports (map symbol->string (vector->list [unit exports])))
+            (prefix (string-append name ":"))
+            (names (%sort-names
+                    (filter-map (lambda (cell)
+                                  (let ((s (symbol->string [cell symbol])))
+                                    (and (string-prefix? prefix s) [cell symbol])))
+                                (%bound-cells))))
+            (local (lambda (n) (substring (symbol->string n) (string-length prefix) (string-length (symbol->string n)))))
+            (exported? (lambda (n) (and (member (local n) exports) #t))))
+       (map (lambda (n) (vector n (ide-definition-kind n) (exported? n)))
+            (append (filter exported? names) (remove exported? names)))))
+    (else (error "ide-group-definitions: no such kind of group" kind))))
+
+;; the files a name's definition may be in: its library's; the files the image
+;; has loaded; cog-lisp's own built-in sources
+(define (%candidate-files name)
+  (let* ((s (symbol->string name))
+         (colon (string-index s #\:))
+         (library (and colon [(smalltalk LispUnit) libraryNamed: (string->symbol (substring s 0 colon))]))
+         (home (hash-table-ref/default *env* 'home #f))
+         (builtins (if home
+                       (append (map (lambda (f) (string-append home "/lib/" f ".lisp")) '("core" "format" "json" "http" "coverage"))
+                               (filter-map (lambda (e) (and [[e basename] endsWith: ".lisp"] [e fullName]))
+                                           (guard (x (#t '())) (vector->list [[[(string-append home "/lib/compiler") asFileReference] files] asArray]))))
+                       '())))
+    (if (and library (not (smalltalk-nil? library)) (not (smalltalk-nil? [library path])))
+        (list [library path])
+        (append (filter-map (lambda (u) (let ((p [u path])) (and (not (smalltalk-nil? p)) p)))
+                            (vector->list [[(smalltalk LispUnit) units] asArray]))
+                builtins))))
+
+;; where name is defined: (path start end stale?), or #f
+(define (%place-of name source)
+  (let* ((s (symbol->string name))
+         (colon (string-index s #\:))
+         (local (if colon (substring s (+ colon 1) (string-length s)) s))
+         (named #f))
+    (let loop ((files (%candidate-files name)))
+      (if (null? files)
+          (and named (append named (list (and source #t))))      ; found by name only: stale if it had a text
+          (let* ((path (car files))
+                 (text (guard (e (#t #f)) (car (ide-read-file path))))
+                 (defs (if text (filter (lambda (d) (string=? (definition-name d) local)) (editor-definitions text path)) '())))
+            (cond ((null? defs) (loop (cdr files)))
+                  ((and source (string-search text source))
+                   => (lambda (at) (list path at (+ at (string-length source)) #f)))
+                  (else
+                   (unless named (set! named (list path (definition-start (car defs)) (definition-end (car defs)))))
+                   (if source (loop (cdr files)) (list path (definition-start (car defs)) (definition-end (car defs)) #f)))))))))
+
+(define (ide-browse name)
+  "(ide-browse name)
+A definition as the browser shows it (R-17, R-21): #(name kind documentation source path start end stale?). documentation and source are strings or #f (a built-in compiled by the seed keeps no source); path, start and end (character offsets from 0, in the file's text with line feeds) say where it is, or are #f; stale? is #t when its file no longer holds the text it was compiled from. #f when name is not bound."
+  (let ((kind (ide-definition-kind name)))
+    (and kind
+         (let* ((v (and (not (eq? kind 'special-form)) (%value-of name)))
+                (source (and v (%source-of v)))
+                (place (%place-of name source)))
+           (vector name kind (documentation name) source
+                   (and place (car place)) (and place (cadr place)) (and place (caddr place))
+                   (and place (cadddr place)))))))
+
+;; the compiled code of a value: its procedure's block and the blocks inside it
+(define (%codes-of v)
+  (let ((p (%procedure-of v)))
+    (if (not p)
+        '()
+        (let walk ((code (guard (e (#t #f)) [[p block] compiledBlock])) (acc '()))
+          (if (not code)
+              acc
+              (fold (lambda (lit acc)
+                      (cond ([lit isKindOf: (smalltalk CompiledBlock)] (walk lit acc))
+                            ([lit isKindOf: (smalltalk BlockClosure)] (walk [lit compiledBlock] acc))
+                            (else acc)))
+                    (cons code acc)
+                    (vector->list [code literals])))))))
+
+;; the names a value's code names: its global cells, and the symbols an inlined
+;; call guards with (R-18)
+(define (%names-used v)
+  (delete-duplicates
+   (append-map (lambda (code)
+                 (filter-map (lambda (lit)
+                               (cond ([lit isKindOf: (smalltalk LispGlobal)] [lit symbol])
+                                     ((symbol? lit) lit)
+                                     (else #f)))
+                             (vector->list [code literals])))
+               (%codes-of v))
+   eq?))
+
+(define (ide-callers name)
+  "(ide-callers name)
+The bound names whose compiled code names name (R-18): procedures and macros that call it or read it, built-ins included, found from their code's literals as Pharo finds senders (a quoted symbol of that name counts too). Sorted."
+  (%sort-names
+   (filter-map (lambda (cell)
+                 (let ((n [cell symbol]))
+                   (and (not (eq? n name))
+                        (%procedure-of [cell value])
+                        (memq name (%names-used [cell value]))
+                        n)))
+               (%bound-cells))))
+
+(define (ide-callees name)
+  "(ide-callees name)
+The bound names name's compiled code names (R-18): what it calls and reads, from its code's literals. Sorted; () for a special form or a variable."
+  (let ((v (and (not (memq name (special-form-names))) (%value-of name))))
+    (if (not v)
+        '()
+        (%sort-names (filter (lambda (n) (and (not (eq? n name)) [(%env) isBound: n])) (%names-used v))))))
+
+(define (ide-search text)
+  "(ide-search text)
+The names bound in the image, special forms among them, whose name or documentation holds text, ignoring case (R-19): those matching by name first, each part by name. At most 300."
+  (let* ((needle (string-downcase text))
+         (names (append (special-form-names) (map (lambda (c) [c symbol]) (%bound-cells))))
+         (in-name (filter (lambda (n) (string-search (string-downcase (symbol->string n)) needle)) names))
+         (in-doc (filter (lambda (n) (and (not (memq n in-name))
+                                          (let ((d (documentation n))) (and d (string-search (string-downcase d) needle)))))
+                         names))
+         (all (append (%sort-names (delete-duplicates in-name eq?)) (%sort-names (delete-duplicates in-doc eq?)))))
+    (%take all 300)))
+
+(define (ide-disassembly name)
+  "(ide-disassembly name)
+The bytecode of name's compiled code as text, each block after its own heading, one bytecode a line; #f for a special form or a variable."
+  (let ((v (and (not (memq name (special-form-names))) (%value-of name))))
+    (and v (%procedure-of v)
+         (with-output-to-string
+          (lambda ()
+            (let loop ((codes (reverse (%codes-of v))) (k 0))
+              (when (pair? codes)
+                (display (if (= k 0) "; the procedure" (string-append "; block " (number->string k))))
+                (newline)
+                (vector-for-each (lambda (b) (display "  ") (display [b printString]) (newline))
+                                 [[[(car codes) symbolicBytecodes] asArray] copy])
+                (loop (cdr codes) (+ k 1)))))))))
+
+(define (ide-write-definition name text . options)
+  "(ide-write-definition name text option ...)
+Edits a definition from the browser (R-20): writes text in place of name's definition in its file, saves the file (recorded as a save, undoable) and evaluates text as part of the file, answering the result (as ide-eval does). #f, writing nothing, when the file no longer holds the definition's text there (its place is stale), for the window to open the file in the editor instead. An error when name has no file. Options: maker (person or agent; person)."
+  (let* ((b (ide-browse name))
+         (path (and b (vector-ref b 4))))
+    (cond ((not path) (error "ide-write-definition: no file holds" name))
+          ((vector-ref b 7) #f)
+          (else
+           (let* ((maker (%option options 'maker 'person))
+                  (file (car (ide-read-file path)))
+                  (updated (string-append (substring file 0 (vector-ref b 5)) text
+                                          (substring file (vector-ref b 6) (string-length file)))))
+             (ide-save-file path updated 'session "browser" 'maker maker)
+             (let* ((s (ide-file-session path 'maker maker))
+                    (r (ide-eval s text)))
+               (if (eq? (result-status r) 'error) (ide-eval s "(abort)"))
+               r))))))

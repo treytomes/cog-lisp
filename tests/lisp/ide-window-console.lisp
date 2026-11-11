@@ -254,11 +254,11 @@
       [[repl window] close])
     [w close]))
 
-(define-test "R-41 one cog-lisp menu: New REPL, Editor, Loaded files, Update"
+(define-test "R-41 one cog-lisp menu: New REPL, Editor, Browser, Loaded files, Update"
   (let* ((spec [[(smalltalk PragmaMenuBuilder) pragmaKeyword: ["worldMenu" asSymbol] model: (smalltalk-nil)] menuSpec])
          (item [[spec items] detect: (lambda (i) [[i label] = "cog-lisp"]) ifNone: (lambda () #f)]))
     (check-true (and item #t))
     (check (map (lambda (i) [[i label] asString]) (vector->list [[[item subMenu] items] asArray]))
-           '("New REPL" "Editor" "Loaded files" "Update the image from the checkout"))))
+           '("New REPL" "Editor" "Browser" "Loaded files" "Update the image from the checkout"))))
 
 (run-tests)

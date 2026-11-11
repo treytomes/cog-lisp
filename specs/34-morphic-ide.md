@@ -401,10 +401,15 @@ Item 6 is answered already.
   into its file, at its place, saves and evaluates it, when the file still
   holds the same text there; otherwise it opens the file in the editor at that
   place instead.
-- **R-21. Where a definition is.** A procedure, a macro and a global variable
-  record their unit's path and the start and end of their source text, so the
-  browser and go-to-definition reach the file and the place. (`LispProcedure`
-  gains a slot: a class-shape change, subject to the seed rule, §10.)
+- **R-21. Where a definition is.** The browser and go to definition reach a
+  definition's file and its place. As built (step 4a), no slot is added, so the
+  seed rule (§10) is not met: the place is found. A library's name is looked
+  for in its unit's file; any other in the files the image has loaded (its
+  units' paths), then in cog-lisp's own built-in sources (`lib/`); in each
+  file, among its top-level definitions, by its name; a procedure's retained
+  source text, when it has one, picks the definition and its exact place, and a
+  definition whose file no longer holds its text is marked stale (§10, the image
+  and the files drift).
 
 ### 5.6 The inspector
 
@@ -541,7 +546,8 @@ its windows.
    full rendering in a window (R-39).
 3. **The editor** (R-5 to R-11).
 4. **The browser and the inspector** (R-17 to R-24), with the definitions'
-   places (R-21).
+   places (R-21): 4a the browser (R-17 to R-21), 4b the inspector (R-22 to
+   R-24).
 5. **Errors and the debugger** (R-25), with 11.5's backtrace.
 6. **Finishing**: Spotter, the theme (dark, as the site is), settings, the
    manual's chapter "Developing in the image".
@@ -701,7 +707,7 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 | 1 | The spike (§4.1); the editor services (R-29, R-30) | Done (2026-11-10): `lib/editor-services.lisp` and `tests/lisp/editor-services.lisp` (62 checks); the language server on it, its 31 checks and VS Code's 5 offline and 12 with the server passing unchanged |
 | 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c done (2026-11-11): R-39 (§16). 2d done (2026-11-11), the owner's trial of 2c: R-40, R-41 (§17) |
 | 3 | The editor | 3a done (2026-11-11): R-5, R-6, R-8's saving, R-9 (but Inspect it), R-11, Format; the owner's trial fixed (§18). 3c done (2026-11-11), the owner's request: R-42 to R-44 (§19). 3b done (2026-11-11): R-7, R-8's files changed on disk, R-10 (§20). |
-| 4 | The browser and the inspector | |
+| 4 | The browser and the inspector | 4a done (2026-11-11): the browser, R-17 to R-21 (§21). 4b next: the inspector, R-22 to R-24 |
 | 5 | Errors and the debugger | |
 | 6 | Finishing | |
 | 7 | The agent's doorway (its own spec first) | |
@@ -1074,3 +1080,48 @@ and Ctrl+L hard to find; R-42 to R-44 were added for it.
   seeing it underlined; Ctrl+Space and Ctrl+B on a real keyboard, and the
   completion list's keys (arrows, Enter); a file changed in VS Code while open
   in the editor.
+
+## 21. As built: step 4a, the browser (2026-11-11)
+
+- **The `ide` procedures** (R-32), each answering data: `ide-groups` (the
+  built-in categories that have names, in the reference's order; the loaded
+  libraries; programs), `ide-group-definitions` (`#(name kind exported?)`, a
+  library's exports first), `ide-definition-kind` (special-form, macro,
+  syntax, primitive, procedure, variable), `ide-browse` (`#(name kind
+  documentation source path start end stale?)`), `ide-callers`,
+  `ide-callees`, `ide-search`, `ide-disassembly` and `ide-write-definition`.
+- **Kinds.** A primitive is a procedure whose block is in a method of a class
+  (`LispPrimitives`' installers: `map` is one); one cog-lisp compiled is in a
+  method of none. A syntax is a macro whose source starts with
+  `(define-syntax`. Built-ins the seed compiled keep no source (`filter`), so
+  the browser shows their text from the file.
+- **Places** (R-21, as amended): found, not recorded, so `LispProcedure`'s shape
+  is unchanged and the seed rule is not met. A procedure's retained source picks
+  its definition and its exact place; one whose file no longer holds that text
+  is stale, and the browser says so.
+- **Callers and callees** (R-18): the global cells in a procedure's code and its
+  blocks' (a macro's expander's), and the symbols an inlined call to a built-in
+  guards with (`*` is inlined, behind a check of its symbol), as Pharo's senders
+  count symbol literals; a quoted symbol of that name counts too.
+- **Disassembly**: `symbolicBytecodes` of each piece of code, the procedure's,
+  then each block's, which prints a nested block without the source lookup
+  that `symbolic` fails on.
+- **The window is `LispBrowserPresenter`** (the `cog-lisp` menu's *Browser*): a
+  search field (Enter searches names, then documentation); the groups; their
+  definitions, each with its kind, private names dimmed; the definition, with
+  its header (name, kind, file and line, stale), *Save* and *Open in editor*,
+  and tabs for its source (styled, editable), documentation, callers, callees
+  (each opened by a double click) and disassembly. *Save* (Ctrl+S) is R-20:
+  written into its file, saved and evaluated in the file's unit, recorded; a
+  stale definition is opened in the editor, not written.
+- **The editor's go to definition** on a built-in with no file opens the
+  browser on it, as the file means the name (R-10).
+- **Checks**: `tests/lisp/ide-browser.lisp` (45: groups, a library's and the
+  programs' definitions, kinds, places by text and by name, stale, callers and
+  callees, built-ins included, search by name and documentation, disassembly,
+  writing back recorded and refused when stale) and
+  `tests/lisp/ide-browser-window.lisp` (27); the console suite's menu check
+  names *Browser*.
+- **For the owner to check**: `ide.bat --fresh`; the browser from the
+  `cog-lisp` menu; a definition edited and saved there, then the file in the
+  editor; Ctrl+B on `car` in the editor.
