@@ -60,6 +60,18 @@
     (check (vector->list [[(smalltalk LispIde) takeRequestsIn: [[dir / "none"] fullName]] asArray]) '())
     [dir ensureDeleteAll]))
 
+(define-test "quitting, a development image removes its heartbeat; saving, it keeps it"
+  (let ((beat [[(smalltalk Smalltalk) imageDirectory] / "heartbeat"])
+        (pool [(smalltalk LispIde) classPool]))
+    [beat writeStreamDo: (procedure->block (lambda (s) [s nextPutAll: "now"]))]
+    [pool at: ["Watcher" asSymbol] put: [(procedure->block (lambda () #f)) newProcess]]
+    [(smalltalk LispIde) shutDown: #f]                          ; a save: kept
+    (check-true [beat exists])
+    [(smalltalk LispIde) shutDown: #t]                          ; quitting: gone
+    (check-false [beat exists])
+    (check-true (smalltalk-nil? [pool at: ["Watcher" asSymbol]]))
+    [beat ensureDelete]))
+
 (define-test "the start-up hook does nothing in a headless run"
   ;; a build and every suite start headless: no watcher, no window
   [(smalltalk LispIde) startUp: #t]

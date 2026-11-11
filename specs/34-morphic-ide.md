@@ -863,3 +863,18 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
   `fetch`'s city list, the menu, and *Loaded files*, in a fresh development
   image (`ide.bat --fresh`): the window's class changed shape, which an update
   in place carries badly into windows already open.
+- **Found by the owner in the fresh image** (2026-11-11), and fixed:
+  - typing worked, but the arrows, Backspace, Delete and the Ctrl combinations
+    did not: a key that types no character arrives only as a key down, which
+    the pane ignored. `LispTerminalView` now takes those, and Ctrl with a
+    letter, on key down (by their `KeyboardKey`: `keyValueFor:`, `letterOf:`;
+    a letter key is named by its capital, `#C`), and suppresses the key press
+    that may follow, so nothing happens twice; typed characters still come as
+    key presses. Ctrl+Left and Ctrl+Right move a word.
+  - `ide.bat` with no argument failed ("The syntax of the command is
+    incorrect"): `%FIRST:~0,1%` of an undefined variable garbles its line; it
+    reads `!FIRST:~0,1!` now. With no request, a running image now opens a new
+    REPL window, so the launcher's call shows.
+  - a closed image's heartbeat looked fresh for ten seconds, so `--fresh` just
+    after closing refused: quitting, the image removes its heartbeat
+    (`LispIde class>>shutDown:`).

@@ -535,6 +535,13 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **Never inject clicks or keys into the GUI while the owner is at the
   machine**: Windows will not bring Pharo forward over the window in use, so
   they land in the owner's window instead.
+- **Keys without a character (arrows, Backspace, Delete, Home, End) and Ctrl
+  combinations arrive only as key-down events**; typed characters as key
+  presses. A morph that takes keys handles both (`handlesKeyDown:`), and
+  suppresses the key press after one it handled (`supressNextKeyPress:`).
+- **In a batch file, `%VAR:~0,1%` of an undefined variable garbles the whole
+  line** ("The syntax of the command is incorrect"): use delayed expansion,
+  `!VAR:~0,1!`, and test every script with no arguments too.
 - **A `start`ed `Pharo.exe` inherits the caller's pipes**: `ide.bat ... | grep`
   never ends while the image runs. Run the launchers without a pipe.
 - **`removeStaleFrom:` reads `src/` beside the image's folder** unless given

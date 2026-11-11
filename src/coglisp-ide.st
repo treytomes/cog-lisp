@@ -336,6 +336,13 @@ cm value: ide class value: 'development image' value: 'startUp: resuming
 	 a build, does nothing here."
 	(resuming and: [Smalltalk isInteractive and: [(Smalltalk imageDirectory / ''requests'') exists]])
 		ifTrue: [[self startInGui] forkAt: Processor userBackgroundPriority]'.
+cm value: ide class value: 'development image' value: 'shutDown: quitting
+	"Quitting, a development image removes its heartbeat, so a launcher does not take
+	 it for running for the ten seconds after (R-37)."
+	(quitting and: [Watcher notNil]) ifTrue: [
+		Watcher terminate.
+		Watcher := nil.
+		[(Smalltalk imageDirectory / ''heartbeat'') ensureDelete] on: Error do: [:e | nil]]'.
 cm value: ide class value: 'development image' value: 'startEnvironment
 	"*env* as a program run has it. The launchers set COGLISP_HOME; without it the
 	 cog-lisp folder is the one above pharo/ide/."
@@ -674,9 +681,49 @@ cm value: tview value: 'events' value: 'handlesMouseDown: anEvent
 	^ true'.
 cm value: tview value: 'events' value: 'handlesMouseWheel: anEvent
 	^ true'.
+cm value: tview class value: 'keys' value: 'keyValueFor: aKeyboardKey
+	"The Morphic key value of a key that types no character, as the REPL window
+	 takes it (28 to 31 the arrows); nil for any other."
+	| table |
+	table := {
+		KeyboardKey left -> 28. KeyboardKey right -> 29. KeyboardKey up -> 30. KeyboardKey down -> 31.
+		KeyboardKey home -> 1. KeyboardKey end -> 4. KeyboardKey pageUp -> 11. KeyboardKey pageDown -> 12.
+		KeyboardKey backspace -> 8. KeyboardKey delete -> 127. KeyboardKey escape -> 27.
+		KeyboardKey enter -> 13. KeyboardKey keypadEnter -> 13. KeyboardKey tab -> 9 }.
+	table do: [:a | a key = aKeyboardKey ifTrue: [^ a value]].
+	^ nil'.
+cm value: tview class value: 'keys' value: 'letterOf: aKeyboardKey
+	"The letter a key types, lower case, or nil: for Ctrl+letter, which types none."
+	| name |
+	name := [aKeyboardKey name asString] on: Error do: [:e | ''''].
+	^ (name size = 1 and: [name first isLetter]) ifTrue: [name first asLowercase] ifFalse: [nil]'.
+cm value: tview value: 'events' value: 'handlesKeyDown: anEvent
+	^ true'.
+cm value: tview value: 'events' value: 'keyDown: anEvent
+	"A key that types no character (an arrow, Backspace, Enter), or Ctrl with a
+	 letter, arrives only as a key down: it goes to the REPL window here, and the
+	 key press that may follow it is suppressed, so nothing happens twice (R-40)."
+	| value control letter |
+	target ifNil: [^ self].
+	value := self class keyValueFor: anEvent key.
+	control := anEvent controlKeyPressed or: [anEvent commandKeyPressed].
+	letter := control ifTrue: [self class letterOf: anEvent key] ifFalse: [nil].
+	(value isNil and: [letter isNil]) ifTrue: [^ self].
+	[anEvent supressNextKeyPress: true] on: Error do: [:e | nil].
+	target
+		pressKey: (value ifNil: [letter asInteger])
+		character: (letter ifNil: [Character value: value])
+		control: control
+		alt: anEvent altKeyPressed'.
 cm value: tview value: 'events' value: 'keyStroke: anEvent
-	"Every key goes to the REPL window: it edits the line, or sends it to the program."
-	target ifNotNil: [:t | t keyStroke: anEvent]'.
+	"A character typed goes to the REPL window: it edits the line, or goes to the
+	 program. Keys without a character came as key downs (keyDown:)."
+	| c control |
+	target ifNil: [^ self].
+	c := [anEvent keyCharacter] on: Error do: [:e | nil].
+	control := anEvent controlKeyPressed or: [anEvent commandKeyPressed].
+	(c isNil or: [control or: [c asInteger < 32 or: [c asInteger = 127]]]) ifTrue: [^ self].
+	target keyStroke: anEvent'.
 cm value: tview value: 'events' value: 'mouseDown: anEvent
 	self takeKeyboardFocus.
 	selectFrom := self positionAt: anEvent position.
@@ -907,6 +954,8 @@ cm value: replp value: 'keys' value: 'pressKey: keyValue character: aCharacter c
 	(busy and: [keys wantsKeys]) ifTrue: [
 		^ self typeKeys: (LispIde keysForValue: keyValue character: aCharacter control: control alt: alt)].
 	ch = $c ifTrue: [busy ifTrue: [self interrupt] ifFalse: [buffer := ''''. bufferCursor := 0. self refresh]. ^ self].
+	(control and: [keyValue = 28]) ifTrue: [^ self wordLeft].
+	(control and: [keyValue = 29]) ifTrue: [^ self wordRight].
 	control ifTrue: [^ self].
 	keyValue = 13 ifTrue: [^ self submit].
 	keyValue = 8 ifTrue: [^ self deleteBack].
@@ -933,6 +982,16 @@ cm value: replp value: 'editing' value: 'paste: aString
 	text := text copyReplaceAll: String cr with: String lf.
 	(busy and: [keys wantsKeys]) ifTrue: [^ self typeKeys: text].
 	self insert: text'.
+cm value: replp value: 'editing' value: 'wordLeft
+	"To the start of the word before the caret."
+	[bufferCursor > 0 and: [(buffer at: bufferCursor) isAlphaNumeric not]] whileTrue: [bufferCursor := bufferCursor - 1].
+	[bufferCursor > 0 and: [(buffer at: bufferCursor) isAlphaNumeric]] whileTrue: [bufferCursor := bufferCursor - 1].
+	self refresh'.
+cm value: replp value: 'editing' value: 'wordRight
+	"To the end of the word after the caret."
+	[bufferCursor < buffer size and: [(buffer at: bufferCursor + 1) isAlphaNumeric not]] whileTrue: [bufferCursor := bufferCursor + 1].
+	[bufferCursor < buffer size and: [(buffer at: bufferCursor + 1) isAlphaNumeric]] whileTrue: [bufferCursor := bufferCursor + 1].
+	self refresh'.
 cm value: replp value: 'editing' value: 'deleteBack
 	bufferCursor = 0 ifTrue: [^ self].
 	buffer := (buffer copyFrom: 1 to: bufferCursor - 1) , (buffer copyFrom: bufferCursor + 1 to: buffer size).

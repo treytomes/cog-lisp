@@ -65,7 +65,7 @@ running() {
 }
 
 if [ "$fresh" = 1 ]; then
-  if running; then echo "ide.sh: close the development image first (it is running)" >&2; exit 1; fi
+  if running; then echo "ide.sh: close the development image first (it is running, or closed in the last ten seconds)" >&2; exit 1; fi
   "$ROOT/build-image.sh" || exit 1
   if [ -f "$IMG" ]; then
     stamp="$(date +%Y%m%d%H%M%S)"
@@ -87,6 +87,8 @@ if [ ! -f "$IMG" ]; then
   echo "ide.sh: made the development image $IMG"
 fi
 
+# nothing asked of a running image: a new REPL window there, to show it heard
+if [ -z "$request" ] && [ "$fresh" = 0 ] && running; then request="(repl)"; fi
 mkdir -p "$REQUESTS"
 # the project folder first, then what was asked for: each request a file, taken in name order
 put() { printf '%s\n' "$1" > "$REQUESTS/$(date +%s%N)-$$-$2.request"; }

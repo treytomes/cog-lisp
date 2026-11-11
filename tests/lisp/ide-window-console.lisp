@@ -135,6 +135,27 @@
     (check [p inputText] "[+ 1 40]")
     [w close]))
 
+(define-test "R-40 a key that types no character comes as a key down, mapped to its key value"
+  (define (value-of name) [(smalltalk LispTerminalView) keyValueFor: [(smalltalk KeyboardKey) perform: [name asSymbol]]])
+  (check (map value-of '("left" "right" "up" "down" "home" "end" "backspace" "delete" "escape" "enter" "keypadEnter" "tab"))
+         '(28 29 30 31 1 4 8 127 27 13 13 9))
+  (check-true (smalltalk-nil? (value-of "space")))
+  ;; Ctrl with a letter key: its letter
+  (check [(smalltalk LispTerminalView) letterOf: [(smalltalk KeyboardKey) named: "C"]] #\c)   ; a letter key is named by its capital
+  (check-true (smalltalk-nil? [(smalltalk LispTerminalView) letterOf: [(smalltalk KeyboardKey) left]])))
+
+(define-test "R-40 Ctrl+Left and Ctrl+Right move a word"
+  (let* ((p (repl)) (w [p open]))
+    (press-text! p "(define long-name 42)")
+    (press! p 28 (integer->char 28) 'ctrl)                    ; before 42
+    (press! p 28 (integer->char 28) 'ctrl)                    ; before name
+    (press-text! p "X")
+    (check [p inputText] "(define long-Xname 42)")
+    (press! p 29 (integer->char 29) 'ctrl)                    ; after name
+    (press-text! p "Y")
+    (check [p inputText] "(define long-XnameY 42)")
+    [w close]))
+
 (define-test "R-40 Up and Down go through the history when idle"
   (let* ((p (repl)) (w [p open]))
     (run! p "(+ 1 1)")

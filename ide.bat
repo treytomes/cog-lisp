@@ -48,8 +48,9 @@ if "%~1"=="--fresh" (
 if "%~1"=="--help" ( for /f "tokens=1* delims= " %%a in ('findstr /b /c:"rem  " "%~f0"') do echo.%%b
   exit /b 0 )
 set "FIRST=%~1"
-if defined FIRST if not "%FIRST%"=="--repl" if not "%FIRST%"=="--run" if not "%FIRST%"=="--fresh" if not "%FIRST%"=="--help" (
-  if "%FIRST:~0,1%"=="-" ( echo ide.bat: unknown option %FIRST% ^(--repl, --run FILE, --fresh, --help^) 1>&2 & exit /b 2 )
+rem (delayed expansion: %FIRST:~0,1% of an undefined FIRST garbles the line)
+if defined FIRST if not "!FIRST!"=="--repl" if not "!FIRST!"=="--run" if not "!FIRST!"=="--fresh" if not "!FIRST!"=="--help" (
+  if "!FIRST:~0,1!"=="-" ( echo ide.bat: unknown option !FIRST! ^(--repl, --run FILE, --fresh, --help^) 1>&2 & exit /b 2 )
   set "FOLDER=%~f1"
 )
 
@@ -57,9 +58,11 @@ if not exist "%GUI%" ( echo ide.bat: no Pharo VM at %GUI% - run bootstrap-pharo.
 
 call :running
 set "RUNNING=!ERRORLEVEL!"
+rem nothing asked of a running image: a new REPL window there, to show it heard
+if not defined REQUEST if "!RUNNING!"=="0" if "%FRESH%"=="0" set "REQUEST=(repl)"
 
 if "%FRESH%"=="1" (
-  if "!RUNNING!"=="0" ( echo ide.bat: close the development image first ^(it is running^) 1>&2 & exit /b 1 )
+  if "!RUNNING!"=="0" ( echo ide.bat: close the development image first ^(it is running, or closed in the last ten seconds^) 1>&2 & exit /b 1 )
   call "%ROOT%\build-image.bat"
   set "RC=!ERRORLEVEL!"
   if not "!RC!"=="0" exit /b 1
