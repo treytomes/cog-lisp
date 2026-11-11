@@ -691,7 +691,13 @@ cm value: tview class value: 'keys' value: 'keyValueFor: aKeyboardKey
 		KeyboardKey backspace -> 8. KeyboardKey delete -> 127. KeyboardKey escape -> 27.
 		KeyboardKey enter -> 13. KeyboardKey keypadEnter -> 13. KeyboardKey tab -> 9 }.
 	table do: [:a | a key = aKeyboardKey ifTrue: [^ a value]].
+	"a key made from another platform''s table may be another object of the same name"
+	table do: [:a | ([a key name = aKeyboardKey name] on: Error do: [:e | false]) ifTrue: [^ a value]].
 	^ nil'.
+cm value: tview class value: 'keys' value: 'legacyKeyValues
+	"Morphic''s own codes for the keys that type no character, as a key-down event
+	 carries them on Windows (Pharo''s Spotter reads them so)."
+	^ #(1 4 8 9 11 12 13 27 28 29 30 31 127)'.
 cm value: tview class value: 'keys' value: 'letterOf: aKeyboardKey
 	"The letter a key types, lower case, or nil: for Ctrl+letter, which types none."
 	| name |
@@ -707,6 +713,8 @@ cm value: tview value: 'events' value: 'keyDown: anEvent
 	target ifNil: [^ self].
 	value := self class keyValueFor: anEvent key.
 	control := anEvent controlKeyPressed or: [anEvent commandKeyPressed].
+	(value isNil and: [control not and: [self class legacyKeyValues includes: anEvent keyValue]])
+		ifTrue: [value := anEvent keyValue].
 	letter := control ifTrue: [self class letterOf: anEvent key] ifFalse: [nil].
 	(value isNil and: [letter isNil]) ifTrue: [^ self].
 	[anEvent supressNextKeyPress: true] on: Error do: [:e | nil].

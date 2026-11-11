@@ -144,6 +144,37 @@
   (check [(smalltalk LispTerminalView) letterOf: [(smalltalk KeyboardKey) named: "C"]] #\c)   ; a letter key is named by its capital
   (check-true (smalltalk-nil? [(smalltalk LispTerminalView) letterOf: [(smalltalk KeyboardKey) left]])))
 
+;; a key event as the GUI makes it: type (keyDown or keystroke), Morphic key value, key
+(define (key-event type value key)
+  (let ((e [[(smalltalk KeyboardEvent) new]
+            setType: [type asSymbol] buttons: 0 position: [0 @ 0] keyValue: value charCode: value
+            hand: [(smalltalk World) activeHand] stamp: 0]))
+    [e key: key]
+    e))
+
+(define-test "R-40 keys go through the pane's own event handling, as in the GUI"
+  (let* ((p (repl)) (w [p open]) (v [p terminalView]))
+    ;; Enter as a key down, its key the one Pharo names
+    [p inputText: "(+ 40 2)"]
+    [v handleKeyDown: (key-event "keyDown" 13 [(smalltalk KeyboardKey) enter])]
+    (check-true [p waitUntilIdle: 10000])
+    (check-true (has? (shown p) "> (+ 40 2)\n42\n"))
+    ;; a key down whose key the table does not know, with Morphic's code for Enter
+    [p inputText: "(* 6 7)"]
+    [v handleKeyDown: (key-event "keyDown" 13 [(smalltalk KeyboardKey) named: "F13"])]
+    (check-true [p waitUntilIdle: 10000])
+    (check-true (has? (shown p) "> (* 6 7)\n42\n"))
+    ;; Backspace as a key down; a typed character as a key press
+    [p inputText: "ab"]
+    [v handleKeyDown: (key-event "keyDown" 8 [(smalltalk KeyboardKey) backspace])]
+    (check [p inputText] "a")
+    [v handleKeystroke: (key-event "keystroke" 122 [(smalltalk KeyboardKey) named: "Z"])]
+    (check [p inputText] "az")
+    ;; a key press of Enter, if one comes too, adds nothing
+    [v handleKeystroke: (key-event "keystroke" 13 [(smalltalk KeyboardKey) enter])]
+    (check [p inputText] "az")
+    [w close]))
+
 (define-test "R-40 Ctrl+Left and Ctrl+Right move a word"
   (let* ((p (repl)) (w [p open]))
     (press-text! p "(define long-name 42)")
