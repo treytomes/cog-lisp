@@ -96,6 +96,15 @@
     (check-true (and (find (lambda (e) (string=? (car e) f)) (ide-loaded-files)) #t))
     [d ensureDeleteAll]))
 
+(define ide-program-ran #f)
+(define-test "R-9 a program's file is not run to evaluate in it; a library's is loaded"
+  (let* ((d (temp "cog-lisp-ide-program"))
+         (f (write-raw! [d / "prog.lisp"] "(set! ide-program-ran #t)\n(read-line)\n"))
+         (s (ide-file-session f)))
+    (check-false ide-program-ran)
+    (check (result-values (ide-eval s "(+ 1 2)")) '(3))
+    [d ensureDeleteAll]))
+
 (define-test "R-9 loading a file: its result, an error reported, not left at a break"
   (let* ((d (temp "cog-lisp-ide-load"))
          (good (write-raw! [d / "good.lisp"] "(define ide-loaded-value 41)\n(display \"loaded\")\n"))

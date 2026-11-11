@@ -147,6 +147,43 @@
     (close! w)
     [d ensureDeleteAll]))
 
+(define-test "R-9 Do it in a program that reads its input: the program is not run first"
+  (let* ((d (temp "cog-lisp-editor-program"))
+         (f (write-raw! [d / "echo.lisp"]
+                        "(let loop ((line (read-line)))\n  (unless (eof-object? line) (loop (read-line))))\n(display \"end of input\")\n"))
+         (e (editor)) (w (open! e))
+         (p (open-file! e f)))
+    (let ((n (string-length (text p))))
+      (select! p (- n 24) (- n 1)))
+    (check (on-ui [[p text] copyFrom: (- (string-length (text p)) 24) to: (- (string-length (text p)) 1)])
+           "(display \"end of input\")")
+    (check-true (run! p (lambda () [p doIt])))
+    (check-true (has? (output e) "end of input"))
+    (check-false [p isBusy])
+    (close! w)
+    [d ensureDeleteAll]))
+
+(define-test "R-15 Interrupt stops an evaluation; the page evaluates again after"
+  (let* ((d (temp "cog-lisp-editor-interrupt"))
+         (f (write-raw! [d / "loop.lisp"] "(let loop () (loop))\n"))
+         (e (editor)) (w (open! e))
+         (p (open-file! e f)))
+    (on-ui [p loadFile])
+    (check-false [p waitUntilIdle: 500])                 ; still running
+    (check-true [p isBusy])
+    (on-ui [p interrupt])
+    (check-true [p waitUntilIdle: 20000])
+    (check-true (has? (output e) "error: "))
+    (check-false [p isBusy])
+    (set-text! p "(+ 40 2)\n")
+    (cursor! p 1)
+    (check-true (run! p (lambda () [p doIt])))
+    (check-true (has? (output e) "42"))
+    (on-ui [p interrupt])
+    (check-true (has? (output e) "nothing to interrupt"))
+    (close! w)
+    [d ensureDeleteAll]))
+
 (define-test "R-11 Format lays the text out as format-source does"
   (let* ((d (temp "cog-lisp-editor-format"))
          (f (write-raw! [d / "f.lisp"] "(define (f x)   (* x\n 2))\n"))
@@ -160,27 +197,43 @@
 (define-test "R-6 the styler styles LISP: comments, strings, keywords, parentheses"
   (let* ((s [(smalltalk LispStyler) new])
          (styled [s privateStyle: [(smalltalk Text) fromString: "(define x \"s\") ; c"]]))
-    (check [[s styleFor: (vector 'comment 0 1)] asString] "comment")
-    (check [[s styleFor: (vector 'string 0 1)] asString] "string")
-    (check [[s styleFor: (vector 'keyword 0 1)] asString] "self")
-    (check [[s styleFor: (vector 'open 0 1 0)] asString] "parenthesis")
-    (check [[s styleFor: (vector 'open 0 1 2)] asString] "parenthesis2")
-    (check [[s styleFor: (vector 'symbol 0 1)] asString] "default")
+    (check [[s styleFor: (vector 'comment 0 1)] asString] "lispComment")
+    (check [[s styleFor: (vector 'string 0 1)] asString] "lispString")
+    (check [[s styleFor: (vector 'keyword 0 1)] asString] "lispKeyword")
+    (check [[s styleFor: (vector 'open 0 1 0)] asString] "lispParen1")
+    (check [[s styleFor: (vector 'open 0 1 2)] asString] "lispParen3")
+    (check [[s styleFor: (vector 'close 0 1 3)] asString] "lispParen1")      ; three colors, round
+    (check [[s styleFor: (vector 'symbol 0 1)] asString] "lispDefault")
+    ;; cog-lisp's own colors, Dark+ on a dark theme
+    (let ((dark [(smalltalk LispStyler) paletteForDark: #t]))
+      (check [[[[[dark at: ["lispString" asSymbol]] first] color] asHexString] asUppercase] "CE9178")
+      (check [[[dark at: ["lispComment" asSymbol]] size] printString] "2"))  ; and italic
+    (check [[[[[[(smalltalk LispStyler) paletteForDark: #f] at: ["lispString" asSymbol]] first] color] asHexString] asUppercase] "A31515")
     ;; the comment and the string are styled differently from a name
     (check-false (equal? [[styled attributesAt: 4] printString] [[styled attributesAt: 17] printString]))
     (check-false (equal? [[styled attributesAt: 11] printString] [[styled attributesAt: 9] printString]))))
 
-(define-test "R-11 the page's keys, each bound as a real key and as a typed one; its menu"
+(define-test "R-11 the page's actions: its menu, each with its key, the typed key too"
   (let* ((p [(smalltalk LispEditorPage) new])
-         (entries (vector->list [[[[p code] actions] entries] asArray])))
-    (check (map (lambda (a) [[a name] asString]) entries)
-           '("save" "save-char" "do-it" "do-it-char" "print-it" "print-it-char"
-             "load-file" "load-file-char" "format" "format-char"))
-    (check-true (every (lambda (a) (not (smalltalk-nil? [a shortcutKey]))) entries))   ; each has its key
-    (check (map (lambda (i) [[i name] asString])
-                (append-map (lambda (g) (vector->list [[g menuItems] asArray]))
-                            (vector->list [[[p contextMenu] menuGroups] asArray])))
-           '("Do it" "Print it" "Load file" "Save" "Format" "Cut" "Copy" "Paste"))))
+         (entries (vector->list [[[[p code] actions] entries] asArray]))
+         (shown (filter (lambda (a) [a isVisible]) entries)))
+    (check (map (lambda (a) [[a name] asString]) shown)
+           '("Do it" "Print it" "Load file" "Interrupt" "Save" "Format" "Cut" "Copy" "Paste"))
+    (check (map (lambda (a) [[a name] asString]) (remove (lambda (a) [a isVisible]) entries))
+           '("do-it-typed" "print-it-typed" "load-file-typed" "save-typed" "format-typed"))
+    (check (length (filter (lambda (a) [a hasShortcutKey]) entries)) 10)))  ; Rubric's own keys cut, copy, paste
+
+(define-test "R-11 a right click builds the menu: the page's actions only"
+  (let* ((d (temp "cog-lisp-editor-menu"))
+         (f (write-raw! [d / "m.lisp"] "(+ 1 2)
+"))
+         (e (editor)) (w (open! e))
+         (p (open-file! e f))
+         (menu (on-ui [[[p code] adapter] codePaneMenu: #f shifted: #f])))
+    (check (map (lambda (i) [[i contents] asString]) (vector->list [[menu items] asArray]))
+           '("Do it" "Print it" "Load file" "Interrupt" "Save" "Format" "Cut" "Copy" "Paste"))
+    (close! w)
+    [d ensureDeleteAll]))
 
 (define-test "the cog-lisp menu opens the editor"
   (check-true [[(smalltalk LispEditorPresenter) class] includesSelector: ["open" asSymbol]])

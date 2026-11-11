@@ -41,8 +41,8 @@ ide := (Object << #LispIde) sharedVariables: { #Watcher }; package: 'CogLisp-IDE
 replp := (SpPresenter << #LispReplPresenter) slots: { #session. #view. #termView. #restartsBar. #interruptButton. #history. #historyIndex. #shown. #transcriptText. #historyLines. #buffer. #bufferCursor. #updates. #idle. #busy. #level. #restarts. #terminal. #keys. #columns. #rows }; package: 'CogLisp-IDE'; install.
 tview := (Morph << #LispTerminalView) slots: { #target. #lines. #caret. #top. #selectFrom. #selectTo }; package: 'CogLisp-IDE'; install.
 files := (SpPresenter << #LispFilesPresenter) slots: { #list. #source. #runButton. #refreshButton }; package: 'CogLisp-IDE'; install.
-styler := (SHRBTextStyler << #LispStyler) package: 'CogLisp-IDE'; install.
-epage := (SpPresenter << #LispEditorPage) slots: { #code. #path. #ending. #savedText. #editor. #updates. #idle. #busy }; package: 'CogLisp-IDE'; install.
+styler := (SHRBTextStyler << #LispStyler) slots: { #palette }; package: 'CogLisp-IDE'; install.
+epage := (SpPresenter << #LispEditorPage) slots: { #code. #path. #ending. #savedText. #editor. #updates. #idle. #busy. #running }; package: 'CogLisp-IDE'; install.
 editorp := (SpPresenter << #LispEditorPresenter) slots: { #tree. #notebook. #output. #pages. #folder }; package: 'CogLisp-IDE'; install.
 keyq := (Object << #LispKeyQueue) slots: { #chars. #ready. #wanted }; package: 'CogLisp-IDE'; install.
 
@@ -1219,15 +1219,38 @@ cm value: styler value: 'styling' value: 'privateStyle: aText
 cm value: styler value: 'styling' value: 'styleFor: aToken
 	| kind |
 	kind := (aToken at: 1) name asString.
-	kind = ''comment'' ifTrue: [^ #comment].
-	kind = ''string'' ifTrue: [^ #string].
-	kind = ''character'' ifTrue: [^ #character].
-	kind = ''number'' ifTrue: [^ #number].
-	kind = ''quote'' ifTrue: [^ #symbol].
-	kind = ''keyword'' ifTrue: [^ #self].
+	kind = ''comment'' ifTrue: [^ #lispComment].
+	kind = ''string'' ifTrue: [^ #lispString].
+	kind = ''character'' ifTrue: [^ #lispCharacter].
+	kind = ''number'' ifTrue: [^ #lispNumber].
+	kind = ''quote'' ifTrue: [^ #lispQuote].
+	kind = ''keyword'' ifTrue: [^ #lispKeyword].
 	(kind = ''open'' or: [kind = ''close''])
-		ifTrue: [^ #(#parenthesis #parenthesis1 #parenthesis2 #parenthesis3 #parenthesis4 #parenthesis5 #parenthesis6 #parenthesis7) at: ((aToken at: 4) \\ 8) + 1].
-	^ #default'.
+		ifTrue: [^ #(#lispParen1 #lispParen2 #lispParen3) at: ((aToken at: 4) \\ 3) + 1].
+	^ #lispDefault'.
+cm value: styler value: 'styling' value: 'attributesFor: aSymbol
+	"cog-lisp''s own colors (VS Code''s Dark+ or Light+, by the theme), not Pharo''s
+	 Smalltalk styles, which are hard to read on LISP; any other style is Pharo''s."
+	palette ifNil: [palette := self class paletteForDark: self class isDarkTheme].
+	^ palette at: aSymbol ifAbsent: [super attributesFor: aSymbol]'.
+cm value: styler class value: 'palette' value: 'isDarkTheme
+	^ [Smalltalk ui theme backgroundColor luminance < 0.5] on: Error do: [:e | true]'.
+cm value: styler class value: 'palette' value: 'paletteForDark: dark
+	"style -> text attributes: a color, and italic for comments"
+	| colors d |
+	colors := dark
+		ifTrue: [#(#lispDefault ''D4D4D4'' #lispComment ''6A9955'' #lispString ''CE9178''
+			#lispCharacter ''D7BA7D'' #lispNumber ''B5CEA8'' #lispQuote ''4EC9B0''
+			#lispKeyword ''569CD6'' #lispParen1 ''FFD700'' #lispParen2 ''DA70D6'' #lispParen3 ''179FFF'')]
+		ifFalse: [#(#lispDefault ''000000'' #lispComment ''008000'' #lispString ''A31515''
+			#lispCharacter ''795E26'' #lispNumber ''098658'' #lispQuote ''267F99''
+			#lispKeyword ''0000FF'' #lispParen1 ''0431FA'' #lispParen2 ''319331'' #lispParen3 ''7B3814'')].
+	d := Dictionary new.
+	colors pairsDo: [:style :hex | | attrs |
+		attrs := OrderedCollection with: (TextColor color: (Color fromHexString: hex)).
+		style = #lispComment ifTrue: [attrs add: TextEmphasis italic].
+		d at: style put: attrs asArray].
+	^ d'.
 cm value: styler class value: 'installing' value: 'installOn: aCodePresenter
 	"Styles aCodePresenter''s text as LISP, once its widget is built."
 	aCodePresenter withSyntaxHighlight.
@@ -1244,50 +1267,45 @@ cm value: epage value: 'initialization' value: 'initializePresenters
 	code := self newCode.
 	"not wrapped: a wrapped Rubric pane can recompose forever as its scroll bar comes and goes"
 	code beNotWrapWord.
-	"Pharo''s own Do it, Print it and Inspect it evaluate Smalltalk: replaced"
-	code overrideContextMenu: true; contextMenu: [self contextMenu].
+	"Pharo''s own Do it, Print it and Inspect it evaluate Smalltalk: replaced by the
+	 page''s actions, which are its menu too (Spec refuses contextMenu: with actions)"
+	code overrideContextMenu: true.
 	LispStyler installOn: code.
 	self bindKeys'.
 cm value: epage value: 'initialization' value: 'defaultLayout
 	^ SpBoxLayout newTopToBottom add: code; yourself'.
 cm value: epage value: 'initialization' value: 'keys
-	"The page''s keys (R-11): name, letter, shifted?, action."
+	"The page''s actions (R-11): name, menu label, letter (nil: none), shifted?, action."
 	^ {
-		{ ''save''. $s. false. [self save] }.
-		{ ''do-it''. $d. false. [self doIt] }.
-		{ ''print-it''. $p. false. [self printIt] }.
-		{ ''load-file''. $l. false. [self loadFile] }.
-		{ ''format''. $f. true. [self format] } }'.
+		{ ''do-it''. ''Do it''. $d. false. [self doIt] }.
+		{ ''print-it''. ''Print it''. $p. false. [self printIt] }.
+		{ ''load-file''. ''Load file''. $l. false. [self loadFile] }.
+		{ ''interrupt''. ''Interrupt''. nil. false. [self interrupt] }.
+		{ ''save''. ''Save''. $s. false. [self save] }.
+		{ ''format''. ''Format''. $f. true. [self format] }.
+		"keys of Rubric''s own: Ctrl+X, Ctrl+C, Ctrl+V"
+		{ ''cut''. ''Cut''. nil. false. [self withEditor: [:ed | ed cut]] }.
+		{ ''copy''. ''Copy''. nil. false. [self withEditor: [:ed | ed copySelection]] }.
+		{ ''paste''. ''Paste''. nil. false. [self withEditor: [:ed | ed paste]] } }'.
+cm value: epage value: 'initialization' value: 'withEditor: aBlock
+	code withAdapterDo: [:a | aBlock value: a widget textArea editor]'.
 cm value: epage value: 'initialization' value: 'bindKeys
-	"Ctrl+S save, Ctrl+D do it, Ctrl+P print it, Ctrl+L load the file, Ctrl+Shift+F
-	 format: each bound as a real key (a KeyboardKey) and as a character (a
-	 scripted key), each named, or Spec refuses the second."
-	self keys do: [:each | | name char shifted action real typed |
-		name := each at: 1. char := each at: 2. shifted := each at: 3. action := each at: 4.
-		real := (KeyboardKey named: char asUppercase asString) asKeyCombination.
-		typed := char.
-		shifted ifTrue: [real := KMModifier shift + real. typed := typed shift].
-		"shift first: actionModifier answers Ctrl or Cmd, which takes no shift"
-		real := real actionModifier.
-		typed := typed actionModifier.
-		code addShortcutWith: [:a | a name: name; shortcutKey: real; action: action].
-		code addShortcutWith: [:a | a name: name , ''-char''; shortcutKey: typed; action: action]]'.
-cm value: epage value: 'initialization' value: 'contextMenu
-	"The code pane''s menu: the page''s actions, then cut, copy and paste."
-	| menu |
-	menu := self newMenu.
-	menu addGroup: [:g |
-		g addItem: [:i | i name: ''Do it''; shortcut: $d actionModifier; action: [self doIt]].
-		g addItem: [:i | i name: ''Print it''; shortcut: $p actionModifier; action: [self printIt]].
-		g addItem: [:i | i name: ''Load file''; shortcut: $l actionModifier; action: [self loadFile]]].
-	menu addGroup: [:g |
-		g addItem: [:i | i name: ''Save''; shortcut: $s actionModifier; action: [self save]].
-		g addItem: [:i | i name: ''Format''; shortcut: $f shift actionModifier; action: [self format]]].
-	menu addGroup: [:g |
-		g addItem: [:i | i name: ''Cut''; action: [code withAdapterDo: [:a | a widget textArea editor cut]]].
-		g addItem: [:i | i name: ''Copy''; action: [code withAdapterDo: [:a | a widget textArea editor copySelection]]].
-		g addItem: [:i | i name: ''Paste''; action: [code withAdapterDo: [:a | a widget textArea editor paste]]]].
-	^ menu'.
+	"Each action in the pane''s menu with its key, a real key (a KeyboardKey); the same
+	 key typed (a Character, as a script sends it) is bound too, shortcut only and
+	 under its own name, or Spec refuses it."
+	self keys do: [:each | | name label char shifted action real typed |
+		name := each at: 1. label := each at: 2. char := each at: 3. shifted := each at: 4. action := each at: 5.
+		char
+			ifNil: [code addActionWith: [:a | a name: label; action: action]]
+			ifNotNil: [
+				real := (KeyboardKey named: char asUppercase asString) asKeyCombination.
+				typed := char.
+				"shift first: actionModifier answers Ctrl or Cmd, which takes no shift"
+				shifted ifTrue: [real := KMModifier shift + real. typed := typed shift].
+				real := real actionModifier.
+				typed := typed actionModifier.
+				code addActionWith: [:a | a name: label; shortcutKey: real; action: action].
+				code addActionWith: [:a | a name: name , ''-typed''; shortcutKey: typed; beShortcutOnly; action: action]]]'.
 cm value: epage value: 'accessing' value: 'editor: anEditor
 	editor := anEditor'.
 cm value: epage value: 'accessing' value: 'path
@@ -1343,11 +1361,12 @@ cm value: epage value: 'evaluating' value: 'evaluate: aString then: aBlock
 	 so that the window carries on; then, in the UI process, what it wrote is
 	 reported and aBlock given the values written. An error is reported and the
 	 session brought back from its break. One evaluation at a time."
-	busy == true ifTrue: [^ self report: ''busy: an evaluation is running''].
+	busy == true ifTrue: [^ self report: ''busy: an evaluation is running (Interrupt, in the menu, stops it)''].
 	busy := true.
 	idle := Semaphore new.
 	[| s r written |
 	 [s := self session.
+	  running := s.
 	  r := self wait: (LispIde call: ''ide:ide-eval'' with: { s. aString }) in: s.
 	  (r at: 4) isEmpty ifFalse: [| out | out := r at: 4. self queue: [self report: out]].
 	  (r at: 1) name = ''error''
@@ -1360,8 +1379,14 @@ cm value: epage value: 'evaluating' value: 'evaluate: aString then: aBlock
 			(r at: 3) do: [:w | written add: w].
 			self queue: [aBlock value: written]]]
 		on: Error do: [:e | | text | text := LispError describe: e. self queue: [self report: ''error: '' , text]].
+	 running := nil.
 	 busy := false.
 	 idle signal] forkAt: Processor userBackgroundPriority named: ''cog-lisp editor evaluation'''.
+cm value: epage value: 'evaluating' value: 'interrupt
+	"Stops the evaluation running, which is then reported as an error (R-15)."
+	running
+		ifNil: [self report: ''nothing to interrupt'']
+		ifNotNil: [:s | LispIde call: ''ide:ide-interrupt'' with: { s }]'.
 cm value: epage value: 'evaluating' value: 'wait: aResult in: aSession
 	"The result once the evaluation has finished."
 	| r |

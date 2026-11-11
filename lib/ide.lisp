@@ -413,15 +413,20 @@ Loads the file at path, as load does, in a session of its own, and answers the r
     (ide-close s)
     r))
 
+;; does the file's first form declare a library?
+(define (%library-file? path)
+  (let ((d (guard (e (#t #f)) (reader-next (make-reader (car (ide-read-file path)))))))
+    (and (pair? d) (eq? (car d) 'library))))
+
 (define (ide-file-session path . options)
   "(ide-file-session path option ...)
-The session that evaluates forms as part of the file at path (R-9): in its unit, so a define in a library's file defines the library's name. The file is loaded first if it has not been, and the session is made once and kept. Options: maker (person or agent; person)."
+The session that evaluates forms as part of the file at path (R-9): in its unit, so a define in a library's file defines the library's name. A library's file is loaded first if it has not been; a program's is not, since loading it would run it. The session is made once and kept. Options: maker (person or agent; person)."
   ;; units are known by the path's full name, as load gives it
   (let* ((full [[path asFileReference] fullName]) (key (editor-key full)))
     (or (let ((s (hash-table-ref/default %file-sessions key #f)))
           (and s (memq s (ide-sessions)) s))
         (begin
-          (when (smalltalk-nil? [(smalltalk LispUnit) atPath: full])
+          (when (and (smalltalk-nil? [(smalltalk LispUnit) atPath: full]) (%library-file? full))
             (ide-load-file full 'maker (%option options 'maker 'person)))
           (let* ((unit [(smalltalk LispUnit) atPath: full])
                  (s (ide-session 'name [[path asFileReference] basename]

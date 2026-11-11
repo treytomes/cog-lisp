@@ -281,7 +281,9 @@ Item 6 is answered already.
   the value written after the form as `;; => value`) and Inspect it (Ctrl+I)
   evaluate the selection, or the top-level form at the cursor, **as part of the
   file**: in its `LispUnit`, with its library's names and imports, so a `define`
-  in `lib/cl.lisp` defines `cl:remove`. A file not loaded yet is loaded first.
+  in `lib/cl.lisp` defines `cl:remove`. A library's file not loaded yet is
+  loaded first; a program's is not, since loading it runs it (it may wait for
+  input). Interrupt stops an evaluation.
   Load file (Ctrl+L) evaluates the whole file, as `require` or `load` would.
 - **R-10. What the language server knows**, through the shared services
   (§5.9): diagnostics as underlines and a list of problems, updated as the text
@@ -674,7 +676,7 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 |------|------|--------|
 | 1 | The spike (§4.1); the editor services (R-29, R-30) | Done (2026-11-10): `lib/editor-services.lisp` and `tests/lisp/editor-services.lisp` (62 checks); the language server on it, its 31 checks and VS Code's 5 offline and 12 with the server passing unchanged |
 | 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c done (2026-11-11): R-39 (§16). 2d done (2026-11-11), the owner's trial of 2c: R-40, R-41 (§17) |
-| 3 | The editor | 3a done (2026-11-11): R-5, R-6, R-8's saving, R-9 (but Inspect it), R-11, Format (§18). 3b next: R-10, R-8's files changed on disk, R-7's indenting on Enter |
+| 3 | The editor | 3a done (2026-11-11): R-5, R-6, R-8's saving, R-9 (but Inspect it), R-11, Format; the owner's trial fixed (§18). 3b next: R-10, R-8's files changed on disk, R-7's indenting on Enter |
 | 4 | The browser and the inspector | |
 | 5 | Errors and the debugger | |
 | 6 | Finishing | |
@@ -930,6 +932,22 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
     output panes are not wrapped (`beNotWrapWord`).
   - `cursorPositionIndex:` moves one end of the selection only, so the old end
     makes a selection; a cursor is an empty `selectionInterval:`.
+- **Found by the owner in the GUI** (2026-11-11), and fixed:
+  - a right click raised Spec's "You are using contextMenu: and actions: at
+    the same time": a presenter with shortcut actions takes its menu from its
+    actions. The page's actions are now its menu (*Do it*, *Print it*, *Load
+    file*, *Interrupt*, *Save*, *Format*, *Cut*, *Copy*, *Paste*), each with its
+    key; the typed-key twins are `beShortcutOnly`. A test builds the menu as a
+    right click does (`codePaneMenu:shifted:`).
+  - Do it in `examples/echo.lisp` answered only "busy": the file was loaded
+    before its first evaluation, which ran the program, and it waited for input
+    for ever. Only a library's file is loaded first now, and *Interrupt* stops
+    an evaluation (the busy message names it).
+  - Pharo's styles were hard to read on LISP: the styler has its own palette,
+    VS Code's Dark+ (Light+ on a light theme): keywords blue, strings orange,
+    comments green and italic, numbers pale green, quoted data teal,
+    parentheses gold, orchid and blue by depth. Checked by drawing the pane to a
+    PNG headless (`imageForm`, `PNGReadWriter`).
 - **For the owner to check**: in the development image (`ide.bat --fresh`), the
   editor from the `cog-lisp` menu; that Ctrl+D, Ctrl+P and Ctrl+S on a real
   keyboard are the editor's, not Pharo's (headless tests call the actions, not
