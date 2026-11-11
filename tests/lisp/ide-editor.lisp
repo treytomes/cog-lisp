@@ -131,6 +131,9 @@
     (check (map (lambda (p) (list (problem-severity p) (problem-start p) (problem-end p)))
                 (ide-check path "(display nope)\n(if)\n"))
            '((warning 9 13) (error 15 19)))
+    ;; a full name: of a library not loaded, unknown until run time; of one loaded, checked
+    (check (messages (ide-check path "(not-loaded-lib:thing 1)\n(ide:no-such-name 2)\n"))
+           '("unbound variable: ide:no-such-name"))
     ;; a name a macro defines is defined
     (check (ide-check path "(define-macro (defconst n v) (list 'define n v))\n(defconst ide-k 1)\n(+ ide-k 1)\n") '())
     ;; a library's own names, private ones too (a library form reads its file)

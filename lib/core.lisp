@@ -599,6 +599,15 @@ Evaluates the body with each param giving value (after its converter), and gives
 
 [make-parameter category: "Control"]
 
+(define (documentation-categories)
+  "(documentation-categories)
+The sections of the reference of the built-ins, in its order: the ones documentation-category answers."
+  '("Special forms" "Derived forms" "Equality and types" "Numbers" "Lists"
+    "Characters" "Strings" "Vectors" "Hash tables" "Control"
+    "Conditions and restarts" "Evaluation and macros" "Output" "Ports" "Files" "Network"
+    "The system" "Smalltalk interop" "Language server" "The compiler and reader"))
+[documentation-categories category: "Evaluation and macros"]
+
 (for-each (lambda (p) [p category: "Lists"])
           (list list-tail list-ref filter remove delete delete-duplicates fold reduce iota sort
                 caar cadr cdar cddr caaar caadr cadar caddr cdaar cdadr cddar cdddr

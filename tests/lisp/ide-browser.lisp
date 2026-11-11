@@ -90,7 +90,7 @@
     (check-true (string-prefix? "; the procedure\n" d))
     (check-true (and (string-search d "pushTemp:") #t)))
   (check-false (ide-disassembly 'browse-limit))
-  (check-false (ide-disassembly 'if)))
+  (check-true (string? (ide-disassembly 'if))))                         ; its translator's
 
 (define-test "R-20 editing from the browser: written into its file, saved, evaluated, recorded"
   (let ((r (ide-write-definition 'browse-lib:%double "(define (%double x)\n  \"(%double x)\nx and x, by three.\"\n  (* 3 x))")))
@@ -106,6 +106,56 @@
   (check-false (ide-write-definition 'browse-stale "(define (browse-stale) 3)"))
   (check (raw [dir / "stale.lisp"]) "(define (browse-stale) 2)\n")
   (check-error (ide-write-definition 'car "(define (car x) x)") "ide-write-definition: no file holds"))
+
+;;; ---------------------------------------------------------------------------
+;;; The whole body, the compiler included (section 22)
+
+(define home (hash-table-ref *env* 'home))
+(define compiler-file (string-append home "/lib/compiler/compiler.lisp"))
+
+(define-test "one list of categories: the image's, in the reference's order"
+  (check (car (documentation-categories)) "Special forms")
+  (check (map (lambda (g) (vector-ref g 0)) (filter (lambda (g) (eq? (vector-ref g 1) 'category)) (ide-groups)))
+         (filter (lambda (c) (pair? (ide-group-definitions c 'category))) (documentation-categories))))
+
+(define-test "a special form: its define-special-form in the compiler's source, its translator"
+  (let ((b (ide-browse 'if)))
+    (check (vector-ref b 1) 'special-form)
+    (check (key (vector-ref b 4)) (key compiler-file))
+    (check-true (string-prefix? "(define-special-form 'if"
+                                (substring (car (ide-read-file compiler-file)) (vector-ref b 5) (vector-ref b 6)))))
+  (check-true (and (memq 'lc-translate-if (ide-callees 'if)) #t))
+  (check-true (string-prefix? "; the procedure" (ide-disassembly 'if))))
+
+(define-test "a primitive: the Smalltalk that implements it"
+  (check (vector-ref (ide-browse 'car) 8) '("LispPrimitives class" "installListsInto:" "[:p | p car]"))
+  (check-false (vector-ref (ide-browse 'filter) 8)))
+
+(define-test "the sealed sources: a group each, all their definitions in the file's order"
+  (check (map (lambda (p) [[p asFileReference] basename]) (ide-sealed-sources))
+         '("reader.lisp" "opal.lisp" "codegen.lisp" "compiler.lisp" "syntax-rules.lisp"
+           "core.lisp" "format.lisp" "json.lisp" "http.lisp" "coverage.lisp"))
+  (check-true (and (member (vector "compiler/compiler.lisp" 'source) (ide-groups)) #t))
+  (let ((names (names (ide-group-definitions "compiler/compiler.lisp" 'source))))
+    (check (car names) 'lc-nesting-budget)                            ; its first definition
+    (check-true (and (memq 'if names) (memq 'lc-expansion-too-deep names) #t))))
+
+(define-macro (bw-forever) '(bw-forever))
+(define-test "the compiler edited live: from its own source, not from a program"
+  (let* ((too-deep (lambda () (guard (e (#t (condition-report e))) (compile-form '(bw-forever)) "no error")))
+         (normal (too-deep)))
+    (check-true (string-prefix? "macro expansion too deep" normal))
+    ;; a program's definition of a compiler's name changes nothing for the compiler
+    (ide-eval (ide-session) "(define (lc-expansion-too-deep form) (error \"from a program\"))")
+    (check (too-deep) normal)
+    ;; the same name evaluated as part of the compiler's source changes the compiler
+    (let ((s (ide-file-session compiler-file)))
+      (check (result-status (ide-eval s "(define (lc-expansion-too-deep form) (lc-error \"edited live\"))")) 'done)
+      (check-true (string-prefix? "edited live" (too-deep)))
+      ;; and its file's text puts it back
+      (let ((b (ide-browse 'lc-expansion-too-deep)))
+        (ide-eval s (substring (car (ide-read-file compiler-file)) (vector-ref b 5) (vector-ref b 6)))))
+    (check (too-deep) normal)))
 
 (run-tests)
 [dir ensureDeleteAll]

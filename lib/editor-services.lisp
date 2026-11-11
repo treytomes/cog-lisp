@@ -218,6 +218,13 @@ The unit the text at path was last checked in (editor-check), whose imports say 
           ((%definition-of e) => (lambda (def) (list (car def))))
           (else '()))))
 
+;; a full name of a library the image has not loaded (lib:name): a program may load
+;; it at run time, so its names cannot be known now
+(define (%unloaded-library-name? name)
+  (let ((colon (string-index name #\:)))
+    (and colon (> colon 0)
+         (smalltalk-nil? [(smalltalk LispUnit) libraryNamed: (string->symbol (substring name 0 colon))]))))
+
 (define (%local-name name)
   (let ((colon (string-index name #\:)))
     (if colon (substring name (+ colon 1) (string-length name)) name)))
@@ -234,7 +241,8 @@ The unit the text at path was last checked in (editor-check), whose imports say 
           (let* ((name (symbol->string [cell symbol])) (local (%local-name name)))
             (if (or [cell isBound]
                     (hash-table-contains? defined name) (hash-table-contains? defined local)
-                    (pair? (editor-definitions-named local)))
+                    (pair? (editor-definitions-named local))
+                    (%unloaded-library-name? name))
                 '()
                 (filter-map (lambda (tok)
                               (and (eq? (token-kind tok) 'symbol)

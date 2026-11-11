@@ -707,7 +707,7 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 | 1 | The spike (§4.1); the editor services (R-29, R-30) | Done (2026-11-10): `lib/editor-services.lisp` and `tests/lisp/editor-services.lisp` (62 checks); the language server on it, its 31 checks and VS Code's 5 offline and 12 with the server passing unchanged |
 | 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c done (2026-11-11): R-39 (§16). 2d done (2026-11-11), the owner's trial of 2c: R-40, R-41 (§17) |
 | 3 | The editor | 3a done (2026-11-11): R-5, R-6, R-8's saving, R-9 (but Inspect it), R-11, Format; the owner's trial fixed (§18). 3c done (2026-11-11), the owner's request: R-42 to R-44 (§19). 3b done (2026-11-11): R-7, R-8's files changed on disk, R-10 (§20). |
-| 4 | The browser and the inspector | 4a done (2026-11-11): the browser, R-17 to R-21 (§21). 4b next: the inspector, R-22 to R-24 |
+| 4 | The browser and the inspector | 4a done (2026-11-11): the browser, R-17 to R-21 (§21). The whole body in it, the compiler edited live (§22). 4b next: the inspector, R-22 to R-24 |
 | 5 | Errors and the debugger | |
 | 6 | Finishing | |
 | 7 | The agent's doorway (its own spec first) | |
@@ -1125,3 +1125,54 @@ and Ctrl+L hard to find; R-42 to R-44 were added for it.
 - **For the owner to check**: `ide.bat --fresh`; the browser from the
   `cog-lisp` menu; a definition edited and saved there, then the file in the
   editor; Ctrl+B on `car` in the editor.
+
+## 22. As built: the whole body in the browser, the compiler edited live (2026-11-11)
+
+The owner's trial of 4a found every special form, and many built-ins, shown
+"with no source in the image", and asked that the whole compiler be editable
+live from the browser.
+
+- **Special forms** are entries in the compiler's table, made by a top-level
+  `define-special-form` in `lib/compiler/compiler.lisp`, which no definition
+  reader knew. The browser finds that form (its place and text), and the
+  translator procedure in the table stands for the form: its callees
+  (`lc-translate-if` for `if`), callers and disassembly.
+- **Primitives** are Smalltalk: `ide-browse`'s ninth part is `(class selector
+  source)`, the method of `LispPrimitives` that installs it and the block that
+  implements it (from the block's source node). The browser shows that block in
+  the Source tab and opens Pharo's browser on the method (*Browse the
+  Smalltalk*): the Smalltalk door.
+- **The sealed sources** (`ide-sealed-sources`: the compiler's five files and
+  the five built-in libraries) are a group each in the browser, listing every
+  definition in the file in its order, the helpers no category holds, and the
+  special forms, so the whole compiler can be read there.
+- **The compiler edited live.** The sealed compiler reads private copies of the
+  cells it uses, so a definition of one of its names, from a program, changes
+  only the program's world. A definition evaluated **as part of a sealed
+  source** (in its file's session, `ide-file-session`: the editor's Do it and
+  Load file, the tab's REPL, the browser's Save) now changes the sealed code
+  too: `LispCompiler resealAll:sourceDirectory:` finds each name's private copy
+  (walking the sealed code from what the sealed sources define, as sealing
+  did), puts the new value in it, seals the new value's own code the same way,
+  takes again any entry point defined anew, and voids Cog's machine code. A
+  program's definition still never comes there. A special form's
+  `define-special-form` replaces its translator in the shared table, which
+  needed nothing new. The edit lasts until the next build, which compiles the
+  file as saved; a broken edit can break the running compiler, and a fresh image
+  (`ide.bat --fresh`) is the way back.
+- **One list of categories**: `documentation-categories`, a documented
+  built-in in `lib/core.lisp`, which the browser and `tools/docs.lisp` both
+  use.
+- **A full name of a library not loaded** (`lib:name`) is no longer reported
+  unbound by the editor services' check: a program may load the library at run
+  time. One of a loaded library that does not have the name still is.
+- **Checks**: `tests/lisp/ide-browser.lisp` (63: the category list, a special
+  form's place and translator, a primitive's Smalltalk, the sealed sources'
+  groups, and the compiler edited live: a program's definition of
+  `lc-expansion-too-deep` changes nothing, the same definition evaluated in
+  `compiler.lisp`'s session changes the running compiler's message at once,
+  and the file's text puts it back); `tests/lisp/ide-browser-window.lisp`
+  (35); `tests/lisp/ide-editor.lisp` (65).
+- **For the owner to check**: `ide.bat --fresh`; in the browser,
+  `compiler/compiler.lisp (source)`, a helper edited and saved, then a form
+  compiled that uses it; *Browse the Smalltalk* on `car`.

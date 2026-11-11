@@ -7,11 +7,7 @@
 ;;; from the image. Only the built-in categories below are included, in this
 ;;; order, so a program's own documented definitions never are.
 
-(define docs-categories
-  '("Special forms" "Derived forms" "Equality and types" "Numbers" "Lists"
-    "Characters" "Strings" "Vectors" "Hash tables" "Control"
-    "Conditions and restarts" "Evaluation and macros" "Output" "Ports" "Files" "Network"
-    "The system" "Smalltalk interop" "Language server" "The compiler and reader"))
+(define docs-categories (documentation-categories))      ; the image's own list, in its order
 
 ;; an entry: #(name kind category call description)
 (define (docs-entry-name e) (vector-ref e 0))

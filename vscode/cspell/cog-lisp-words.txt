@@ -55,6 +55,7 @@ capabilities
 capitalize
 car
 case
+categories
 category
 cdaaar
 cdaadr
@@ -359,6 +360,7 @@ run
 save
 screen
 scrolled
+sealed
 search
 second
 seconds
@@ -381,6 +383,7 @@ size
 smalltalk
 sort
 source
+sources
 special
 split
 sqrt

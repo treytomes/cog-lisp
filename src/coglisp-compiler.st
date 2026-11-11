@@ -157,22 +157,27 @@ cm value: comp class value: 'implementation' value: 'compilerSourceNames
 cm value: comp class value: 'implementation' value: 'lispEntries
 	"The LISP procedures the Smalltalk side calls, taken now, after sealing: later
 	 definitions of these names do not change what eval and the reader use."
-	| at |
-	at := [:name | (LispEnvironment default cellFor: (LispSymbol named: name)) value].
+	| entries |
+	entries := Dictionary new.
+	self entryNames keysAndValuesDo: [:key :name |
+		entries at: key put: (LispEnvironment default cellFor: (LispSymbol named: name)) value].
+	^ entries'.
+cm value: comp class value: 'implementation' value: 'entryNames
+	"Each entry point, and the LISP name it is taken from."
 	^ Dictionary new
-		at: #compile put: (at value: ''lisp-compile-from'');
-		at: #eval put: (at value: ''lisp-eval-from'');
-		at: #macroexpand1 put: (at value: ''lisp-macroexpand-1'');
-		at: #macroexpand put: (at value: ''lisp-macroexpand'');
-		at: #parseNumber put: (at value: ''reader-parse-number'');
-		at: #makeReader put: (at value: ''make-reader'');
-		at: #next put: (at value: ''reader-next'');
-		at: #datumStart put: (at value: ''reader-datum-start'');
-		at: #position put: (at value: ''reader-position'');
-		at: #setPosition put: (at value: ''rd-pos!!'');
-		at: #sourceFor put: (at value: ''reader-source-for'');
-		at: #skipIntertoken put: (at value: ''rd-skip-intertoken!!'');
-		at: #atEnd put: (at value: ''rd-at-end?'');
+		at: #compile put: ''lisp-compile-from'';
+		at: #eval put: ''lisp-eval-from'';
+		at: #macroexpand1 put: ''lisp-macroexpand-1'';
+		at: #macroexpand put: ''lisp-macroexpand'';
+		at: #parseNumber put: ''reader-parse-number'';
+		at: #makeReader put: ''make-reader'';
+		at: #next put: ''reader-next'';
+		at: #datumStart put: ''reader-datum-start'';
+		at: #position put: ''reader-position'';
+		at: #setPosition put: ''rd-pos!!'';
+		at: #sourceFor put: ''reader-source-for'';
+		at: #skipIntertoken put: ''rd-skip-intertoken!!'';
+		at: #atEnd put: ''rd-at-end?'';
 		yourself'.
 cm value: comp class value: 'implementation' value: 'definedNamesIn: aFile
 	"The names a file of LISP defines at top level."
@@ -216,6 +221,84 @@ cm value: comp class value: 'implementation' value: 'sealLispCompiler: lib
 	self sealLibraries: lib frozen: frozen.
 	"machine code made before sealing may still read the old cells"
 	Smalltalk vm voidCogVMState'.
+cm value: comp class value: 'live editing' value: 'sealedRootsIn: lib
+	"The values the seal starts from: what the compiler''s source and the built-in
+	 libraries (in the folder lib) define, and the procedures in their tables (the
+	 special forms)."
+	| roots add |
+	roots := OrderedCollection new.
+	add := [:v | v notNil ifTrue: [
+		roots add: v.
+		(v isKindOf: (Smalltalk at: #LispHashTable)) ifTrue: [roots addAll: v values]]].
+	(self compilerSourceNames collect: [:n | lib / ''compiler'' / n]) , (self builtInLibraryNames collect: [:n | lib / n])
+		do: [:file | file exists ifTrue: [
+			(self definedNamesIn: file) do: [:sym | add value: ((LispEnvironment default cellFor: sym) valueIfUnbound: [nil])]]].
+	LispEntries ifNotNil: [:e | roots addAll: e values].
+	^ roots'.
+cm value: comp class value: 'live editing' value: 'codesOf: aValue
+	"The compiled code a procedure (or a macro''s expander) runs, its blocks'' too."
+	| p codes walk |
+	p := (aValue isKindOf: LispMacro) ifTrue: [aValue expander] ifFalse: [aValue].
+	codes := OrderedCollection new.
+	((p isKindOf: (Smalltalk at: #LispProcedure)) and: [p block isKindOf: BlockClosure]) ifFalse: [^ codes].
+	walk := nil.
+	walk := [:code | (codes includes: code) ifFalse: [
+		codes add: code.
+		code literals do: [:lit |
+			(lit isKindOf: CompiledBlock) ifTrue: [walk value: lit].
+			(lit isKindOf: BlockClosure) ifTrue: [walk value: lit compiledBlock]]]].
+	walk value: p block compiledBlock.
+	^ codes'.
+cm value: comp class value: 'live editing' value: 'sealedCopiesIn: lib
+	"symbol -> the private cell the sealed code reads that global through: the cells
+	 in the sealed code that are not the environment''s own (frozen copies)."
+	| copies seen pending |
+	copies := IdentityDictionary new.
+	seen := IdentitySet new.
+	pending := OrderedCollection withAll: (self sealedRootsIn: lib).
+	[pending isEmpty] whileFalse: [| v |
+		v := pending removeFirst.
+		(seen includes: v) ifFalse: [
+			seen add: v.
+			(self codesOf: v) do: [:code |
+				code literals do: [:lit |
+					((lit isKindOf: LispGlobal) and: [lit ~~ (LispEnvironment default cellFor: lit symbol)]) ifTrue: [
+						(copies includesKey: lit symbol) ifFalse: [
+							copies at: lit symbol put: lit.
+							pending add: (lit valueIfUnbound: [nil])]]]]]].
+	^ copies'.
+cm value: comp class value: 'live editing' value: 'seal: aValue with: copies
+	"aValue''s code made to read each global that has a private copy through it, as
+	 the compiler''s code does."
+	(self codesOf: aValue) do: [:code |
+		1 to: code numLiterals do: [:i | | lit |
+			lit := code literalAt: i.
+			((lit isKindOf: LispGlobal) and: [lit == (LispEnvironment default cellFor: lit symbol)]) ifTrue: [
+				(copies at: lit symbol ifAbsent: [nil]) ifNotNil: [:copy | code literalAt: i put: copy]]]]'.
+cm value: comp class value: 'live editing' value: 'resealAll: symbols
+	^ self resealAll: symbols sourceDirectory: self lispSourceDirectory'.
+cm value: comp class value: 'live editing' value: 'resealAll: symbols sourceDirectory: lib
+	"The compiler edited live (specs/34-morphic-ide.md section 22): after its own
+	 source, or a built-in library''s, defined these names again, each one''s private
+	 copy takes the new value, whose code is sealed as the compiler''s is, and the
+	 entry points are taken again. A program''s definitions never come here: only
+	 an evaluation as part of a sealed source file does. Answers the names resealed."
+	| copies done |
+	copies := self sealedCopiesIn: lib asFileReference.
+	done := OrderedCollection new.
+	symbols do: [:sym | (copies at: sym ifAbsent: [nil]) ifNotNil: [:copy | | v |
+		v := (LispEnvironment default cellFor: sym) valueIfUnbound: [nil].
+		v ifNotNil: [
+			self seal: v with: copies.
+			copy define: v.
+			done add: sym]]].
+	"an entry point defined again is the one the Smalltalk side calls; the others stay"
+	LispEntries ifNotNil: [
+		self entryNames keysAndValuesDo: [:key :name |
+			(symbols includes: (LispSymbol named: name)) ifTrue: [
+				LispEntries at: key put: (LispEnvironment default cellFor: (LispSymbol named: name)) value]]].
+	Smalltalk vm voidCogVMState.
+	^ done asArray'.
 cm value: comp class value: 'implementation' value: 'builtInLibraryNames
 	"the lib/ files the build compiles into the image, besides the compiler"
 	^ #(''core.lisp'' ''format.lisp'' ''json.lisp'' ''http.lisp'' ''coverage.lisp'')'.

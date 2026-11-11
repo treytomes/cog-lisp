@@ -35,7 +35,8 @@
           ide-check ide-describe ide-complete ide-definitions ide-index-project!
           ide-indent-unit ide-indent ide-format
           ide-groups ide-group-definitions ide-definition-kind ide-browse
-          ide-callers ide-callees ide-search ide-disassembly ide-write-definition))
+          ide-callers ide-callees ide-search ide-disassembly ide-write-definition
+          ide-sealed-sources))
 (require 'editor-services)
 (require 'console)
 
@@ -170,7 +171,11 @@ For a file saved, the text it held before, which ide-undo-change writes back; el
   (let ((names (map definition-name (guard (e (#t '())) (editor-definitions text)))))
     (unless (null? names)
       (%record! (vector [[[(smalltalk DateAndTime) now] printString] asString]
-                        [s name] (ide-session-maker s) 'evaluate names text)))))
+                        [s name] (ide-session-maker s) 'evaluate names text))
+      ;; as part of the compiler's source (or a built-in library's): the sealed code too
+      (when (hash-table-ref/default %sealed-sessions s #f)
+        [(smalltalk LispCompiler) resealAll: (list->vector (map string->symbol names))
+         sourceDirectory: (string-append (hash-table-ref *env* 'home) "/lib")]))))
 
 (define (ide-changes)
   "(ide-changes)
@@ -424,7 +429,7 @@ Loads the file at path, as load does, in a session of its own, and answers the r
 
 (define (ide-file-session path . options)
   "(ide-file-session path option ...)
-The session that evaluates forms as part of the file at path (R-9): in its unit, so a define in a library's file defines the library's name. A library's file is loaded first if it has not been; a program's is not, since loading it would run it. The session is made once and kept. Options: maker (person or agent; person)."
+The session that evaluates forms as part of the file at path (R-9): in its unit, so a define in a library's file defines the library's name. For a sealed source (ide-sealed-sources), what it defines changes the sealed code too, so the compiler is edited live. A library's file is loaded first if it has not been; a program's is not, since loading it would run it. The session is made once and kept. Options: maker (person or agent; person)."
   ;; units are known by the path's full name, as load gives it
   (let* ((full [[path asFileReference] fullName]) (key (editor-key full)))
     (or (let ((s (hash-table-ref/default %file-sessions key #f)))
@@ -437,6 +442,7 @@ The session that evaluates forms as part of the file at path (R-9): in its unit,
                                  'maker (%option options 'maker 'person)
                                  'unit (if (smalltalk-nil? unit) #f unit))))
             (hash-table-set! %file-sessions key s)
+            (when (%sealed-source? full) (hash-table-set! %sealed-sessions s #t))
             s)))))
 
 ;;; ---------------------------------------------------------------------------
@@ -541,12 +547,6 @@ text laid out by format-source, indented as text indents (ide-indent-unit): with
 ;;; ---------------------------------------------------------------------------
 ;;; The body, as the browser reads it (step 4a, R-17 to R-21)
 
-;; the reference's categories, in its order (tools/docs.lisp)
-(define %categories
-  '("Special forms" "Derived forms" "Equality and types" "Numbers" "Lists"
-    "Characters" "Strings" "Vectors" "Hash tables" "Control"
-    "Conditions and restarts" "Evaluation and macros" "Output" "Ports" "Files" "Network"
-    "The system" "Smalltalk interop" "Language server" "The compiler and reader"))
 
 (define (%env) [(smalltalk LispEnvironment) default])
 
@@ -555,7 +555,10 @@ text laid out by format-source, indented as text indents (ide-indent-unit): with
     [(%env) cellsDo: (lambda (cell) (when [cell isBound] (set! acc (cons cell acc))))]
     acc))
 
-(define (%value-of name) (and [(%env) isBound: name] [(%env) lookup: name]))
+(define (%value-of name)
+  (if (memq name (special-form-names))
+      (hash-table-ref/default lc-special-forms name #f)        ; its translator
+      (and [(%env) isBound: name] [(%env) lookup: name])))
 
 (define (%qualified? s) (and (string-index s #\:) #t))
 
@@ -586,7 +589,7 @@ text laid out by format-source, indented as text indents (ide-indent-unit): with
 What the symbol name is in the image: special-form, macro, syntax (a define-syntax macro), primitive (installed by Smalltalk), procedure, or variable; #f when it is not bound."
   (if (memq name (special-form-names))
       'special-form
-      (let ((v (%value-of name)))
+      (let ((v (and [(%env) isBound: name] [(%env) lookup: name])))
         (cond ((not [(%env) isBound: name]) #f)
               ([v isKindOf: (smalltalk LispMacro)]
                (let ((s (%source-of v))) (if (and s (string-prefix? "(define-syntax" s)) 'syntax 'macro)))
@@ -616,9 +619,10 @@ What the symbol name is in the image: special-form, macro, syntax (a define-synt
 
 (define (ide-groups)
   "(ide-groups)
-The groups the browser lists (R-17), each #(name kind): the built-in categories that have names, in the reference's order (kind category); the loaded libraries, by name (kind library); and programs (kind programs), the globals programs have defined, when there are any."
+The groups the browser lists (R-17), each #(name kind): the built-in categories that have names, in the reference's order (kind category); the sealed sources, the compiler's files and the built-in libraries', each listing everything it defines, helpers included (kind source; ide-sealed-sources); the loaded libraries, by name (kind library); and programs (kind programs), the globals programs have defined, when there are any."
   (append
-   (filter-map (lambda (c) (and (pair? (%category-names c)) (vector c 'category))) %categories)
+   (filter-map (lambda (c) (and (pair? (%category-names c)) (vector c 'category))) (documentation-categories))
+   (map (lambda (path) (vector (%source-label path) 'source)) (ide-sealed-sources))
    (map (lambda (name) (vector name 'library))
         (sort (map (lambda (u) (symbol->string [u library])) (vector->list [[(smalltalk LispUnit) libraries] asArray]))
               string<?))
@@ -626,10 +630,15 @@ The groups the browser lists (R-17), each #(name kind): the built-in categories 
 
 (define (ide-group-definitions name kind)
   "(ide-group-definitions name kind)
-The definitions in a group of ide-groups, each #(name kind exported?): name the full symbol, kind ide-definition-kind's, exported? whether a library exports it (#t outside libraries). A library's exports come first, then its private names, each by name."
+The definitions in a group of ide-groups, each #(name kind exported?): name the full symbol, kind ide-definition-kind's, exported? whether a library exports it (#t outside libraries). A library's exports come first, then its private names, each by name; a sealed source's are in the file's order, its special forms among them."
   (case kind
     ((category) (map (lambda (n) (vector n (ide-definition-kind n) #t)) (%category-names name)))
     ((programs) (map (lambda (n) (vector n (ide-definition-kind n) #t)) (%program-names)))
+    ((source)
+     (let ((path (find (lambda (p) (string=? (%source-label p) name)) (ide-sealed-sources))))
+       (if (not path)
+           '()
+           (map (lambda (n) (vector n (ide-definition-kind n) #t)) (%names-defined-in path)))))
     ((library)
      (let* ((unit [(smalltalk LispUnit) libraryNamed: (string->symbol name)])
             (exports (map symbol->string (vector->list [unit exports])))
@@ -684,15 +693,16 @@ The definitions in a group of ide-groups, each #(name kind exported?): name the 
 
 (define (ide-browse name)
   "(ide-browse name)
-A definition as the browser shows it (R-17, R-21): #(name kind documentation source path start end stale?). documentation and source are strings or #f (a built-in compiled by the seed keeps no source); path, start and end (character offsets from 0, in the file's text with line feeds) say where it is, or are #f; stale? is #t when its file no longer holds the text it was compiled from. #f when name is not bound."
+A definition as the browser shows it (R-17, R-21): #(name kind documentation source path start end stale? smalltalk). documentation and source are strings or #f (a built-in compiled by the seed keeps no source); path, start and end (character offsets from 0, in the file's text with line feeds) say where it is, or are #f: a special form's is its define-special-form in the compiler's source; stale? is #t when its file no longer holds the text it was compiled from; smalltalk, for a primitive, is (class selector source): the method of Smalltalk that installs it and the block that implements it. #f when name is not bound."
   (let ((kind (ide-definition-kind name)))
     (and kind
          (let* ((v (and (not (eq? kind 'special-form)) (%value-of name)))
                 (source (and v (%source-of v)))
-                (place (%place-of name source)))
+                (place (if (eq? kind 'special-form) (%special-form-place name) (%place-of name source))))
            (vector name kind (documentation name) source
                    (and place (car place)) (and place (cadr place)) (and place (caddr place))
-                   (and place (cadddr place)))))))
+                   (and place (cadddr place))
+                   (and (eq? kind 'primitive) (%smalltalk-of v)))))))
 
 ;; the compiled code of a value: its procedure's block and the blocks inside it
 (define (%codes-of v)
@@ -736,8 +746,8 @@ The bound names whose compiled code names name (R-18): procedures and macros tha
 
 (define (ide-callees name)
   "(ide-callees name)
-The bound names name's compiled code names (R-18): what it calls and reads, from its code's literals. Sorted; () for a special form or a variable."
-  (let ((v (and (not (memq name (special-form-names))) (%value-of name))))
+The bound names name's compiled code names (R-18): what it calls and reads, from its code's literals; for a special form, its translator's. Sorted; () for a variable."
+  (let ((v (%value-of name)))
     (if (not v)
         '()
         (%sort-names (filter (lambda (n) (and (not (eq? n name)) [(%env) isBound: n])) (%names-used v))))))
@@ -756,8 +766,8 @@ The names bound in the image, special forms among them, whose name or documentat
 
 (define (ide-disassembly name)
   "(ide-disassembly name)
-The bytecode of name's compiled code as text, each block after its own heading, one bytecode a line; #f for a special form or a variable."
-  (let ((v (and (not (memq name (special-form-names))) (%value-of name))))
+The bytecode of name's compiled code as text, each block after its own heading, one bytecode a line; for a special form, its translator's; #f for a variable."
+  (let ((v (%value-of name)))
     (and v (%procedure-of v)
          (with-output-to-string
           (lambda ()
@@ -786,3 +796,76 @@ Edits a definition from the browser (R-20): writes text in place of name's defin
                     (r (ide-eval s text)))
                (if (eq? (result-status r) 'error) (ide-eval s "(abort)"))
                r))))))
+
+;;; ---------------------------------------------------------------------------
+;;; The sealed sources, edited live (section 22): the compiler's files and the
+;;; built-in libraries'
+
+(define (ide-sealed-sources)
+  "(ide-sealed-sources)
+The files whose code the image seals (the compiler's, in lib/compiler/, and the built-in libraries' in lib/: core, format, json, http, coverage), as full paths, those that exist in cog-lisp's home. A definition evaluated as part of one of them, in its file's session (ide-file-session), changes the sealed code too: the compiler is edited live."
+  (let ((home (hash-table-ref/default *env* 'home #f)))
+    (if (not home)
+        '()
+        (filter (lambda (p) [[p asFileReference] exists])
+                (append (map (lambda (n) [[[[[home asFileReference] / "lib"] / "compiler"] / n] fullName])
+                             (map (lambda (s) [s asString]) (vector->list [(smalltalk LispCompiler) compilerSourceNames])))
+                        (map (lambda (n) [[[[home asFileReference] / "lib"] / n] fullName])
+                             (map (lambda (s) [s asString]) (vector->list [(smalltalk LispCompiler) builtInLibraryNames]))))))))
+
+(define (%sealed-source? path)
+  (let ((key (editor-key [[path asFileReference] fullName])))
+    (and (find (lambda (p) (string=? (editor-key p) key)) (ide-sealed-sources)) #t)))
+
+;; compiler/codegen.lisp, core.lisp: a sealed source's name in the browser
+(define (%source-label path)
+  (let ((ref [path asFileReference]))
+    (if (string=? [[ref parent] basename] "compiler")
+        (string-append "compiler/" [ref basename])
+        [ref basename])))
+
+;; the names a file defines at top level, in its order, special forms among them
+(define (%names-defined-in path)
+  (let ((r (make-reader (car (ide-read-file path)))))
+    (let loop ((acc '()))
+      (let ((d (guard (e (#t (eof-object))) (reader-next r))))
+        (cond ((eof-object? d) (reverse acc))
+              ((and (pair? d) (eq? (car d) 'define-special-form) (pair? (cdr d))
+                    (pair? (cadr d)) (eq? (car (cadr d)) 'quote))
+               (loop (cons (cadr (cadr d)) acc)))
+              ((%definition-of-form d) => (lambda (n) (loop (if (memq n acc) acc (cons n acc)))))
+              (else (loop acc)))))))
+
+(define (%definition-of-form d)
+  (and (pair? d) (memq (car d) '(define define-macro define-syntax)) (pair? (cdr d))
+       (let ((target (cadr d)))
+         (cond ((symbol? target) target)
+               ((and (pair? target) (symbol? (car target))) (car target))
+               (else #f)))))
+
+;; a special form's define-special-form, in the compiler's source: (path start end #f)
+(define (%special-form-place name)
+  (let loop ((files (filter (lambda (p) (string-search p "compiler")) (ide-sealed-sources))))
+    (if (null? files)
+        #f
+        (let* ((path (car files))
+               (r (make-reader (car (ide-read-file path)))))
+          (let scan ()
+            (let ((d (guard (e (#t (eof-object))) (reader-next r))))
+              (cond ((eof-object? d) (loop (cdr files)))
+                    ((and (pair? d) (eq? (car d) 'define-special-form) (pair? (cdr d))
+                          (equal? (cadr d) (list 'quote name)))
+                     (list path (reader-datum-start r) (reader-position r) #f))
+                    (else (scan)))))))))
+
+;; a primitive's Smalltalk: (class selector block-source)
+(define (%smalltalk-of p)
+  (guard (e (#t #f))
+    (let* ((code [[p block] compiledBlock])
+           (method [code method]))
+      (list [[[method methodClass] name] asString]
+            [[method selector] asString]
+            [[[code sourceNode] sourceCode] asString]))))
+
+;; the sessions evaluating as part of a sealed source
+(define %sealed-sessions (make-hash-table eq?))

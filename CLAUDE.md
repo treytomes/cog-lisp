@@ -656,7 +656,11 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **The installed compiler is sealed:** its code reads private copies of the
   global cells it uses, so redefining `append` (or `lc-translate-if`) in a
   program changes nothing for the compiler. To change the compiler, edit
-  `lib/compiler/` and rebuild; `define-special-form` extends it live.
+  `lib/compiler/` and rebuild; `define-special-form` extends it live, and so
+  does a definition evaluated as part of a sealed source, in its file's session
+  (`ide-file-session`: the editor, the browser), which `LispCompiler
+  resealAll:sourceDirectory:` puts into the sealed code (specs/34-morphic-ide.md
+  section 22). A program's definition never does.
 - **Hot LISP code: compare characters with `eq?`, not `char=?`.** `char=?` is
   variadic and builds an argument list per call; characters are immediate, so
   `eq?` (inlined to `==`) is exact. `vector-ref` and `string-ref` are checked

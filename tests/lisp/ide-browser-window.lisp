@@ -53,7 +53,7 @@
     ;; a primitive: no source, no file
     (on-ui [b browse: 'car])
     (check-true (has? (on-ui [b headerText]) "car -- primitive"))
-    (check-true (has? (on-ui [b sourceText]) "with no source in the image"))
+    (check-true (has? (on-ui [b sourceText]) "written in Smalltalk"))
     (check-true (string-prefix? "(car" (on-ui [b documentationText])))
     ;; a built-in from cog-lisp's own sources: its text from the file
     (on-ui [b browse: 'filter])
@@ -105,6 +105,21 @@
     (let ((b (on-ui [e lastBrowser])))
       (check-true (has? (on-ui [b headerText]) "car -- primitive"))
       (on-ui [[b window] close]))
+    (close! w)))
+
+(define-test "the whole body: a special form, a primitive's Smalltalk, a compiler helper"
+  (let* ((b (browser)) (w (open! b)))
+    (on-ui [b browse: 'if])
+    (check-true (has? (on-ui [b headerText]) "if -- special form   compiler.lisp:"))
+    (check-true (string-prefix? "(define-special-form 'if" (on-ui [b sourceText])))
+    (check-true (and (member "lc-translate-if" (strings (on-ui [b calleeNames]))) #t))
+    (on-ui [b browse: 'car])
+    (check-true (has? (on-ui [b sourceText]) "car is a primitive, written in Smalltalk: a block in LispPrimitives class>>installListsInto:\n[:p | p car]"))
+    (check (on-ui [[[b smalltalkMethod] selector] asString]) "installListsInto:")
+    (on-ui [b browse: 'lc-translate-if])
+    (check (on-ui [[[[b instVarNamed: "groups"] selectedItem] first] asString]) "compiler/compiler.lisp")
+    (check-true (string-prefix? "(define (lc-translate-if" (on-ui [b sourceText])))
+    (check-true (smalltalk-nil? (on-ui [b smalltalkMethod])))
     (close! w)))
 
 (define-test "the cog-lisp menu opens the browser"

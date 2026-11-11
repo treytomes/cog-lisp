@@ -45,7 +45,7 @@ files := (SpPresenter << #LispFilesPresenter) slots: { #list. #source. #runButto
 styler := (SHRBTextStyler << #LispStyler) slots: { #palette. #page }; package: 'CogLisp-IDE'; install.
 epage := (SpPresenter << #LispEditorPage) slots: { #code. #path. #ending. #savedText. #editor. #repl. #bottom. #problemsList. #problems. #checkGeneration. #diskText. #choices }; package: 'CogLisp-IDE'; install.
 editorp := (SpPresenter << #LispEditorPresenter) slots: { #tree. #notebook. #status. #toolbar. #pages. #tabs. #folder. #lastRun. #watching. #lastBrowser }; package: 'CogLisp-IDE'; install.
-brw := (SpPresenter << #LispBrowserPresenter) slots: { #search. #groups. #definitions. #header. #notebook. #source. #documentation. #callers. #callees. #disassembly. #saveButton. #editorButton. #status. #current. #lastEditor }; package: 'CogLisp-IDE'; install.
+brw := (SpPresenter << #LispBrowserPresenter) slots: { #search. #groups. #definitions. #header. #notebook. #source. #documentation. #callers. #callees. #disassembly. #saveButton. #editorButton. #smalltalkButton. #status. #current. #lastEditor }; package: 'CogLisp-IDE'; install.
 keyq := (Object << #LispKeyQueue) slots: { #chars. #ready. #wanted }; package: 'CogLisp-IDE'; install.
 
 "=== LispSessionInput: lines typed for a program that reads ==================="
@@ -1883,6 +1883,8 @@ cm value: brw value: 'initialization' value: 'initializePresenters
 	saveButton label: ''Save''; help: ''Write the definition into its file, save it, and evaluate it (Ctrl+S)''; action: [self saveDefinition]; disable.
 	editorButton := self newButton.
 	editorButton label: ''Open in editor''; help: ''Open its file in the editor, at the definition''; action: [self openInEditor]; disable.
+	smalltalkButton := self newButton.
+	smalltalkButton label: ''Browse the Smalltalk''; help: ''Open Pharo''''s browser on the method that installs this primitive''; action: [self browseSmalltalk]; disable.
 	status := self newLabel.
 	groups items: (self listFrom: (LispIde call: ''ide:ide-groups'' with: #()))'.
 cm value: brw value: 'initialization' value: 'defaultLayout
@@ -1899,6 +1901,7 @@ cm value: brw value: 'initialization' value: 'defaultLayout
 						add: header;
 						add: saveButton expand: false;
 						add: editorButton expand: false;
+						add: smalltalkButton expand: false;
 						yourself) expand: false;
 					add: notebook;
 					yourself);
@@ -1943,9 +1946,9 @@ cm value: brw value: 'accessing' value: 'lastEditor
 	"The editor Open in editor last used."
 	^ lastEditor'.
 cm value: brw value: 'accessing' value: 'groupLabel: aGroup
-	^ (aGroup at: 2) name = ''library''
-		ifTrue: [(aGroup at: 1) , ''  (library)'']
-		ifFalse: [aGroup at: 1]'.
+	(aGroup at: 2) name = ''library'' ifTrue: [^ (aGroup at: 1) , ''  (library)''].
+	(aGroup at: 2) name = ''source'' ifTrue: [^ (aGroup at: 1) , ''  (source)''].
+	^ aGroup at: 1'.
 cm value: brw value: 'accessing' value: 'definitionLabel: anEntry
 	"Its name (a library''s own without the library''s prefix), and its kind."
 	| name colon kind |
@@ -1972,6 +1975,10 @@ cm value: brw value: 'browsing' value: 'groupOf: aName
 	colon > 0 ifTrue: [^ s copyFrom: 1 to: colon - 1].
 	category := [LispIde call: ''documentation-category'' with: { aName }] on: Error do: [:e | false].
 	(category isString and: [self groupNames includes: category]) ifTrue: [^ category].
+	"a helper of the compiler or of a built-in library: the file that defines it"
+	(groups items select: [:g | (g at: 2) name = ''source'']) do: [:g |
+		((self listFrom: (LispIde call: ''ide:ide-group-definitions'' with: { g at: 1. g at: 2 }))
+			anySatisfy: [:d | (d at: 1) == aName]) ifTrue: [^ g at: 1]].
 	^ ''programs'''.
 cm value: brw value: 'browsing' value: 'browse: aName
 	"aName shown, with its group and its place in the group''s list when it has one."
@@ -2005,13 +2012,19 @@ cm value: brw value: 'browsing' value: 'show: aName
 		ifTrue: [b at: 4]
 		ifFalse: [(text notNil and: [(b at: 6) isInteger])
 			ifTrue: [text copyFrom: (b at: 6) + 1 to: ((b at: 7) min: text size)]
-			ifFalse: [''; '' , aName name , '': '' , ((b at: 2) name copyReplaceAll: ''-'' with: '' '') , '', with no source in the image'']]).
+			ifFalse: [(b size >= 9 and: [(b at: 9) isKindOf: LispCons])
+				ifTrue: [| st |
+					st := self listFrom: (b at: 9).
+					''; '' , aName name , '' is a primitive, written in Smalltalk: a block in '' ,
+						(st at: 1) , ''>>'' , (st at: 2) , String lf , (st at: 3)]
+				ifFalse: [''; '' , aName name , '': '' , ((b at: 2) name copyReplaceAll: ''-'' with: '' '') , '', with no source in the image'']]]).
 	documentation text: ((b at: 3) isString ifTrue: [b at: 3] ifFalse: [''(no documentation)'']).
 	callers items: (self listFrom: (LispIde call: ''ide:ide-callers'' with: { aName })).
 	callees items: (self listFrom: (LispIde call: ''ide:ide-callees'' with: { aName })).
 	dis := LispIde call: ''ide:ide-disassembly'' with: { aName }.
 	disassembly text: (dis isString ifTrue: [dis] ifFalse: [''(no compiled code: a special form or a variable)'']).
 	path ifNil: [saveButton disable. editorButton disable] ifNotNil: [:p | saveButton enable. editorButton enable].
+	(b size >= 9 and: [(b at: 9) isKindOf: LispCons]) ifTrue: [smalltalkButton enable] ifFalse: [smalltalkButton disable].
 	status label: '''''.
 
 cm value: brw value: 'editing' value: 'saveDefinition
@@ -2029,6 +2042,21 @@ cm value: brw value: 'editing' value: 'saveDefinition
 	(r at: 1) name = ''error''
 		ifTrue: [status label: ''saved; evaluating it failed: '' , (r at: 5)]
 		ifFalse: [status label: ''saved to '' , (current at: 5) asFileReference basename , '' and evaluated'']'.
+cm value: brw value: 'editing' value: 'smalltalkMethod
+	"The method of Smalltalk that installs the primitive shown, or nil."
+	| st name cls |
+	(current isNil or: [current size < 9 or: [((current at: 9) isKindOf: LispCons) not]]) ifTrue: [^ nil].
+	st := self listFrom: (current at: 9).
+	name := st at: 1.
+	cls := (name endsWith: '' class'')
+		ifTrue: [(Smalltalk at: (name allButLast: 6) asSymbol) class]
+		ifFalse: [Smalltalk at: name asSymbol].
+	^ cls >> (st at: 2) asSymbol'.
+cm value: brw value: 'editing' value: 'browseSmalltalk
+	"Pharo''s browser on the method that installs the primitive shown: the Smalltalk door."
+	self smalltalkMethod
+		ifNil: [status label: ''only a primitive has Smalltalk to browse'']
+		ifNotNil: [:m | m browse]'.
 cm value: brw value: 'editing' value: 'openInEditor
 	"Its file in the editor (reused while its window is open), the definition selected."
 	| page |

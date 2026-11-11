@@ -116,6 +116,7 @@
   "display": {"call": "(display x [port])", "kind": "procedure", "category": "Output", "description": "Writes x for a person: strings and characters as they are, to port or the current output."},
   "do": {"call": "(do ((var init step) ...) (test result ...) body ...)", "kind": "macro", "category": "Derived forms", "description": "A loop: binds each var to its init, then until test is true runs the body and steps each var; answers the results."},
   "documentation": {"call": "(documentation name)", "kind": "procedure", "category": "The compiler and reader", "description": "The documentation of what the symbol name means: a special form, a macro or a procedure; #f if it has none. Its first line is the call form."},
+  "documentation-categories": {"call": "(documentation-categories)", "kind": "procedure", "category": "Evaluation and macros", "description": "The sections of the reference of the built-ins, in its order: the ones documentation-category answers."},
   "documentation-category": {"call": "(documentation-category name)", "kind": "procedure", "category": "The compiler and reader", "description": "The section of the reference of the built-ins that name belongs in, or #f."},
   "dynamic-wind": {"call": "(dynamic-wind before thunk after)", "kind": "procedure", "category": "Conditions and restarts", "description": "Calls before, thunk and after, and calls after however thunk is left."},
   "eof-object": {"call": "(eof-object)", "kind": "procedure", "category": "Ports", "description": "The eof object, which reading answers at the end of its input."},
