@@ -27,3 +27,21 @@ reflection, and persistence*, not only performance.
   normal code compiles. Keep that escape hatch open when shaping Phases 3–4.
 - Self-hosting (Phase 8) and rich reflection are not side-quests; they are
   directly in service of an agent that can read and rewrite its own body.
+
+**The layers of the body** (owner, 2026-11-10): "What we're doing now is
+building the body. Starting with the Lisp substrate, then building the expert
+system on top of that." Three layers, bottom up:
+1. **The LISP substrate**: cog-lisp, the image, its tools (spec 34).
+2. **The expert system**: `~/projects/lisp-expert`'s rules, forward and backward
+   chaining, explanations, written in cog-lisp ([[expert-system-goal]]).
+3. **The model at the top**, "like the higher cognitive functions of the human
+   brain", reaching the layers below through the image's interface.
+
+The owner hopes to bring in many principles of `~/projects/local-assist`, the
+assistant built over the past year (notes, tasks, memory, tools over MCP).
+
+**How to apply:** the tools are the body's senses and hands before they are
+windows: spec 34's amendment (2026-11-10) makes every tool an `ide` procedure
+answering plain data, records every change to the body (R-35), and plans the
+model's doorway in over MCP (R-36). When designing a layer, ask what the layer
+above will need from it, and what local-assist already learned about that.

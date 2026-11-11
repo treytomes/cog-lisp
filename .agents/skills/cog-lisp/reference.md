@@ -632,3 +632,39 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(with-hidden-cursor thunk)`: Runs thunk with the cursor hidden, and shows it again however thunk is left, and at exit.
 - `(with-raw-mode thunk)`: Runs thunk with the terminal in raw mode (keys arrive one at a time, not echoed), and restores it however thunk is left, and at exit. Nested, the outermost restores. Without a terminal, it only runs thunk.
 - `(with-test-console options thunk)`: Runs thunk against a test console, and answers its screen: options is a list of names and values, width (80), height (24), colors (truecolor), unicode? (#t), events (a list of key names, characters, strings, lists such as (ctrl #\c), or events, for read-event and the prompts), and input (a string of lines: then the console reads no keys, and the prompts read these lines, as with piped input). The screen is what was written, as a terminal shows it: screen-text, screen-cell and the rest read it.
+
+### editor-services: `(require 'editor-services)`
+
+- `(completion-detail completion)`: One line about the name: its call, or its definition's first line.
+- `(completion-documentation completion)`: The rest of its documentation, or the empty string.
+- `(completion-kind completion)`: keyword (a special form or a macro), function, or variable (a name the workspace defines).
+- `(completion-label completion)`: The name to insert, a string.
+- `(definition-documentation definition)`: A definition's documentation string, or #f.
+- `(definition-end definition)`: Where a definition's form ends in its text: the offset after its last character.
+- `(definition-name definition)`: A definition's name, a string.
+- `(definition-path definition)`: The path of the file a definition is in, or #f for a text that is no file.
+- `(definition-source definition)`: The text of a definition's whole form.
+- `(definition-start definition)`: Where a definition's form starts in its text, a character offset from 0.
+- `(editor-check path text)`: The problems compiling text, the file at path, would meet: each read error, compile error and warning, placed on its form. Runs only its define-syntax, define-macro, require and library forms. The unit it compiles in is kept (editor-unit-of).
+- `(editor-completions path)`: The names to offer in the file at path: the documented built-ins and the special forms, the file's imports as it imported them (con:rule), and the names the index defines, each once.
+- `(editor-definitions text [path])`: The top-level definitions in text (define, define-macro, define-syntax), read but not run, up to the first form that does not read. Each records path, or #f.
+- `(editor-definitions-for path name)`: The definitions name, in the file at path, leads to: a library's full name to that library's file, anything else to its name across the index.
+- `(editor-definitions-named name)`: Every definition in the index named name, a string.
+- `(editor-index-file! path)`: Indexes the file at path as it is on disk; a file that cannot be read is left out.
+- `(editor-index-folder! folder)`: Indexes every .lisp file under folder (a path or a file reference), leaving out pharo, node_modules, .vscode-test, .git and dist.
+- `(editor-index-text! path text)`: Indexes text as the file at path holds it (an editor's unsaved text, say): its definitions replace the file's.
+- `(editor-indexed-text path)`: The text the index holds for the file at path, or #f.
+- `(editor-key path)`: The key a file is known by: its path with / for \, and in lower case on Windows, so two spellings of one path are one file.
+- `(editor-macro-call-at text offset)`: The innermost macro call holding offset in text, as (source . expansion), its text and its full expansion written; or #f.
+- `(editor-resolve path name)`: The symbol name means in the file at path, as its last check (editor-check) imported it: a library's full name for an import, else name as a symbol.
+- `(editor-symbol-at text offset)`: The name around offset in text, as (name start end), or #f between names.
+- `(editor-tokens text)`: The tokens of text, for styling it: comments, strings, characters, numbers, parentheses (with their depth), quotes, keywords (special forms and macros) and other symbols. An unclosed string or comment runs to the end; text that does not read still has tokens.
+- `(editor-unit-of path)`: The unit the text at path was last checked in (editor-check), whose imports say what its names mean, or #f.
+- `(problem-end problem)`: Where a problem ends in its text: the offset after its last character.
+- `(problem-message problem)`: What the problem is, a string.
+- `(problem-severity problem)`: error or warning.
+- `(problem-start problem)`: Where a problem starts in its text, a character offset from 0.
+- `(token-depth token)`: An open or close parenthesis's nesting depth, from 0; 0 for any other token.
+- `(token-end token)`: The offset after a token's last character.
+- `(token-kind token)`: comment, string, character, number, open, close, quote, keyword or symbol.
+- `(token-start token)`: Where a token starts, a character offset from 0.

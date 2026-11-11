@@ -2,8 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (owner, 2026-11-10) with the leanings of §12, decision 3 amended (a stale image updates itself, R-3) and decision 4 to be reassessed later. A spike first (§4) |
+| **Status** | Accepted (owner, 2026-11-10) with the leanings of §12, decision 3 amended (a stale image updates itself, R-3) and decision 4 to be reassessed later. A spike first (§4). Amended (owner, 2026-11-10) for the agent the image is a body for: §3's first principle, §5.10 (R-32 to R-36), step 7, AC-7, decisions 11 and 12 |
 | **Asked for by** | The owner (2026-11-10): "I need you to begin thinking through how we can start migrating app development back into the Pharo UI shell. We need the code file editor, REPL, along with some kind of browse / inspect functionality living inside of Morphic. We need a spec for this." |
+| **Amended for** | The owner (2026-11-10), on the project's first premise: "One of the original premises of this project was to make the "image" the world that an AI agent lives in, equipped with a well known highly structured, highly reflective language. The Pharo/Lisp image becomes the agent's body." So every tool is a LISP interface before it is a window, and the agent gets a way in (§5.10) |
 | **Relates to** | `specs/16-phase-10-documentation-and-editor.md` (the language server, `lib/lsp.lisp`, whose analysis the editor shares, §5.9); `specs/27-namespaces.md` (`LispUnit`: a file's library, its imports, what a form is evaluated in); `specs/29-console.md` (its output in the REPL pane, §5.4); `specs/32-tui.md` (a later front end on the same model, §3); `specs/33-phase-11-pure-image.md` (11.2's audit, which this changes, §6; 11.5's `inspect`, `apropos`, `who-calls` and `backtrace`, which share this model; 11.7's graphics) |
 
 ## 1. Where development happens now
@@ -71,6 +72,14 @@ What cog-lisp's objects know about themselves:
 
 ## 3. Principles
 
+- **The image is a body, and the tools are its senses and hands** (the
+  amendment). cog-lisp's world is meant to be where an AI agent lives, in a
+  structured, reflective language it can read and rewrite. So every tool is a
+  **LISP interface first and a window second**: what the browser lists, what the
+  inspector shows, what the editor checks, evaluating in a unit, changing a
+  definition, are procedures that answer plain LISP data, documented and tested
+  as any library's exports, which a person's windows and an agent's calls use
+  alike (§5.10). A window never knows something the interface cannot say.
 - **Files are the truth; the image is live state.** Programs live in files,
   under git, as now, and VS Code stays a way to edit them. The image holds what
   has been evaluated, and the tools that show it. An edit is saved to its file;
@@ -125,9 +134,68 @@ Item 6 is answered already.
    finds which changes it cannot carry (a class shape change with live
    instances, say), so R-3 can tell them apart.
 
-### 4.1 The answers
+### 4.1 The answers (2026-11-10)
 
-To be recorded.
+1. **The GUI starts, given `--interactive`.** On Windows, `Pharo.exe
+   <image> --interactive --no-default-preferences` opens the world
+   (`OSWorldRenderer`, `MorphicUIManager`, 976 by 665), the playground and a code
+   pane open, and LISP evaluates. Without `--interactive` the pinned VM (the
+   headless build) does not add it, `Smalltalk isInteractive` is false, and the
+   image prints Pharo's command-line usage and quits, under `Pharo.exe` and
+   `PharoConsole.exe` alike. So `ide.bat` passes it. Nothing is written to the
+   current folder; the playground writes its cache to `pharo-local/` beside the
+   image, which is the development image's own folder (R-1). Linux is checked by
+   hand when step 2 lands: no display reaches WSL or Docker here.
+2. **The styler works and is fast enough in the background.** An
+   `SHRBTextStyler` subclass (to keep the theme's table of styles) overrides
+   `privateStyle:`, fills `charAttr` from LISP tokens and answers the text with
+   its runs; the code pane's Shout decorator takes it (`shoutStyler styler:`).
+   Comments, strings and keywords take the theme's colors, so a dark theme
+   follows. On `lib/console.lisp` (80,854 characters, 1,477 lines): the tokens
+   take 70 ms, styling 88 ms, and restyling in the pane about 400 ms, most of
+   it Rubric laying out the text. So styling runs in Shout's background process,
+   and the form being edited is styled first if typing in long files lags.
+   (Skipping `string->number` for words that cannot be numbers halved the tokens'
+   time; reading characters with `[text at: i]` instead of `string-ref` gained
+   nothing.)
+3. **The interaction model is all Do it needs.** `SpCodePresenter` evaluates
+   through `interactionModel compiler`, which answers `source:`,
+   `environment:`, `failBlock:` and `evaluate`; a LISP model answering a LISP
+   evaluator makes Pharo's own Do it, Print it and Inspect it evaluate LISP.
+   In a library file's unit, `(define (g) (+ (f) 1))` defined `spike/demo:g`,
+   which called the library's private `f`. Print it writes Pharo's
+   `printString` ("a LispCons"), so the front end prints with `write` instead.
+   The code pane's "selection or else the line" becomes "selection or else the
+   top-level form" in the LISP presenter.
+4. **The REPL runs unchanged in a process of its own.** `LispRepl` over an
+   input that waits on a semaphore (in its own process only) and a
+   `WriteStream`: output streamed; an unbound variable opened the break loop
+   with `use-value store-value abort`, and `(use-value 5)` continued with 5; a
+   runaway loop left the UI process free and was interrupted
+   (`signalException:`) into the break loop; `(abort)` returned to the prompt;
+   the end of the input ended the REPL. **But the current output and input
+   ports are image-global** (`LispPrimitives`' class variables `Output` and
+   `Input`), as is the console library's `%console`: two REPLs would write into
+   each other's panes. They become per process (a `DynamicVariable`, as
+   `LispCurrentUnit` and the restarts already are) in step 2, R-31.
+5. **An inspector tab is one method.** `LispCons>>inspectionList:` with the
+   pragma made the inspector's tabs `List`, `Raw`, `Meta`, in that order; its
+   table showed `1 1`, `2 (2 3)`, `3 "x"`, each written as LISP.
+6. **Headless testing works** (§2).
+7. **The console library in the pane**: the test console already interprets
+   the library's escape codes into styled cells (29's R-23), so the pane's
+   output stream does the same into text attributes; built in step 2, with
+   `%console` per process (answer 4).
+8. **The cost**: `cog-lisp.image` is 68.4 MB today; the tools add only the
+   IDE's own code, measured in step 2 against this.
+9. **The update in place works for `src/` and the libraries.** In a live
+   image holding a definition of its own, filing in all of `src/` again took
+   3.7 s (478 methods), kept the same `LispEnvironment`, and the definition
+   still answered; compiling `lib/core.lisp` into the live environment took
+   1.2 s, and afterwards the definition, the built-ins and new code all worked.
+   `buildFromSeed:` cannot be used as it is: it makes a fresh environment, which
+   would strand the image's own definitions, so the update compiles into the
+   existing one. Recompiling the compiler in place is checked when R-3 is built.
 
 ## 5. The design (subject to the spike)
 
@@ -140,16 +208,21 @@ To be recorded.
    LISP. They move onto `define-class` when Phase 11.1 brings it.
 2. **The model**, LISP: `lib/editor-services.lisp` (§5.9, shared with the
    language server) and `lib/ide.lisp` (sessions, the browser's queries, the
-   inspection views, the projects). No Spec2 or Morphic name appears in it.
-3. **The front end**, Spec2 presenters on the Morphic backend: the editor, the
-   REPL, the browser (§12 decision 2: in Smalltalk now, beside the glue).
+   inspection views, the projects, changing definitions). Both are public
+   libraries (§5.10, R-32): their exports documented, tested without a window.
+   No Spec2 or Morphic name appears in them.
+3. **The front ends.** First, Spec2 presenters on the Morphic backend: the
+   editor, the REPL, the browser (§12 decision 2: in Smalltalk now, beside the
+   glue). Later, the agent's doorway (R-36), and whatever else is built on the
+   model: 11.5's REPL tools, a terminal front end on `specs/32-tui.md`.
 
 ### 5.2 The development image
 
 - **R-1. `ide.bat` and `ide.sh`** (a pair, kept in step) start the GUI on a
   development image, `pharo/ide/cog-lisp-ide.image`, made from
   `pharo/cog-lisp.image` the first time, and on a project folder given as an
-  argument (the checkout, or `lisp-expert`).
+  argument (the checkout, or `lisp-expert`). They pass `--interactive`, which
+  the pinned VM does not add (spike 1).
 - **R-2. It is the owner's image to save.** Saving keeps the live state, the
   open windows and the REPL histories (§12 decision 3). `build-image` and the
   suites never touch it, so a build never collides with it (`specs/17`), and
@@ -225,6 +298,11 @@ To be recorded.
 - **R-16. The console library's output** (spike 7, §12 decision 7): colors and
   bold shown, cursor movement dropped, so a table or a tree renders and a live
   display degrades to plain lines; its prompts read lines from the pane.
+- **R-31. Each evaluation has its own ports** (spike 4). The current output and
+  input ports, and the console library's capabilities, are bound per process
+  (as `LispCurrentUnit` and the restarts are), not in variables the whole image
+  shares, so two REPLs, or a REPL and the editor's Do it, never write into each
+  other's panes. A program run from a terminal sees no difference.
 
 ### 5.5 The browser
 
@@ -300,6 +378,44 @@ To be recorded.
 - **R-30. VS Code sees no difference**: `vscode/test/lsp.test.js` and
   `npm run test:vscode` pass unchanged.
 
+### 5.10 The agent's interface (the amendment)
+
+- **R-32. Every tool is an `ide` procedure first.** For each thing a window
+  does, `lib/ide.lisp` (`(require 'ide)`) exports a procedure that does it,
+  and the window calls that procedure:
+  - **evaluating**: a session (`ide-session`), with its own ports (R-31) and
+    unit; evaluating text in a session or in a file's unit (R-9), answering the
+    values, the output written, and the error and its restarts if one is raised;
+    choosing a restart; interrupting;
+  - **reading the body**: the libraries, a library's definitions, a definition
+    (name, kind, documentation, source, file and place, R-21), callers and
+    callees (R-18), searching names and documentation (R-19);
+  - **looking into a value**: its views (R-22) as data, each a title and its
+    rows, a row's value itself inspectable;
+  - **checking and changing source**: the editor services' checks (§5.9);
+    writing a definition back into its file and evaluating it (R-20); loading
+    a file; the update in place (R-3).
+- **R-33. Answers are data, not windows.** Lists, vectors, strings, symbols and
+  the values themselves, described by the procedures' documentation; never a
+  presenter or a morph. A window renders them; an agent reads them.
+- **R-34. The interface is a public library.** Its exports are documented
+  (the 10.1 suite) and listed in the reference (`docs/builtins.md`, Libraries),
+  and `tests/lisp/ide-*.lisp` checks every one without opening a window. A step
+  lands its interface before its window (§7).
+- **R-35. Changes to the body are recorded.** Every change made through the
+  interface, to a file or to the image (an evaluation that defines, a
+  definition written back, a file loaded, an update), is appended to a log: when,
+  by whom (the session, and whether a person's window or an agent made it), what
+  changed (the file and place, the names defined), and the text before and
+  after for a file. `(ide-changes)` answers it; a file's change can be undone.
+  The log is kept in the image and, line by line, in a file beside it, so it
+  outlives a crash (§10's "No Epicea").
+- **R-36. The agent's doorway** (step 7, its own spec first): a server in the
+  image that offers R-32's procedures to an agent as tools, over the Model
+  Context Protocol (decision 11), on standard input and output or a local
+  socket, its JSON and framing the language server's. What an agent may change
+  is bounded (decision 12), and every change it makes goes to R-35's log.
+
 ## 6. What it changes elsewhere
 
 - **Phase 11's audit (`specs/33` 11.2).** It expects to remove "the IDE" and to
@@ -310,22 +426,27 @@ To be recorded.
   spec is accepted (§12 decision 9).
 - **Phase 11.5** (`describe`, `inspect`, `apropos`, `who-calls`, `backtrace`) is
   built on this model, not beside it: one implementation, two front ends.
+- **Phase 11.6** (networking from LISP) is how an agent gets into the world
+  from outside (`specs/33`); R-36's doorway is its first use, local only.
 - **`LispProcedure`'s shape** (R-21).
 
 ## 7. Steps
 
 Each step lands green, with its tests and a status line here, one commit each,
-through CI.
+through CI. Each lands its `ide` procedures (R-32) and their LISP tests before
+its windows.
 
 1. **The spike** (§4), its answers recorded; and **the editor services** taken
    out of the language server (R-29, R-30).
-2. **The development image and the REPL** (R-1 to R-4, R-12 to R-16).
+2. **The development image and the REPL** (R-1 to R-4, R-12 to R-16, R-31).
 3. **The editor** (R-5 to R-11).
 4. **The browser and the inspector** (R-17 to R-24), with the definitions'
    places (R-21).
 5. **Errors and the debugger** (R-25), with 11.5's backtrace.
 6. **Finishing**: Spotter, the theme (dark, as the site is), settings, the
    manual's chapter "Developing in the image".
+7. **The agent's doorway** (R-36), after its own spec, with R-35's log. The log
+   itself lands with step 2, the first step that changes the body.
 
 ## 8. Examples
 
@@ -369,6 +490,11 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 - **AC-6 (every step).** `tests/run-all` passes on both platforms; the image's
   size and start-up time are recorded, and stay within what step 1 measured plus
   what the IDE's own code adds.
+- **AC-7 (every step from 2; the amendment).** Everything the step's windows do
+  is done by an `ide` procedure, checked by `tests/lisp/ide-*.lisp` with no window
+  open, and documented (the 10.1 suite lists `ide`). Every change the step's
+  procedures make to a file or the image appears in `(ide-changes)` with its
+  session and its maker, and a file's change undoes.
 
 ## 10. Risks
 
@@ -407,6 +533,11 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 - **Not version control.** Iceberg is in the image; git stays where it is.
 - **Not a GUI library for programs.** Windows for LISP programs are 11.7's,
   and full-screen terminal programs 32's.
+- **Not in the release bundles, yet.** A bundle ships only the VM files
+  `release/package.sh` keeps, and it drops `Pharo.exe`, SDL2, Cairo and the
+  other libraries a window needs (their licenses were never needed). The tools
+  run from a checkout's `pharo/` VM. Shipping them is a later decision, with
+  those licenses checked as `release/licenses/README.md` says.
 
 ## 12. Decisions for the owner
 
@@ -441,3 +572,23 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
    measuring their size.
 10. **What the image opens to.** Leaning: a REPL and the project's files
     (R-4). The other choice is Pharo's own world, with the `cog-lisp` menu.
+11. **The doorway's protocol** (the amendment). *Settled (owner, 2026-11-10):
+    "The MCP server will eventually be built as well."* The Model Context
+    Protocol, which agents speak already, carried on the language server's
+    JSON and framing. When, and its details, are its own spec's (step 7).
+12. **What an agent may change** (the amendment; settled in its own spec).
+    Leaning: by default, a project's files and the definitions it loads; cog-lisp's
+    own `lib/`, `src/` and the compiler only with the owner's leave, given for a
+    session. Reading the whole body is always allowed.
+
+## 13. Step status
+
+| Step | What | Status |
+|------|------|--------|
+| 1 | The spike (§4.1); the editor services (R-29, R-30) | Done (2026-11-10): `lib/editor-services.lisp` and `tests/lisp/editor-services.lisp` (62 checks); the language server on it, its 31 checks and VS Code's 5 offline and 12 with the server passing unchanged |
+| 2 | The development image and the REPL | Next |
+| 3 | The editor | |
+| 4 | The browser and the inspector | |
+| 5 | Errors and the debugger | |
+| 6 | Finishing | |
+| 7 | The agent's doorway (its own spec first) | |

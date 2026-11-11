@@ -79,6 +79,8 @@ columns
 command
 compile
 compiler
+completion
+completions
 complex
 compute
 cond
@@ -104,6 +106,8 @@ days
 default
 defconstant
 define
+definition
+definitions
 defmacro
 defparameter
 defsetf
@@ -112,6 +116,7 @@ defvar
 delete
 denominator
 depth
+detail
 diff
 differences
 digit
@@ -126,6 +131,7 @@ duplicates
 duration
 dynamic
 each
+editor
 eighth
 encode
 end
@@ -161,6 +167,7 @@ fixpoint
 flet
 floor
 fold
+folder
 for
 foreground
 form
@@ -190,6 +197,7 @@ ignore
 image
 imports
 index
+indexed
 inexact
 infinite
 info
@@ -204,6 +212,7 @@ json
 key
 keys
 kind
+label
 labels
 lambda
 last
@@ -246,6 +255,7 @@ modifiers
 modulo
 month
 name
+named
 names
 nan
 negative
@@ -284,6 +294,7 @@ positive
 prefix
 pretty
 print
+problem
 procedure
 prog
 progn
@@ -313,6 +324,7 @@ renderable
 report
 request
 require
+resolve
 response
 rest
 restart
@@ -337,6 +349,7 @@ setf
 setq
 setter
 seventh
+severity
 shared
 sin
 sixth
@@ -373,10 +386,13 @@ test
 tests
 text
 third
+token
+tokens
 tree
 trim
 true
 truncate
+unit
 unix
 unless
 unwind

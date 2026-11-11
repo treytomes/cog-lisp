@@ -77,7 +77,7 @@
 ;;; The libraries cog-lisp ships, which a program requires (specs/27-namespaces.md
 ;;; R-14): each export, documented, under the library's name as its category
 
-(define docs-libraries '(cl test datetime pretty format-source console))
+(define docs-libraries '(cl test datetime pretty format-source console editor-services))
 
 ;; a value with no documentation (cl's t and nil): what it holds, when short
 (define (docs-value-description value)
@@ -559,7 +559,7 @@
 ;;; The libraries' names are read from their files, not by requiring them, so
 ;;; that a library's names (cl's remove, say) never change the built-ins'.
 
-(define spelling-libraries '("cl" "test" "datetime" "pretty" "format-source" "console"))
+(define spelling-libraries '("cl" "test" "datetime" "pretty" "format-source" "console" "editor-services"))
 
 ;; the names a library file defines at its top level, as strings
 (define (library-defined-names library)

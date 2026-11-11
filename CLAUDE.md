@@ -484,6 +484,38 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   `with-test-console`'s `input`. Never test a prompt reading the real current
   input: a suite run by hand in a terminal waits there for a person.
 
+## Developing in the image (specs/34-morphic-ide.md)
+
+- **The built image is a full Pharo IDE** (Spec2, NewTools, Calypso, Morphic,
+  Rubric, Shout, SDL2), and **Spec2 works headless**: a window opens, its
+  presenters are driven and read back, and it closes, under `--headless`. So
+  the tools are tested by ordinary headless suites.
+- **A GUI start needs `--interactive`**: `Pharo.exe <image> --interactive
+  --no-default-preferences`. The pinned VM (a headless build) does not add it,
+  so without it `Smalltalk isInteractive` is false and the image prints the
+  command-line usage and quits, under `Pharo.exe` and `PharoConsole.exe` alike.
+  `PharoConsole.exe` never opens a world. Opening the playground writes
+  `pharo-local/play-cache` beside the image.
+- **The release bundles cannot open windows**: `release/package.sh` drops
+  `Pharo.exe`, SDL2 and Cairo. The tools run from a checkout's `pharo/`.
+- **The current output and input ports are image-global** (`LispPrimitives`'
+  `Output` and `Input`), as is `console`'s `%console`: two evaluations in two
+  processes write into each other's. Bind them per process before running
+  REPLs side by side (R-31).
+- **Pharo's extension points, checked live:** a code pane evaluates through
+  `interactionModel compiler` (`source:`, `environment:`, `failBlock:`,
+  `evaluate`); its Shout decorator takes a styler (`textArea shoutStyler
+  styler:`), which subclasses `SHRBTextStyler` to keep the theme's styles and
+  fills `charAttr` in `privateStyle:`; an inspector tab is a method on the
+  inspected class with `<inspectorPresentationOrder: n title: 'T'>`, and
+  `StInspectionCollector` lists the tabs. `SharedQueue` has no wait-without-take;
+  wait on a `Semaphore`. A process is interrupted with `signalException:`.
+- **The editor services speak character offsets**; the language server turns
+  them into UTF-16 positions. Change what an editor knows in
+  `lib/editor-services.lisp`, and `lib/lsp.lisp` only for the protocol.
+- **`vscode/node_modules` can lag the lockfile** after a pull: `node
+  scripts/deps.js` (from `vscode/`) installs what it names, as `build-ext` does.
+
 ## Documentation and the generated files (Phase 10)
 
 - **Every built-in is documented in the image.** A primitive by the table at the
@@ -640,9 +672,12 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
 - **A name in `lib/compiler/` must be new:** defining a compiler helper under a
   name it already has (`lc-check` was taken) replaces the old one, and the build
   fails with "bad syntax" on the first form the seed compiles. `grep` first.
-- **Libraries to `require`:** `cl`, `test`, `datetime`, `pretty` and
+- **Libraries to `require`:** `cl`, `test`, `datetime`, `pretty`,
   `format-source` (the source formatter, also `tools/format.lisp` and the
-  language server's formatting; specs/26-formatter.md) (`lib/*.lisp`); `format`, `json-read`/`json-write` and `coverage-*` are built in.
+  language server's formatting; specs/26-formatter.md), `console` and
+  `editor-services` (what an editor knows about source, shared by the language
+  server and the image's own tools; specs/34-morphic-ide.md) (`lib/*.lisp`); a
+  new one joins the lists in `tools/docs.lisp` and the 10.1 suite; `format`, `json-read`/`json-write` and `coverage-*` are built in.
 - **The LISP compiler's errors hide its own bugs.** As in `LispCompiler>>compile:`,
   an unexpected error while translating becomes `bad syntax: <form>`, so a bug in
   `lib/compiler/*.lisp` (an unbound helper, say) shows only as "bad syntax" on

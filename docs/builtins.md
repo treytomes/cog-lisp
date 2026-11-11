@@ -31,7 +31,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Smalltalk interop](#smalltalk-interop) (11)
 - [Language server](#language-server) (2)
 - [The compiler and reader](#the-compiler-and-reader) (24)
-- [Libraries](#libraries): cl, test, datetime, pretty, format-source, console
+- [Libraries](#libraries): cl, test, datetime, pretty, format-source, console, editor-services
 
 ## Special forms
 
@@ -726,3 +726,43 @@ the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and
 | `with-hidden-cursor` | `(with-hidden-cursor thunk)` | procedure | Runs thunk with the cursor hidden, and shows it again however thunk is left, and at exit. |
 | `with-raw-mode` | `(with-raw-mode thunk)` | procedure | Runs thunk with the terminal in raw mode (keys arrive one at a time, not echoed), and restores it however thunk is left, and at exit. Nested, the outermost restores. Without a terminal, it only runs thunk. |
 | `with-test-console` | `(with-test-console options thunk)` | procedure | Runs thunk against a test console, and answers its screen: options is a list of names and values, width (80), height (24), colors (truecolor), unicode? (#t), events (a list of key names, characters, strings, lists such as (ctrl #\c), or events, for read-event and the prompts), and input (a string of lines: then the console reads no keys, and the prompts read these lines, as with piped input). The screen is what was written, as a terminal shows it: screen-text, screen-cell and the rest read it. |
+
+### editor-services
+
+`(require 'editor-services)`
+
+| Name | Call | Kind | What it does |
+|---|---|---|---|
+| `completion-detail` | `(completion-detail completion)` | procedure | One line about the name: its call, or its definition's first line. |
+| `completion-documentation` | `(completion-documentation completion)` | procedure | The rest of its documentation, or the empty string. |
+| `completion-kind` | `(completion-kind completion)` | procedure | keyword (a special form or a macro), function, or variable (a name the workspace defines). |
+| `completion-label` | `(completion-label completion)` | procedure | The name to insert, a string. |
+| `definition-documentation` | `(definition-documentation definition)` | procedure | A definition's documentation string, or #f. |
+| `definition-end` | `(definition-end definition)` | procedure | Where a definition's form ends in its text: the offset after its last character. |
+| `definition-name` | `(definition-name definition)` | procedure | A definition's name, a string. |
+| `definition-path` | `(definition-path definition)` | procedure | The path of the file a definition is in, or #f for a text that is no file. |
+| `definition-source` | `(definition-source definition)` | procedure | The text of a definition's whole form. |
+| `definition-start` | `(definition-start definition)` | procedure | Where a definition's form starts in its text, a character offset from 0. |
+| `editor-check` | `(editor-check path text)` | procedure | The problems compiling text, the file at path, would meet: each read error, compile error and warning, placed on its form. Runs only its define-syntax, define-macro, require and library forms. The unit it compiles in is kept (editor-unit-of). |
+| `editor-completions` | `(editor-completions path)` | procedure | The names to offer in the file at path: the documented built-ins and the special forms, the file's imports as it imported them (con:rule), and the names the index defines, each once. |
+| `editor-definitions` | `(editor-definitions text [path])` | procedure | The top-level definitions in text (define, define-macro, define-syntax), read but not run, up to the first form that does not read. Each records path, or #f. |
+| `editor-definitions-for` | `(editor-definitions-for path name)` | procedure | The definitions name, in the file at path, leads to: a library's full name to that library's file, anything else to its name across the index. |
+| `editor-definitions-named` | `(editor-definitions-named name)` | procedure | Every definition in the index named name, a string. |
+| `editor-index-file!` | `(editor-index-file! path)` | procedure | Indexes the file at path as it is on disk; a file that cannot be read is left out. |
+| `editor-index-folder!` | `(editor-index-folder! folder)` | procedure | Indexes every .lisp file under folder (a path or a file reference), leaving out pharo, node_modules, .vscode-test, .git and dist. |
+| `editor-index-text!` | `(editor-index-text! path text)` | procedure | Indexes text as the file at path holds it (an editor's unsaved text, say): its definitions replace the file's. |
+| `editor-indexed-text` | `(editor-indexed-text path)` | procedure | The text the index holds for the file at path, or #f. |
+| `editor-key` | `(editor-key path)` | procedure | The key a file is known by: its path with / for \, and in lower case on Windows, so two spellings of one path are one file. |
+| `editor-macro-call-at` | `(editor-macro-call-at text offset)` | procedure | The innermost macro call holding offset in text, as (source . expansion), its text and its full expansion written; or #f. |
+| `editor-resolve` | `(editor-resolve path name)` | procedure | The symbol name means in the file at path, as its last check (editor-check) imported it: a library's full name for an import, else name as a symbol. |
+| `editor-symbol-at` | `(editor-symbol-at text offset)` | procedure | The name around offset in text, as (name start end), or #f between names. |
+| `editor-tokens` | `(editor-tokens text)` | procedure | The tokens of text, for styling it: comments, strings, characters, numbers, parentheses (with their depth), quotes, keywords (special forms and macros) and other symbols. An unclosed string or comment runs to the end; text that does not read still has tokens. |
+| `editor-unit-of` | `(editor-unit-of path)` | procedure | The unit the text at path was last checked in (editor-check), whose imports say what its names mean, or #f. |
+| `problem-end` | `(problem-end problem)` | procedure | Where a problem ends in its text: the offset after its last character. |
+| `problem-message` | `(problem-message problem)` | procedure | What the problem is, a string. |
+| `problem-severity` | `(problem-severity problem)` | procedure | error or warning. |
+| `problem-start` | `(problem-start problem)` | procedure | Where a problem starts in its text, a character offset from 0. |
+| `token-depth` | `(token-depth token)` | procedure | An open or close parenthesis's nesting depth, from 0; 0 for any other token. |
+| `token-end` | `(token-end token)` | procedure | The offset after a token's last character. |
+| `token-kind` | `(token-kind token)` | procedure | comment, string, character, number, open, close, quote, keyword or symbol. |
+| `token-start` | `(token-start token)` | procedure | Where a token starts, a character offset from 0. |
