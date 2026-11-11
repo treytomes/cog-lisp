@@ -30,6 +30,7 @@ boolean
 bootstrap
 boundp
 build
+busy
 caaaar
 caaadr
 caaar
@@ -68,6 +69,8 @@ cddr
 cdr
 ceiling
 cell
+change
+changes
 char
 check
 choose
@@ -193,6 +196,7 @@ hidden
 hour
 hours
 http
+ide
 ignore
 image
 imports
@@ -203,6 +207,7 @@ infinite
 info
 input
 integer
+interrupt
 interval
 invoke
 iota
@@ -220,6 +225,7 @@ lcm
 length
 let
 letrec
+level
 library
 line
 lines
@@ -235,6 +241,7 @@ macro
 macroexpand
 magnitude
 make
+maker
 many
 map
 mapcar
@@ -329,6 +336,7 @@ response
 rest
 restart
 restarts
+result
 reverse
 round
 row
@@ -344,6 +352,8 @@ seed
 segment
 selector
 send
+session
+sessions
 set
 setf
 setq
@@ -386,12 +396,14 @@ test
 tests
 text
 third
+time
 token
 tokens
 tree
 trim
 true
 truncate
+type
 unit
 unix
 unless
@@ -405,6 +417,7 @@ value
 values
 variable
 vector
+wait
 walk
 when
 whitespace

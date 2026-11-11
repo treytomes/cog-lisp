@@ -9,7 +9,7 @@
  Classes: LispError, LispArityError, LispProcedure, LispTailCall, LispPrimitives,
  LispTextOutput, LispProcess, LispHttpResponse.
  ============================================================================"
-| failures cm lerr aerr proc tcall prims tout facade htab hkey iport oport lines vals procx hresp term |
+| failures cm lerr aerr proc tcall prims tout facade htab hkey iport oport lines vals procx hresp term outvar invar |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -23,6 +23,11 @@ tcall := (Object << #LispTailCall) slots: { #fn. #args }; package: 'CogLisp-Runt
 "Zero or several values, as values answers them (R7RS 6.10; Phase 9 step 9.2)."
 vals := (Object << #LispValues) slots: { #values }; package: 'CogLisp-Runtime'; install.
 prims := (Object << #LispPrimitives) sharedVariables: { #Output. #Input. #CommandLine. #GensymCounter. #EqualityTests. #MessageInput }; package: 'CogLisp-Runtime'; install.
+"The current output and input ports, bound per process (specs/34-morphic-ide.md
+ R-31), so two evaluations in two processes never write into each other: a REPL
+ window and the editor, or two REPLs. Unbound, the image-wide default holds."
+outvar := (DynamicVariable << #LispOutputBinding) package: 'CogLisp-Runtime'; install.
+invar := (DynamicVariable << #LispInputBinding) package: 'CogLisp-Runtime'; install.
 "CogLisp: the Smalltalk-side facade for evaluating and calling LISP (Phase 7.6 section 5.2)."
 facade := (Object << #CogLisp) package: 'CogLisp-Runtime'; install.
 "Phase 7.8: hash tables (keys wrapped so a Pharo OrderedDictionary compares them
@@ -1424,16 +1429,16 @@ cm value: prims class value: 'installing' value: 'installInlineFormsInto: anEnv
 cm value: prims class value: 'installing' value: 'installDefault
 	^ self installInto: LispEnvironment default'.
 cm value: prims class value: 'output' value: 'output
-	"Where display/write/newline/disassemble write. Defaults to stdout; the REPL and tests redirect it."
-	^ Output ifNil: [LispTextOutput stdout]'.
+	"Where display/write/newline/disassemble write: the port this process bound
+	 (withOutput:do:), else the image-wide default, stdout."
+	^ LispOutputBinding value ifNil: [Output ifNil: [LispTextOutput stdout]]'.
 cm value: prims class value: 'input' value: 'input
-	"The current input port: set by the REPL and the runner to read stdin."
-	^ Input ifNil: [Input := LispInputPort onStream: (LispLineStream on: (ReadStream on: #()))]'.
+	"The current input port: the one this process bound (withInput:do:; the REPL
+	 and the runner bind stdin), else the image-wide default, an empty one."
+	^ LispInputBinding value ifNil: [Input ifNil: [Input := LispInputPort onStream: (LispLineStream on: (ReadStream on: #()))]]'.
 cm value: prims class value: 'input' value: 'withInput: aPort do: aBlock
-	| previous |
-	previous := Input.
-	Input := aPort.
-	^ aBlock ensure: [Input := previous]'.
+	"aPort is the current input port while aBlock runs, in this process only."
+	^ LispInputBinding value: aPort during: aBlock'.
 cm value: prims class value: 'system' value: 'commandLine: anArray
 	CommandLine := anArray'.
 cm value: prims class value: 'installing' value: 'installFilesInto: anEnv
@@ -1535,10 +1540,8 @@ cm value: prims class value: 'exiting' value: 'runAtExit
 	LispEnvironment default define: name value: false.
 	(hook isKindOf: LispProcedure) ifTrue: [[hook value] on: Error do: [:e | nil]]'.
 cm value: prims class value: 'output' value: 'withOutput: aStream do: aBlock
-	| previous |
-	previous := Output.
-	Output := aStream.
-	^ aBlock ensure: [Output := previous]'.
+	"aStream is the current output port while aBlock runs, in this process only."
+	^ LispOutputBinding value: aStream during: aBlock'.
 cm value: prims class value: 'system' value: 'saveImage
 	"Snapshot the running image in place (Phase 5). On the resume path, when the saved
 	 image next starts, the process that saved must not keep running: terminate it."

@@ -668,3 +668,32 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(token-end token)`: The offset after a token's last character.
 - `(token-kind token)`: comment, string, character, number, open, close, quote, keyword or symbol.
 - `(token-start token)`: Where a token starts, a character offset from 0.
+
+### ide: `(require 'ide)`
+
+- `(change-kind change)`: evaluate: an evaluation that defined names.
+- `(change-maker change)`: person or agent.
+- `(change-names change)`: The names it defined, strings.
+- `(change-session change)`: The name of the session that made it.
+- `(change-text change)`: The text evaluated.
+- `(change-time change)`: When it was made, a date and time as text.
+- `(ide-changes)`: The changes made through these tools, oldest first: each evaluation that defined names, with when, its session, who made it (person or agent), the names and the text.
+- `(ide-close session)`: Ends session and its process.
+- `(ide-eval session text option ...)`: Evaluates text's forms in session and answers the result. Options: timeout (milliseconds to wait; as long as it takes if not given): a result still running then has status running, and ide-wait answers it. An evaluation that defines names is recorded (ide-changes).
+- `(ide-interrupt session)`: Stops the evaluation session is running: it waits at a break, with its restarts (abort among them), and the evaluation's result has status error.
+- `(ide-log-to! path)`: From now on the changes are also kept in the file at path, one written record a line, rewritten at each change, so the record outlives a crash. #f stops it.
+- `(ide-session option ...)`: A new session: evaluations in a process of their own, with their own unit and output and input ports. Options: name (a string; session 1, 2, ...), maker (person or agent: who its changes are recorded as made by; person), unit (the unit to evaluate in, such as a file's; a session unit of its own), wrapper (a procedure given a thunk, run around every evaluation: (lambda (thunk) (with-console '(colors none) thunk))).
+- `(ide-session-busy? session)`: #t while it evaluates; at a break, waiting for a restart or another form, #f.
+- `(ide-session-maker session)`: person or agent: who its changes are recorded as made by.
+- `(ide-session-name session)`: Its name, a string.
+- `(ide-session-output session)`: Everything the session has written to its output port, a string.
+- `(ide-sessions)`: The sessions open in the image.
+- `(ide-type session line)`: Gives the program session runs a line to read: read-line answers it, and read reads from it.
+- `(ide-wait session [milliseconds])`: The result of the oldest evaluation not yet answered, waiting at most milliseconds (as long as it takes if not given); a result with status running if it has not come.
+- `(result-level result)`: How many breaks deep the session is: 0 at the top.
+- `(result-output result)`: What the evaluation wrote to the output port, a string.
+- `(result-report result)`: An error's report, a string; or #f.
+- `(result-restarts result)`: At an error, the names of the restarts active, strings: evaluating (name args ...) in the session invokes one.
+- `(result-status result)`: done; error (the session waits at a break); aborted (an abort restart came back to the top); or running (not finished in the time asked for: ide-wait answers it later).
+- `(result-values result)`: The values of the forms evaluated, as a list, leaving out the unspecified value.
+- `(result-written result)`: The values, each as write writes it.

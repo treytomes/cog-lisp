@@ -39,9 +39,16 @@
 ;;; ===========================================================================
 ;;; The console and its capabilities (R-1, R-2)
 
-;; the console in use: a hash table of its capabilities, and for a test console
-;; its events; #f until first asked, then the one detected
+;; the console detected: a hash table of its capabilities; #f until first asked
 (define %console #f)
+
+;; the console this process uses, when with-console or a test console has bound
+;; one: a hash table of its capabilities, and for a test console its events.
+;; Bound per process (specs/34-morphic-ide.md R-31), so two programs in one image
+;; (a REPL window and the editor) never use each other's.
+(define %bound-console [(smalltalk DynamicVariable) new])
+(define (%with-bound-console caps thunk)
+  [%bound-console value: caps during: (procedure->block thunk)])
 
 (define (%env name)
   (let ((v (get-environment-variable name))) (and v (not (string=? v "")) v)))
@@ -91,8 +98,10 @@
     caps))
 
 (define (%caps)
-  (if (not %console) (set! %console (%detect)))
-  %console)
+  (let ((bound [%bound-console value]))
+    (if (smalltalk-nil? bound)
+        (begin (if (not %console) (set! %console (%detect))) %console)
+        bound)))
 
 (define (%cap name) (hash-table-ref/default (%caps) name #f))
 
@@ -117,8 +126,7 @@ The console's width in cells."
 (define (with-console overrides thunk)
   "(with-console overrides thunk)
 Runs thunk with the console's capabilities changed as overrides says, a list of names and values: (with-console '(colors none width 40) thunk). Gives them back however thunk is left."
-  (let ((old (%caps)) (new (%with-overrides (%caps) overrides)))
-    (dynamic-wind (lambda () (set! %console new)) thunk (lambda () (set! %console old)))))
+  (%with-bound-console (%with-overrides (%caps) overrides) thunk))
 
 ;;; ===========================================================================
 ;;; Colors
@@ -1337,10 +1345,7 @@ Runs thunk against a test console, and answers its screen: options is a list of 
     (hash-table-set! caps 'width width)
     (hash-table-set! caps 'height height)
     (hash-table-set! caps 'events (list (%shorthand->events (get 'events '()))))
-    (let* ((old %console)
-           (text (dynamic-wind (lambda () (set! %console caps))
-                               (lambda () (with-output-to-string thunk))
-                               (lambda () (set! %console old)))))
+    (let ((text (%with-bound-console caps (lambda () (with-output-to-string thunk)))))
       (%emulate text width height))))
 
 (define (%blank-row width) (make-vector width (cons #\space %plain)))

@@ -45,7 +45,7 @@ SystemAnnouncer uniqueInstance
 	do: [:a | compiled add: a methodClass name asString , '>>' , a selector]
 	for: listener.
 "An unhandled error here would hang the VM; fail the build instead."
-[[#('coglisp-reader.st' 'coglisp-core.st' 'coglisp-compiler.st' 'coglisp-runtime.st' 'coglisp-shell.st')
+[[#('coglisp-reader.st' 'coglisp-core.st' 'coglisp-compiler.st' 'coglisp-runtime.st' 'coglisp-shell.st' 'coglisp-ide.st')
 	do: [:name | (dir / name) fileIn]]
 		ensure: [SystemAnnouncer uniqueInstance unsubscribe: listener]]
 	on: Error

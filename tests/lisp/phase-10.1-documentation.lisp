@@ -118,7 +118,7 @@ x times x."
                                   (not (documentation full)))
                          (set! missing (cons full missing)))))
                    (vector->list [unit exports]))))
-     '(cl test datetime pretty format-source console editor-services))
+     '(cl test datetime pretty format-source console editor-services ide))
     (check missing '())))
 
 (run-tests)

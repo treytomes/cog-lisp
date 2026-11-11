@@ -31,7 +31,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Smalltalk interop](#smalltalk-interop) (11)
 - [Language server](#language-server) (2)
 - [The compiler and reader](#the-compiler-and-reader) (24)
-- [Libraries](#libraries): cl, test, datetime, pretty, format-source, console, editor-services
+- [Libraries](#libraries): cl, test, datetime, pretty, format-source, console, editor-services, ide
 
 ## Special forms
 
@@ -766,3 +766,36 @@ the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and
 | `token-end` | `(token-end token)` | procedure | The offset after a token's last character. |
 | `token-kind` | `(token-kind token)` | procedure | comment, string, character, number, open, close, quote, keyword or symbol. |
 | `token-start` | `(token-start token)` | procedure | Where a token starts, a character offset from 0. |
+
+### ide
+
+`(require 'ide)`
+
+| Name | Call | Kind | What it does |
+|---|---|---|---|
+| `change-kind` | `(change-kind change)` | procedure | evaluate: an evaluation that defined names. |
+| `change-maker` | `(change-maker change)` | procedure | person or agent. |
+| `change-names` | `(change-names change)` | procedure | The names it defined, strings. |
+| `change-session` | `(change-session change)` | procedure | The name of the session that made it. |
+| `change-text` | `(change-text change)` | procedure | The text evaluated. |
+| `change-time` | `(change-time change)` | procedure | When it was made, a date and time as text. |
+| `ide-changes` | `(ide-changes)` | procedure | The changes made through these tools, oldest first: each evaluation that defined names, with when, its session, who made it (person or agent), the names and the text. |
+| `ide-close` | `(ide-close session)` | procedure | Ends session and its process. |
+| `ide-eval` | `(ide-eval session text option ...)` | procedure | Evaluates text's forms in session and answers the result. Options: timeout (milliseconds to wait; as long as it takes if not given): a result still running then has status running, and ide-wait answers it. An evaluation that defines names is recorded (ide-changes). |
+| `ide-interrupt` | `(ide-interrupt session)` | procedure | Stops the evaluation session is running: it waits at a break, with its restarts (abort among them), and the evaluation's result has status error. |
+| `ide-log-to!` | `(ide-log-to! path)` | procedure | From now on the changes are also kept in the file at path, one written record a line, rewritten at each change, so the record outlives a crash. #f stops it. |
+| `ide-session` | `(ide-session option ...)` | procedure | A new session: evaluations in a process of their own, with their own unit and output and input ports. Options: name (a string; session 1, 2, ...), maker (person or agent: who its changes are recorded as made by; person), unit (the unit to evaluate in, such as a file's; a session unit of its own), wrapper (a procedure given a thunk, run around every evaluation: (lambda (thunk) (with-console '(colors none) thunk))). |
+| `ide-session-busy?` | `(ide-session-busy? session)` | procedure | #t while it evaluates; at a break, waiting for a restart or another form, #f. |
+| `ide-session-maker` | `(ide-session-maker session)` | procedure | person or agent: who its changes are recorded as made by. |
+| `ide-session-name` | `(ide-session-name session)` | procedure | Its name, a string. |
+| `ide-session-output` | `(ide-session-output session)` | procedure | Everything the session has written to its output port, a string. |
+| `ide-sessions` | `(ide-sessions)` | procedure | The sessions open in the image. |
+| `ide-type` | `(ide-type session line)` | procedure | Gives the program session runs a line to read: read-line answers it, and read reads from it. |
+| `ide-wait` | `(ide-wait session [milliseconds])` | procedure | The result of the oldest evaluation not yet answered, waiting at most milliseconds (as long as it takes if not given); a result with status running if it has not come. |
+| `result-level` | `(result-level result)` | procedure | How many breaks deep the session is: 0 at the top. |
+| `result-output` | `(result-output result)` | procedure | What the evaluation wrote to the output port, a string. |
+| `result-report` | `(result-report result)` | procedure | An error's report, a string; or #f. |
+| `result-restarts` | `(result-restarts result)` | procedure | At an error, the names of the restarts active, strings: evaluating (name args ...) in the session invokes one. |
+| `result-status` | `(result-status result)` | procedure | done; error (the session waits at a break); aborted (an abort restart came back to the top); or running (not finished in the time asked for: ide-wait answers it later). |
+| `result-values` | `(result-values result)` | procedure | The values of the forms evaluated, as a list, leaving out the unspecified value. |
+| `result-written` | `(result-written result)` | procedure | The values, each as write writes it. |

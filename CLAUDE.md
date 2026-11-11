@@ -510,6 +510,16 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   inspected class with `<inspectorPresentationOrder: n title: 'T'>`, and
   `StInspectionCollector` lists the tabs. `SharedQueue` has no wait-without-take;
   wait on a `Semaphore`. A process is interrupted with `signalException:`.
+- **The tools' Smalltalk is the package `CogLisp-IDE`** (`src/coglisp-ide.st`),
+  filed in after the shell (the build's list in `build/build.st`): `LispSession`
+  (an evaluation in a process of its own, with a break loop), `LispIde` (calls
+  into `lib/ide.lisp`), `LispReplPresenter` (the REPL window). Their LISP side is
+  `lib/ide.lisp`; the windows evaluate only through it.
+- **The output and input ports are per process** since step 2a (R-31):
+  `withOutput:do:` and `withInput:do:` bind `DynamicVariable`s, so a forked
+  process writes to the image-wide default (stdout), not to its parent's port.
+- **`Semaphore>>waitTimeoutMSecs:` is deprecated** and its notice goes to
+  stdout; use `waitTimeoutMilliseconds:` (answers true on a timeout).
 - **The editor services speak character offsets**; the language server turns
   them into UTF-16 positions. Change what an editor knows in
   `lib/editor-services.lisp`, and `lib/lsp.lisp` only for the protocol.
@@ -676,7 +686,8 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   `format-source` (the source formatter, also `tools/format.lisp` and the
   language server's formatting; specs/26-formatter.md), `console` and
   `editor-services` (what an editor knows about source, shared by the language
-  server and the image's own tools; specs/34-morphic-ide.md) (`lib/*.lisp`); a
+  server and the image's own tools; specs/34-morphic-ide.md) and `ide` (the
+  image's tools as procedures: sessions, the record of changes) (`lib/*.lisp`); a
   new one joins the lists in `tools/docs.lisp` and the 10.1 suite; `format`, `json-read`/`json-write` and `coverage-*` are built in.
 - **The LISP compiler's errors hide its own bugs.** As in `LispCompiler>>compile:`,
   an unexpected error while translating becomes `bad syntax: <form>`, so a bug in

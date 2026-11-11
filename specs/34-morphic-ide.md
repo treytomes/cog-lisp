@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (owner, 2026-11-10) with the leanings of §12, decision 3 amended (a stale image updates itself, R-3) and decision 4 to be reassessed later. A spike first (§4). Amended (owner, 2026-11-10) for the agent the image is a body for: §3's first principle, §5.10 (R-32 to R-36), step 7, AC-7, decisions 11 and 12 |
+| **Status** | Accepted (owner, 2026-11-10) with the leanings of §12, decision 3 amended (a stale image updates itself, R-3) and decision 4 to be reassessed later. A spike first (§4). Amended (owner, 2026-11-10) for the agent the image is a body for: §3's first principle, §5.10 (R-32 to R-36), step 7, AC-7, decisions 11 and 12. Amended again (owner, 2026-11-10): VS Code runs a file, or opens a REPL, in the Pharo GUI (R-37, decision 13) |
 | **Asked for by** | The owner (2026-11-10): "I need you to begin thinking through how we can start migrating app development back into the Pharo UI shell. We need the code file editor, REPL, along with some kind of browse / inspect functionality living inside of Morphic. We need a spec for this." |
 | **Amended for** | The owner (2026-11-10), on the project's first premise: "One of the original premises of this project was to make the "image" the world that an AI agent lives in, equipped with a well known highly structured, highly reflective language. The Pharo/Lisp image becomes the agent's body." So every tool is a LISP interface before it is a window, and the agent gets a way in (§5.10) |
 | **Relates to** | `specs/16-phase-10-documentation-and-editor.md` (the language server, `lib/lsp.lisp`, whose analysis the editor shares, §5.9); `specs/27-namespaces.md` (`LispUnit`: a file's library, its imports, what a form is evaluated in); `specs/29-console.md` (its output in the REPL pane, §5.4); `specs/32-tui.md` (a later front end on the same model, §3); `specs/33-phase-11-pure-image.md` (11.2's audit, which this changes, §6; 11.5's `inspect`, `apropos`, `who-calls` and `backtrace`, which share this model; 11.7's graphics) |
@@ -251,6 +251,17 @@ Item 6 is answered already.
   files, and a `cog-lisp` menu in the world menu (new REPL, open a file or a
   project, the browser).
 
+- **R-37. VS Code reaches the GUI** (owner, 2026-11-10: "an update to the
+  VS.Code extension to run either the current source file or the REPL from the
+  Pharo GUI, in addition to the terminal options"). The extension gains two
+  commands beside its terminal ones: *Run File in the Pharo GUI* and *Open a
+  REPL in the Pharo GUI*. Each starts the development image if it is not
+  running (as `ide.bat`/`ide.sh` do, on the workspace folder), and otherwise
+  hands the running image the request (decision 13): the file runs in a new
+  REPL window of the image, its output and errors there, or a REPL window opens.
+  The image records each as a change made by a person (R-35). The terminal
+  commands are unchanged.
+
 ### 5.3 The editor
 
 - **R-5. Files and tabs**: a tree of the project folder's `.lisp` files, and
@@ -415,6 +426,27 @@ Item 6 is answered already.
   Context Protocol (decision 11), on standard input and output or a local
   socket, its JSON and framing the language server's. What an agent may change
   is bounded (decision 12), and every change it makes goes to R-35's log.
+- **R-38. Several agents at once** (owner, 2026-11-10: "We're going to need to
+  consider ways for multiple agents to be able to work with the image without
+  getting in each others way"). Specified with the doorway (step 7). What each
+  agent already has of its own: a session, with its process, ports, console
+  and unit (R-31). What they share, and the spec must settle:
+  - **who**: an identity for each agent, not only "agent", in R-35's record and
+    on every change;
+  - **the definitions**: one global environment, where two agents defining one
+    name replace each other's; perhaps a session's own namespace (a unit of its
+    own, `specs/27`) to work in, and a deliberate step to make its definitions
+    everyone's;
+  - **the files**: two agents editing one file, or one a person has open:
+    leases on files or definitions, or a check that the text is still what the
+    agent read (as R-20 does for the browser);
+  - **dynamic state** shared across processes: `parameterize`'s bindings are one
+    per image today, as the ports were until R-31;
+  - **saving and updating the image** (R-2, R-3): one at a time, and not under
+    an agent mid-evaluation;
+  - **the image files on disk**: a build, or a second VM, on an image another
+    has open (`specs/17`; on 2026-11-10 another session's run held
+    `cog-lisp.image` and the build could not replace it).
 
 ## 6. What it changes elsewhere
 
@@ -438,7 +470,8 @@ its windows.
 
 1. **The spike** (§4), its answers recorded; and **the editor services** taken
    out of the language server (R-29, R-30).
-2. **The development image and the REPL** (R-1 to R-4, R-12 to R-16, R-31).
+2. **The development image and the REPL** (R-1 to R-4, R-12 to R-16, R-31),
+   and VS Code's commands to reach it (R-37).
 3. **The editor** (R-5 to R-11).
 4. **The browser and the inspector** (R-17 to R-24), with the definitions'
    places (R-21).
@@ -580,15 +613,63 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
     Leaning: by default, a project's files and the definitions it loads; cog-lisp's
     own `lib/`, `src/` and the compiler only with the owner's leave, given for a
     session. Reading the whole body is always allowed.
+13. **How VS Code hands a running image a request** (R-37). Leaning: a request
+    file the extension writes into the development image's folder
+    (`pharo/ide/requests/`), which the image watches and removes once taken:
+    no network port (none to open in the firewall), nothing the image cannot
+    do already, and replaced by the model's doorway (R-36) when it comes. The
+    other choice is a socket on localhost now, which the doorway could later
+    share.
 
 ## 13. Step status
 
 | Step | What | Status |
 |------|------|--------|
 | 1 | The spike (§4.1); the editor services (R-29, R-30) | Done (2026-11-10): `lib/editor-services.lisp` and `tests/lisp/editor-services.lisp` (62 checks); the language server on it, its 31 checks and VS Code's 5 offline and 12 with the server passing unchanged |
-| 2 | The development image and the REPL | Next |
+| 2 | The development image and the REPL | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b next: R-1 to R-4, R-37 |
 | 3 | The editor | |
 | 4 | The browser and the inspector | |
 | 5 | Errors and the debugger | |
 | 6 | Finishing | |
 | 7 | The agent's doorway (its own spec first) | |
+
+## 14. As built: step 2a, sessions and the REPL window (2026-11-10)
+
+- **R-31.** `LispPrimitives`' output and input ports are bound in
+  `LispOutputBinding` and `LispInputBinding` (`DynamicVariable`s), falling back
+  to the image-wide default; the console library binds its capabilities in a
+  `DynamicVariable` instance it makes (`%bound-console`). A forked process sees
+  the defaults, not its parent's bindings.
+- **A session is `LispSession`** (`src/coglisp-ide.st`, the new package
+  `CogLisp-IDE`, filed in after the shell): requests in, results out, in a
+  process of its own below the UI's priority, with its unit, ports and a
+  wrapper run around each evaluation. It evaluates as `LispRepl` does, but
+  answers results as data rather than printing them: on an error it answers
+  the report and the active restarts, then waits on the failing computation's
+  stack for the next request, so `(use-value 5)` continues the computation and
+  `(abort)` comes back to the top (answered `aborted`). This replaces R-13's
+  "`LispRepl` in its own process": the same break loop, with results a window
+  or an agent can read.
+- **`lib/ide.lisp`** (`(require 'ide)`, documented and in the reference):
+  `ide-session`, `ide-eval` (with a `timeout`), `ide-wait`, `ide-type`,
+  `ide-interrupt`, `ide-close`, `ide-sessions`, the result accessors, and the
+  record of changes, `ide-changes` and `ide-log-to!`. A change is recorded when
+  an evaluation that defines names is answered; its maker is the session's,
+  person or agent.
+- **The REPL window is `LispReplPresenter`** (and the `cog-lisp REPL` item in
+  the world menu): a transcript, an input, an Interrupt button, and a row of
+  buttons for the restarts at a break. R-14's restarts are buttons, not links:
+  `abort` and `continue` run at once, any other puts `(name )` in the input to be
+  finished. It evaluates only through `ide` (R-32); a watcher process streams
+  the output and queues updates for the UI process. The console library's
+  escape codes become text colors and emphasis (`LispIde textFromTerminal:`),
+  the session running inside `with-console` with true color, 100 columns, and
+  prompts reading lines.
+- **Not yet**: clicking a value to inspect it (R-13) comes with the inspector,
+  step 4; Alt+. for Interrupt, with the editor's keys, step 3.
+- **Found**: `Semaphore>>waitTimeoutMSecs:` is deprecated in Pharo 14, and its
+  rewrite notice goes to stdout: use `waitTimeoutMilliseconds:`. Under the
+  headless `NonInteractiveUIManager`, `defer:` runs its block at once in the
+  calling process.
+- **Checks**: `tests/lisp/ide-sessions.lisp` (60) and
+  `tests/lisp/ide-repl-window.lisp` (54).
