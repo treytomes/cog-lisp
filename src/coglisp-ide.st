@@ -23,8 +23,11 @@
    LispTerminalView   the terminal pane: the console's rows in the code font,
                       typed into at its cursor (R-40)
    LispFilesPresenter the files the image has loaded (R-41)
+   LispStyler         LISP source styled from its tokens (R-6)
+   LispEditorPage     one file open in the editor (R-5 to R-9)
+   LispEditorPresenter the editor: the project's files, a tab for each (R-5 to R-11)
  ============================================================================"
-| failures cm sess sinput sresult ide replp keyq tview files |
+| failures cm sess sinput sresult ide replp keyq tview files styler epage editorp |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
@@ -38,6 +41,9 @@ ide := (Object << #LispIde) sharedVariables: { #Watcher }; package: 'CogLisp-IDE
 replp := (SpPresenter << #LispReplPresenter) slots: { #session. #view. #termView. #restartsBar. #interruptButton. #history. #historyIndex. #shown. #transcriptText. #historyLines. #buffer. #bufferCursor. #updates. #idle. #busy. #level. #restarts. #terminal. #keys. #columns. #rows }; package: 'CogLisp-IDE'; install.
 tview := (Morph << #LispTerminalView) slots: { #target. #lines. #caret. #top. #selectFrom. #selectTo }; package: 'CogLisp-IDE'; install.
 files := (SpPresenter << #LispFilesPresenter) slots: { #list. #source. #runButton. #refreshButton }; package: 'CogLisp-IDE'; install.
+styler := (SHRBTextStyler << #LispStyler) package: 'CogLisp-IDE'; install.
+epage := (SpPresenter << #LispEditorPage) slots: { #code. #path. #ending. #savedText. #editor. #updates. #idle. #busy }; package: 'CogLisp-IDE'; install.
+editorp := (SpPresenter << #LispEditorPresenter) slots: { #tree. #notebook. #output. #pages. #folder }; package: 'CogLisp-IDE'; install.
 keyq := (Object << #LispKeyQueue) slots: { #chars. #ready. #wanted }; package: 'CogLisp-IDE'; install.
 
 "=== LispSessionInput: lines typed for a program that reads ==================="
@@ -233,6 +239,23 @@ cm value: ide class value: 'calling' value: 'call: aName with: anArray
 	"Calls the LISP procedure aName (its full name, ide:ide-eval) on anArray''s values."
 	self ensureLoaded.
 	^ LispProcedure apply: (LispEnvironment default lookup: (LispSymbol named: aName)) to: anArray asArray'.
+cm value: ide class value: 'calling' value: 'onUi: aBlock
+	"aBlock''s value, run in Morphic''s UI process (here at once if this is it); an
+	 error in it is signalled here. Windows are changed only in that process: the
+	 VM yields a process at a preemption, so another at the same priority can run
+	 in the middle of a layout."
+	| ui done result error |
+	"Morphic''s, which cycles the world headless too (UIManager default has none there)"
+	ui := [MorphicUIManager uiProcess] on: Error do: [:e | nil].
+	(ui isNil or: [ui == Processor activeProcess or: [ui isTerminated]]) ifTrue: [^ aBlock value].
+	done := Semaphore new.
+	self currentWorld defer: [
+		[result := aBlock value] on: Error do: [:e | error := e].
+		done signal].
+	(done waitTimeoutMilliseconds: 120000)
+		ifTrue: [^ LispError new messageText: ''the UI process did not answer''; signal].
+	error ifNotNil: [^ LispError new messageText: (LispError describe: error); signal].
+	^ result'.
 cm value: ide class value: 'calling' value: 'symbol: aString
 	^ LispSymbol named: aString'.
 cm value: ide class value: 'calling' value: 'evalString: aString
@@ -449,6 +472,10 @@ cm value: ide class value: 'world menu' value: 'menuCommandOn: aBuilder
 		parent: #''cog-lisp''; order: 1;
 		help: ''A cog-lisp REPL, on a session of its own'';
 		action: [LispReplPresenter open].
+	(aBuilder item: #''Editor'')
+		parent: #''cog-lisp''; order: 1.5;
+		help: ''The editor, on the project: its files, a tab for each (Ctrl+S save, Ctrl+D do it, Ctrl+P print it, Ctrl+L load)'';
+		action: [LispEditorPresenter open].
 	(aBuilder item: #''Loaded files'')
 		parent: #''cog-lisp''; order: 2;
 		help: ''The files the image has loaded: their source, and running one in a new REPL'';
@@ -1175,6 +1202,300 @@ cm value: files value: 'actions' value: 'runSelected
 	p inputText: ''(load '' , (LispPrinter writeString: (entry at: 1)) , '')''.
 	p submit.
 	^ p'.
+
+"=== LispStyler: LISP source, styled from its tokens (R-6) ===================="
+cm value: styler value: 'styling' value: 'privateStyle: aText
+	"The text styled from editor-services'' tokens: comments, strings, characters,
+	 numbers, quotes, keywords (special forms and macros), parentheses by depth."
+	| tokens |
+	aText ifEmpty: [^ self].
+	charAttr := Array new: aText size withAll: (self attributesFor: #default).
+	tokens := [LispIde call: ''editor-services:editor-tokens'' with: { aText asString }] on: Error do: [:e | nil].
+	[tokens isKindOf: LispCons] whileTrue: [| t |
+		t := tokens car.
+		self addStyle: (self styleFor: t) from: (t at: 2) + 1 to: (t at: 3).
+		tokens := tokens cdr].
+	^ aText runs: (RunArray newFrom: charAttr)'.
+cm value: styler value: 'styling' value: 'styleFor: aToken
+	| kind |
+	kind := (aToken at: 1) name asString.
+	kind = ''comment'' ifTrue: [^ #comment].
+	kind = ''string'' ifTrue: [^ #string].
+	kind = ''character'' ifTrue: [^ #character].
+	kind = ''number'' ifTrue: [^ #number].
+	kind = ''quote'' ifTrue: [^ #symbol].
+	kind = ''keyword'' ifTrue: [^ #self].
+	(kind = ''open'' or: [kind = ''close''])
+		ifTrue: [^ #(#parenthesis #parenthesis1 #parenthesis2 #parenthesis3 #parenthesis4 #parenthesis5 #parenthesis6 #parenthesis7) at: ((aToken at: 4) \\ 8) + 1].
+	^ #default'.
+cm value: styler class value: 'installing' value: 'installOn: aCodePresenter
+	"Styles aCodePresenter''s text as LISP, once its widget is built."
+	aCodePresenter withSyntaxHighlight.
+	aCodePresenter whenBuiltDo: [:ann | self installInWidget: ann widget].
+	aCodePresenter withAdapterDo: [:a | a widget ifNotNil: [:w | self installInWidget: w]]'.
+cm value: styler class value: 'installing' value: 'installInWidget: aWidget
+	[| decorator |
+	 decorator := aWidget textArea shoutStyler.
+	 decorator styler: (self new view: decorator; yourself).
+	 decorator refreshStyling] on: Error do: [:e | nil]'.
+
+"=== LispEditorPage: one file, open in the editor (R-5 to R-9) ================"
+cm value: epage value: 'initialization' value: 'initializePresenters
+	code := self newCode.
+	"not wrapped: a wrapped Rubric pane can recompose forever as its scroll bar comes and goes"
+	code beNotWrapWord.
+	"Pharo''s own Do it, Print it and Inspect it evaluate Smalltalk: replaced"
+	code overrideContextMenu: true; contextMenu: [self contextMenu].
+	LispStyler installOn: code.
+	self bindKeys'.
+cm value: epage value: 'initialization' value: 'defaultLayout
+	^ SpBoxLayout newTopToBottom add: code; yourself'.
+cm value: epage value: 'initialization' value: 'keys
+	"The page''s keys (R-11): name, letter, shifted?, action."
+	^ {
+		{ ''save''. $s. false. [self save] }.
+		{ ''do-it''. $d. false. [self doIt] }.
+		{ ''print-it''. $p. false. [self printIt] }.
+		{ ''load-file''. $l. false. [self loadFile] }.
+		{ ''format''. $f. true. [self format] } }'.
+cm value: epage value: 'initialization' value: 'bindKeys
+	"Ctrl+S save, Ctrl+D do it, Ctrl+P print it, Ctrl+L load the file, Ctrl+Shift+F
+	 format: each bound as a real key (a KeyboardKey) and as a character (a
+	 scripted key), each named, or Spec refuses the second."
+	self keys do: [:each | | name char shifted action real typed |
+		name := each at: 1. char := each at: 2. shifted := each at: 3. action := each at: 4.
+		real := (KeyboardKey named: char asUppercase asString) asKeyCombination.
+		typed := char.
+		shifted ifTrue: [real := KMModifier shift + real. typed := typed shift].
+		"shift first: actionModifier answers Ctrl or Cmd, which takes no shift"
+		real := real actionModifier.
+		typed := typed actionModifier.
+		code addShortcutWith: [:a | a name: name; shortcutKey: real; action: action].
+		code addShortcutWith: [:a | a name: name , ''-char''; shortcutKey: typed; action: action]]'.
+cm value: epage value: 'initialization' value: 'contextMenu
+	"The code pane''s menu: the page''s actions, then cut, copy and paste."
+	| menu |
+	menu := self newMenu.
+	menu addGroup: [:g |
+		g addItem: [:i | i name: ''Do it''; shortcut: $d actionModifier; action: [self doIt]].
+		g addItem: [:i | i name: ''Print it''; shortcut: $p actionModifier; action: [self printIt]].
+		g addItem: [:i | i name: ''Load file''; shortcut: $l actionModifier; action: [self loadFile]]].
+	menu addGroup: [:g |
+		g addItem: [:i | i name: ''Save''; shortcut: $s actionModifier; action: [self save]].
+		g addItem: [:i | i name: ''Format''; shortcut: $f shift actionModifier; action: [self format]]].
+	menu addGroup: [:g |
+		g addItem: [:i | i name: ''Cut''; action: [code withAdapterDo: [:a | a widget textArea editor cut]]].
+		g addItem: [:i | i name: ''Copy''; action: [code withAdapterDo: [:a | a widget textArea editor copySelection]]].
+		g addItem: [:i | i name: ''Paste''; action: [code withAdapterDo: [:a | a widget textArea editor paste]]]].
+	^ menu'.
+cm value: epage value: 'accessing' value: 'editor: anEditor
+	editor := anEditor'.
+cm value: epage value: 'accessing' value: 'path
+	^ path'.
+cm value: epage value: 'accessing' value: 'code
+	^ code'.
+cm value: epage value: 'accessing' value: 'text
+	^ code text asString'.
+cm value: epage value: 'accessing' value: 'text: aString
+	code text: aString'.
+cm value: epage value: 'accessing' value: 'isDirty
+	"Edited since it was opened or saved?"
+	^ self text ~= savedText'.
+cm value: epage value: 'accessing' value: 'title
+	^ path asFileReference basename , (self isDirty ifTrue: ['' *''] ifFalse: [''''])'.
+cm value: epage value: 'file' value: 'openPath: aPath
+	"Reads the file (ide-read-file): its text with line feeds, its line ending kept for saving."
+	| answer |
+	path := aPath.
+	answer := LispIde call: ''ide:ide-read-file'' with: { aPath }.
+	savedText := answer car.
+	ending := answer cdr.
+	code text: savedText.
+	code whenTextChangedDo: [editor ifNotNil: [:e | e pageChanged: self]]'.
+cm value: epage value: 'file' value: 'save
+	"Writes the file in its own line endings (R-8); saving does not evaluate."
+	| text |
+	text := self text.
+	LispIde call: ''ide:ide-save-file'' with: { path. text. LispIde symbol: ''ending''. ending }.
+	savedText := text.
+	self report: ''saved '' , path asFileReference basename.
+	editor ifNotNil: [:e | e pageChanged: self]'.
+cm value: epage value: 'file' value: 'format
+	"The whole text laid out by format-source, the formatter VS Code uses."
+	| formatted |
+	formatted := [LispIde evalString: ''(require (quote format-source))''.
+		LispIde call: ''format-source:format-source'' with: { self text }]
+		on: Error do: [:e | self report: ''format: '' , (LispError describe: e). ^ self].
+	code text: formatted'.
+cm value: epage value: 'evaluating' value: 'session
+	"The session that evaluates as part of this file (R-9)."
+	^ LispIde call: ''ide:ide-file-session'' with: { path }'.
+cm value: epage value: 'evaluating' value: 'formInterval
+	"The selection, or else the top-level form at the cursor: an Interval in the text, or nil."
+	| sel form |
+	sel := code selectionInterval.
+	(sel notNil and: [sel notEmpty]) ifTrue: [^ sel].
+	form := LispIde call: ''ide:ide-form-at'' with: { self text. ((code cursorPositionIndex ifNil: [1]) - 1) max: 0 }.
+	form == false ifTrue: [^ nil].
+	^ (form car + 1) to: form cdr'.
+cm value: epage value: 'evaluating' value: 'evaluate: aString then: aBlock
+	"Evaluates aString as part of the file, in its session, in a process of its own
+	 so that the window carries on; then, in the UI process, what it wrote is
+	 reported and aBlock given the values written. An error is reported and the
+	 session brought back from its break. One evaluation at a time."
+	busy == true ifTrue: [^ self report: ''busy: an evaluation is running''].
+	busy := true.
+	idle := Semaphore new.
+	[| s r written |
+	 [s := self session.
+	  r := self wait: (LispIde call: ''ide:ide-eval'' with: { s. aString }) in: s.
+	  (r at: 4) isEmpty ifFalse: [| out | out := r at: 4. self queue: [self report: out]].
+	  (r at: 1) name = ''error''
+		ifTrue: [| report |
+			report := r at: 5.
+			self queue: [self report: ''error: '' , report].
+			self wait: (LispIde call: ''ide:ide-eval'' with: { s. ''(abort)'' }) in: s]
+		ifFalse: [
+			written := OrderedCollection new.
+			(r at: 3) do: [:w | written add: w].
+			self queue: [aBlock value: written]]]
+		on: Error do: [:e | | text | text := LispError describe: e. self queue: [self report: ''error: '' , text]].
+	 busy := false.
+	 idle signal] forkAt: Processor userBackgroundPriority named: ''cog-lisp editor evaluation'''.
+cm value: epage value: 'evaluating' value: 'wait: aResult in: aSession
+	"The result once the evaluation has finished."
+	| r |
+	r := aResult.
+	[(r at: 1) name = ''running''] whileTrue: [
+		r := LispIde call: ''ide:ide-wait'' with: { aSession. 100 }].
+	^ r'.
+cm value: epage value: 'evaluating' value: 'isBusy
+	^ busy == true'.
+cm value: epage value: 'updating' value: 'queue: aBlock
+	"Runs aBlock in the UI process: an evaluation''s results come from another one."
+	updates ifNil: [updates := OrderedCollection new].
+	updates add: aBlock.
+	self defer: [self flushUpdates]'.
+cm value: epage value: 'updating' value: 'flushUpdates
+	| pending |
+	updates ifNil: [^ self].
+	pending := updates copy.
+	updates removeAll.
+	pending do: [:each | each value]'.
+cm value: epage value: 'updating' value: 'waitUntilIdle: milliseconds
+	"For a test: waits for the evaluation to finish, then shows what it answered
+	 (in the UI process). False if it is still running."
+	idle ifNil: [^ true].
+	(idle waitTimeoutMilliseconds: milliseconds) ifTrue: [^ false].
+	idle signal.
+	LispIde onUi: [self flushUpdates].
+	^ true'.
+cm value: epage value: 'evaluating' value: 'doIt
+	"Ctrl+D: the selection or the form at the cursor, evaluated as part of the file;
+	 its values reported (R-9)."
+	| interval |
+	interval := self formInterval.
+	interval ifNil: [^ self].
+	self evaluate: (self text copyFrom: interval first to: interval last)
+		then: [:values | self report: (values isEmpty ifTrue: [''done''] ifFalse: [values last])]'.
+cm value: epage value: 'evaluating' value: 'printIt
+	"Ctrl+P: as Do it, and the value written after the form as ;; => value (R-9)."
+	| interval |
+	interval := self formInterval.
+	interval ifNil: [^ self].
+	self evaluate: (self text copyFrom: interval first to: interval last)
+		then: [:values | | written text |
+			written := values isEmpty ifTrue: [''(no value)''] ifFalse: [values last].
+			text := self text.
+			code text: (text copyFrom: 1 to: interval last) , String lf , '';; => '' , written ,
+				(text copyFrom: interval last + 1 to: text size).
+			[code selectionInterval: (interval last + 9 + written size to: interval last + 8 + written size)] on: Error do: [:e | nil]]'.
+cm value: epage value: 'evaluating' value: 'loadFile
+	"Ctrl+L: the whole text, as the file holds it now, evaluated as part of the file."
+	self evaluate: self text then: [:r | self report: ''loaded '' , path asFileReference basename]'.
+cm value: epage value: 'reporting' value: 'report: aString
+	editor ifNotNil: [:e | e report: aString]'.
+
+"=== LispEditorPresenter: the editor window (R-5 to R-11) ===================="
+cm value: editorp class value: 'opening' value: 'open
+	"An editor on the project (ide-project), else the cog-lisp folder."
+	^ self new open; yourself'.
+cm value: editorp class value: 'opening' value: 'openOn: aFolder
+	^ self new folder: aFolder; open; yourself'.
+cm value: editorp value: 'initialization' value: 'initializePresenters
+	tree := self newTree.
+	tree display: [:ref | ref basename].
+	tree children: [:ref | self childrenOf: ref].
+	tree whenActivatedDo: [:selection | selection selectedItem ifNotNil: [:ref | ref isFile ifTrue: [self openFile: ref fullName]]].
+	notebook := self newNotebook.
+	output := self newText.
+	output beNotEditable.
+	output beNotWrapWord.
+	pages := OrderedCollection new.
+	self folder: (self defaultFolder)'.
+cm value: editorp value: 'initialization' value: 'defaultLayout
+	^ SpBoxLayout newTopToBottom
+		add: (SpPanedLayout newLeftToRight
+			positionOfSlider: 0.25;
+			add: tree;
+			add: (SpPanedLayout newTopToBottom positionOfSlider: 0.8; add: notebook; add: output; yourself);
+			yourself);
+		yourself'.
+cm value: editorp value: 'initialization' value: 'initializeWindow: aWindowPresenter
+	aWindowPresenter title: ''cog-lisp editor''; initialExtent: 1000 @ 680'.
+cm value: editorp value: 'files' value: 'defaultFolder
+	| project |
+	project := LispIde call: ''ide:ide-project'' with: #().
+	^ project == false
+		ifTrue: [(OSEnvironment current at: ''COGLISP_HOME'' ifAbsent: [FileSystem workingDirectory fullName]) asFileReference fullName]
+		ifFalse: [project]'.
+cm value: editorp value: 'files' value: 'folder: aPath
+	"The project folder whose files the tree shows (R-5)."
+	folder := aPath asFileReference.
+	tree roots: (self childrenOf: folder)'.
+cm value: editorp value: 'files' value: 'childrenOf: aReference
+	"The folders holding .lisp files, then the .lisp files, each sorted."
+	| files dirs |
+	aReference isDirectory ifFalse: [^ #()].
+	dirs := (aReference directories reject: [:d | #(''pharo'' ''node_modules'' ''.git'' ''dist'' ''coverage'' ''.vscode-test'') includes: d basename])
+		select: [:d | self holdsLisp: d].
+	files := aReference files select: [:f | f extension = ''lisp''].
+	^ ((dirs asSortedCollection: [:a :b | a basename <= b basename]) asArray) ,
+		((files asSortedCollection: [:a :b | a basename <= b basename]) asArray)'.
+cm value: editorp value: 'files' value: 'holdsLisp: aDirectory
+	^ (LispIde call: ''ide:ide-project-files'' with: { aDirectory fullName }) isKindOf: LispCons'.
+cm value: editorp value: 'files' value: 'pages
+	^ pages'.
+cm value: editorp value: 'files' value: 'pageFor: aPath
+	^ pages detect: [:p | p path asFileReference = aPath asFileReference] ifNone: [nil]'.
+cm value: editorp value: 'files' value: 'openFile: aPath
+	"The file in a tab of its own, or its tab if it has one (R-5). Answers its page."
+	| page tab |
+	(self pageFor: aPath) ifNotNil: [:p | self selectPage: p. ^ p].
+	page := self instantiate: LispEditorPage.
+	page editor: self.
+	page openPath: aPath.
+	pages add: page.
+	tab := SpNotebookPage title: page title provider: [page].
+	[tab beCloseable] on: Error do: [:e | nil].
+	notebook addPage: tab.
+	self selectPage: page.
+	^ page'.
+cm value: editorp value: 'files' value: 'selectPage: aPage
+	| i |
+	i := pages indexOf: aPage.
+	(i between: 1 and: notebook pages size) ifTrue: [notebook selectPage: (notebook pages at: i)]'.
+cm value: editorp value: 'files' value: 'pageChanged: aPage
+	"Its title marks unsaved edits."
+	| i |
+	i := pages indexOf: aPage.
+	(i between: 1 and: notebook pages size) ifTrue: [(notebook pages at: i) title: aPage title]'.
+cm value: editorp value: 'reporting' value: 'outputText
+	^ output text asString'.
+cm value: editorp value: 'reporting' value: 'report: aString
+	"A line in the output pane: what an evaluation wrote or answered, a save."
+	output text: output text asString , aString , String lf.
+	[output withAdapterDo: [:a | a widget scrollToEndOfText]] on: Error do: [:e | nil]'.
 
 "the development image takes its requests when it starts in the GUI (R-37)"
 SessionManager default registerUserClassNamed: #LispIde.

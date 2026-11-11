@@ -675,20 +675,27 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 
 ### ide: `(require 'ide)`
 
+- `(change-before change)`: For a file saved, the text it held before, which ide-undo-change writes back; else #f.
 - `(change-kind change)`: evaluate (an evaluation that defined names), run (a file run, from a request), update (the image updated in place), or log (the record began to be kept in a file).
 - `(change-maker change)`: person or agent.
 - `(change-names change)`: The names it defined, strings.
 - `(change-session change)`: The name of the session that made it.
-- `(change-text change)`: The text evaluated.
+- `(change-text change)`: The text evaluated; for a file saved, the text it was saved with.
 - `(change-time change)`: When it was made, a date and time as text.
 - `(ide-changes)`: The changes made through these tools, oldest first: each evaluation that defined names, with when, its session, who made it (person or agent), the names and the text.
 - `(ide-close session)`: Ends session and its process.
 - `(ide-eval session text option ...)`: Evaluates text's forms in session and answers the result. Options: timeout (milliseconds to wait; as long as it takes if not given): a result still running then has status running, and ide-wait answers it. An evaluation that defines names is recorded (ide-changes).
+- `(ide-file-session path option ...)`: The session that evaluates forms as part of the file at path (R-9): in its unit, so a define in a library's file defines the library's name. The file is loaded first if it has not been, and the session is made once and kept. Options: maker (person or agent; person).
+- `(ide-form-at text offset)`: The top-level form holding offset in text, a character offset from 0, or else the last one before it: (start . end), the form's text from start to before end; #f when there is none. The forms are read, not run; reading stops at the first that does not read.
 - `(ide-interrupt session)`: Stops the evaluation session is running: it waits at a break, with its restarts (abort among them), and the evaluation's result has status error.
+- `(ide-load-file path option ...)`: Loads the file at path, as load does, in a session of its own, and answers the result (as ide-eval does); the evaluation is recorded as a change when it defines names. Options: maker (person or agent; person).
 - `(ide-loaded-files)`: The files the image has loaded, programs and libraries, each (path . library): library is the library's name, or #f for a program. In the order of their paths.
 - `(ide-log-to! path)`: From now on the changes are also kept in the file at path, one written record a line, rewritten at each change, so the record outlives a crash. #f stops it.
 - `(ide-project [folder])`: The project folder the image works on, or #f; with folder, makes it the project (a path) and indexes its .lisp files for the editor services.
+- `(ide-project-files [folder])`: The .lisp files under folder (the project's, ide-project, if not given), as full paths, sorted; the folders pharo, node_modules, .git, dist, coverage and .vscode-test left out. () when there is no folder.
+- `(ide-read-file path)`: The file at path as an editor holds it: (text . ending), its lines ended by line feeds whatever the file has, and ending crlf or lf, the file's own (R-8).
 - `(ide-request text)`: Takes a request the launchers (ide.bat, ide.sh) and VS Code leave for the image, a form as text: (project folder) makes folder the project and answers project; (repl) answers repl, for a new REPL window; (run path) records the run (a change, kind run) and answers (run path); (update) answers update. Anything else answers unknown.
+- `(ide-save-file path text option ...)`: Writes text, its lines ended by line feeds, to the file at path as UTF-8, its lines ended as the file had them (R-8): ending, an option, says crlf or lf, else the file's own, else lf. Records the save as a change (kind save) with the text before it, for ide-undo-change. Options: ending, session (the name of the session saving it; editor), maker (person or agent; person).
 - `(ide-session option ...)`: A new session: evaluations in a process of their own, with their own unit and output and input ports. Options: name (a string; session 1, 2, ...), maker (person or agent: who its changes are recorded as made by; person), unit (the unit to evaluate in, such as a file's; a session unit of its own), wrapper (a procedure given a thunk, run around every evaluation: (lambda (thunk) (with-console '(colors none) thunk))).
 - `(ide-session-busy? session)`: #t while it evaluates; at a break, waiting for a restart or another form, #f.
 - `(ide-session-maker session)`: person or agent: who its changes are recorded as made by.
@@ -697,6 +704,7 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(ide-sessions)`: The sessions open in the image.
 - `(ide-stale-files option ...)`: The source files the image is built from (src/*.st, lib/compiler/, and the built-in libraries core, format, json, http and coverage) that changed since it was built or last updated, as paths relative to the cog-lisp folder; () when it is up to date, or was not built from a seed. Options: home (the cog-lisp folder; *env*'s).
 - `(ide-type session line)`: Gives the program session runs a line to read: read-line answers it, and read reads from it.
+- `(ide-undo-change change)`: Writes back the text a file held before a save (a change of kind save), keeping its line ending, and records that as a change too (kind undo). An error for any other change.
 - `(ide-update option ...)`: Brings the image up to date with the checkout, in place, keeping what it holds (R-3): copies the image as last saved beside it (name.before-update.image), files in src/ again and removes the methods src/ no longer defines, compiles each changed built-in library into the live environment, loads the project's files again, and records the update. A change to lib/compiler/ it cannot carry: it answers fresh, for a fresh image (ide.bat --fresh). Answers an association list: status (current, updated, fresh or failed), files (the changed ones), backup (the copy's path), report (a failure's). Options: home (the cog-lisp folder), image (the image file to copy; this one).
 - `(ide-wait session [milliseconds])`: The result of the oldest evaluation not yet answered, waiting at most milliseconds (as long as it takes if not given); a result with status running if it has not come.
 - `(ide-window-console width height keys)`: A wrapper for a session (ide-session's wrapper option) whose evaluations run in a console that is a window's: a terminal, interactive, true color and Unicode, width by height cells, its keys read from keys (an object answering nextWithin: milliseconds with the next character typed, or nil), so the console library renders and reads keys as in a terminal.

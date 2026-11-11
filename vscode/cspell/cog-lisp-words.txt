@@ -22,6 +22,7 @@ atan
 atom
 attributes
 background
+before
 begin
 bind
 block
@@ -411,6 +412,7 @@ trim
 true
 truncate
 type
+undo
 unit
 unix
 unless

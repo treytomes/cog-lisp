@@ -674,7 +674,7 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 |------|------|--------|
 | 1 | The spike (§4.1); the editor services (R-29, R-30) | Done (2026-11-10): `lib/editor-services.lisp` and `tests/lisp/editor-services.lisp` (62 checks); the language server on it, its 31 checks and VS Code's 5 offline and 12 with the server passing unchanged |
 | 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c done (2026-11-11): R-39 (§16). 2d done (2026-11-11), the owner's trial of 2c: R-40, R-41 (§17) |
-| 3 | The editor | |
+| 3 | The editor | 3a done (2026-11-11): R-5, R-6, R-8's saving, R-9 (but Inspect it), R-11, Format (§18). 3b next: R-10, R-8's files changed on disk, R-7's indenting on Enter |
 | 4 | The browser and the inspector | |
 | 5 | Errors and the debugger | |
 | 6 | Finishing | |
@@ -878,3 +878,65 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
   - a closed image's heartbeat looked fresh for ten seconds, so `--fresh` just
     after closing refused: quitting, the image removes its heartbeat
     (`LispIde class>>shutDown:`).
+
+## 18. As built: step 3a, the editor window (2026-11-11)
+
+- **The `ide` procedures first** (R-32): `ide-project-files` (a folder's
+  `.lisp` files, `pharo`, `node_modules`, `.git`, `dist`, `coverage` and
+  `.vscode-test` left out), `ide-read-file` (`(text . ending)`: the text with line
+  feeds, the file's ending `crlf` or `lf`), `ide-save-file` (UTF-8, in the file's
+  own ending, or the `ending` option's; recorded as a change of kind `save` with
+  the text before, `change-before`), `ide-undo-change` (writes that text back,
+  recorded as `undo`), `ide-form-at` (the top-level form holding an offset, or
+  the last one before it), `ide-load-file` (a `load` in a session of its own,
+  which is closed after) and `ide-file-session` (the session that evaluates as
+  part of a file, in its `LispUnit`, the file loaded first if it was not; one per
+  file, whichever way its path is written).
+- **The window is `LispEditorPresenter`** (the `cog-lisp` menu's *Editor*): a
+  tree of the project's folders and `.lisp` files (`ide-project`, else
+  `COGLISP_HOME`), a notebook with a page per file opened (a file opens once),
+  and an output pane. A page (`LispEditorPage`) is a code pane whose tab title
+  marks unsaved edits with `*`.
+- **Styling** (R-6) is `LispStyler`, an `SHRBTextStyler` filling its attributes
+  from `editor-tokens`: comments, strings, characters, numbers, quoted data,
+  special forms and macros as Pharo's styles for comments, strings, characters,
+  numbers, symbols and `self`, parentheses by depth as `parenthesis` to
+  `parenthesis7`. Rubric styles synchronously ("not safe" in the background).
+  The matching parenthesis's highlight is not done.
+- **Keys** (R-11): Ctrl+S save, Ctrl+D Do it, Ctrl+P Print it, Ctrl+L Load file,
+  Ctrl+Shift+F Format, each bound twice (a real key and a typed one, each named),
+  and the same actions, with Cut, Copy and Paste, in the pane's menu, which
+  replaces Pharo's (its Do it evaluates Smalltalk). Inspect it (Ctrl+I) comes
+  with the inspector, step 4. A shifted key is `KMModifier shift + key` before
+  `actionModifier` (a Ctrl-or-Cmd choice, which takes no shift).
+- **Evaluating** (R-9): the selection, else the form at the cursor, in the
+  file's session, in a process of its own; what it writes and its value go to
+  the output pane, Print it writes `;; => value` after the form, an error is
+  reported and the session brought back from its break, and a second
+  evaluation while one runs is refused (`busy`). Load file evaluates the
+  page's text as it is, unsaved edits and all.
+- **Format** (R-7) is `format-source` on the whole text; the selection alone is
+  not done.
+- **Found:**
+  - `processPreemptionYields` is true, and headless Pharo still has a Morphic
+    UI process cycling the world at the user's priority. So a process changing
+    a window can be put behind that process in the middle of a layout. The
+    tests failed about one run in six until every change to a window went
+    through `LispIde onUi:`, which runs a block in Morphic's UI process
+    (`currentWorld defer:`; `UIManager default` has no UI process headless) and
+    answers its value. Keys and clicks already run there.
+  - A wrapped Rubric pane once recomposed forever, in a loop between its
+    scroll pane's width and its paragraph, and ran out of memory: the code and
+    output panes are not wrapped (`beNotWrapWord`).
+  - `cursorPositionIndex:` moves one end of the selection only, so the old end
+    makes a selection; a cursor is an empty `selectionInterval:`.
+- **For the owner to check**: in the development image (`ide.bat --fresh`), the
+  editor from the `cog-lisp` menu; that Ctrl+D, Ctrl+P and Ctrl+S on a real
+  keyboard are the editor's, not Pharo's (headless tests call the actions, not
+  the keys); the styling's colors.
+- **Checks**: `tests/lisp/ide-editor.lisp` (37: the procedures, a CRLF file
+  saved, a save undone, the form at a place, a library's unit, loading) and
+  `tests/lisp/ide-editor-window.lisp` (47: the tree, tabs, the unsaved mark,
+  saving in CRLF, Do it at the cursor and on a selection in a library's unit,
+  an error, Print it, Load file, busy, Format, the styler, the keys and the
+  menu); `tests/lisp/ide-window-console.lisp`'s menu check names *Editor*.

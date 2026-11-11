@@ -539,6 +539,17 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   combinations arrive only as key-down events**; typed characters as key
   presses. A morph that takes keys handles both (`handlesKeyDown:`), and
   suppresses the key press after one it handled (`supressNextKeyPress:`).
+- **Change a window only in Morphic's UI process.** `processPreemptionYields`
+  is true, and headless Pharo still runs a Morphic UI process cycling the world
+  at the user's priority, so a test's process changing a Rubric pane can land in
+  the middle of a layout (random hangs, "index out of range"). Tests go through
+  `LispIde onUi:` (it uses `MorphicUIManager uiProcess` and `currentWorld
+  defer:`; `UIManager default` has no UI process headless, and its `defer:`
+  runs at once).
+- **Code panes are not wrapped** (`beNotWrapWord`): a wrapped Rubric pane can
+  recompose forever between its scroll bar and its paragraph, until the memory
+  watchdog fires. **`cursorPositionIndex:` moves one end of the selection
+  only**: place a cursor with an empty `selectionInterval:` (`n to: n - 1`).
 - **In a batch file, `%VAR:~0,1%` of an undefined variable garbles the whole
   line** ("The syntax of the command is incorrect"): use delayed expansion,
   `!VAR:~0,1!`, and test every script with no arguments too.

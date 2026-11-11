@@ -29,7 +29,9 @@
           ide-changes ide-log-to!
           change-time change-session change-maker change-kind change-names change-text
           ide-project ide-request ide-stale-files ide-update
-          ide-window-console ide-loaded-files))
+          ide-window-console ide-loaded-files
+          change-before ide-project-files ide-read-file ide-save-file ide-undo-change
+          ide-form-at ide-file-session ide-load-file))
 (require 'editor-services)
 (require 'console)
 
@@ -148,7 +150,11 @@ Ends session and its process."
 (define (change-maker c) "(change-maker change)\nperson or agent." (vector-ref c 2))
 (define (change-kind c) "(change-kind change)\nevaluate (an evaluation that defined names), run (a file run, from a request), update (the image updated in place), or log (the record began to be kept in a file)." (vector-ref c 3))
 (define (change-names c) "(change-names change)\nThe names it defined, strings." (vector-ref c 4))
-(define (change-text c) "(change-text change)\nThe text evaluated." (vector-ref c 5))
+(define (change-text c) "(change-text change)\nThe text evaluated; for a file saved, the text it was saved with." (vector-ref c 5))
+(define (change-before c)
+  "(change-before change)
+For a file saved, the text it held before, which ide-undo-change writes back; else #f."
+  (if (> (vector-length c) 6) (vector-ref c 6) #f))
 
 (define (%record! change)
   (set! %changes (cons change %changes))
@@ -316,3 +322,110 @@ The files the image has loaded, programs and libraries, each (path . library): l
                                    (let ((l [u library])) (if (smalltalk-nil? l) #f l))))))
                     (vector->list [[[(smalltalk LispUnit) units] values] asArray]))
         (lambda (a b) (string<? (car a) (car b)))))
+
+;;; ---------------------------------------------------------------------------
+;;; Files, for the editor (step 3, R-5 to R-9)
+
+(define %skipped '("pharo" "node_modules" ".vscode-test" ".git" "dist" "coverage"))
+
+(define (ide-project-files . folder)
+  "(ide-project-files [folder])
+The .lisp files under folder (the project's, ide-project, if not given), as full paths, sorted; the folders pharo, node_modules, .git, dist, coverage and .vscode-test left out. () when there is no folder."
+  (let ((root (if (pair? folder) (car folder) (ide-project))))
+    (if (not root)
+        '()
+        (let walk ((dir [root asFileReference]))
+          (if (not [dir isDirectory])
+              '()
+              (sort (append-map (lambda (entry)
+                                  (cond ([entry isDirectory]
+                                         (if (member [entry basename] %skipped) '() (walk entry)))
+                                        ([[entry basename] endsWith: ".lisp"] (list [entry fullName]))
+                                        (else '())))
+                                (vector->list [[dir children] asArray]))
+                    string<?))))))
+
+;; the text with CR LF and CR as LF; its line ending, crlf or lf
+(define (%split-ending text)
+  (if (string-search text (string #\return #\newline))
+      (cons [text copyReplaceAll: (string #\return #\newline) with: (string #\newline)] 'crlf)
+      (cons text 'lf)))
+
+(define (ide-read-file path)
+  "(ide-read-file path)
+The file at path as an editor holds it: (text . ending), its lines ended by line feeds whatever the file has, and ending crlf or lf, the file's own (R-8)."
+  (%split-ending [[[path asFileReference] contents] asString]))
+
+(define (%write-file! path text)
+  (let ((f [path asFileReference]))
+    [f ensureDelete]
+    [f binaryWriteStreamDo: (procedure->block
+                             (lambda (s) [s nextPutAll: [[(smalltalk ZnUTF8Encoder) new] encodeString: text]]))]))
+
+(define (ide-save-file path text . options)
+  "(ide-save-file path text option ...)
+Writes text, its lines ended by line feeds, to the file at path as UTF-8, its lines ended as the file had them (R-8): ending, an option, says crlf or lf, else the file's own, else lf. Records the save as a change (kind save) with the text before it, for ide-undo-change. Options: ending, session (the name of the session saving it; editor), maker (person or agent; person)."
+  (let* ((f [path asFileReference])
+         (old (and [f exists] (ide-read-file path)))
+         (ending (%option options 'ending (if old (cdr old) 'lf)))
+         (out (if (eq? ending 'crlf) [text copyReplaceAll: (string #\newline) with: (string #\return #\newline)] text)))
+    (%write-file! path out)
+    (%record! (vector (%now) (%option options 'session "editor") (%option options 'maker 'person)
+                      'save (list path) text (if old (car old) "")))
+    #t))
+
+(define (ide-undo-change change)
+  "(ide-undo-change change)
+Writes back the text a file held before a save (a change of kind save), keeping its line ending, and records that as a change too (kind undo). An error for any other change."
+  (if (not (eq? (change-kind change) 'save))
+      (error "ide-undo-change: only a file saved can be undone" (change-kind change))
+      (let* ((path (car (change-names change)))
+             (ending (cdr (ide-read-file path)))
+             (before (change-before change)))
+        (%write-file! path (if (eq? ending 'crlf) [before copyReplaceAll: (string #\newline) with: (string #\return #\newline)] before))
+        (%record! (vector (%now) "editor" 'person 'undo (list path) before (car (ide-read-file path))))
+        #t)))
+
+;;; ---------------------------------------------------------------------------
+;;; The form at a place, and evaluating in a file's unit (R-9)
+
+(define (ide-form-at text offset)
+  "(ide-form-at text offset)
+The top-level form holding offset in text, a character offset from 0, or else the last one before it: (start . end), the form's text from start to before end; #f when there is none. The forms are read, not run; reading stops at the first that does not read."
+  (let ((r (make-reader text)))
+    (let loop ((last #f))
+      (let ((d (guard (e (#t (eof-object))) (reader-next r))))
+        (if (eof-object? d)
+            last
+            (let ((start (reader-datum-start r)) (end (reader-position r)))
+              (cond ((and (<= start offset) (< offset end)) (cons start end))
+                    ((> start offset) (or last (cons start end)))
+                    (else (loop (cons start end))))))))))
+
+(define %file-sessions (make-hash-table equal?))
+
+(define (ide-load-file path . options)
+  "(ide-load-file path option ...)
+Loads the file at path, as load does, in a session of its own, and answers the result (as ide-eval does); the evaluation is recorded as a change when it defines names. Options: maker (person or agent; person)."
+  (let* ((s (ide-session 'name [[path asFileReference] basename] 'maker (%option options 'maker 'person)))
+         (r (ide-eval s (string-append "(load " (with-output-to-string (lambda () (write path))) ")"))))
+    (if (eq? (result-status r) 'error) (ide-eval s "(abort)"))
+    (ide-close s)
+    r))
+
+(define (ide-file-session path . options)
+  "(ide-file-session path option ...)
+The session that evaluates forms as part of the file at path (R-9): in its unit, so a define in a library's file defines the library's name. The file is loaded first if it has not been, and the session is made once and kept. Options: maker (person or agent; person)."
+  ;; units are known by the path's full name, as load gives it
+  (let* ((full [[path asFileReference] fullName]) (key (editor-key full)))
+    (or (let ((s (hash-table-ref/default %file-sessions key #f)))
+          (and s (memq s (ide-sessions)) s))
+        (begin
+          (when (smalltalk-nil? [(smalltalk LispUnit) atPath: full])
+            (ide-load-file full 'maker (%option options 'maker 'person)))
+          (let* ((unit [(smalltalk LispUnit) atPath: full])
+                 (s (ide-session 'name [[path asFileReference] basename]
+                                 'maker (%option options 'maker 'person)
+                                 'unit (if (smalltalk-nil? unit) #f unit))))
+            (hash-table-set! %file-sessions key s)
+            s)))))
