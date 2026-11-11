@@ -37,7 +37,8 @@
           ide-groups ide-group-definitions ide-definition-kind ide-browse
           ide-callers ide-callees ide-search ide-disassembly ide-write-definition
           ide-sealed-sources
-          ide-views ide-evaluate-with-it ide-inspect ide-open-source))
+          ide-views ide-evaluate-with-it ide-inspect ide-open-source
+          result-backtrace ide-backtrace))
 (require 'editor-services)
 (require 'console)
 
@@ -92,9 +93,10 @@ The sessions open in the image."
                 [r output]
                 (let ((rep [r report])) (if (smalltalk-nil? rep) #f rep))
                 (map (lambda (n) n) (vector->list [r restarts]))
-                [r level]))))
+                [r level]
+                (%frame-records [r backtrace])))))
 
-(define %running (vector 'running '() '() "" #f '() 0))
+(define %running (vector 'running '() '() "" #f '() 0 '()))
 
 (define (result-status r) "(result-status result)\ndone; error (the session waits at a break); aborted (an abort restart came back to the top); or running (not finished in the time asked for: ide-wait answers it later)." (vector-ref r 0))
 (define (result-values r) "(result-values result)\nThe values of the forms evaluated, as a list, leaving out the unspecified value." (vector-ref r 1))
@@ -103,6 +105,10 @@ The sessions open in the image."
 (define (result-report r) "(result-report result)\nAn error's report, a string; or #f." (vector-ref r 4))
 (define (result-restarts r) "(result-restarts result)\nAt an error, the names of the restarts active, strings: evaluating (name args ...) in the session invokes one." (vector-ref r 5))
 (define (result-level r) "(result-level result)\nHow many breaks deep the session is: 0 at the top." (vector-ref r 6))
+(define (result-backtrace r)
+  "(result-backtrace result)
+At an error, its LISP frames, innermost first, each #(name path line procedure): a procedure's name and the file and line of its definition (#f, #f for one with no file, a primitive), and the procedure; the last is the top-level form the evaluation began in, named top-level. () for any other result."
+  (if (> (vector-length r) 7) (vector-ref r 7) '()))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Evaluating
@@ -434,7 +440,7 @@ The session that evaluates forms as part of the file at path (R-9): in its unit,
   ;; units are known by the path's full name, as load gives it
   (let* ((full [[path asFileReference] fullName]) (key (editor-key full)))
     (or (let ((s (hash-table-ref/default %file-sessions key #f)))
-          (and s (memq s (ide-sessions)) s))
+          (and s (memq s (ide-sessions)) [s isAlive] s))
         (begin
           (when (and (smalltalk-nil? [(smalltalk LispUnit) atPath: full]) (%library-file? full))
             (ide-load-file full 'maker (%option options 'maker 'person)))
@@ -1040,3 +1046,40 @@ The original source of a definition, given its name or its value, opened where i
                 (else [(smalltalk LispIde) inUI: (procedure->block
                                                   (lambda () [(smalltalk LispBrowserPresenter) openOn: name]))]))
           place))))
+
+;;; ---------------------------------------------------------------------------
+;;; Backtraces (step 5, R-25)
+
+;; Smalltalk's frames (LispIde lispFramesFrom:, #(name procedure context) each) as
+;; data: #(name path line procedure)
+(define (%frame-records frames)
+  (if (or (smalltalk-nil? frames) (not (vector? frames)))
+      '()
+      (map (lambda (f)
+             (let ((name [f at: 1]))
+               (if (smalltalk-nil? name)
+                   (vector 'top-level #f #f #f)
+                   (let* ((b (guard (e (#t #f)) (ide-browse name)))
+                          (path (and b (vector-ref b 4))))
+                     (vector name path (and path (%line-at path (vector-ref b 5))) [f at: 2])))))
+           (vector->list frames))))
+
+(define (ide-backtrace s)
+  "(ide-backtrace session)
+The LISP frames of the error session waits at a break for, as result-backtrace gives them; () when it is at no break."
+  (let ((ctx [s errorContext]))
+    (if (smalltalk-nil? ctx) '() (%frame-records [(smalltalk LispIde) lispFramesFrom: ctx]))))
+
+;; what (backtrace) writes: a frame a line, innermost first
+(define (%write-backtrace frames)
+  (let loop ((records (%frame-records frames)) (i 0))
+    (when (pair? records)
+      (let ((r (car records)))
+        (display "  ") (display i) (display ": ")
+        (cond ((eq? (vector-ref r 0) 'top-level) (display "the top-level form"))
+              ((vector-ref r 1)
+               (display (vector-ref r 0)) (display "  ")
+               (display [[(vector-ref r 1) asFileReference] basename]) (display ":") (display (vector-ref r 2)))
+              (else (display (vector-ref r 0))))
+        (newline))
+      (loop (cdr records) (+ i 1)))))

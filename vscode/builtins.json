@@ -24,6 +24,7 @@
   "assq": {"call": "(assq key alist)", "kind": "procedure", "category": "Lists", "description": "The first pair of the association list whose car is eq? to key, or #f."},
   "assv": {"call": "(assv key alist)", "kind": "procedure", "category": "Lists", "description": "The first pair of the association list whose car is eqv? to key, or #f."},
   "atan": {"call": "(atan y [x])", "kind": "procedure", "category": "Numbers", "description": "The arctangent of y, or of y/x in the right quadrant."},
+  "backtrace": {"call": "(backtrace)", "kind": "procedure", "category": "Conditions and restarts", "description": "Writes the LISP frames of the error being handled at this break, innermost first: each procedure with its file and line, a primitive as one, then the top-level form it began in. Away from a break, the frames of the current computation."},
   "begin": {"call": "(begin form ...)", "kind": "special form", "category": "Special forms", "description": "Evaluates the forms in order and answers the last; at top level each is a top-level form."},
   "boolean?": {"call": "(boolean? x)", "kind": "procedure", "category": "Equality and types", "description": "True if x is #t or #f."},
   "bootstrap-compiler": {"call": "(bootstrap-compiler directory)", "kind": "procedure", "category": "The compiler and reader", "description": "Compiles the compiler source in directory with the running compiler, then with each new stage in turn, three times; answers the stages, for bootstrap-fixpoint? and bootstrap-differences. The last stage is left installed."},

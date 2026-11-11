@@ -292,6 +292,7 @@ Only these names exist. `[x]` is optional; `x ...` is any number of them.
 ## Conditions and restarts
 
 - `(abort)`: Invokes the abort restart.
+- `(backtrace)`: Writes the LISP frames of the error being handled at this break, innermost first: each procedure with its file and line, a primitive as one, then the top-level form it began in. Away from a break, the frames of the current computation.
 - `(compute-restarts)`: A list of the active restarts, innermost first.
 - `(condition-report c)`: The text that describes the condition c, as the runner shows it.
 - `(condition? x)`: True if x is a condition: anything raised or signalled.
@@ -685,6 +686,7 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(change-session change)`: The name of the session that made it.
 - `(change-text change)`: The text evaluated; for a file saved, the text it was saved with.
 - `(change-time change)`: When it was made, a date and time as text.
+- `(ide-backtrace session)`: The LISP frames of the error session waits at a break for, as result-backtrace gives them; () when it is at no break.
 - `(ide-browse name)`: A definition as the browser shows it (R-17, R-21): #(name kind documentation source path start end stale? smalltalk). documentation and source are strings or #f (a built-in compiled by the seed keeps no source); path, start and end (character offsets from 0, in the file's text with line feeds) say where it is, or are #f: a special form's is its define-special-form in the compiler's source; stale? is #t when its file no longer holds the text it was compiled from; smalltalk, for a primitive, is (class selector source): the method of Smalltalk that installs it and the block that implements it. #f when name is not bound.
 - `(ide-callees name)`: The bound names name's compiled code names (R-18): what it calls and reads, from its code's literals; for a special form, its translator's. Sorted; () for a variable.
 - `(ide-callers name)`: The bound names whose compiled code names name (R-18): procedures and macros that call it or read it, built-ins included, found from their code's literals as Pharo finds senders (a quoted symbol of that name counts too). Sorted.
@@ -733,6 +735,7 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(ide-wait session [milliseconds])`: The result of the oldest evaluation not yet answered, waiting at most milliseconds (as long as it takes if not given); a result with status running if it has not come.
 - `(ide-window-console width height keys)`: A wrapper for a session (ide-session's wrapper option) whose evaluations run in a console that is a window's: a terminal, interactive, true color and Unicode, width by height cells, its keys read from keys (an object answering nextWithin: milliseconds with the next character typed, or nil), so the console library renders and reads keys as in a terminal.
 - `(ide-write-definition name text option ...)`: Edits a definition from the browser (R-20): writes text in place of name's definition in its file, saves the file (recorded as a save, undoable) and evaluates text as part of the file, answering the result (as ide-eval does). #f, writing nothing, when the file no longer holds the definition's text there (its place is stale), for the window to open the file in the editor instead. An error when name has no file. Options: maker (person or agent; person).
+- `(result-backtrace result)`: At an error, its LISP frames, innermost first, each #(name path line procedure): a procedure's name and the file and line of its definition (#f, #f for one with no file, a primitive), and the procedure; the last is the top-level form the evaluation began in, named top-level. () for any other result.
 - `(result-level result)`: How many breaks deep the session is: 0 at the top.
 - `(result-output result)`: What the evaluation wrote to the output port, a string.
 - `(result-report result)`: An error's report, a string; or #f.

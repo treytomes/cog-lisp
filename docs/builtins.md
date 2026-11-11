@@ -21,7 +21,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 - [Vectors](#vectors) (14)
 - [Hash tables](#hash-tables) (19)
 - [Control](#control) (6)
-- [Conditions and restarts](#conditions-and-restarts) (19)
+- [Conditions and restarts](#conditions-and-restarts) (20)
 - [Evaluation and macros](#evaluation-and-macros) (10)
 - [Output](#output) (4)
 - [Ports](#ports) (16)
@@ -343,6 +343,7 @@ In a call form, `[x]` is optional and `x ...` is any number of them.
 | Name | Call | Kind | What it does |
 |---|---|---|---|
 | `abort` | `(abort)` | procedure | Invokes the abort restart. |
+| `backtrace` | `(backtrace)` | procedure | Writes the LISP frames of the error being handled at this break, innermost first: each procedure with its file and line, a primitive as one, then the top-level form it began in. Away from a break, the frames of the current computation. |
 | `compute-restarts` | `(compute-restarts)` | procedure | A list of the active restarts, innermost first. |
 | `condition-report` | `(condition-report c)` | procedure | The text that describes the condition c, as the runner shows it. |
 | `condition?` | `(condition? x)` | procedure | True if x is a condition: anything raised or signalled. |
@@ -787,6 +788,7 @@ the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and
 | `change-session` | `(change-session change)` | procedure | The name of the session that made it. |
 | `change-text` | `(change-text change)` | procedure | The text evaluated; for a file saved, the text it was saved with. |
 | `change-time` | `(change-time change)` | procedure | When it was made, a date and time as text. |
+| `ide-backtrace` | `(ide-backtrace session)` | procedure | The LISP frames of the error session waits at a break for, as result-backtrace gives them; () when it is at no break. |
 | `ide-browse` | `(ide-browse name)` | procedure | A definition as the browser shows it (R-17, R-21): #(name kind documentation source path start end stale? smalltalk). documentation and source are strings or #f (a built-in compiled by the seed keeps no source); path, start and end (character offsets from 0, in the file's text with line feeds) say where it is, or are #f: a special form's is its define-special-form in the compiler's source; stale? is #t when its file no longer holds the text it was compiled from; smalltalk, for a primitive, is (class selector source): the method of Smalltalk that installs it and the block that implements it. #f when name is not bound. |
 | `ide-callees` | `(ide-callees name)` | procedure | The bound names name's compiled code names (R-18): what it calls and reads, from its code's literals; for a special form, its translator's. Sorted; () for a variable. |
 | `ide-callers` | `(ide-callers name)` | procedure | The bound names whose compiled code names name (R-18): procedures and macros that call it or read it, built-ins included, found from their code's literals as Pharo finds senders (a quoted symbol of that name counts too). Sorted. |
@@ -835,6 +837,7 @@ the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and
 | `ide-wait` | `(ide-wait session [milliseconds])` | procedure | The result of the oldest evaluation not yet answered, waiting at most milliseconds (as long as it takes if not given); a result with status running if it has not come. |
 | `ide-window-console` | `(ide-window-console width height keys)` | procedure | A wrapper for a session (ide-session's wrapper option) whose evaluations run in a console that is a window's: a terminal, interactive, true color and Unicode, width by height cells, its keys read from keys (an object answering nextWithin: milliseconds with the next character typed, or nil), so the console library renders and reads keys as in a terminal. |
 | `ide-write-definition` | `(ide-write-definition name text option ...)` | procedure | Edits a definition from the browser (R-20): writes text in place of name's definition in its file, saves the file (recorded as a save, undoable) and evaluates text as part of the file, answering the result (as ide-eval does). #f, writing nothing, when the file no longer holds the definition's text there (its place is stale), for the window to open the file in the editor instead. An error when name has no file. Options: maker (person or agent; person). |
+| `result-backtrace` | `(result-backtrace result)` | procedure | At an error, its LISP frames, innermost first, each #(name path line procedure): a procedure's name and the file and line of its definition (#f, #f for one with no file, a primitive), and the procedure; the last is the top-level form the evaluation began in, named top-level. () for any other result. |
 | `result-level` | `(result-level result)` | procedure | How many breaks deep the session is: 0 at the top. |
 | `result-output` | `(result-output result)` | procedure | What the evaluation wrote to the output port, a string. |
 | `result-report` | `(result-report result)` | procedure | An error's report, a string; or #f. |

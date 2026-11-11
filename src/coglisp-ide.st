@@ -29,16 +29,18 @@
    LispBrowserPresenter the browser: groups, definitions, a definition (R-17 to R-21)
    LispInspectorPresenter a value as LISP sees it, and Pharo's inspector's LISP tab (R-22 to R-24)
  ============================================================================"
-| failures cm sess sinput sresult ide replp keyq tview files styler epage editorp brw insp |
+| failures cm sess sinput sresult ide replp keyq tview files styler epage editorp brw insp errctx dpane |
 failures := OrderedCollection new.
 cm := [:cls :cat :src |
   [cls compile: src classified: cat]
     on: Error
     do: [:e | failures add: cls name , ' >> ' , src lines first , '  --  ' , e messageText]].
 
-sess := (Object << #LispSession) slots: { #name. #maker. #unit. #compiler. #process. #requests. #ready. #answers. #answered. #pending. #output. #input. #inputPort. #busy. #wrapper }; sharedVariables: { #Sessions }; package: 'CogLisp-IDE'; install.
+sess := (Object << #LispSession) slots: { #name. #maker. #unit. #compiler. #process. #requests. #ready. #answers. #answered. #pending. #output. #input. #inputPort. #busy. #wrapper. #errorContext }; sharedVariables: { #Sessions }; package: 'CogLisp-IDE'; install.
 sinput := (Object << #LispSessionInput) slots: { #lines. #ready. #closed }; package: 'CogLisp-IDE'; install.
-sresult := (Object << #LispSessionResult) slots: { #status. #values. #output. #report. #restarts. #level }; package: 'CogLisp-IDE'; install.
+sresult := (Object << #LispSessionResult) slots: { #status. #values. #output. #report. #restarts. #level. #backtrace }; package: 'CogLisp-IDE'; install.
+errctx := (ProcessLocalVariable << #LispErrorContext) package: 'CogLisp-IDE'; install.
+dpane := (SpPresenter << #LispDebuggerPane) traits: { TStDebuggerExtension }; slots: { #dbg. #frames. #frameList. #source. #locals }; package: 'CogLisp-IDE'; install.
 ide := (Object << #LispIde) sharedVariables: { #Watcher }; package: 'CogLisp-IDE'; install.
 replp := (SpPresenter << #LispReplPresenter) slots: { #session. #view. #termView. #restartsBar. #interruptButton. #history. #historyIndex. #shown. #transcriptText. #historyLines. #buffer. #bufferCursor. #updates. #idle. #busy. #level. #restarts. #terminal. #keys. #columns. #rows. #sessionSource. #ownsSession. #after. #inspectButton. #lastValue. #lastInspector }; package: 'CogLisp-IDE'; install.
 tview := (Morph << #LispTerminalView) slots: { #target. #lines. #caret. #top. #selectFrom. #selectTo }; package: 'CogLisp-IDE'; install.
@@ -197,6 +199,7 @@ cm value: sess value: 'serving' value: 'run: text at: level
 	values := OrderedCollection new.
 	aborted := false.
 	busy := true.
+	level = 0 ifTrue: [errorContext := nil. LispErrorContext value: nil].
 	LispRestart
 		withRestarts: (level = 0 ifTrue: [{ LispRestart name: ''abort'' action: [aborted := true. nil] }] ifFalse: [#()])
 		do: [
@@ -210,14 +213,20 @@ cm value: sess value: 'serving' value: 'run: text at: level
 				on: Error
 				do: [:e |
 					busy := false.
-					self answer: (LispSessionResult status: #error values: #() output: (self outputSince: start)
+					"kept for (backtrace) at the break, the tools, and Debug (R-25)"
+					errorContext := e signalerContext.
+					LispErrorContext value: errorContext.
+					self answer: ((LispSessionResult status: #error values: #() output: (self outputSince: start)
 						report: (LispError describe: e)
 						restarts: (LispRestart active collect: [:r | r name name asString]) asArray
-						level: level + 1).
+						level: level + 1)
+							backtrace: ([LispIde lispFramesFrom: errorContext] on: Error do: [:x | #()]);
+							yourself).
 					self serveAt: level + 1]].
 	busy := false.
 	"an abort comes back here: the request that asked for it is answered"
 	aborted ifTrue: [
+		errorContext := nil.
 		self answer: (LispSessionResult status: #aborted values: #() output: (self outputSince: start)
 			report: nil restarts: #() level: 0)]'.
 cm value: sess value: 'serving' value: 'inContext: aBlock
@@ -841,6 +850,9 @@ cm value: replp value: 'initialization' value: 'initializeWindow: aWindowPresent
 	[aWindowPresenter whenClosedDo: [self closeSession]] on: Error do: [:e | nil]'.
 
 cm value: replp value: 'accessing' value: 'session
+	"The session, made at the first evaluation, and again if its process has ended
+	 (a debugger closed on it)."
+	(session notNil and: [session isAlive not]) ifTrue: [session := nil. level := 0].
 	^ session ifNil: [session := sessionSource value]'.
 cm value: replp value: 'accessing' value: 'sessionSource: aBlock
 	"The REPL evaluates in the session aBlock answers, made at its first evaluation
@@ -1129,6 +1141,8 @@ cm value: replp value: 'evaluating' value: 'show: aResult
 		self showRestarts: #()].
 	status = ''error'' ifTrue: [
 		self emit: ''error: '' , (aResult at: 5) , String lf sgr: ''91''.
+		(aResult size >= 8 and: [(aResult at: 8) isKindOf: LispCons]) ifTrue: [
+			(aResult at: 8) do: [:f | self emit: ''  in '' , (self frameLabel: f) , String lf sgr: ''90'']].
 		self showRestarts: (aResult at: 6) asArray].
 	self emit: self prompt sgr: self promptColor.
 	after ifNotNil: [:b | after := nil. b value: aResult]'.
@@ -1142,7 +1156,26 @@ cm value: replp value: 'evaluating' value: 'showRestarts: names
 		b := self newButton.
 		b label: name; help: ''Invoke the restart '' , name; action: [self chooseRestart: name].
 		layout add: b expand: false].
+	names isEmpty ifFalse: [| d |
+		d := self newButton.
+		d label: ''Debug''; help: ''Pharo''''s debugger on the computation, with its LISP frames (R-25)''; action: [self debug].
+		layout add: d expand: false].
 	restartsBar layout: layout'.
+cm value: replp value: 'evaluating' value: 'barLabels
+	"The labels of the buttons below the transcript at a break: the restarts, then Debug."
+	^ restartsBar layout children collect: [:b | b label asString]'.
+cm value: replp value: 'evaluating' value: 'frameLabel: aFrame
+	"A frame of a backtrace, #(name path line procedure), as a line: name  file:line."
+	| name |
+	name := (aFrame at: 1) name.
+	name = ''top-level'' ifTrue: [^ ''the top-level form''].
+	^ (aFrame at: 2) isString
+		ifTrue: [name , ''  '' , (aFrame at: 2) asFileReference basename , '':'' , (aFrame at: 3) printString]
+		ifFalse: [name]'.
+cm value: replp value: 'evaluating' value: 'debug
+	"Pharo''s debugger on the computation the session waits at a break (R-25)."
+	session ifNil: [^ nil].
+	^ LispIde debug: session'.
 cm value: replp value: 'evaluating' value: 'chooseRestart: aName
 	(#(''abort'' ''continue'') includes: aName)
 		ifTrue: [self inputText: ''('' , aName , '')''. self submit]
@@ -2262,6 +2295,14 @@ cm value: ide class value: 'built-ins' value: 'installToolsInto: anEnv
 		LispIde call: ''ide:ide-inspect'' with: { x }] arity: 1).
 	anEnv define: (LispSymbol named: ''browse'') value: (LispProcedure fixed: [:x |
 		LispIde call: ''ide:ide-open-source'' with: { x }] arity: 1).
+	anEnv define: (LispSymbol named: ''backtrace'') value: (LispProcedure fixed: [| ctx frames |
+		ctx := LispErrorContext value ifNil: [thisContext].
+		frames := (LispIde lispFramesFrom: ctx) reject: [:f | (f at: 1) == (LispSymbol named: ''backtrace'')].
+		LispIde call: ''ide:%write-backtrace'' with: { frames }.
+		LispUnspecified default] arity: 0).
+	LispPrimitives document: anEnv category: ''Conditions and restarts'' with: #(
+		''backtrace'' ''(backtrace)''
+			''Writes the LISP frames of the error being handled at this break, innermost first: each procedure with its file and line, a primitive as one, then the top-level form it began in. Away from a break, the frames of the current computation.'').
 	LispPrimitives document: anEnv category: ''The system'' with: #(
 		''inspect'' ''(inspect value)''
 			''Inspects value: in an inspector window when the image shows its world (the development image), else by writing its views, a part a line. Answers value.''
@@ -2291,6 +2332,179 @@ cm value: ide class value: 'tools' value: 'browseSmalltalk: className selector: 
 cm value: ide class value: 'tools' value: 'canOpenWindows
 	"Does the image show its world, for a window to open in?"
 	^ Smalltalk isInteractive'.
+
+"=== LISP backtraces (R-25, and 11.5's backtrace) ==========================="
+cm value: ide class value: 'backtraces' value: 'proceduresByBlock
+	"block -> #(name procedure): every procedure (and macro expander) a global holds,
+	 by the block it runs, named by the global."
+	| d |
+	d := IdentityDictionary new.
+	LispEnvironment default cellsDo: [:c | | v |
+		v := c valueIfUnbound: [nil].
+		(v isKindOf: LispMacro) ifTrue: [v := v expander].
+		((v isKindOf: LispProcedure) and: [v block notNil])
+			ifTrue: [d at: v block ifAbsentPut: [{ c symbol. v }]]].
+	^ d'.
+cm value: ide class value: 'backtraces' value: 'lispFramesFrom: aContext
+	"The LISP frames of the stack from aContext down, innermost first: each
+	 #(name procedure context), name nil for the top-level form the evaluation
+	 began in, which is the last. A procedure''s inner blocks are its frame too:
+	 each call shows once."
+	| procs frames seen ctx |
+	procs := self proceduresByBlock.
+	frames := OrderedCollection new.
+	seen := IdentitySet new.
+	ctx := aContext.
+	[ctx notNil] whileTrue: [
+		(self lispFrameFor: ctx in: procs) ifNotNil: [:f |
+			(seen includes: (f at: 3)) ifFalse: [
+				seen add: (f at: 3).
+				frames add: f.
+				(f at: 1) isNil ifTrue: [^ frames asArray]]].
+		ctx := ctx sender].
+	^ frames asArray'.
+cm value: ide class value: 'backtraces' value: 'lispFrameFor: aContext in: procs
+	"#(name procedure context) when aContext runs LISP code: a procedure''s (its own
+	 block, or a block inside it, found through the closures'' outer contexts), or a
+	 top-level form''s (name nil). Otherwise nil."
+	| c |
+	c := aContext.
+	[c notNil] whileTrue: [| cl |
+		cl := c closure.
+		cl isNil ifTrue: [^ (self isLispTopLevel: c) ifTrue: [{ nil. nil. c }] ifFalse: [nil]].
+		(procs at: cl ifAbsent: [nil]) ifNotNil: [:np | ^ { np first. np last. c }].
+		c := cl outerContext].
+	^ nil'.
+cm value: ide class value: 'backtraces' value: 'isLispTopLevel: aContext
+	"A top-level LISP form: a doIt of no class whose literals name LISP globals."
+	| m |
+	m := aContext method.
+	^ m selector == #doIt
+		and: [m methodClass == UndefinedObject
+		and: [m literals anySatisfy: [:l | (l isKindOf: LispGlobal) or: [l isKindOf: LispSymbol]]]]'.
+cm value: ide class value: 'backtraces' value: 'debug: aSession
+	"Pharo''s debugger on the computation aSession waits at a break, its LISP pane
+	 showing the LISP frames (R-25). Closing the debugger may end the session''s
+	 process: the REPL then starts a new session."
+	| ctx |
+	ctx := aSession errorContext.
+	ctx ifNil: [^ nil].
+	^ (OupsDebugRequest newForContext: ctx)
+		process: aSession process;
+		label: ''cog-lisp: '' , aSession name;
+		submit'.
+
+"the error a process is at a break for, so that (backtrace) there shows its stack"
+cm value: sess value: 'accessing' value: 'errorContext
+	"The context the error the session waits at a break for was signalled in, or nil."
+	^ errorContext'.
+cm value: sess value: 'accessing' value: 'process
+	^ process'.
+cm value: sess value: 'accessing' value: 'isAlive
+	"Is its process still there (a debugger closed on it may have ended it)?"
+	^ process notNil and: [process isTerminated not]'.
+cm value: sresult value: 'accessing' value: 'backtrace
+	"At an error, its LISP frames (LispIde lispFramesFrom:), else #()."
+	^ backtrace ifNil: [#()]'.
+cm value: sresult value: 'accessing' value: 'backtrace: anArray
+	backtrace := anArray'.
+
+"=== LispDebuggerPane: the LISP frames, in Pharo''s debugger (R-25) ==========="
+cm value: dpane class value: 'debugger extension' value: 'showInDebugger
+	^ true'.
+cm value: dpane class value: 'debugger extension' value: 'showInDebugger: aBoolean
+	"always shown: the LISP image''s own pane"'.
+cm value: dpane class value: 'debugger extension' value: 'displayOrder
+	^ 1'.
+cm value: dpane class value: 'debugger extension' value: 'acceptsPredicate: aPredicate
+	^ true'.
+cm value: dpane value: 'debugger extension' value: 'debuggerExtensionToolName
+	^ ''LISP'''.
+cm value: dpane value: 'debugger extension' value: 'debuggerLayout
+	^ self defaultLayout'.
+cm value: dpane value: 'debugger extension' value: 'displayOrder
+	^ 1'.
+cm value: dpane value: 'debugger extension' value: 'setModelBeforeInitialization: aDebugger
+	dbg := aDebugger'.
+cm value: dpane value: 'debugger extension' value: 'debugger
+	^ dbg'.
+cm value: dpane value: 'debugger extension' value: 'accept: aVisitor
+	"nothing for a visitor here"'.
+cm value: dpane value: 'debugger extension' value: 'updatePresenter
+	self showDebuggerContext'.
+cm value: dpane value: 'initialization' value: 'initializePresenters
+	frameList := self newList.
+	frameList display: [:f | self labelFor: f].
+	frameList whenSelectionChangedDo: [:selection | selection selectedItem ifNotNil: [:f | self showFrame: f]].
+	source := self newCode.
+	source beNotWrapWord; beNotEditable.
+	LispStyler installOn: source.
+	locals := self newText.
+	locals beNotEditable; beNotWrapWord.
+	frames := #().
+	self showDebuggerContext'.
+cm value: dpane value: 'initialization' value: 'defaultLayout
+	^ SpPanedLayout newTopToBottom
+		positionOfSlider: 0.35;
+		add: frameList;
+		add: (SpPanedLayout newLeftToRight positionOfSlider: 0.65; add: source; add: locals; yourself);
+		yourself'.
+cm value: dpane value: 'showing' value: 'showDebuggerContext
+	"The frames of the computation the debugger stopped."
+	| ctx |
+	dbg ifNil: [^ self].
+	ctx := [dbg interruptedContext] on: Error do: [:e | [dbg session interruptedContext] on: Error do: [:e2 | nil]].
+	ctx ifNotNil: [self showContext: ctx]'.
+cm value: dpane value: 'showing' value: 'showContext: aContext
+	"The LISP frames from aContext down (R-25), the innermost chosen."
+	frames := LispIde lispFramesFrom: aContext.
+	frameList items: frames.
+	frames isEmpty ifFalse: [frameList selectIndex: 1]'.
+cm value: dpane value: 'showing' value: 'frameNames
+	^ frames collect: [:f | (f at: 1) ifNil: [''top level''] ifNotNil: [:n | n name]]'.
+cm value: dpane value: 'showing' value: 'labelFor: aFrame
+	| b path |
+	(aFrame at: 1) ifNil: [^ ''top level''].
+	b := [LispIde call: ''ide:ide-browse'' with: { aFrame at: 1 }] on: Error do: [:e | false].
+	path := (b isKindOf: Array) ifTrue: [b at: 5] ifFalse: [false].
+	^ (aFrame at: 1) name , (path isString
+		ifTrue: [''   '' , path asFileReference basename , '':'' , (LispIde call: ''ide:%line-at'' with: { path. b at: 6 }) printString]
+		ifFalse: [''''])'.
+cm value: dpane value: 'showing' value: 'showFrame: aFrame
+	"Its source, and its locals with their values."
+	| b text |
+	(aFrame at: 1)
+		ifNil: [source text: ''; a top-level form'']
+		ifNotNil: [:name |
+			b := [LispIde call: ''ide:ide-browse'' with: { name }] on: Error do: [:e | false].
+			text := (b isKindOf: Array) ifFalse: [''''] ifTrue: [
+				(b at: 4) isString
+					ifTrue: [b at: 4]
+					ifFalse: [((b at: 5) isString and: [(b at: 6) isInteger])
+						ifTrue: [| file | file := (LispIde call: ''ide:ide-read-file'' with: { b at: 5 }) car.
+							file copyFrom: (b at: 6) + 1 to: ((b at: 7) min: file size)]
+						ifFalse: [''; '' , name name , '', with no source in the image'']]].
+			source text: text].
+	locals text: (self localsOf: (aFrame at: 3))'.
+cm value: dpane value: 'showing' value: 'localsOf: aContext
+	"The frame''s arguments, then its locals, each written. The compiler keeps no LISP
+	 names for them (its temps are l1, l2, ...), so they go by place: the first
+	 locals are the arguments'' own copies, which set!! assigns."
+	| n args |
+	n := [aContext method numTemps] on: Error do: [:e | 0].
+	args := [aContext method numArgs] on: Error do: [:e | 0].
+	^ String streamContents: [:s |
+		1 to: n do: [:i |
+			s nextPutAll: (i <= args ifTrue: [''argument '' , i printString] ifFalse: [''local '' , (i - args) printString]).
+			s nextPutAll: '' = ''.
+			s nextPutAll: ([LispPrinter writeString: (aContext tempAt: i) limitedTo: 200] on: Error do: [:e | ''?'']).
+			s nextPut: Character lf]]'.
+cm value: dpane value: 'showing' value: 'sourceText
+	^ source text asString'.
+cm value: dpane value: 'showing' value: 'localsText
+	^ locals text asString'.
+cm value: dpane value: 'showing' value: 'selectFrame: anIndex
+	frameList selectIndex: anIndex'.
 
 "the development image takes its requests when it starts in the GUI (R-37)"
 SessionManager default registerUserClassNamed: #LispIde.

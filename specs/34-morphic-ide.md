@@ -714,7 +714,7 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 | 2 | The development image and the REPL (2c: R-39) | 2a done (2026-11-10): R-12 to R-16, R-31, R-32 to R-35 for sessions (§14). 2b done (2026-11-11): R-1 to R-4, R-37 (§15). 2c done (2026-11-11): R-39 (§16). 2d done (2026-11-11), the owner's trial of 2c: R-40, R-41 (§17) |
 | 3 | The editor | 3a done (2026-11-11): R-5, R-6, R-8's saving, R-9 (but Inspect it), R-11, Format; the owner's trial fixed (§18). 3c done (2026-11-11), the owner's request: R-42 to R-44 (§19). 3b done (2026-11-11): R-7, R-8's files changed on disk, R-10 (§20). |
 | 4 | The browser and the inspector | 4a done (2026-11-11): the browser, R-17 to R-21 (§21). The whole body in it, the compiler edited live (§22). 4b done (2026-11-11): the inspector, R-22 to R-24, and R-45, `inspect` and `browse` built in (§23) |
-| 5 | Errors and the debugger | |
+| 5 | Errors and the debugger | Done (2026-11-11): R-25, with 11.5's `backtrace` (§24) |
 | 6 | Finishing | |
 | 7 | The agent's doorway (its own spec first) | |
 
@@ -1227,3 +1227,47 @@ live from the browser.
 - **For the owner to check**: `ide.bat --fresh`; `(inspect '(1 (2 3) "x"))`
   and `(browse car)`, `(browse 'filter)`, `(browse 'if)` at a REPL window;
   Ctrl+I in the editor; a LISP value in Pharo's own inspector.
+
+## 24. As built: step 5, errors and the debugger (2026-11-11)
+
+- **A LISP backtrace** (R-25, and 11.5's `backtrace`): `LispIde
+  lispFramesFrom:` turns a context into LISP frames, innermost first. A context
+  belongs to the procedure whose block it runs, or a block inside it (found
+  through the closures' outer contexts), named by the global that holds it; each
+  call shows once; a primitive is a frame of its own; the walk stops at the
+  top-level form the evaluation began in. A primitive the compiler inlines (`car`,
+  a direct send) and a tail call leave no frame, as in any LISP with them.
+- **As data** (R-33): a session keeps the error's context at a break (cleared
+  back at the top), a result's eighth part is its frames (`result-backtrace`:
+  `#(name path line procedure)`, the definition's file and line), and
+  `ide-backtrace` answers them for a session at a break.
+- **`(backtrace)`**, built in (Conditions and restarts), writes the frames of the
+  break it is called at, a line each: at a session's (the windows'), and at the
+  console REPL's break loop, which records its error per process
+  (`LispErrorContext`, a `ProcessLocalVariable`) and, leaving, puts back the one
+  before it. Away from a break, the frames of the current computation.
+- **The REPL window** writes the frames under an error's report (`in name
+  file:line`, dimmed), and offers *Debug* beside the restarts at a break: Pharo's
+  debugger on the session's process, at the error (`OupsDebugRequest`). Closing
+  the debugger may end that process; a REPL whose session's process has ended
+  makes a new session at its next evaluation, and a file's session is made again.
+- **The LISP pane in Pharo's debugger** is `LispDebuggerPane`
+  (`TStDebuggerExtension`, always shown): the same frames, and for the one
+  chosen, its source (styled) and its arguments and locals, written. The
+  compiler keeps no LISP names for its temporaries (`l1`, `l2`), so they are
+  shown by place: arguments, then locals (the first locals are the arguments'
+  own copies, which `set!` assigns).
+- **Not done**: an uncaught error while running a file (`cog-lisp.bat
+  file.lisp`) still reports only `path:line:col: error: message`, as the suites
+  expect; 11.5's acceptance asks for a backtrace there too, which comes with
+  11.5.
+- **Checks**: `tests/lisp/ide-backtrace.lisp` (14: frames as data with files and
+  lines, a lambda's call as its procedure's frame, `(backtrace)` at a session's
+  break and at the console REPL's, away from a break, its documentation) and
+  `tests/lisp/ide-debugger-window.lisp` (19: the REPL window's frames and Debug,
+  the pane's frames, source and locals, the pane as an extension, a dead session
+  replaced). Pharo's debugger is not opened by a suite: closing it is a
+  person's act.
+- **For the owner to check**: `ide.bat --fresh`; an error in a REPL window (its
+  frames under the report), *Debug*, the debugger's *LISP* pane, then closing
+  the debugger and evaluating again; `(backtrace)` at a break.

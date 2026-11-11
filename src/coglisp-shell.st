@@ -209,6 +209,7 @@ cm value: repl value: 'running' value: 'evalAndPrint: datum from: aReader
 	 unhandled error is reported, or, at a console, opens a break loop on top of the
 	 failing computation, where its restarts can be invoked (Phase 7.7 section 7)."
 	| value |
+	level = 0 ifTrue: [(Smalltalk at: #LispErrorContext ifAbsent: [nil]) ifNotNil: [:v | v value: nil]].
 	LispRestart
 		withRestarts: (level = 0 ifTrue: [{ LispRestart name: ''abort'' action: [nil] }] ifFalse: [#()])
 		do: [
@@ -222,11 +223,17 @@ cm value: repl value: 'running' value: 'evalAndPrint: datum from: aReader
 cm value: repl value: 'running' value: 'breakLoop: anError
 	"A nested REPL, still inside the computation that failed. Invoking a restart
 	 continues it; (abort) or end of input returns to the top-level prompt."
+	"(backtrace) at the break shows the failing stack (the IDE package, filed in later);
+	 leaving the break puts back the one before, an outer break''s or none"
+	| holder before |
+	holder := Smalltalk at: #LispErrorContext ifAbsent: [nil].
+	holder ifNotNil: [before := holder value. holder value: anError signalerContext].
 	self report: anError.
 	err nextPutAll: ''restarts:''.
 	LispRestart active do: [:r | err nextPut: Character space; nextPutAll: r name name].
 	err nextPut: Character lf; flush.
-	(LispRepl in: in out: out err: err) interactive: true; level: level + 1; loop'.
+	[(LispRepl in: in out: out err: err) interactive: true; level: level + 1; loop]
+		ensure: [holder ifNotNil: [holder value: before]]'.
 cm value: repl value: 'running' value: 'process: buffer
 	"Evaluate each complete datum in buffer as soon as it is read, and answer what is
 	 left to keep reading: the text after the last complete datum if the input ends in
