@@ -18,6 +18,12 @@ Studio): how to write, run and fix cog-lisp programs, with checked examples. The
 bundles carry it too, in `.agents/skills/cog-lisp/`, so it is active when the
 unpacked folder is opened as a Bionic project.
 
+`mcp-server.sh` (`mcp-server.bat` on Windows) in each bundle serves tools for
+coding agents over the Model Context Protocol: check a file, explain a name,
+find a definition, complete a name, expand a macro call, format source. The VS
+Code extension offers it to VS Code's agent; for Claude Code, Bionic and others,
+`INSTALL.md` and `docs/mcp.md` show the configuration.
+
 cog-lisp is under the MIT license. Each bundle includes the Pharo image and VM
 and the libraries the VM needs, with their licenses in `licenses/` and a summary
 in `THIRD-PARTY-NOTICES.md`.
