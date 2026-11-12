@@ -63,7 +63,9 @@ A thin extension for working on cog-lisp in VS Code
   `lisp_completion`, `lisp_expand_macro`, `lisp_format`). VS Code starts it when
   its agent first needs it, on a copy of the image of its own. Where it offers
   none (no cog-lisp folder, no built image), the "cog-lisp" output channel says
-  why. Other agents configure it themselves: [`docs/mcp.md`](../docs/mcp.md).
+  why. Other agents configure it themselves: [Tools for coding
+  agents](https://treytomes.github.io/cog-lisp/mcp.html) (`docs/mcp.md` in the
+  repository).
 
 The extension claims `.lisp` files, so it works in any folder; disable it in a
 workspace where `.lisp` means Common Lisp.
