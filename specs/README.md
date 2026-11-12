@@ -16,6 +16,11 @@ is the implementation of the contract; the acceptance suite is the proof.
    with a `RESULT: n/n` line, and `Smalltalk snapshot: false andQuit: true`.
 5. **When reality disagrees with the spec, change the spec first**, then the code.
    The spec is never allowed to silently drift from what ships.
+6. **Defer work where it will be found.** What a spec puts off goes in its
+   section titled "Later", each item with an id `L-<spec number>.<n>`, and the
+   same id goes in [the plan's](../PROJECT-PLAN.md) list "Deferred: to pick up",
+   with when to consider it. Starting new work begins with that list. A suite
+   checks that the two agree (`specs/35-mcp-server.md` R-23).
 
 ## Status lifecycle
 
@@ -79,3 +84,4 @@ GitHub issues and the owner's requests:
 | [31-vsix-bundle.md](31-vsix-bundle.md) | The VS Code extension as one bundled file (esbuild), not 330 | Done |
 | [32-tui.md](32-tui.md) | Full-screen terminal programs, in the manner of Terminal.Gui v2, on the console's core | Accepted |
 | [34-morphic-ide.md](34-morphic-ide.md) | Developing in the image: a LISP editor, REPL, browser and inspector in Morphic | Accepted |
+| [35-mcp-server.md](35-mcp-server.md) | Agents' tools: an MCP server, run by the image, for VS Code, Claude Code and Bionic | Accepted |

@@ -787,6 +787,9 @@ This project follows spec-driven development: **write the spec before the code.*
   `PASS`/`FAIL` per check, and a final `RESULT: n/n` line.
 - Code changes reference the spec section they satisfy. If reality forces a
   deviation, update the spec first, then the code.
+- **Deferred work goes on the plan's list.** A spec's "Later" section gives each
+  item an id (`L-35.1`), and `PROJECT-PLAN.md`'s "Deferred: to pick up" names
+  it, with when to consider it. Read that list before proposing new work.
 - **Run everything with `tests\run-all.bat`** (`tests/run-all.sh` on Linux): it
   builds `pharo\cog-lisp.image` from the seed, runs each `tests\phase-*.st` on a
   fresh copy of it (`pharo\suite.image`; a suite files in only its harness), then
