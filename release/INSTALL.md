@@ -49,6 +49,32 @@ documentation; the image serves a language server for completion, *Go to
 Definition*, errors as you type, *cog-lisp: Expand Macro* and *Format
 Document*.
 
+## Tools for coding agents (MCP)
+
+The image serves the Model Context Protocol: tools that check a file, explain a
+name, find a definition, complete a name, expand a macro call and format
+source, for a coding agent. `mcp-server.sh` (`mcp-server.bat` on Windows), in
+this folder, starts the server with your project folder as its argument. A
+host on Windows runs it through `cmd.exe /d /c`. For Bionic (LM Studio), in
+`%USERPROFILE%\.lmstudio\mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "cog-lisp": {
+      "command": "cmd.exe",
+      "args": ["/d", "/c", "C:\\path\\to\\this\\folder\\mcp-server.bat", "C:\\path\\to\\your\\project"]
+    }
+  }
+}
+```
+
+For Claude Code, in your project's `.mcp.json`, the same `command` and `args`
+under `"mcpServers"`, with `"type": "stdio"`; on Linux,
+`claude mcp add --scope local cog-lisp -- /path/to/this/folder/mcp-server.sh .`.
+The VS Code extension offers the server to VS Code's agent by itself.
+`docs/mcp.md` has the rest.
+
 ## Documentation
 
 The documentation of the latest release is also on the web, at

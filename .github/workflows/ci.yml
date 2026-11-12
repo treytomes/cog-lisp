@@ -56,6 +56,10 @@ jobs:
         run: |
           npm ci
           node test/lsp.test.js
+      # the MCP server, through its launcher (specs/35-mcp-server.md R-15)
+      - name: The MCP server
+        working-directory: vscode
+        run: node test/mcp.test.js
       - name: Keep the suite outputs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -140,6 +144,10 @@ jobs:
         run: |
           call npm ci || exit /b 1
           node test\lsp.test.js
+      - name: The MCP server
+        shell: cmd
+        working-directory: vscode
+        run: node test\mcp.test.js
       - name: Keep the suite outputs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

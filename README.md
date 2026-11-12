@@ -109,6 +109,53 @@ stderr as `path:line:col: error: …`), or whatever it passes to `(exit n)`. The
 programs in [`examples/`](examples/) are a good place to start: each is a section
 of the manual.
 
+## Tools for coding agents (MCP)
+
+The image also serves the Model Context Protocol, so a coding agent can ask
+cog-lisp about cog-lisp source: the problems in a file, what a name means and
+where it is defined, the names that complete a prefix, a macro call's expansion,
+and the file laid out. It never runs code. The launcher, `mcp-server.bat` (or
+`./mcp-server.sh`), takes the project folder as its argument and runs the server
+on a private copy of the image, so `build-image` works while an agent keeps it
+running.
+
+**VS Code**: nothing to do. With the cog-lisp extension installed, VS Code's
+agent is offered the server once the extension finds the cog-lisp folder (the
+open folder, or the `cogLisp.root` setting) with a built image.
+
+**Claude Code**: this repository's `.mcp.json` starts the server; approve it when
+Claude Code asks. In a project of your own, add a `.mcp.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "cog-lisp": {
+      "type": "stdio",
+      "command": "cmd.exe",
+      "args": ["/d", "/c", "C:\\path\\to\\cog-lisp\\mcp-server.bat", "${CLAUDE_PROJECT_DIR:-.}"]
+    }
+  }
+}
+```
+
+On Linux: `claude mcp add --scope local cog-lisp -- /path/to/cog-lisp/mcp-server.sh .`
+
+**Bionic (LM Studio)**: in `%USERPROFILE%\.lmstudio\mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "cog-lisp": {
+      "command": "cmd.exe",
+      "args": ["/d", "/c", "C:\\path\\to\\cog-lisp\\mcp-server.bat", "C:\\path\\to\\your\\project"]
+    }
+  }
+}
+```
+
+[Tools for coding agents](docs/mcp.md) has the tools, Linux, and what to do when
+the server does not start.
+
 ## Documentation
 
 - **[The manual](docs/manual/README.md)** teaches the language chapter by chapter,
@@ -122,6 +169,8 @@ of the manual.
   install it (`build-ext.bat`, `load-ext.bat`).
 - **[A skill for coding agents](.agents/skills/cog-lisp/SKILL.md)**: how to write,
   run and fix cog-lisp programs, and the traps for anyone used to another Lisp.
+- **[Tools for coding agents](docs/mcp.md)**: the MCP server, its six tools, and
+  how to set it up in VS Code, Claude Code and Bionic.
 - **[The project plan](PROJECT-PLAN.md)**: what has been built, phase by phase,
   and what comes next.
 

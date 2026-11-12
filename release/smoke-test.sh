@@ -75,6 +75,19 @@ if [ -f cog-lisp.bat ]; then
   check "cog-lisp.bat runs a program" $ok
 fi
 
+# the MCP server's launcher answers initialize (specs/35-mcp-server.md R-15, AC-20)
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}' > "$OUT/mcp.in"
+./mcp-server.sh examples <"$OUT/mcp.in" >"$OUT/mcp.out" 2>"$OUT/mcp.err"
+rc=$?
+ok=0; [ "$rc" = 0 ] && [ "$(wc -l < "$OUT/mcp.out")" -eq 1 ] && grep -q '"serverInfo":{"name":"cog-lisp"' "$OUT/mcp.out" && ok=1
+check "mcp-server.sh answers initialize, one line on stdout (exit $rc)" $ok
+[ "$ok" = 1 ] || { head -c 300 "$OUT/mcp.out"; head -3 "$OUT/mcp.err"; }
+if [ -f mcp-server.bat ]; then
+  cmd //d //c ".\\mcp-server.bat examples" <"$OUT/mcp.in" >"$OUT/mcp-bat.out" 2>"$OUT/mcp-bat.err"
+  ok=0; [ "$(wc -l < "$OUT/mcp-bat.out")" -eq 1 ] && grep -q '"serverInfo":{"name":"cog-lisp"' "$OUT/mcp-bat.out" && ok=1
+  check "mcp-server.bat answers initialize, one line on stdout" $ok
+fi
+
 # require finds the bundle's own libraries from a program in another folder
 # (specs/18-library-path.md AC-1)
 ELSE="$(mktemp -d)"

@@ -39,6 +39,8 @@ Never run `cog-lisp` without a file: its REPL waits for typing.
 4. Unsure a name exists? Run `(display (documentation 'name))`: it prints the
    call form and what it does, or `#f` when there is no such name.
 
+Have a `lisp_check` tool? Read `mcp.md` beside this file first.
+
 ## Traps
 
 These hold for plain cog-lisp. `(require 'cl)` adds Common Lisp's `defun`,

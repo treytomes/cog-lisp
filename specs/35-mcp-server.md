@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-11-12), after the owner's answers to §8, a review (§9), and the owner's additions (§9, items 13 to 17) |
+| **Status** | Implemented (2026-11-12; §7), accepted the same day after the owner's answers to §8, a review (§9), and the owner's additions (§9, items 13 to 17). AC-16 to AC-19 are by hand, for the owner |
 | **Asked for by** | The owner (2026-11-12), after configuring the language server for OpenCode and asking whether Bionic (LM Studio's agent) could use it: "An ideal place to host a language server MCP might be the `cog-lisp` image itself. Let's talk through that idea as well." Then: "write a spec document for building the MCP server." And on scope: "Knowing how to build the MCP server in Lisp will be a good step towards some other open tasks. Simply running it without hosting it is fine for this stage." |
 | **Relates to** | `specs/16-phase-10-documentation-and-editor.md` steps 10.5 (the language server, `editor-services`, the extension) and 10.7 (the agent skill), `specs/28-versioning.md` (the image's version, which `serverInfo` reports), `specs/21-https-and-json.md` (`json-read`/`json-write`), `specs/34-morphic-ide.md` (`editor-services`, the image's own editor, the development image), `specs/31-vsix-bundle.md` (the extension's bundle), `specs/17-startup-anywhere.md` (two VMs on one image) |
 
@@ -316,8 +316,10 @@ answers, from the same service layer. Nothing is added and nothing is left out.
   absent `resultType` as `"complete"`.
 - **R-11. Errors.** In both eras an unknown tool is `-32602` and an unknown method
   is `-32601`. A modern request missing a required `_meta` field, or naming an
-  unsupported revision, is refused as R-5 says (`-32602`, `-32022`); no other
-  error code is emitted but `-32603` for an internal error. A tool that cannot do
+  unsupported revision, is refused as R-5 says (`-32602`, `-32022`); a message
+  that is not a request object (a JSON array, a request with no method) is
+  `-32600`; no other error code is emitted but `-32603` for an internal error.
+  A tool that cannot do
   its work (a missing file, text that does not read, no name at the place, a
   place outside the text) answers `isError: true` with a text line saying why,
   never a protocol error. A line that is not JSON is answered with `-32700` and
@@ -335,7 +337,9 @@ answers, from the same service layer. Nothing is added and nothing is left out.
   checking a file run macro expanders, as the language server's do; they run
   nothing else.)
 - **R-15. Tests.**
-  - `tests/lisp/mcp.lisp` tests the handlers, the tool table and the dispatch
+  - `tests/lisp/mcp-server.lisp` (not `mcp.lisp`: `lib/mcp.lisp` serves when the
+    program it runs as is named `lib/mcp.lisp`, and a suite of the same name
+    would look like it) tests the handlers, the tool table and the dispatch
     procedure of R-20 in the image, without a process, with `lib/test.lisp`
     (`define-test`, `check`), as every LISP suite does; `tests/run-all` runs it
     with no other change. It covers R-8 (all four forms, and that the index is the
@@ -432,9 +436,12 @@ answers, from the same service layer. Nothing is added and nothing is left out.
   names one stdio server, `cog-lisp`, that runs the launcher with the project's
   own folder as its argument (R-6).
   - **This repository's** runs its own `mcp-server` launcher.
-  - **`lisp-expert`'s** finds cog-lisp as its `run-tests` does: `COGLISP_HOME`
-    when it is set, else the sibling checkout `../cog-lisp`, through
-    `.mcp.json`'s `${VAR:-default}` expansion. Its `CLAUDE.md` gains a line on the
+  - **`lisp-expert`'s** finds cog-lisp at `COGLISP_HOME` when it is set, else
+    the sibling checkout `../cog-lisp`, through `.mcp.json`'s
+    `${VAR:-default}` expansion. (Its `run-tests` names the runner itself,
+    `COGLISP_RUNNER`; an expansion cannot take a file's folder, so the server
+    names the cog-lisp folder, as cog-lisp's own launchers call it.) Its
+    `CLAUDE.md` gains a line on the
     tools, and its instructions for copying the skill name the new file of R-22.
   - Windows runs the `.bat` through `cmd.exe /d /c`. One committed file serves
     Windows and Linux if `${VAR:-default}` expansion can choose the launcher's
@@ -606,12 +613,66 @@ Two steps, released together (decision 6):
 
 ## 7. As built
 
-Not built yet. A first draft of `lib/mcp.lisp` and of the extension's provider
-exists in the working tree (2026-11-12). It predates §9 and must follow it: it
-reads `rootUri`/`workspaceFolders` from `initialize`, handles
-`notifications/roots/list_changed`, falls back to the working directory, runs the
-checkout's image, takes text or path but not both, and its provider names the
-`.bat` as the command instead of running it through `cmd.exe /d /c`.
+Built 2026-11-12, both steps; the first draft (which read LSP roots from
+`initialize` and ran the checkout's image) was rewritten to this spec.
+
+**What there is.**
+- `lib/mcp.lisp`: the tool table (six rows of name, title, description, input
+  schema, output schema, handler), `mcp-handle` (a message in, its reply out) and
+  `mcp-serve-stdio`, the only code that reads or writes. It serves only when run
+  as `lib/mcp.lisp`, so a suite can load it.
+- `mcp-server.bat` / `mcp-server.sh`, in the checkout and in both release
+  bundles; `.mcp.json` here and in `lisp-expert`; the extension's provider
+  (`vscode/src/mcp-definition.js`, which plain Node tests); `docs/mcp.md`, the
+  README's section, `INSTALL.md`'s; the skill's `mcp.md`; `tests/lisp/deferred.lisp`.
+- `editor-services` gained `editor-unindex!` (R-8's "put back as it was" needs to
+  take a file out of the index). The language server does not use it.
+
+**Decided while building.**
+- **The index follows the disk.** R-5 calls the index a cache of the files on
+  disk; a cache built once would answer from a file as it was before the agent
+  edited it. Before each answer that uses the workspace, the server lists the
+  folder and reads again every file that is new, changed (time or size) or
+  changed in the last two seconds (the file system gives times to the second),
+  and drops every file gone. On this repository that costs about 170 ms an
+  answer; the first answer, which reads every file, about 1.2 s.
+- **Every tool checks its source first** (`editor-check`), as the language server
+  does on every change: what a name means depends on the file's imports, which
+  only a check knows, and a request may not rely on an earlier one's check.
+- **A copy is the launcher's only if it says so.** Its sweep first matched
+  `cog-lisp-mcp-*` and removed the test's own workspace (`cog-lisp-mcp-ws-...`)
+  in the temporary folder. Copies are now `cog-lisp-mcp-image-*`, and the sweep
+  touches only a folder holding the launcher's marker (`cog-lisp-mcp.copy` on
+  Windows, `owner.pid` on Linux) and no running VM: on Windows a folder a VM
+  holds cannot be renamed, so the sweep renames before removing.
+- **`tools/call` refuses an argument a tool's schema does not name** (`-32602`),
+  as `additionalProperties: false` says.
+- **The completion with only a `prefix`** uses a path no request checks, so an
+  earlier request's imports never complete there (a check in the LISP suite).
+- **One `.mcp.json` cannot serve both platforms** (R-21's fallback holds):
+  `${VAR:-default}` expansion cannot choose a command. Each repository commits
+  the Windows form, through `${CLAUDE_PROJECT_DIR:-.}` so that it works from a
+  subfolder too; `docs/mcp.md` and the README give the Linux command, at local
+  scope, which takes the place of the project's server of the same name.
+- **`docs/mcp.md` is the site's one hand-written page**; `_config.yml` says so,
+  and the generated index links it.
+
+**Checked by hand.** `claude mcp list` (Claude Code 2.1.278) found the
+project's `cog-lisp` server in both repositories, pending approval as a project
+server is until its owner approves it. The same commands, registered for a
+moment at local scope, answered: "✔ Connected", here and in `lisp-expert`.
+AC-16 to AC-19 in a live session (approving the server and calling a tool in
+Claude Code, Bionic and VS Code's agent; the skill evaluation) are the owner's
+to run and record here.
+
+**Results (2026-11-12).** Windows: all suites 4211/4211 (`tests\run-all.bat`),
+`mcp.test.js` 46/46, `lsp.test.js` passing, the extension's unit tests passing,
+the site built with GitHub's Jekyll image and `check-site.js` 12/12, the
+workflows clean under actionlint. Linux (Docker, Ubuntu 24.04): all suites
+4225/4225 (the versioning suite once `git` was installed in the container; it
+had none), `mcp.test.js` 46/46, `lsp.test.js` 31/31. The new suites:
+`mcp-server` 146/146, `deferred` 8/8 (and failing, as it should, with `L-35.1`
+taken off the plan's list), `phase-10.7-skill` 442/442.
 
 ## 8. Decisions (owner, 2026-11-12)
 

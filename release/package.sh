@@ -95,9 +95,9 @@ common() {   # $1 the bundle's folder
   cp release/licenses/Pharo-LICENSE.txt release/licenses/pharo-vm-LICENSE.txt \
      release/licenses/Apache-2.0.txt release/licenses/OFL-1.1.txt \
      release/licenses/libffi-LICENSE.txt "$d/licenses/"
-  cp cog-lisp.sh "$d/"
+  cp cog-lisp.sh mcp-server.sh "$d/"
   cp scripts/pharo-vm.sh "$d/scripts/"
-  chmod +x "$d/cog-lisp.sh"
+  chmod +x "$d/cog-lisp.sh" "$d/mcp-server.sh"
   # the agent skill, a project skill wherever the bundle is opened (Phase 10 step 10.7)
   skill "$d/.agents/skills/cog-lisp"
 }
@@ -106,7 +106,7 @@ common() {   # $1 the bundle's folder
 # ignores front matter fields it does not know; the agent sees which release.
 skill() {
   mkdir -p "$1"
-  cp .agents/skills/cog-lisp/SKILL.md .agents/skills/cog-lisp/reference.md "$1/"
+  cp .agents/skills/cog-lisp/SKILL.md .agents/skills/cog-lisp/reference.md .agents/skills/cog-lisp/mcp.md "$1/"
   awk -v v="$VERSION" '{ print } /^name: / && !done { print "version: " v; done = 1 }' \
     .agents/skills/cog-lisp/SKILL.md > "$1/SKILL.md"
   grep -q "^version: $VERSION\$" "$1/SKILL.md"
@@ -126,7 +126,7 @@ echo "[ok  ] $DIST/$NAME-linux-x86_64.tar.gz"
 W="$STAGE/windows/$NAME"
 common "$W"
 cp release/licenses/winpthreads-COPYING.txt "$W/licenses/"
-cp cog-lisp.bat "$W/"
+cp cog-lisp.bat mcp-server.bat "$W/"
 WINDOWS_VM="$STAGE/windows-vm"
 mkdir -p "$WINDOWS_VM"
 unzip -q -o "$WIN_VM_ZIP" -d "$WINDOWS_VM"

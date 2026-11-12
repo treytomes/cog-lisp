@@ -183,10 +183,16 @@
           "title": "cog-lisp REPL"
         }
       ]
-    }
+    },
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "cog-lisp.mcp",
+        "label": "cog-lisp"
+      }
+    ]
   },
   "scripts": {
-    "test": "node test/forms.test.js && node test/matcher.test.js && node test/builtins.test.js && node test/spelling.test.js && node test/package.test.js && node test/grammar.test.js",
+    "test": "node test/forms.test.js && node test/matcher.test.js && node test/builtins.test.js && node test/spelling.test.js && node test/package.test.js && node test/grammar.test.js && node test/mcp-definition.test.js",
     "test:vscode": "npm run bundle && node test/integration/run.js",
     "bundle": "node scripts/bundle.js",
     "vscode:prepublish": "npm run bundle",

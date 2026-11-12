@@ -16,6 +16,7 @@ const path = require('path');
 const { topLevelFormAt } = require('./forms');
 const { loadBuiltins, symbolAt, hoverMarkdown, completions } = require('./builtins');
 const { registerSpelling } = require('./spelling');
+const { mcpServerCommand, mcpServerProblem } = require('./mcp-definition');
 const cp = require('child_process');
 const os = require('os');
 const lc = require('vscode-languageclient/node');
@@ -57,6 +58,46 @@ function requireRoot() {
     return null;
   }
   return root;
+}
+
+// The MCP server for VS Code's agent (specs/35-mcp-server.md R-17): the
+// folder's launcher, mcp-server.bat or .sh, which runs lib/mcp.lisp on a private
+// copy of the image (R-19), with the first workspace folder as the folder it
+// indexes (R-6). The version is the image's, once the language server has
+// reported it, so a rebuilt image makes the host offer a refreshed tool list.
+
+// the image's version, from the language server's initialize answer (R-18)
+let mcpImageVersion = null;
+const mcpChanged = new vscode.EventEmitter();
+
+function mcpServerDefinitions() {
+  if (!SUPPORTED) {
+    logLine('cog-lisp: no MCP server: it runs on Windows and Linux.');
+    return [];
+  }
+  const root = cogLispRoot();
+  const problem = mcpServerProblem(root, WINDOWS);
+  if (problem) {
+    logLine('cog-lisp: no MCP server: ' + problem + '.');
+    return [];
+  }
+  const folder = (vscode.workspace.workspaceFolders || [])[0];
+  const run = mcpServerCommand(root, folder ? folder.uri.fsPath : null, WINDOWS);
+  const definition = new vscode.McpStdioServerDefinition('cog-lisp', run.command, run.args, {}, mcpImageVersion || undefined);
+  // cwd is a property of the definition, not a constructor argument
+  definition.cwd = vscode.Uri.file(run.cwd);
+  return [definition];
+}
+
+function registerMcpServer(context) {
+  // older editors have no MCP API; everything else works without it
+  if (!vscode.lm || typeof vscode.lm.registerMcpServerDefinitionProvider !== 'function') return;
+  context.subscriptions.push(
+    vscode.lm.registerMcpServerDefinitionProvider('cog-lisp.mcp', {
+      onDidChangeMcpServerDefinitions: mcpChanged.event,
+      provideMcpServerDefinitions: mcpServerDefinitions
+    })
+  );
 }
 
 /** cmd.exe arguments that run one of the repo's batch files from the repo root.
@@ -439,14 +480,24 @@ function reportVersions(extensionVersion, languageClient) {
     logLine('warning: the extension and the image are different versions: rebuild the one that is older '
       + '(build-ext and load-ext, or build-image), so hover and completion match the image.');
   }
+  // the MCP server's definition carries it, so a rebuilt image is a new version
+  // to the host, which offers the tool list again (specs/35-mcp-server.md R-17)
+  if (info && info.version && info.version !== mcpImageVersion) {
+    mcpImageVersion = info.version;
+    mcpChanged.fire();
+  }
 }
 
 function activate(context) {
   registerBuiltins(context);
   // cog-lisp's names in Code Spell Checker, when it is installed (specs/25-vscode-spelling.md)
   registerSpelling(context, vscode, logLine);
-  context.subscriptions.push(vscode.commands.registerCommand('cog-lisp.expandMacro', expandMacro));
+  context.subscriptions.push(
+    vscode.commands.registerCommand('cog-lisp.expandMacro', expandMacro),
+    mcpChanged   // disposed with the extension
+  );
   startLanguageServer(context);
+  registerMcpServer(context);
   context.subscriptions.push(
     vscode.commands.registerCommand('cog-lisp.runFile', runFile),
     vscode.commands.registerCommand('cog-lisp.startRepl', () => ensureRepl(true)),

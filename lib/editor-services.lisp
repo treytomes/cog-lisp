@@ -26,7 +26,7 @@
 
 (library editor-services
   (export editor-key
-          editor-definitions editor-index-text! editor-index-file! editor-index-folder!
+          editor-definitions editor-index-text! editor-index-file! editor-unindex! editor-index-folder!
           editor-indexed-text editor-definitions-named
           definition-name definition-path definition-start definition-end
           definition-documentation definition-source
@@ -105,6 +105,11 @@ Indexes text as the file at path holds it (an editor's unsaved text, say): its d
 Indexes the file at path as it is on disk; a file that cannot be read is left out."
   (let ((text (guard (e (#t #f)) [[[path asFileReference] contents] asString])))
     (when text (editor-index-text! path text))))
+
+(define (editor-unindex! path)
+  "(editor-unindex! path)
+Takes the file at path out of the index: its definitions answer no more."
+  (hash-table-delete! %index (editor-key path)))
 
 (define (editor-index-folder! folder)
   "(editor-index-folder! folder)

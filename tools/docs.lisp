@@ -390,6 +390,7 @@
       (display (docs-introduction-opening)) (newline) (newline)
       (display "- [The manual](manual/README.md): the language chapter by chapter, through worked and checked examples.") (newline)
       (display "- [The built-ins](builtins.md): every special form, derived form and procedure, with its call form and what it does.") (newline)
+      (display "- [Tools for coding agents](mcp.md): cog-lisp's MCP server, its tools, and how to set it up in VS Code, Claude Code and Bionic.") (newline)
       (display (string-append "- [Releases](" docs-repository "/releases): bundles for Linux and Windows, and the VS Code extension."))
       (newline)
       (display (string-append "- [The source](" docs-repository "): the repository, its specs and its tests."))
@@ -527,7 +528,14 @@
 ;; every generated file of the skill: (relative-path . text)
 (define (skill-files)
   (list (cons (string-append skill-folder "/SKILL.md") (skill-markdown))
-        (cons (string-append skill-folder "/reference.md") (skill-reference))))
+        (cons (string-append skill-folder "/reference.md") (skill-reference))
+        (cons (string-append skill-folder "/mcp.md") (skill-mcp-markdown))))
+
+;; mcp.md: how to use the MCP server's tools (specs/35-mcp-server.md R-22), the
+;; source with the note after its title
+(define (skill-mcp-markdown)
+  (let ((lines (docs-lines (docs-file-text "docs/skill/mcp.md"))))
+    (string-join (cons (car lines) (cons "" (cons skill-generated-note (cdr lines)))) "\n")))
 
 ;; every example: a .lisp file of examples/, or a folder with a main.lisp
 (define (docs-example-names)

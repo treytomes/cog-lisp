@@ -765,6 +765,7 @@ the names below; `(require 'name 'prefix 'p:)` brings them in as `p:x`, and
 | `editor-resolve` | `(editor-resolve path name)` | procedure | The symbol name means in the file at path, as its last check (editor-check) imported it: a library's full name for an import, else name as a symbol. |
 | `editor-symbol-at` | `(editor-symbol-at text offset)` | procedure | The name around offset in text, as (name start end), or #f between names. |
 | `editor-tokens` | `(editor-tokens text)` | procedure | The tokens of text, for styling it: comments, strings, characters, numbers, parentheses (with their depth), quotes, keywords (special forms and macros) and other symbols. An unclosed string or comment runs to the end; text that does not read still has tokens. |
+| `editor-unindex!` | `(editor-unindex! path)` | procedure | Takes the file at path out of the index: its definitions answer no more. |
 | `editor-unit-of` | `(editor-unit-of path)` | procedure | The unit the text at path was last checked in (editor-check), whose imports say what its names mean, or #f. |
 | `problem-end` | `(problem-end problem)` | procedure | Where a problem ends in its text: the offset after its last character. |
 | `problem-message` | `(problem-message problem)` | procedure | What the problem is, a string. |

@@ -28,6 +28,10 @@ const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'ut
 const language = manifest.contributes.languages.find((l) => l.id === 'cog-lisp');
 check('the cog-lisp language claims .lisp files', !!language && (language.extensions || []).includes('.lisp'));
 check('the extension activates on a cog-lisp file', manifest.activationEvents.includes('onLanguage:cog-lisp'));
+// specs/35-mcp-server.md R-17: the extension offers the image's MCP server
+const providers = manifest.contributes.mcpServerDefinitionProviders || [];
+check('the extension contributes one MCP server provider, cog-lisp.mcp',
+  providers.length === 1 && providers[0].id === 'cog-lisp.mcp' && !!providers[0].label);
 
 // the files vsce packages, as it lists them
 const listed = cp.execSync('npx --no-install vsce ls', { cwd: root, encoding: 'utf8' })

@@ -282,7 +282,7 @@ system, `format`, a weather REPL), found bugs and gaps that are not its own:
 - [**A full-screen library**](specs/32-tui.md) (accepted, after the console): `(require
   'tui)`, windows, views, layout, focus, the mouse and an event loop on the
   console's core, in the manner of Terminal.Gui v2.
-- [**Agents' tools: an MCP server**](specs/35-mcp-server.md) (accepted, next): the
+- [**Agents' tools: an MCP server**](specs/35-mcp-server.md) (done): the
   language server's answers as MCP tools, run by the image for VS Code, Claude
   Code and Bionic, and the agent skill taught to use them.
 

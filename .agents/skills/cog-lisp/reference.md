@@ -667,6 +667,7 @@ brings in the names under cl. `cl:name` reaches one from anywhere.
 - `(editor-resolve path name)`: The symbol name means in the file at path, as its last check (editor-check) imported it: a library's full name for an import, else name as a symbol.
 - `(editor-symbol-at text offset)`: The name around offset in text, as (name start end), or #f between names.
 - `(editor-tokens text)`: The tokens of text, for styling it: comments, strings, characters, numbers, parentheses (with their depth), quotes, keywords (special forms and macros) and other symbols. An unclosed string or comment runs to the end; text that does not read still has tokens.
+- `(editor-unindex! path)`: Takes the file at path out of the index: its definitions answer no more.
 - `(editor-unit-of path)`: The unit the text at path was last checked in (editor-check), whose imports say what its names mean, or #f.
 - `(problem-end problem)`: Where a problem ends in its text: the offset after its last character.
 - `(problem-message problem)`: What the problem is, a string.

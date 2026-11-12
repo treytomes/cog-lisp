@@ -642,6 +642,28 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   evaluation's tasks; a real run needs a model behind an OpenAI-compatible
   server, such as LM Studio's (`--url`, `--model`; `--list` shows the ids).
 
+## The MCP server (specs/35-mcp-server.md)
+
+- **`lib/mcp.lisp` is the protocol, `mcp-server.bat`/`.sh` the way to run it.**
+  The launcher copies the image to `%TEMP%\cog-lisp-mcp-image-*` and serves
+  from the copy, because a VM holding `pharo/cog-lisp.changes` makes
+  `build-image` fail. Its sweep of old copies touches only folders holding its
+  marker (`cog-lisp-mcp.copy`, or `owner.pid` on Linux): a looser pattern once
+  deleted a test's workspace in the temporary folder.
+- **Standard output is the wire.** The launchers write nothing to it (`copy`
+  prints "1 file(s) copied.": send it to `nul`); the server logs to stderr.
+- **`lib/mcp.lisp` serves only when it is the program** (`lib/mcp.lisp` in
+  `(command-line)`), so a suite can `load` it and call `mcp-handle`. Its suite is
+  `tests/lisp/mcp-server.lisp`; `vscode/test/mcp.test.js` drives the launcher.
+- **Under Git Bash, a folder argument must be a Windows path** for the VM;
+  `mcp-server.sh` converts it with `cygpath -w`, as `cog-lisp.sh` does the program.
+- **Claude Code's project server is `.mcp.json`**, pending until the owner
+  approves it. `claude mcp list` health-checks servers; to try a command without
+  approving, add it at local scope (`claude mcp add --scope local NAME -- ...`,
+  with `MSYS_NO_PATHCONV=1` from Git Bash) and remove it after. Local scope is
+  keyed by the folder's spelling: `C:/...` and `c:/...` are two projects, so
+  remove it from the same shell. `add-json` from Git Bash garbles backslashes.
+
 ## Writing the compiler in LISP (Phase 8)
 
 - **The LISP reader and compiler are the only ones** (since Phase 9 step 9.1;

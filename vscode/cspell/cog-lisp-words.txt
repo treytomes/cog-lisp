@@ -428,6 +428,7 @@ true
 truncate
 type
 undo
+unindex
 unit
 unix
 unless

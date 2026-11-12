@@ -82,6 +82,31 @@
                        (list (vector-ref trap 3) 'answers))))
             (skill-traps)))
 
+;; specs/35-mcp-server.md R-22, AC-14: mcp.md teaches the MCP server's tools, all
+;; of them and no others, and SKILL.md points to it
+(define (tool-names-in text)
+  (let loop ((i 0) (acc '()))
+    (let ((at (string-search (substring text i (string-length text)) "lisp_")))
+      (if (not at)
+          ;; "the lisp_ tools" names the family, not a tool
+          (docs-sort-strings (delete (string-copy "lisp_") (delete-duplicates acc)))
+          (let* ((start (+ i at))
+                 (end (let scan ((j (+ start 5)))
+                        (if (and (< j (string-length text))
+                                 (let ((c (string-ref text j))) (or (char-lower-case? c) (char=? c #\_))))
+                            (scan (+ j 1))
+                            j))))
+            (loop end (cons (substring text start end) acc)))))))
+
+(define-test "AC-14 mcp.md names every tool of the MCP server, and only those"
+  (load "../../lib/mcp.lisp")
+  (check (tool-names-in (skill-mcp-markdown))
+         (docs-sort-strings (map (lambda (tool) (vector-ref tool 0)) (eval 'mcp-tools)))))
+
+(define-test "AC-14 mcp.md stays small, and SKILL.md points to it"
+  (check-true (< (string-length (skill-mcp-markdown)) 3072))
+  (check-true (string-search (skill-markdown) "`mcp.md`")))
+
 (define-test "AC-7 the reference lists every built-in, a line each"
   (let ((text (skill-reference)))
     (for-each (lambda (e) (check-true (string-search text (docs-entry-call e)))) (builtin-entries))

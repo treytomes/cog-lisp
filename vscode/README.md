@@ -56,6 +56,14 @@ A thin extension for working on cog-lisp in VS Code
   Without a launcher, or with `cogLisp.languageServer` set to `false`, the
   built-ins' hover help and completion above still work. If the server stops,
   the extension says so once and goes on with them.
+- **Tools for VS Code's agent** (`specs/35-mcp-server.md`): the extension offers
+  cog-lisp's MCP server, `mcp-server.bat` or `mcp-server.sh` from the same
+  cog-lisp folder, on the first workspace folder: the language server's answers
+  as six tools (`lisp_check`, `lisp_hover`, `lisp_definition`,
+  `lisp_completion`, `lisp_expand_macro`, `lisp_format`). VS Code starts it when
+  its agent first needs it, on a copy of the image of its own. Where it offers
+  none (no cog-lisp folder, no built image), the "cog-lisp" output channel says
+  why. Other agents configure it themselves: [`docs/mcp.md`](../docs/mcp.md).
 
 The extension claims `.lisp` files, so it works in any folder; disable it in a
 workspace where `.lisp` means Common Lisp.
