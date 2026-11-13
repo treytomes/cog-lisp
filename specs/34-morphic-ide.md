@@ -1383,3 +1383,25 @@ live from the browser.
 - **Check**: `tests/lisp/ide-development-image.lisp` (46): a bar stripped of the
   `cog-lisp` menu, as the update left the owner's, has it again after
   `refreshMenubar`, and the update and the GUI start both call it.
+
+## 26. Found: an update in place never bound the primitives added since (2026-11-13)
+
+- **Found by the owner**: `(inspect ...)` and `(browse ...)` were unbound in the
+  development image's REPL. The image had been made before step 4b and kept
+  current by updates in place since. The installers (`LispPrimitives
+  installInto:`, which asks `LispIde installToolsInto:`) run only when an
+  environment is made, at a build; an update files them in again but never runs
+  them, so `inspect`, `browse` and `backtrace` were never bound there. Any
+  primitive added after an image is built had the same fate.
+- **The fix:** `LispIde installMissingPrimitivesInto:` runs the installers into a
+  scratch environment and binds in the image's each primitive it lacks, with its
+  documentation, after every update in place and at every GUI start of a
+  development image (so an image updated before the fix is made whole at its
+  next start). A primitive the image already has keeps its procedure: inlined
+  calls compare it by identity, and a new one would send them down the slow path.
+  So a primitive whose implementation changed in `src/` still needs
+  `ide.bat --fresh`.
+- **Check**: `tests/lisp/ide-development-image.lisp` (55): an environment with
+  one primitive of its own and the rest missing gets `inspect`, `browse` and
+  `backtrace`, keeps its own, and has nothing more to take the second time; the
+  update and the GUI start both call it.

@@ -164,4 +164,29 @@
     (check-true (has? (source "updateFromCheckout") "self refreshMenubar"))
     (check-true (has? (source "startInGui") "self refreshMenubar"))))
 
+;;; --- primitives added since the image was built -------------------------------------------
+
+(define-test "an update in place binds the primitives added since the image was built"
+  ;; an environment with one primitive bound to something of its own, the rest missing,
+  ;; as an image built before inspect, browse and backtrace was
+  (let* ((env [(smalltalk LispEnvironment) new])
+         (marker (lambda (x) 'mine)))
+    [env define: 'car value: marker]
+    (let ((added (vector->list [(smalltalk LispIde) installMissingPrimitivesInto: env])))
+      (check-true (and (member "inspect" (map (lambda (s) [s asString]) added))
+                       (member "browse" (map (lambda (s) [s asString]) added))
+                       (member "backtrace" (map (lambda (s) [s asString]) added))
+                       #t))
+      (check-false (member "car" (map (lambda (s) [s asString]) added))))
+    (check-true (eq? [env lookup: 'car] marker))                       ; one it had is kept
+    (check-true (procedure? [env lookup: 'browse]))
+    (check (documentation-category 'browse) "The system")
+    ;; nothing more to bind the second time
+    (check (vector->list [(smalltalk LispIde) installMissingPrimitivesInto: env]) '()))
+  ;; the image's own environment lacks none of them
+  (check (vector->list [(smalltalk LispIde) installMissingPrimitives]) '())
+  (let ((source (lambda (sel) [[[[(smalltalk LispIde) class] >> [sel asSymbol]] sourceCode] asString])))
+    (check-true (has? (source "updateFromCheckout") "self installMissingPrimitives"))
+    (check-true (has? (source "startInGui") "self installMissingPrimitives"))))
+
 (run-tests)

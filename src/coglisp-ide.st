@@ -396,7 +396,9 @@ cm value: ide class value: 'development image' value: 'startInGui
 	dir := Smalltalk imageDirectory / ''requests''.
 	self startEnvironment.
 	self ensureLoaded.
-	"a menu bar saved without the cog-lisp menu (an earlier update) is made whole"
+	"what an earlier update in place left out: primitives added since the image was
+	 built, and the cog-lisp menu in the menu bar"
+	[self installMissingPrimitives] on: Error do: [:e | nil].
 	self inUI: [self refreshMenubar].
 	Watcher ifNotNil: [:w | w terminate].
 	first := true.
@@ -456,9 +458,30 @@ cm value: ide class value: 'development image' value: 'updateFromCheckout
 	"The update in place (R-3), its answer shown."
 	| answer |
 	answer := self call: ''ide:ide-update'' with: #().
+	"the installers are filed in again but not run: the primitives added since, bound"
+	[self installMissingPrimitives] on: Error do: [:e | nil].
 	"the menu bar is built once and kept; an update recompiles LispIde, menu and all"
 	self refreshMenubar.
 	UIManager default inform: ''cog-lisp update: '' , (LispPrinter writeString: answer)'.
+cm value: ide class value: 'development image' value: 'installMissingPrimitives
+	^ self installMissingPrimitivesInto: LispEnvironment default'.
+cm value: ide class value: 'development image' value: 'installMissingPrimitivesInto: anEnv
+	"The primitives src/ defines that anEnv lacks, bound in it, with their
+	 documentation. The installers run only when an environment is made, at a
+	 build: an update in place files them in again but never runs them, so a
+	 primitive added since the image was built (inspect, browse, backtrace) was
+	 never bound. They run here into a scratch environment, and only what anEnv
+	 lacks is taken: one it has keeps its procedure, which inlined calls compare
+	 by identity. Answers the names bound."
+	| scratch added |
+	scratch := LispEnvironment new.
+	LispPrimitives installInto: scratch.
+	added := OrderedCollection new.
+	scratch cellsDo: [:c |
+		(c isBound and: [(anEnv isBound: c symbol) not]) ifTrue: [
+			anEnv define: c symbol value: c value.
+			added add: c symbol name]].
+	^ added asArray'.
 cm value: ide class value: 'development image' value: 'refreshMenubar
 	"The menu bar built again from the <worldMenu> methods, the cog-lisp menu among
 	 them. Pharo builds it once and keeps it in the world, saved with the image, so
