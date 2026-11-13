@@ -396,6 +396,8 @@ cm value: ide class value: 'development image' value: 'startInGui
 	dir := Smalltalk imageDirectory / ''requests''.
 	self startEnvironment.
 	self ensureLoaded.
+	"a menu bar saved without the cog-lisp menu (an earlier update) is made whole"
+	self inUI: [self refreshMenubar].
 	Watcher ifNotNil: [:w | w terminate].
 	first := true.
 	Watcher := [[| opened |
@@ -454,7 +456,15 @@ cm value: ide class value: 'development image' value: 'updateFromCheckout
 	"The update in place (R-3), its answer shown."
 	| answer |
 	answer := self call: ''ide:ide-update'' with: #().
+	"the menu bar is built once and kept; an update recompiles LispIde, menu and all"
+	self refreshMenubar.
 	UIManager default inform: ''cog-lisp update: '' , (LispPrinter writeString: answer)'.
+cm value: ide class value: 'development image' value: 'refreshMenubar
+	"The menu bar built again from the <worldMenu> methods, the cog-lisp menu among
+	 them. Pharo builds it once and keeps it in the world, saved with the image, so
+	 after an update in place recompiled LispIde it could lack the cog-lisp menu,
+	 and stay so. Only when the menu bar is shown at all."
+	[MenubarMorph showMenubar ifTrue: [MenubarMorph reset]] on: Error do: [:e | nil]'.
 cm value: ide class value: 'development image' value: 'refileSourceFrom: aPath
 	"Files in the src/ packages at aPath again, as the build does (build.st chunk 2),
 	 then removes the methods src/ no longer defines (chunk 3). Answers the names removed."

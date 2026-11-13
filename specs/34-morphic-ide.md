@@ -1271,3 +1271,19 @@ live from the browser.
 - **For the owner to check**: `ide.bat --fresh`; an error in a REPL window (its
   frames under the report), *Debug*, the debugger's *LISP* pane, then closing
   the debugger and evaluating again; `(backtrace)` at a break.
+
+## 25. Found: the menu bar lost the cog-lisp menu after an update in place (2026-11-13)
+
+- **Found by the owner**, running the development image from `lisp-expert`: no
+  `cog-lisp` menu in the menu bar. The project had nothing to do with it. The
+  image had been updated in place (2026-11-12), and its `<worldMenu>` method was
+  still there, and the world menu's builder still listed `cog-lisp`; but Pharo
+  builds the menu bar once and keeps it in the world, saved with the image, and
+  the bar drawn after the update lacked the menu. (Section 16 saw the same once.)
+- **The fix:** `LispIde refreshMenubar` builds the bar again from the
+  `<worldMenu>` methods (`MenubarMorph reset`, only when the menu bar is shown),
+  after every update in place, and at every GUI start of a development image, so
+  an image already saved without the menu is made whole at its next start.
+- **Check**: `tests/lisp/ide-development-image.lisp` (46): a bar stripped of the
+  `cog-lisp` menu, as the update left the owner's, has it again after
+  `refreshMenubar`, and the update and the GUI start both call it.

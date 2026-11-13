@@ -139,4 +139,29 @@
     [h ensureDeleteAll]
     [images ensureDeleteAll]))
 
+;;; --- the menu bar (R-41) ----------------------------------------------------------------
+
+;; the menu bars in the world (headless Pharo has one too), and their labels
+(define (menu-bars)
+  (filter (lambda (m) (not (smalltalk-nil? [m world])))
+          (vector->list [[(smalltalk MenubarMorph) allInstances] asArray])))
+(define (labels-of bar)
+  (map (lambda (item) [[item label] asString]) (vector->list [[bar menuBarItems] asArray])))
+(define (bar-labels) (map labels-of (menu-bars)))
+(define (drop-cog-lisp! bar)
+  [bar menuBarItems:
+       (list->vector (remove (lambda (item) (string=? [[item label] asString] "cog-lisp"))
+                             (vector->list [[bar menuBarItems] asArray])))])
+
+(define-test "R-41 the menu bar is built again with the cog-lisp menu, after an update and at a GUI start"
+  ;; a bar saved without it, as an update in place once left one
+  [(smalltalk LispIde) onUi: (procedure->block (lambda () (for-each drop-cog-lisp! (menu-bars))))]
+  (check-false (any (lambda (labels) (member "cog-lisp" labels)) (bar-labels)))
+  [(smalltalk LispIde) onUi: (procedure->block (lambda () [(smalltalk LispIde) refreshMenubar]))]
+  (check-true (and (pair? (bar-labels)) (every (lambda (labels) (and (member "cog-lisp" labels) #t)) (bar-labels))))
+  ;; the update in place and the GUI start both do it
+  (let ((source (lambda (sel) [[[[(smalltalk LispIde) class] >> [sel asSymbol]] sourceCode] asString])))
+    (check-true (has? (source "updateFromCheckout") "self refreshMenubar"))
+    (check-true (has? (source "startInGui") "self refreshMenubar"))))
+
 (run-tests)
