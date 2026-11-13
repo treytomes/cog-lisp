@@ -525,6 +525,76 @@ Item 6 is answered already.
     has open (`specs/17`; on 2026-11-10 another session's run held
     `cog-lisp.image` and the build could not replace it).
 
+### 5.11 The image and its files (the owner, 2026-11-13)
+
+What the image runs is what was last *evaluated*; what the files hold is what was
+last *saved*. They part in four ways: a file edited and saved but not evaluated
+(the disk ahead: saving never evaluates, §12 decision 4); a definition evaluated
+but not saved (Do it, the REPL: the image ahead); a definition taken out of its
+file (it stays in the image, an orphan); and a file changed by another program
+(VS Code, git: the editor reloads the tab, the image keeps what it had). Until
+now only the browser's *stale* mark shows any of it, for procedures and macros,
+and it says "its file has changed" even when it was the image that did.
+
+- **R-46. Drift between the image and its files.**
+  - **As data** (R-32, R-33): for each file the image has loaded (its units'
+    paths), and for the files of the project, `ide-drift` answers its state and
+    the definitions behind it. A file is **in sync**; **changed on disk** since it
+    was loaded (its text differs from the text loaded, or not loaded at all);
+    or **image ahead** (a definition of it evaluated since, by Do it, the REPL or
+    the browser). A definition is **in sync**; **disk ahead** (the file's text of
+    it differs from the image's); **image ahead** (evaluated since the file was
+    loaded and not written back); or an **orphan** (bound in the image under the
+    file's unit, defined by no form of the file any more). A name evaluated at a
+    REPL with no file is listed apart, as the session's.
+  - **Variables too.** A `define` of a variable keeps the text it was compiled
+    from, as a procedure does (R-21's retained source), so a changed `(define
+    limit 10)` is seen; a variable defined before this keeps none and is shown as
+    unknown, never as in sync.
+  - **Which side moved.** Each definition keeps when, and from where, it was last
+    evaluated (R-35's record already holds it for those since the image was made);
+    so the browser says *changed on disk* or *changed in the image*, never only
+    *stale*, and the order of the two decides which way is ahead.
+  - **In the windows.** The *Loaded files* window (R-41) shows each file's state,
+    and its definitions with theirs, and offers the ways back: *Load file*
+    (the disk wins, the file evaluated again in its unit), *Write back* (the
+    image wins: each image-ahead definition written into its file at its place,
+    as the browser's Save does, R-20), and *Remove* for an orphan (its global
+    unbound, recorded, undoable by evaluating it again). The editor's tab marks
+    a file that has drifted, and the browser's header says which way.
+  - **Recorded** (R-35): every load, write-back and removal is a change, with its
+    session and its maker.
+
+### 5.12 The tools from anywhere (the owner, 2026-11-13)
+
+`inspect` and `browse` are built in (R-24, R-45), but they open windows only in
+the development image; a program run by `cog-lisp.bat` (lisp-expert's), a
+console REPL, VS Code's terminal and the MCP server run in a VM with no world,
+where they write instead.
+
+- **R-47. `(edit x)`**, built in beside them (11.5 names it): opens a file, or a
+  definition's source, in the editor. `(edit "path")` a file, `(edit "path"
+  line)` at that line; `(edit 'name)` or `(edit a-procedure)` the file and place
+  `browse` would find (R-45), but always in the editor, a primitive's Smalltalk
+  in the browser of Smalltalk as `browse` does. It answers the place as data;
+  without a world, and with no development image running, it writes the place.
+- **R-48. From outside, into the running development image.** When there is no
+  world but a development image is running (its heartbeat is fresh, R-37), the
+  three hand it a request through `pharo/ide/requests/` (decision 13), as the
+  launchers do:
+  - `(browse x)` and `(edit x)` send `(browse name)` and `(edit "path" start
+    end)`: names and places mean the same in both images, built from the same
+    checkout; a name the GUI image does not have is reported there;
+  - `(inspect x)` sends the value written (`(inspect datum)`), and the GUI image
+    inspects what it reads back: a copy, said so in its title; a value that
+    does not read back (a procedure, a port, an object of Smalltalk) is
+    inspected by its name when it has one, else written where it was called;
+  - each answers at once, with what was sent; the window opens in the GUI image,
+    brought to the front.
+  The checkout is found as the launchers find it (`COGLISP_HOME`, the folder
+  above the running image). With no development image running, the three write
+  as now.
+
 ## 6. What it changes elsewhere
 
 - **Phase 11's audit (`specs/33` 11.2).** It expects to remove "the IDE" and to
@@ -559,6 +629,10 @@ its windows.
    manual's chapter "Developing in the image".
 7. **The agent's doorway** (R-36), after its own spec, with R-35's log. The log
    itself lands with step 2, the first step that changes the body.
+8. **The image and its files, and the tools from anywhere** (R-46 to R-48;
+   the owner, 2026-11-13): the drift as data, then in *Loaded files*, the
+   editor's tabs and the browser's header; `edit`; the requests from outside.
+   Before steps 6 and 7.
 
 ## 8. Examples
 
@@ -605,6 +679,16 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 - **AC-5 (step 5).** An error in a procedure called from the REPL shows a LISP
   backtrace naming that procedure and its file and line; "Debug" opens the
   debugger with the LISP pane listing the same frames.
+- **AC-8 (step 8).** Headless, on files in a temporary folder: a program and a
+  library loaded, then one definition changed on disk, one evaluated anew in the
+  image, one taken out of its file and one variable's value changed in the file;
+  `ide-drift` answers each file's and each definition's state, which side moved,
+  and the REPL's own name apart; *Load file*, *Write back* and *Remove* each
+  bring one back in sync and are recorded. `(edit "path" 3)` and `(edit 'name)`
+  open the editor at the place in the image; from a second VM, with a fake
+  development image's heartbeat fresh, `(browse 'filter)`, `(edit "path")` and
+  `(inspect '(1 2))` leave the requests the GUI image takes, and the image,
+  taking them, opens the windows on the name, the file and the copy.
 - **AC-6 (every step).** `tests/run-all` passes on both platforms; the image's
   size and start-up time are recorded, and stay within what step 1 measured plus
   what the IDE's own code adds.
@@ -706,6 +790,17 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
     other choice is a socket on localhost now, which the doorway could later
     share.
 
+14. **Variables' source (R-46).** Leaning: every `define` keeps its text, so a
+    variable's drift is seen; it costs a string a variable, and needs a compiler
+    change, so it reaches the compiler's source one release after it lands (the
+    self-hosting rule).
+15. **Removing an orphan (R-46).** Leaning: offered, never done by itself; the
+    global is unbound and the removal recorded, so evaluating the definition again
+    brings it back.
+16. **Inspecting from outside (R-48).** Leaning: a copy, read back from the value
+    written, labelled a copy; the value itself cannot cross from one VM to
+    another.
+
 ## 13. Step status
 
 | Step | What | Status |
@@ -716,6 +811,7 @@ example as every feature does (`examples/`): `inspect`'s views, `apropos`,
 | 4 | The browser and the inspector | 4a done (2026-11-11): the browser, R-17 to R-21 (§21). The whole body in it, the compiler edited live (§22). 4b done (2026-11-11): the inspector, R-22 to R-24, and R-45, `inspect` and `browse` built in (§23) |
 | 5 | Errors and the debugger | Done (2026-11-11): R-25, with 11.5's `backtrace` (§24) |
 | 6 | Finishing | |
+| 8 | The image and its files, the tools from anywhere (R-46 to R-48) | Specified (2026-11-13); before 6 and 7 |
 | 7 | The agent's doorway (its own spec first) | |
 
 ## 14. As built: step 2a, sessions and the REPL window (2026-11-10)
