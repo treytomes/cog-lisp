@@ -44,6 +44,8 @@ ok=0; [ -s .agents/skills/cog-lisp/SKILL.md ] && [ -s .agents/skills/cog-lisp/re
   grep -q "^name: cog-lisp\$" .agents/skills/cog-lisp/SKILL.md &&
   grep -q "^version: $V\$" .agents/skills/cog-lisp/SKILL.md && ok=1
 check "the bundle carries the agent skill, stamped $V (.agents/skills/cog-lisp/)" $ok
+ok=0; [ -s .agents/skills/cog-lisp/console.md ] && [ -s tools/console_driver.py ] && ok=1
+check "the bundle carries the console driver and the skill's page on it (specs/36-console-driver.md)" $ok
 stray="$(cd pharo && find . -type f \( -iname '*.dll' -o -name '*.so' -o -name '*.so.*' \) | sed 's|.*/||' |
   grep -Ev '^(lib)?(PharoVMCore|ffi|tty|winpthread-1|B2DPlugin|BitBltPlugin|DSAPrims|FileAttributesPlugin|FilePlugin|FloatArrayPlugin|JPEGReaderPlugin|LargeIntegers|LocalePlugin|MiscPrimitivePlugin|NewFilePlugin|SocketPlugin|SqueakSSL|SurfacePlugin|UUIDPlugin|UnixOSProcessPlugin)\.(dll|so)$' || true)"
 ok=0; [ -z "$stray" ] && ok=1

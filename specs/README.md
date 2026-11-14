@@ -85,3 +85,4 @@ GitHub issues and the owner's requests:
 | [32-tui.md](32-tui.md) | Full-screen terminal programs, in the manner of Terminal.Gui v2, on the console's core | Accepted |
 | [34-morphic-ide.md](34-morphic-ide.md) | Developing in the image: a LISP editor, REPL, browser and inspector in Morphic | Accepted |
 | [35-mcp-server.md](35-mcp-server.md) | Agents' tools: an MCP server, run by the image, for VS Code, Claude Code and Bionic | Implemented (by-hand checks AC-16 to AC-19 open) |
+| [36-console-driver.md](36-console-driver.md) | Agents' tools: a console driver, to test a program at a real console | Implemented |

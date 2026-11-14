@@ -529,13 +529,20 @@
 (define (skill-files)
   (list (cons (string-append skill-folder "/SKILL.md") (skill-markdown))
         (cons (string-append skill-folder "/reference.md") (skill-reference))
-        (cons (string-append skill-folder "/mcp.md") (skill-mcp-markdown))))
+        (cons (string-append skill-folder "/mcp.md") (skill-mcp-markdown))
+        (cons (string-append skill-folder "/console.md") (skill-console-markdown))))
 
-;; mcp.md: how to use the MCP server's tools (specs/35-mcp-server.md R-22), the
-;; source with the note after its title
-(define (skill-mcp-markdown)
-  (let ((lines (docs-lines (docs-file-text "docs/skill/mcp.md"))))
+;; a page of the skill from docs/skill/NAME: the source with the note after its title
+(define (skill-page-markdown name)
+  (let ((lines (docs-lines (docs-file-text (string-append "docs/skill/" name)))))
     (string-join (cons (car lines) (cons "" (cons skill-generated-note (cdr lines)))) "\n")))
+
+;; mcp.md: how to use the MCP server's tools (specs/35-mcp-server.md R-22)
+(define (skill-mcp-markdown) (skill-page-markdown "mcp.md"))
+
+;; console.md: how to test a program at a real console with tools/console_driver.py
+;; (specs/36-console-driver.md R-5)
+(define (skill-console-markdown) (skill-page-markdown "console.md"))
 
 ;; every example: a .lisp file of examples/, or a folder with a main.lisp
 (define (docs-example-names)

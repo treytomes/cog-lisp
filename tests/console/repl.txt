@@ -1,0 +1,24 @@
+# cog-lisp's REPL in a real console (tools/console_driver.py;
+# specs/36-console-driver.md): it answers, keeps a definition between forms,
+# reports an error at a debug level, and ends at the end of input.
+#
+#   python tools/console_driver.py tests/console/repl.txt -- cmd.exe /c .\cog-lisp.bat
+#   python3 tools/console_driver.py tests/console/repl.txt -- ./cog-lisp.sh
+
+expect >
+send (+ 1 2)
+expect 3
+
+# a definition stays for the next form
+send (define answer 41)
+send (+ answer 1)
+expect 42
+
+# an error: reported, and a debug level with its restarts
+send (car '())
+expect error: car: not a pair
+expect 1>
+
+# the end of input (Ctrl+Z, Enter on Windows; Ctrl+D elsewhere) ends it
+key eof
+exit 0

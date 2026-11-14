@@ -285,6 +285,10 @@ system, `format`, a weather REPL), found bugs and gaps that are not its own:
 - [**Agents' tools: an MCP server**](specs/35-mcp-server.md) (done): the
   language server's answers as MCP tools, run by the image for VS Code, Claude
   Code and Bionic, and the agent skill taught to use them.
+- [**Agents' tools: a console driver**](specs/36-console-driver.md) (done):
+  `tools/console_driver.py` runs a program in a real console and types at it
+  from a script, so an agent can test prompts and REPLs as a person meets them;
+  the skill's `console.md` teaches it.
 
 ### Deferred: to pick up
 Work a spec put off, so it is not lost among the specs. Each item's id is the
@@ -296,6 +300,8 @@ the owner drops one, it says why.
 | Id | What | From | Consider it when |
 |----|------|------|------------------|
 | L-35.1 | An MCP server hosted by a running image (the development image first), over Streamable HTTP, with evaluation and inspection tools | [specs/35-mcp-server.md](specs/35-mcp-server.md) §10 | the agent work of the north star begins, or an agent first needs to evaluate in the image; after spec 35 is built and used |
+| L-36.1 | Run the console scenario (`tests/console/repl.txt`) in CI on both runners | [specs/36-console-driver.md](specs/36-console-driver.md) §6 | the console library or the REPL's reading of input next changes, or a console bug reaches a release |
+| L-36.2 | An Enter typed after a key answer (`confirm`) is left in the input; on Linux it is glued to the next line | [specs/36-console-driver.md](specs/36-console-driver.md) §6 | with L-36.1, or when a person reports a command lost after a yes/no question |
 
 ### Phase 11 — A world of its own
 [Spec](specs/33-phase-11-pure-image.md), accepted in outline; a long phase, each

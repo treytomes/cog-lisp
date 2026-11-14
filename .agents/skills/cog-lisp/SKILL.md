@@ -41,6 +41,7 @@ Never run `cog-lisp` without a file: its REPL waits for typing.
    call form and what it does, or `#f` when there is no such name.
 
 Have a `lisp_check` tool? Read `mcp.md` beside this file first.
+Testing a program's prompts at a console? Read `console.md`.
 
 ## Traps
 

@@ -641,6 +641,13 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   that does not exist. `node tools/skill-eval.js --dry-run` checks the
   evaluation's tasks; a real run needs a model behind an OpenAI-compatible
   server, such as LM Studio's (`--url`, `--model`; `--list` shows the ids).
+- **To test a program at a real console** (a REPL, `ask`, `confirm`, `choose`),
+  use `tools/console_driver.py` (specs/36-console-driver.md; the skill's
+  `console.md`): `python tools/console_driver.py tests/console/repl.txt -- cmd.exe /c .\cog-lisp.bat`,
+  or `python3 ... -- ./cog-lisp.sh` on Linux. It needs `pip install --user`
+  pywinpty (Linux: ptyprocess) and pyte, and Python without `-I`. Write
+  `.\cog-lisp.bat`: Claude Code's shell sets `NoDefaultCurrentDirectoryInExePath`.
+  The console's prompts answer on a key: `type y`, not `send y`.
 
 ## The MCP server (specs/35-mcp-server.md)
 

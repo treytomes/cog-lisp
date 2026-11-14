@@ -88,7 +88,7 @@ copy_vm() {
 # what every bundle has: the image, the LISP library, the examples, the notes
 common() {   # $1 the bundle's folder
   local d="$1"
-  mkdir -p "$d/pharo" "$d/scripts" "$d/licenses"
+  mkdir -p "$d/pharo" "$d/scripts" "$d/licenses" "$d/tools"
   cp pharo/cog-lisp.image pharo/cog-lisp.changes "$SOURCES" "$d/pharo/"
   cp -r lib examples docs "$d/"
   cp LICENSE release/INSTALL.md release/THIRD-PARTY-NOTICES.md README.md PROJECT-PLAN.md "$d/"
@@ -97,6 +97,8 @@ common() {   # $1 the bundle's folder
      release/licenses/libffi-LICENSE.txt "$d/licenses/"
   cp cog-lisp.sh mcp-server.sh "$d/"
   cp scripts/pharo-vm.sh "$d/scripts/"
+  # the console driver the skill's console.md teaches (specs/36-console-driver.md R-6)
+  cp tools/console_driver.py "$d/tools/"
   chmod +x "$d/cog-lisp.sh" "$d/mcp-server.sh"
   # the agent skill, a project skill wherever the bundle is opened (Phase 10 step 10.7)
   skill "$d/.agents/skills/cog-lisp"
@@ -106,7 +108,8 @@ common() {   # $1 the bundle's folder
 # ignores front matter fields it does not know; the agent sees which release.
 skill() {
   mkdir -p "$1"
-  cp .agents/skills/cog-lisp/SKILL.md .agents/skills/cog-lisp/reference.md .agents/skills/cog-lisp/mcp.md "$1/"
+  cp .agents/skills/cog-lisp/SKILL.md .agents/skills/cog-lisp/reference.md .agents/skills/cog-lisp/mcp.md \
+     .agents/skills/cog-lisp/console.md "$1/"
   awk -v v="$VERSION" '{ print } /^name: / && !done { print "version: " v; done = 1 }' \
     .agents/skills/cog-lisp/SKILL.md > "$1/SKILL.md"
   grep -q "^version: $VERSION\$" "$1/SKILL.md"

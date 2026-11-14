@@ -107,6 +107,25 @@
   (check-true (< (string-length (skill-mcp-markdown)) 3072))
   (check-true (string-search (skill-markdown) "`mcp.md`")))
 
+;; specs/36-console-driver.md R-5, AC-4: console.md teaches the console driver,
+;; stays small, SKILL.md points to it, and the driver it names is there
+(define-test "36 AC-4 console.md stays small, SKILL.md points to it, and its driver exists"
+  (check-true (< (string-length (skill-console-markdown)) 3072))
+  (check-true (string-search (skill-markdown) "`console.md`"))
+  (check-true (string-search (skill-console-markdown) "tools/console_driver.py"))
+  (check-true (file-exists? (docs-path "tools/console_driver.py"))))
+
+;; every step and key console.md teaches is one the driver knows (its docstring
+;; lists them), so the page and the driver cannot drift apart
+(define-test "36 AC-4 every step and key console.md names is the driver's"
+  (let ((driver (docs-file-text "tools/console_driver.py"))
+        (page (skill-console-markdown)))
+    (for-each (lambda (word)
+                (check (list word (and (string-search page word) #t)) (list word #t))
+                (check (list word (and (string-search driver word) #t)) (list word #t)))
+              '("send " "type " "key " "expect " "expect-re" "refute " "print" "exit "
+                "enter" "up" "down" "tab" "esc" "ctrl-c" "eof" "--cwd" "--transcript"))))
+
 (define-test "AC-7 the reference lists every built-in, a line each"
   (let ((text (skill-reference)))
     (for-each (lambda (e) (check-true (string-search text (docs-entry-call e)))) (builtin-entries))
