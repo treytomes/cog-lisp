@@ -11,6 +11,6 @@ and compiler are written in cog-lisp, and the image builds itself.
 
 - [The manual](manual/README.md): the language chapter by chapter, through worked and checked examples.
 - [The built-ins](builtins.md): every special form, derived form and procedure, with its call form and what it does.
-- [Tools for coding agents](mcp.md): cog-lisp's MCP server, its tools, and how to set it up in VS Code, Claude Code and Bionic.
+- [Tools for coding agents](mcp.md): cog-lisp's MCP server, its tools, and how to set it up in VS Code, Claude Code and Bionic; and the console driver, which tests a program at a real console.
 - [Releases](https://github.com/treytomes/cog-lisp/releases): bundles for Linux and Windows, and the VS Code extension.
 - [The source](https://github.com/treytomes/cog-lisp): the repository, its specs and its tests.

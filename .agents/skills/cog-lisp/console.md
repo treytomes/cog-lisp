@@ -37,6 +37,8 @@ exit 0
   `ctrl-c`, or `eof`, the end of input.
 - `expect TEXT` waits until TEXT is printed after your last input. A missing
   TEXT fails the script. `expect-re` takes a Python regex.
+- `expect-screen TEXT` waits for TEXT on the screen as drawn;
+  `expect-screen-re` takes a regex, `^` at a line's start.
 - `refute TEXT` fails if TEXT was printed after your last input.
 - `print` shows what was printed after your last input.
 - `exit 0` waits for the program to end with that code.

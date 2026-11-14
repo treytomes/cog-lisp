@@ -24,6 +24,13 @@ find a definition, complete a name, expand a macro call, format source. The VS
 Code extension offers it to VS Code's agent; for Claude Code, Bionic and others,
 `INSTALL.md` and `docs/mcp.md` show the configuration.
 
+`tools/console_driver.py` in each bundle runs a program in a real console and
+types at it from a step script, so an agent can test a REPL or a program's
+prompts as a person meets them, on Windows and Linux; the skill's `console.md`
+teaches it. On Linux, a prompt that answers on a key (`confirm`) now leaves an
+Enter typed after it as an empty line, as Windows does, and the console's next
+line starts at the left.
+
 cog-lisp is under the MIT license. Each bundle includes the Pharo image and VM
 and the libraries the VM needs, with their licenses in `licenses/` and a summary
 in `THIRD-PARTY-NOTICES.md`.

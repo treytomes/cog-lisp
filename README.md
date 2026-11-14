@@ -156,6 +156,12 @@ On Linux: `claude mcp add --scope local cog-lisp -- /path/to/cog-lisp/mcp-server
 [Tools for coding agents](docs/mcp.md) has the tools, Linux, and what to do when
 the server does not start.
 
+To test a program that talks to a person (a REPL, `ask`, `confirm`, `choose`),
+`tools/console_driver.py` runs it in a real console and types at it from a step
+script, on Windows and Linux (Python, with `pywinpty` or `ptyprocess`, and
+`pyte`). [Testing a program at a console](docs/mcp.md#testing-a-program-at-a-console)
+shows how; the agent skill teaches it too.
+
 ## Documentation
 
 - **[The manual](docs/manual/README.md)** teaches the language chapter by chapter,

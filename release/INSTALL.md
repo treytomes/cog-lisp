@@ -100,6 +100,12 @@ In Bionic (LM Studio's agent app), either:
 
 Other agent tools that read `SKILL.md` skills can use the same folder.
 
+`tools/console_driver.py` lets an agent (or you) test a program that talks to a
+person: it runs the program in a real console and types at it from a step
+script. It needs Python and two packages, `python -m pip install --user pywinpty
+pyte` on Windows, `python3 -m pip install --user ptyprocess pyte` on Linux.
+The skill's `console.md` and `docs/mcp.md` show how.
+
 ## Licenses
 
 cog-lisp is released under the MIT license (`LICENSE`). See

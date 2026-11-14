@@ -123,7 +123,7 @@
     (for-each (lambda (word)
                 (check (list word (and (string-search page word) #t)) (list word #t))
                 (check (list word (and (string-search driver word) #t)) (list word #t)))
-              '("send " "type " "key " "expect " "expect-re" "refute " "print" "exit "
+              '("send " "type " "key " "expect " "expect-re" "expect-screen " "expect-screen-re" "refute " "print" "exit "
                 "enter" "up" "down" "tab" "esc" "ctrl-c" "eof" "--cwd" "--transcript"))))
 
 (define-test "AC-7 the reference lists every built-in, a line each"

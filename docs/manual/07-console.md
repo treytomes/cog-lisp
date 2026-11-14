@@ -134,12 +134,15 @@ ask reads an answer, with a default, a check (validate) and secret typing;
 confirm a yes or no; choose one item from a list with the arrow keys and
 Enter, and choose-many several, Space marking each. On a terminal they read
 keys; Ctrl+C or Escape cancels, a condition prompt-cancelled? tells, and the
-terminal is always left as it was.
+terminal is always left as it was. confirm answers on y or n alone; an Enter
+pressed after it is an empty line for the next read, on Windows and Linux.
 
 Without a terminal, when the input is piped or a file, each reads a line
 instead: the answer, or an item's number or name. So a program that asks can
 be run from a script. Here a test console stands in for both: once with keys,
-once with lines of input, and its screen shows what the person would see.
+once with lines of input, and its screen shows what the person would see. To
+try a whole program at a real terminal without a person, the console driver,
+tools/console_driver.py, types at it from a script (docs/mcp.md).
 
 `examples/console-prompts.lisp`:
 

@@ -6,7 +6,9 @@ with a file, what a name means and where it is defined, which names complete a
 prefix, what a macro call expands to, and how the file is laid out. The answers
 are the language server's, from the same code. `lib/lsp.lisp` (for editors),
 `lib/mcp.lisp` (for agents) and the image's own Morphic IDE are three adapters
-over one service layer, `lib/editor-services.lisp`. No tool runs code.
+over one service layer, `lib/editor-services.lisp`. No tool runs code. To test
+a program that talks to a person, see
+[Testing a program at a console](#testing-a-program-at-a-console).
 
 ## The tools
 
@@ -139,3 +141,49 @@ server's output (the MCP: List Servers command, then Show Output), Claude Code
 in `claude mcp list` and its debug log (`claude --debug`), Bionic in its
 developer logs. The usual causes are no built image (`build-image`) and, on
 Windows, a host given the `.bat` without `cmd.exe /d /c`.
+
+## Testing a program at a console
+
+The tools above read source; a run shows output. Neither shows a program that
+talks to a person (a REPL, `ask`, `confirm`, `choose`) as the person meets it,
+because an agent's shell gives the program a pipe, and the console library
+then reads lines instead of keys. `tools/console_driver.py`, in the cog-lisp
+folder, runs the program in a real console (ConPTY on Windows, a pty on Linux,
+as a terminal does) and types at it from a step script
+([specs/36-console-driver.md](https://github.com/treytomes/cog-lisp/blob/main/specs/36-console-driver.md)).
+
+It is Python, with two packages, installed once:
+
+```text
+python -m pip install --user pywinpty pyte      (Windows)
+python3 -m pip install --user ptyprocess pyte   (Linux)
+```
+
+A script, a step a line:
+
+```text
+expect >
+send (+ 1 2)
+expect 3
+send (car '())
+expect error: car: not a pair
+key eof
+exit 0
+```
+
+`send` types a line and Enter, `type` text alone, `key` a key (`up`, `down`,
+`enter`, `esc`, `ctrl-c`, `eof` for the end of input); `expect` waits for text
+printed after the last input (`expect-re` for a pattern, `expect-screen` for
+the screen as drawn), `refute` fails on it, `print` shows it, and `exit 0`
+waits for the program to end with that code. A yes/no question takes its key
+alone: `type y`, not `send y`. Run it:
+
+```text
+python tools\console_driver.py test.txt -- cmd.exe /c .\cog-lisp.bat program.lisp
+python3 tools/console_driver.py test.txt -- ./cog-lisp.sh program.lisp
+```
+
+It prints `passed` and exits 0, or the failing step, what was printed and the
+screen, and exits 1. The driver's own docstring lists every step and option;
+the agent skill's `console.md` teaches it to agents; `tests/console/` holds
+cog-lisp's own scenarios, which CI runs on Linux and Windows.
