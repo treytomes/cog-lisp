@@ -1,7 +1,8 @@
 # cog-lisp CI (specs/14-phase-8.9-ci-cd.md section 4.1): every suite on Linux and on
 # Windows, every suite on Linux again with the seed rebuilt from its source
 # (the recovery path, Phase 9 step 9.1), and the VS Code extension's tests, on
-# every push and pull request. The language server (Phase 10 step 10.5) is
+# every push and pull request. The console scenarios (specs/36-console-driver.md)
+# run programs at a real terminal on Linux and on Windows. The language server (Phase 10 step 10.5) is
 # tested on Linux and on Windows, on the image each job's suites built; the VS
 # Code job has no image, so it checks the extension offline. The documentation
 # site (Phase 10 step 10.6) is built and checked, and published only by a release.
@@ -45,6 +46,13 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
         run: tests/run-all.sh
+      # programs at a real terminal, a pty (specs/36-console-driver.md R-7); the
+      # system Python takes no packages (PEP 668), so a virtual environment
+      - name: The console scenarios
+        run: |
+          python3 -m venv "$RUNNER_TEMP/console-venv"
+          "$RUNNER_TEMP/console-venv/bin/python" -m pip install --quiet ptyprocess==0.7.0 pyte==0.8.2 wcwidth==0.9.4
+          PYTHON="$RUNNER_TEMP/console-venv/bin/python" tests/console/run.sh
       # the language server (Phase 10 step 10.5), on the image the suites built
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -133,6 +141,12 @@ jobs:
           TEMP: ${{ runner.temp }}
           TMP: ${{ runner.temp }}
         run: tests\run-all.bat
+      # programs at a real console, ConPTY (specs/36-console-driver.md R-7)
+      - name: The console scenarios
+        shell: cmd
+        run: |
+          python -m pip install --quiet pywinpty==3.1.2 pyte==0.8.2 wcwidth==0.9.4 || exit /b 1
+          tests\console\run.bat
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24

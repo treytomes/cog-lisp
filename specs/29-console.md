@@ -280,6 +280,13 @@ builds on them rather than beside them. None of them is a full-screen feature.
   form and restored when it is left, however it is left, and again at exit
   (`runAtExit`), so a program stopped by an error never leaves the terminal
   raw. A prompt's raw mode inside a full-screen program's is not left early.
+  On Unix, raw mode is `cfmakeraw`'s with two flags kept on, so it behaves as
+  Windows' does (specs/36-console-driver.md L-36.2, 2026-11-14): `ICRNL`, so an
+  Enter typed after a key answer, still waiting when raw mode ends, is an empty
+  line for the next read rather than a carriage return at the start of the next
+  line; and `OPOST`, so a newline written in raw mode starts its line at the
+  left (Windows' raw mode leaves output alone). Enter then arrives as 10, which
+  the decoder reads as Enter, as it does 13.
 - **R-22. One writer:** all drawing goes through the console core, under R-14's
   lock, so a program's live displays now and its event loop later draw through
   the same place.

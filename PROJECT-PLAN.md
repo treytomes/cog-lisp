@@ -300,8 +300,8 @@ the owner drops one, it says why.
 | Id | What | From | Consider it when |
 |----|------|------|------------------|
 | L-35.1 | An MCP server hosted by a running image (the development image first), over Streamable HTTP, with evaluation and inspection tools | [specs/35-mcp-server.md](specs/35-mcp-server.md) §10 | the agent work of the north star begins, or an agent first needs to evaluate in the image; after spec 35 is built and used |
-| L-36.1 | Run the console scenario (`tests/console/repl.txt`) in CI on both runners | [specs/36-console-driver.md](specs/36-console-driver.md) §6 | the console library or the REPL's reading of input next changes, or a console bug reaches a release |
-| L-36.2 | An Enter typed after a key answer (`confirm`) is left in the input; on Linux it is glued to the next line | [specs/36-console-driver.md](specs/36-console-driver.md) §6 | with L-36.1, or when a person reports a command lost after a yes/no question |
+| L-36.1 | Run the console scenario (`tests/console/repl.txt`) in CI on both runners | [specs/36-console-driver.md](specs/36-console-driver.md) §6 | **Done 2026-11-14**, in spec 36 (R-7) |
+| L-36.2 | An Enter typed after a key answer (`confirm`) is left in the input; on Linux it is glued to the next line | [specs/36-console-driver.md](specs/36-console-driver.md) §6 | **Done 2026-11-14**, in spec 36 (`rawOn` keeps `ICRNL` and `OPOST`) |
 
 ### Phase 11 — A world of its own
 [Spec](specs/33-phase-11-pure-image.md), accepted in outline; a long phase, each

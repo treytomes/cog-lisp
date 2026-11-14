@@ -648,6 +648,8 @@ Building a `CompiledMethod` from a hand-built Smalltalk AST (confirmed live):
   pywinpty (Linux: ptyprocess) and pyte, and Python without `-I`. Write
   `.\cog-lisp.bat`: Claude Code's shell sets `NoDefaultCurrentDirectoryInExePath`.
   The console's prompts answer on a key: `type y`, not `send y`.
+  `tests/console/run.sh` / `run.bat` run every scenario in `tests/console/`
+  (`NAME.txt` against `NAME.lisp`, else the REPL); CI runs them on both systems.
 
 ## The MCP server (specs/35-mcp-server.md)
 

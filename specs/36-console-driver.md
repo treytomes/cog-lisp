@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Implemented (2026-11-13; §5) |
+| **Status** | Implemented (2026-11-13; §5); its Later items done 2026-11-14 |
 | **Asked for by** | The owner (2026-11-13), in `~/projects/lisp-expert`, whose weather REPL had one test left that only a person could do: "What would it take to give you the ability to test the weather REPL yourself?" The driver was built there; then: "If this works well, it may be worth adding that script to the `cog-lisp` skill." And: "make the cog-lisp change, and test the driver in AlmaLinux." |
 | **Relates to** | `specs/29-console.md` (the prompts, `with-raw-mode`, the interactive console the driver gives a program), `specs/35-mcp-server.md` (the skill's `mcp.md`, which `console.md` follows), `specs/16-phase-10-documentation-and-editor.md` step 10.7 (the agent skill) |
 
@@ -32,8 +32,9 @@ cog-lisp program cannot open a pseudo-console itself.
   `esc`, `backspace`, arrows, `home`, `end`, `ctrl-<letter>`, and `eof`, the
   end of input: Ctrl+Z, Enter on Windows, Ctrl+D elsewhere, because Ctrl+Z
   suspends a program on Linux), `expect` and `expect-re` (in what was printed
-  since the last input, escapes stripped), `expect-screen` (the rendered
-  screen), `refute`, `wait`, `settle`, `print`, `screen`, `exit [CODE]`; `#`
+  since the last input, escapes stripped), `expect-screen` and
+  `expect-screen-re` (the rendered screen; the regex's `^` and `$` at each
+  line), `refute`, `wait`, `settle`, `print`, `screen`, `exit [CODE]`; `#`
   comments.
 - **R-3** Each wait has a timeout (`--timeout`, 20 s; `--start-timeout`, 90 s,
   for the first `expect`, while the image starts). A failure prints the step,
@@ -47,6 +48,11 @@ cog-lisp program cannot open a pseudo-console itself.
   one line (its budget had 72 bytes left).
 - **R-6** The release bundles carry `tools/console_driver.py` and the skill's
   `console.md`.
+- **R-7** (2026-11-14, L-36.1) `tests/console/run.sh` and `run.bat` run every
+  `NAME.txt` in `tests/console/` against `NAME.lisp` when there is one, else
+  the REPL, and fail if any fails; CI runs them on Linux and on Windows after
+  the suites, with the Python packages pinned. `confirm-enter.txt` is L-36.2's
+  test: `y` and Enter at once, then the next lines read.
 
 ## 4. Acceptance criteria
 
@@ -62,6 +68,11 @@ cog-lisp program cannot open a pseudo-console itself.
   driver's own list (so the two cannot drift apart); SKILL.md stays under its
   budget.
 - **AC-5** `release/smoke-test.sh` finds the driver and `console.md` in a bundle.
+- **AC-6** (L-36.1) `tests/console/run.sh` and `run.bat` pass on both systems,
+  and exit 1 when a scenario fails; CI's Linux and Windows jobs run them.
+- **AC-7** (L-36.2) `tests/console/confirm-enter.txt` passes on both: after
+  `y` and Enter at once, `confirm` answers yes, its next line starts at the
+  left, the next `read-line` is empty, and the one after it `hello`.
 
 ## 5. As built (2026-11-13)
 
@@ -85,15 +96,34 @@ cog-lisp program cannot open a pseudo-console itself.
     line, and the weather REPL read `kb` as an unknown command (L-36.2).
   - lisp-expert's `tools/test/test-tools.lisp` read C's `system()` result as an
     exit code; on Linux it is the wait status, the code times 256 (fixed there).
+- 2026-11-14, L-36.1 and L-36.2 done (R-7, AC-6, AC-7):
+  - L-36.2's cause: `cfmakeraw` turns `ICRNL` off, so an Enter typed while the
+    terminal is raw is queued as a 13; when raw mode ends, Linux hands what is
+    queued to the next read as a line without its newline, and Pharo's line
+    reader joins it to the next line typed. `rawOn` now keeps `ICRNL` on, so it
+    is queued as a 10: an empty line, as on Windows. The same test showed a
+    second difference: `cfmakeraw` turns `OPOST` off too, so a newline the
+    console wrote in raw mode (after `confirm`'s answer) went down a line
+    without going back to the left; the weather REPL's `ask` drew its result's
+    heading half across the screen. `rawOn` keeps `OPOST` on (Windows' raw mode
+    leaves output alone). `specs/29-console.md` R-21 says so.
+  - `confirm-enter.txt` failed on Linux before the change (the read waited for
+    a newline that never came, and the answer's next line started at column
+    14) and passes after it, on Linux and on Windows; `run.sh`, with a failing
+    scenario added, exited 1.
+  - CI's runs are new: the first push shows whether the hosted runners' consoles
+    behave as these machines' do.
 
 ## 6. Later
 
-- **L-36.1 The console scenario in CI.** Run `tests/console/repl.txt` on both
+Both items were done on 2026-11-14, in this spec (R-7; §5).
+
+- **L-36.1 The console scenario in CI.** Done (R-7). Run `tests/console/repl.txt` on both
   runners (pywinpty on Windows, ptyprocess on Linux, pyte; `pip install`). It
   adds two Python packages to CI and a minute a runner. Consider it when the
   console library or the REPL's reading of input next changes, or when a
   console bug reaches a release.
-- **L-36.2 An Enter after a key answer.** After a prompt that answers on a key
+- **L-36.2 An Enter after a key answer.** Done (`rawOn` keeps `ICRNL`; §5). After a prompt that answers on a key
   (`confirm`), an Enter typed by habit stays in the input: on Linux it becomes a
   carriage return glued to the start of the next line read. `with-raw-mode`
   could drain what is typed before it leaves raw mode, or `read-line` could drop

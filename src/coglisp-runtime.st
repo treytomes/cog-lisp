@@ -2341,7 +2341,13 @@ cm value: term class value: 'raw mode' value: 'rawOn
 	"Raw mode for the input, nested: the outermost call saves the mode and sets
 	 raw; inner ones only count (R-21). Answers whether the input is a terminal
 	 that is now raw. Windows: LINE_INPUT (2), ECHO_INPUT (4) and PROCESSED_INPUT (1)
-	 off, VIRTUAL_TERMINAL_INPUT (16r200) and WINDOW_INPUT (8) on."
+	 off, VIRTUAL_TERMINAL_INPUT (16r200) and WINDOW_INPUT (8) on. Unix: cfmakeraw,
+	 but with ICRNL (16r100, in c_iflag, the struct''s first word) kept on, so an
+	 Enter still waiting when raw mode ends (typed after a key answer) is a newline,
+	 an empty line for the next read as on Windows, not a carriage return glued to
+	 the next line typed (specs/36-console-driver.md L-36.2); and OPOST (1, in
+	 c_oflag, the second word) kept on, so a newline written in raw mode starts
+	 its line at the left, as on Windows, whose raw mode leaves output alone."
 	| h b raw |
 	self ensureSession.
 	Depth > 0 ifTrue: [Depth := Depth + 1. ^ true].
@@ -2358,6 +2364,8 @@ cm value: term class value: 'raw mode' value: 'rawOn
 			SavedInput := b.
 			raw := b copy.
 			self makeRaw: raw.
+			raw unsignedLongAt: 1 put: ((raw unsignedLongAt: 1) bitOr: 16r100).
+			raw unsignedLongAt: 5 put: ((raw unsignedLongAt: 5) bitOr: 1).
 			(self tcset: 0 from: raw) = 0 ifFalse: [SavedInput := nil. ^ false]].
 	Depth := 1.
 	^ true'.

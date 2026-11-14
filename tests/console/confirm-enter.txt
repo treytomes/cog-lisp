@@ -1,0 +1,16 @@
+# An Enter typed after a key answer (specs/36-console-driver.md L-36.2).
+#
+#   python tools/console_driver.py tests/console/confirm-enter.txt -- cmd.exe /c .\cog-lisp.bat tests\console\confirm-enter.lisp
+#   python3 tools/console_driver.py tests/console/confirm-enter.txt -- ./cog-lisp.sh tests/console/confirm-enter.lisp
+
+expect [y/n]
+# y and Enter at once, as a person answering by habit: both arrive in raw mode
+send y
+expect answered yes
+# and the newline confirm wrote in raw mode started the line at the left
+expect-screen-re ^answered yes
+# the Enter is an empty line
+expect codes: ()
+send hello
+expect codes: (104 101 108 108 111)
+exit 0

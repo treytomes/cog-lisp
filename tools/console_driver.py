@@ -30,6 +30,8 @@ A step is a line; # starts a comment.
                        span a redraw, so prefer short phrases)
     expect-re REGEX    the same, for a Python regular expression
     expect-screen TEXT wait until TEXT is on the rendered screen
+    expect-screen-re REGEX  the same, a Python regular expression, ^ and $ at
+                       each line's start and end
     refute TEXT        fail if TEXT is in what was printed since the last input
     wait SECONDS       let the program run
     settle             wait until the program prints nothing for 0.5 s
@@ -180,6 +182,10 @@ class Console:
         rx = re.compile(pattern)
         self._until(lambda: rx.search(self.since_input()), timeout, f"expect-re {pattern!r}")
 
+    def expect_screen_re(self, pattern, timeout=20):
+        rx = re.compile(pattern, re.MULTILINE)
+        self._until(lambda: rx.search(self.screen_text()), timeout, f"expect-screen-re {pattern!r}")
+
     def expect_screen(self, text, timeout=20):
         self._until(lambda: text in self.screen_text(), timeout, f"expect-screen {text!r}")
 
@@ -236,11 +242,12 @@ def run_script(console, steps, timeout, start_timeout, verbose):
             elif word == "key":
                 parts = arg.split()
                 console.key(parts[0], int(parts[1]) if len(parts) > 1 else 1)
-            elif word in ("expect", "expect-re", "expect-screen"):
+            elif word in ("expect", "expect-re", "expect-screen", "expect-screen-re"):
                 t = start_timeout if first_expect else timeout
                 first_expect = False
                 {"expect": console.expect, "expect-re": console.expect_re,
-                 "expect-screen": console.expect_screen}[word](arg, t)
+                 "expect-screen": console.expect_screen,
+                 "expect-screen-re": console.expect_screen_re}[word](arg, t)
             elif word == "refute":
                 console.refute(arg)
             elif word == "wait":
